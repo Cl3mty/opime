@@ -53,9 +53,50 @@ const patrimoineGroup = NavGroup(
 const academieGroup = NavGroup(
   label: 'Académie',
   items: [
-    NavItem(key: 'enveloppes', label: 'Enveloppes', icon: LucideIcons.library),
-    NavItem(key: 'investissement', label: 'Investissement', icon: LucideIcons.university),
-    NavItem(key: 'formation', label: 'Formation', icon: LucideIcons.graduationCap),    
+    NavItem(
+      key: 'enveloppes',
+      label: 'Enveloppes',
+      icon: LucideIcons.library,
+      children: [
+        NavItem(key: 'envelope_compte_courant', label: 'Compte courant', icon: LucideIcons.landmark),
+        NavItem(key: 'envelope_livret_a', label: 'Livret A', icon: LucideIcons.piggyBank),
+        NavItem(key: 'envelope_ldds', label: 'LDDS', icon: LucideIcons.sprout),
+        NavItem(key: 'envelope_lep', label: 'LEP', icon: LucideIcons.coins),
+        NavItem(key: 'envelope_pel', label: 'PEL', icon: LucideIcons.house),
+        NavItem(key: 'envelope_cto', label: 'CTO', icon: LucideIcons.briefcase),
+        NavItem(key: 'envelope_pea', label: 'PEA', icon: LucideIcons.trendingUp),
+        NavItem(key: 'envelope_assurance_vie', label: 'Assurance-vie', icon: LucideIcons.heartHandshake),
+        NavItem(key: 'envelope_pee_peg', label: 'PEE / PEG', icon: LucideIcons.users),
+        NavItem(key: 'envelope_per', label: 'PER', icon: LucideIcons.sunset),
+      ],
+    ),
+    NavItem(
+      key: 'investissement',
+      label: 'Investissement',
+      icon: LucideIcons.university,
+      children: [
+        NavItem(key: 'invest_pourquoi', label: 'Pourquoi investir ?', icon: LucideIcons.lightbulb),
+        NavItem(key: 'invest_inflation', label: 'L\'inflation', icon: LucideIcons.trendingDown),
+        NavItem(key: 'invest_risque', label: 'Le risque', icon: LucideIcons.shieldAlert),
+        NavItem(key: 'invest_diversification', label: 'Diversification', icon: LucideIcons.shuffle),
+        NavItem(key: 'invest_etf', label: 'Les ETF', icon: LucideIcons.layers),
+        NavItem(key: 'invest_frais', label: 'Les frais', icon: LucideIcons.percent),
+        NavItem(key: 'invest_pyramide', label: 'Pyramide de l\'investissement', icon: LucideIcons.pyramid),
+        NavItem(key: 'invest_allocation', label: 'Allocation stratégique/dynamique', icon: LucideIcons.scale),
+        NavItem(key: 'invest_temps_long', label: 'Le temps long', icon: LucideIcons.hourglass),
+      ],
+    ),
+    NavItem(
+      key: 'formation',
+      label: 'Formation',
+      icon: LucideIcons.graduationCap,
+      children: [
+        NavItem(key: 'formation_bourse', label: 'Bourse', icon: LucideIcons.chartCandlestick),
+        NavItem(key: 'formation_metaux', label: 'Métaux précieux', icon: LucideIcons.gem),
+        NavItem(key: 'formation_immobilier', label: 'Immobilier', icon: LucideIcons.house),
+        NavItem(key: 'formation_comptes', label: 'Lire les comptes', icon: LucideIcons.fileSpreadsheet),
+      ],
+    ),
   ],
 );
 

@@ -19,6 +19,12 @@ import 'features/simulations/simulations_wealth_screen.dart';
 import 'features/simulations/simulations_loan_screen.dart';
 import 'features/simulations/simulations_transmission_screen.dart';
 import 'features/budget/budget_tracking_screen.dart';
+import 'features/academy/envelope_sheet_screen.dart';
+import 'features/academy/envelopes_data.dart';
+import 'features/academy/investissement_card_screen.dart';
+import 'features/academy/investissement_data.dart';
+import 'features/academy/formation_track_screen.dart';
+import 'features/academy/formation_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -177,9 +183,24 @@ class _FreenaryAppState extends State<FreenaryApp> {
           'actifs_autres': (_) => const Center(child: Text('Autres')),
           'passifs_emprunts': (_) => const Center(child: Text('Emprunts')),
           'passifs_prets_immobiliers': (_) => const Center(child: Text('Prêts immobiliers')),
-          'enveloppes': (_) => const Center(child: Text('Enveloppes')),
-          'investissement': (_) => const Center(child: Text('Investissement')),
-          'formation': (_) => const Center(child: Text('Formation')),
+          for (final envelope in envelopes)
+            envelope.id: (_) => EnvelopeSheetScreen(
+              key: ValueKey('${_profileController!.activeDataPath}_${envelope.id}'),
+              vaultPath: _profileController!.activeDataPath,
+              envelope: envelope,
+            ),
+          for (final card in investissementCards)
+            card.id: (_) => InvestissementCardScreen(
+              key: ValueKey('${_profileController!.activeDataPath}_${card.id}'),
+              vaultPath: _profileController!.activeDataPath,
+              card: card,
+            ),
+          for (final track in formationTracks)
+            track.id: (_) => FormationTrackScreen(
+              key: ValueKey('${_profileController!.activeDataPath}_${track.id}'),
+              vaultPath: _profileController!.activeDataPath,
+              track: track,
+            ),
           'strategie': (_) => StrategyScreen(
             key: ValueKey(_profileController!.activeDataPath),
             vaultPath: _profileController!.activeDataPath,
