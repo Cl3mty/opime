@@ -16,6 +16,7 @@ import 'features/budget/budget_screen.dart';
 import 'features/simulations/simulations_taxation_screen.dart';
 import 'features/simulations/simulations_wealth_screen.dart';
 import 'features/simulations/simulations_loan_screen.dart';
+import 'features/simulations/simulations_transmission_screen.dart';
 import 'features/budget/budget_tracking_screen.dart';
 
 void main() async {
@@ -196,7 +197,10 @@ class _FreenaryAppState extends State<FreenaryApp> {
             key: ValueKey(_profileController!.activeDataPath),
             vaultPath: _profileController!.activeDataPath,
           ),
-          'simulation_transmission': (_) => const Center(child: Text('Transmission')),
+          'simulation_transmission': (_) => TransmissionSimulationScreen(
+            key: ValueKey(_profileController!.activeDataPath),
+            vaultPath: _profileController!.activeDataPath,
+          ),
           'assistant': (_) => const Center(child: Text('Assistant')),
           'account_management': (_) => AccountManagementScreen(profileController: _profileController!),
           'settings': (_) => SettingsScreen(

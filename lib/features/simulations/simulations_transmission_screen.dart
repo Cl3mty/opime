@@ -1,0 +1,1133 @@
+import 'dart:math';
+
+import 'package:flutter/material.dart' show Colors;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+
+import '../../core/simulations/simulation_state_repository.dart';
+import '../../core/ui/frosted_card.dart';
+
+class TransmissionSimulationScreen extends StatefulWidget {
+  final String vaultPath;
+
+  const TransmissionSimulationScreen({super.key, required this.vaultPath});
+
+  @override
+  State<TransmissionSimulationScreen> createState() => _TransmissionSimulationScreenState();
+}
+
+class _TransmissionSimulationScreenState extends State<TransmissionSimulationScreen> {
+  int _tabIndex = 0;
+  late final SimulationStateRepository _stateRepo;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateRepo = SimulationStateRepository(widget.vaultPath);
+    _loadState();
+  }
+
+  Future<void> _loadState() async {
+    final data = await _stateRepo.read('transmission');
+    if (!mounted) return;
+    setState(() {
+      final value = data['tabIndex'];
+      if (value is int) {
+        _tabIndex = value.clamp(0, 2);
+      } else if (value is num) {
+        _tabIndex = value.round().clamp(0, 2);
+      }
+    });
+  }
+
+  Future<void> _saveState() {
+    return _stateRepo.write('transmission', {'tabIndex': _tabIndex});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TabList(
+                index: _tabIndex,
+                onChanged: (value) {
+                  setState(() => _tabIndex = value);
+                  _saveState();
+                },
+                children: const [
+                  TabItem(child: shadcn.Text('Démembrement')),
+                  TabItem(child: shadcn.Text('Donation')),
+                  TabItem(child: shadcn.Text('Héritage')),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _tabIndex == 0
+                ? _DemembrementTab(vaultPath: widget.vaultPath)
+                : _tabIndex == 1
+                    ? _DonationTab(vaultPath: widget.vaultPath)
+                    : _InheritanceTab(vaultPath: widget.vaultPath),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TransmissionSplitCard extends StatelessWidget {
+  final Widget left;
+  final Widget right;
+
+  const _TransmissionSplitCard({required this.left, required this.right});
+
+  @override
+  Widget build(BuildContext context) {
+    return FrostedCard(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 980;
+
+          if (compact) {
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: left,
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: right,
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 340,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: SingleChildScrollView(child: left),
+                ),
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: SingleChildScrollView(child: right),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DemembrementTab extends StatefulWidget {
+  final String vaultPath;
+
+  const _DemembrementTab({required this.vaultPath});
+
+  @override
+  State<_DemembrementTab> createState() => _DemembrementTabState();
+}
+
+class _DemembrementTabState extends State<_DemembrementTab> {
+  double _valeurPleinePropriete = 1000000;
+  int _ageUsufruitier = 62;
+  int _nombreEnfants = 2;
+  double _abattementParEnfant = 100000;
+
+  late final SimulationStateRepository _stateRepo;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateRepo = SimulationStateRepository(widget.vaultPath);
+    _loadState();
+  }
+
+  Future<void> _loadState() async {
+    final data = await _stateRepo.read('transmission_demembrement');
+    if (!mounted || data.isEmpty) return;
+    setState(() {
+      _valeurPleinePropriete = _readDouble(data, 'valeurPleinePropriete', _valeurPleinePropriete);
+      _ageUsufruitier = _readInt(data, 'ageUsufruitier', _ageUsufruitier).clamp(18, 110);
+      _nombreEnfants = _readInt(data, 'nombreEnfants', _nombreEnfants).clamp(1, 10);
+      _abattementParEnfant = _readDouble(data, 'abattementParEnfant', _abattementParEnfant);
+    });
+  }
+
+  Future<void> _saveState() {
+    return _stateRepo.write('transmission_demembrement', {
+      'valeurPleinePropriete': _valeurPleinePropriete,
+      'ageUsufruitier': _ageUsufruitier,
+      'nombreEnfants': _nombreEnfants,
+      'abattementParEnfant': _abattementParEnfant,
+    });
+  }
+
+  void _update(void Function() fn) {
+    setState(fn);
+    _saveState();
+  }
+
+  Future<void> _resetState() async {
+    await _stateRepo.delete('transmission_demembrement');
+    if (!mounted) return;
+    setState(() {
+      _valeurPleinePropriete = 1000000;
+      _ageUsufruitier = 62;
+      _nombreEnfants = 2;
+      _abattementParEnfant = 100000;
+    });
+  }
+
+  _DemembrementResult _compute() {
+    final nueProprietePct = _nueProprietePct(_ageUsufruitier);
+    final usufruitPct = 100 - nueProprietePct;
+
+    final valeurNuePropriete = _valeurPleinePropriete * nueProprietePct / 100;
+    final valeurNueProprieteParEnfant = valeurNuePropriete / _nombreEnfants;
+    final valeurPleineParEnfant = _valeurPleinePropriete / _nombreEnfants;
+
+    final taxableNueParEnfant = max(0.0, valeurNueProprieteParEnfant - _abattementParEnfant);
+    final taxablePleineParEnfant = max(0.0, valeurPleineParEnfant - _abattementParEnfant);
+
+    final droitsNueParEnfant = _directLineRights(taxableNueParEnfant);
+    final droitsPleineParEnfant = _directLineRights(taxablePleineParEnfant);
+
+    final droitsTotauxNue = droitsNueParEnfant * _nombreEnfants;
+    final droitsTotauxPleine = droitsPleineParEnfant * _nombreEnfants;
+
+    return _DemembrementResult(
+      nueProprietePct: nueProprietePct,
+      usufruitPct: usufruitPct,
+      valeurNuePropriete: valeurNuePropriete,
+      droitsTotauxNue: droitsTotauxNue,
+      droitsTotauxPleine: droitsTotauxPleine,
+      economiePotentielle: droitsTotauxPleine - droitsTotauxNue,
+      droitsParEnfantNue: droitsNueParEnfant,
+      taxableParEnfantNue: taxableNueParEnfant,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = _compute();
+    final accent = Theme.of(context).colorScheme.primary;
+
+    return _TransmissionSplitCard(
+      left: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _NumberField(
+            label: 'Valeur en pleine propriété',
+            suffix: '€',
+            value: _valeurPleinePropriete,
+            step: 10000,
+            onChanged: (v) => _update(() => _valeurPleinePropriete = max(0, v)),
+          ),
+          _NumberField(
+            label: "Âge de l'usufruitier",
+            suffix: 'ans',
+            value: _ageUsufruitier.toDouble(),
+            step: 1,
+            decimals: 0,
+            onChanged: (v) => _update(() => _ageUsufruitier = v.round().clamp(18, 110)),
+          ),
+          _NumberField(
+            label: "Nombre d'enfants bénéficiaires",
+            suffix: '',
+            value: _nombreEnfants.toDouble(),
+            step: 1,
+            decimals: 0,
+            onChanged: (v) => _update(() => _nombreEnfants = v.round().clamp(1, 10)),
+          ),
+          _NumberField(
+            label: 'Abattement par enfant (restant)',
+            suffix: '€',
+            value: _abattementParEnfant,
+            step: 5000,
+            onChanged: (v) => _update(() => _abattementParEnfant = max(0, v)),
+          ),
+          const SizedBox(height: 8),
+          OutlineButton(
+            onPressed: _resetState,
+            leading: const Icon(LucideIcons.refreshCw),
+            child: const shadcn.Text('Réinitialiser les paramètres'),
+          ),
+        ],
+      ),
+      right: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ProjectionHeader(
+            title: 'Projection des droits en démembrement',
+            value: _fmtEuros(result.droitsTotauxNue),
+            subtitle: shadcn.Text.rich(
+              TextSpan(
+                style: DefaultTextStyle.of(context).style,
+                children: [
+                  const TextSpan(text: 'Hypothèse 2026 : nue-propriété '),
+                  TextSpan(text: '${result.nueProprietePct.toStringAsFixed(0)}%', style: TextStyle(color: accent, fontWeight: FontWeight.bold)),
+                  const TextSpan(text: ' / usufruit '),
+                  TextSpan(text: '${result.usufruitPct.toStringAsFixed(0)}%', style: TextStyle(color: accent, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ).muted(),
+          ),
+          const SizedBox(height: 20),
+          _MiniBarChart(
+            title: 'Comparaison des scénarios',
+            items: [
+              _BarItem(label: 'Droits pleine propriété', value: result.droitsTotauxPleine, color: const Color(0xFFE07A6B)),
+              _BarItem(label: 'Droits démembrement', value: result.droitsTotauxNue, color: const Color(0xFF7B8FE8)),
+              _BarItem(label: 'Économie potentielle', value: max(0, result.economiePotentielle), color: accent),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              _StatColumn(label: 'Valeur NP', value: _fmtEuros(result.valeurNuePropriete)),
+              _StatColumn(label: 'Taxable NP / enfant', value: _fmtEuros(result.taxableParEnfantNue)),
+              _StatColumn(label: 'Droits NP / enfant', value: _fmtEuros(result.droitsParEnfantNue)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _StatColumn(label: 'Droits si pleine propriété', value: _fmtEuros(result.droitsTotauxPleine)),
+              _StatColumn(label: 'Droits en démembrement', value: _fmtEuros(result.droitsTotauxNue)),
+              _StatColumn(label: 'Économie potentielle', value: _fmtEuros(result.economiePotentielle)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const _TransmissionDisclaimer(
+            text: "Barème de valorisation usufruit/nue-propriété selon l'article 669 CGI (référentiel 2026). "
+                'Simulation indicative, hors clauses civiles spécifiques, réserve/usufruit successif et optimisation notariale personnalisée.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DonationTab extends StatefulWidget {
+  final String vaultPath;
+
+  const _DonationTab({required this.vaultPath});
+
+  @override
+  State<_DonationTab> createState() => _DonationTabState();
+}
+
+class _DonationTabState extends State<_DonationTab> {
+  double _montantDonation = 400000;
+  int _nombreDonataires = 2;
+  _DonationRelation _relation = _DonationRelation.enfant;
+
+  late final SimulationStateRepository _stateRepo;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateRepo = SimulationStateRepository(widget.vaultPath);
+    _loadState();
+  }
+
+  Future<void> _loadState() async {
+    final data = await _stateRepo.read('transmission_donation');
+    if (!mounted || data.isEmpty) return;
+    setState(() {
+      _montantDonation = _readDouble(data, 'montantDonation', _montantDonation);
+      _nombreDonataires = _readInt(data, 'nombreDonataires', _nombreDonataires).clamp(1, 20);
+      final relation = data['relation'];
+      if (relation is String) {
+        _relation = _DonationRelation.values.firstWhere(
+          (r) => r.name == relation,
+          orElse: () => _relation,
+        );
+      }
+    });
+  }
+
+  Future<void> _saveState() {
+    return _stateRepo.write('transmission_donation', {
+      'montantDonation': _montantDonation,
+      'nombreDonataires': _nombreDonataires,
+      'relation': _relation.name,
+    });
+  }
+
+  void _update(void Function() fn) {
+    setState(fn);
+    _saveState();
+  }
+
+  Future<void> _resetState() async {
+    await _stateRepo.delete('transmission_donation');
+    if (!mounted) return;
+    setState(() {
+      _montantDonation = 400000;
+      _nombreDonataires = 2;
+      _relation = _DonationRelation.enfant;
+    });
+  }
+
+  _DonationResult _compute() {
+    final montantParDonataire = _montantDonation / _nombreDonataires;
+    final abattement = _abattementFor(_relation);
+    final taxableParDonataire = max(0.0, montantParDonataire - abattement);
+    final droitsParDonataire = _relation == _DonationRelation.conjoint
+        ? _spouseRights(taxableParDonataire)
+        : _directLineRights(taxableParDonataire);
+
+    final droitsTotaux = droitsParDonataire * _nombreDonataires;
+
+    return _DonationResult(
+      abattementParDonataire: abattement,
+      montantParDonataire: montantParDonataire,
+      taxableParDonataire: taxableParDonataire,
+      droitsParDonataire: droitsParDonataire,
+      droitsTotaux: droitsTotaux,
+      tauxEffectif: _montantDonation <= 0 ? 0 : droitsTotaux / _montantDonation * 100,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = _compute();
+    final accent = Theme.of(context).colorScheme.primary;
+
+    return _TransmissionSplitCard(
+      left: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _NumberField(
+            label: 'Montant de la donation',
+            suffix: '€',
+            value: _montantDonation,
+            step: 5000,
+            onChanged: (v) => _update(() => _montantDonation = max(0, v)),
+          ),
+          _NumberField(
+            label: 'Nombre de bénéficiaires',
+            suffix: '',
+            value: _nombreDonataires.toDouble(),
+            step: 1,
+            decimals: 0,
+            onChanged: (v) => _update(() => _nombreDonataires = v.round().clamp(1, 20)),
+          ),
+          shadcn.Text('Lien donateur / donataire').muted().small(),
+          const SizedBox(height: 8),
+          ButtonGroup(
+            children: [
+              SelectedButton(
+                value: _relation == _DonationRelation.enfant,
+                onChanged: (_) => _update(() => _relation = _DonationRelation.enfant),
+                child: const shadcn.Text('Enfant'),
+              ),
+              SelectedButton(
+                value: _relation == _DonationRelation.petitEnfant,
+                onChanged: (_) => _update(() => _relation = _DonationRelation.petitEnfant),
+                child: const shadcn.Text('Petit-enfant'),
+              ),
+              SelectedButton(
+                value: _relation == _DonationRelation.conjoint,
+                onChanged: (_) => _update(() => _relation = _DonationRelation.conjoint),
+                child: const shadcn.Text('Conjoint/PACS'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          shadcn.Text('Abattement pris en compte : ${_fmtEuros(result.abattementParDonataire)} / bénéficiaire').muted().small(),
+          const SizedBox(height: 8),
+          OutlineButton(
+            onPressed: _resetState,
+            leading: const Icon(LucideIcons.refreshCw),
+            child: const shadcn.Text('Réinitialiser les paramètres'),
+          ),
+        ],
+      ),
+      right: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ProjectionHeader(
+            title: 'Droits de donation estimés',
+            value: _fmtEuros(result.droitsTotaux),
+            subtitle: shadcn.Text.rich(
+              TextSpan(
+                style: DefaultTextStyle.of(context).style,
+                children: [
+                  const TextSpan(text: 'Taux effectif '),
+                  TextSpan(text: '${result.tauxEffectif.toStringAsFixed(1)}%', style: TextStyle(color: accent, fontWeight: FontWeight.bold)),
+                  const TextSpan(text: ' sur le montant transmis.'),
+                ],
+              ),
+            ).muted(),
+          ),
+          const SizedBox(height: 20),
+          _MiniBarChart(
+            title: 'Répartition fiscale',
+            items: [
+              _BarItem(label: 'Montant total transmis', value: _montantDonation, color: const Color(0xFF6B7280)),
+              _BarItem(label: 'Base taxable totale', value: result.taxableParDonataire * _nombreDonataires, color: const Color(0xFF7B8FE8)),
+              _BarItem(label: 'Droits totaux', value: result.droitsTotaux, color: accent),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              _StatColumn(label: 'Montant / bénéficiaire', value: _fmtEuros(result.montantParDonataire)),
+              _StatColumn(label: 'Taxable / bénéficiaire', value: _fmtEuros(result.taxableParDonataire)),
+              _StatColumn(label: 'Droits / bénéficiaire', value: _fmtEuros(result.droitsParDonataire)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const _TransmissionDisclaimer(
+            text: 'Barèmes simplifiés de droits de donation 2026. Abattements simulés par lien de parenté, '
+                'hors dons familiaux de sommes d\'argent, rapport fiscal, réductions spécifiques ou passif déductible.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InheritanceTab extends StatefulWidget {
+  final String vaultPath;
+
+  const _InheritanceTab({required this.vaultPath});
+
+  @override
+  State<_InheritanceTab> createState() => _InheritanceTabState();
+}
+
+class _InheritanceTabState extends State<_InheritanceTab> {
+  double _actifNetSuccessoral = 1200000;
+  bool _conjointSurvivant = true;
+  double _partConjointPct = 25;
+  int _nombreEnfants = 2;
+  double _abattementParEnfant = 100000;
+
+  late final SimulationStateRepository _stateRepo;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateRepo = SimulationStateRepository(widget.vaultPath);
+    _loadState();
+  }
+
+  Future<void> _loadState() async {
+    final data = await _stateRepo.read('transmission_heritage');
+    if (!mounted || data.isEmpty) return;
+    setState(() {
+      _actifNetSuccessoral = _readDouble(data, 'actifNetSuccessoral', _actifNetSuccessoral);
+      _conjointSurvivant = _readBool(data, 'conjointSurvivant', _conjointSurvivant);
+      _partConjointPct = _readDouble(data, 'partConjointPct', _partConjointPct).clamp(0, 100);
+      _nombreEnfants = _readInt(data, 'nombreEnfants', _nombreEnfants).clamp(1, 10);
+      _abattementParEnfant = _readDouble(data, 'abattementParEnfant', _abattementParEnfant);
+    });
+  }
+
+  Future<void> _saveState() {
+    return _stateRepo.write('transmission_heritage', {
+      'actifNetSuccessoral': _actifNetSuccessoral,
+      'conjointSurvivant': _conjointSurvivant,
+      'partConjointPct': _partConjointPct,
+      'nombreEnfants': _nombreEnfants,
+      'abattementParEnfant': _abattementParEnfant,
+    });
+  }
+
+  void _update(void Function() fn) {
+    setState(fn);
+    _saveState();
+  }
+
+  Future<void> _resetState() async {
+    await _stateRepo.delete('transmission_heritage');
+    if (!mounted) return;
+    setState(() {
+      _actifNetSuccessoral = 1200000;
+      _conjointSurvivant = true;
+      _partConjointPct = 25;
+      _nombreEnfants = 2;
+      _abattementParEnfant = 100000;
+    });
+  }
+
+  _InheritanceResult _compute() {
+    final partConjoint = _conjointSurvivant ? _actifNetSuccessoral * _partConjointPct / 100 : 0.0;
+    final masseEnfants = max(0.0, _actifNetSuccessoral - partConjoint);
+    final partParEnfant = masseEnfants / _nombreEnfants;
+    final taxableParEnfant = max(0.0, partParEnfant - _abattementParEnfant);
+    final droitsParEnfant = _directLineRights(taxableParEnfant);
+
+    return _InheritanceResult(
+      partConjointExoneree: partConjoint,
+      masseTaxableEnfants: masseEnfants,
+      partParEnfant: partParEnfant,
+      taxableParEnfant: taxableParEnfant,
+      droitsParEnfant: droitsParEnfant,
+      droitsTotauxEnfants: droitsParEnfant * _nombreEnfants,
+      netParEnfant: partParEnfant - droitsParEnfant,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = _compute();
+
+    return _TransmissionSplitCard(
+      left: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _NumberField(
+            label: 'Actif net successoral',
+            suffix: '€',
+            value: _actifNetSuccessoral,
+            step: 10000,
+            onChanged: (v) => _update(() => _actifNetSuccessoral = max(0, v)),
+          ),
+          Row(
+            children: [
+              Expanded(child: shadcn.Text('Conjoint survivant').muted().small()),
+              _SimpleSwitch(
+                value: _conjointSurvivant,
+                onChanged: (v) => _update(() => _conjointSurvivant = v),
+              ),
+            ],
+          ),
+          if (_conjointSurvivant) ...[
+            const SizedBox(height: 12),
+            _NumberField(
+              label: 'Part attribuée au conjoint',
+              suffix: '%',
+              value: _partConjointPct,
+              step: 1,
+              decimals: 0,
+              onChanged: (v) => _update(() => _partConjointPct = v.clamp(0, 100)),
+            ),
+          ],
+          _NumberField(
+            label: "Nombre d'enfants héritiers",
+            suffix: '',
+            value: _nombreEnfants.toDouble(),
+            step: 1,
+            decimals: 0,
+            onChanged: (v) => _update(() => _nombreEnfants = v.round().clamp(1, 10)),
+          ),
+          _NumberField(
+            label: 'Abattement par enfant',
+            suffix: '€',
+            value: _abattementParEnfant,
+            step: 5000,
+            onChanged: (v) => _update(() => _abattementParEnfant = max(0, v)),
+          ),
+          const SizedBox(height: 8),
+          OutlineButton(
+            onPressed: _resetState,
+            leading: const Icon(LucideIcons.refreshCw),
+            child: const shadcn.Text('Réinitialiser les paramètres'),
+          ),
+        ],
+      ),
+      right: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ProjectionHeader(
+            title: 'Droits de succession estimés',
+            value: _fmtEuros(result.droitsTotauxEnfants),
+          ),
+          const SizedBox(height: 20),
+          _MiniBarChart(
+            title: 'Répartition de la succession',
+            items: [
+              _BarItem(label: 'Part conjoint exonérée', value: result.partConjointExoneree, color: const Color(0xFF6B7280)),
+              _BarItem(label: 'Masse enfants', value: result.masseTaxableEnfants, color: const Color(0xFF7B8FE8)),
+              _BarItem(label: 'Droits totaux enfants', value: result.droitsTotauxEnfants, color: const Color(0xFFE07A6B)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              _StatColumn(label: 'Part conjoint exonérée', value: _fmtEuros(result.partConjointExoneree)),
+              _StatColumn(label: 'Masse transmise aux enfants', value: _fmtEuros(result.masseTaxableEnfants)),
+              _StatColumn(label: 'Part brute / enfant', value: _fmtEuros(result.partParEnfant)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _StatColumn(label: 'Taxable / enfant', value: _fmtEuros(result.taxableParEnfant)),
+              _StatColumn(label: 'Droits / enfant', value: _fmtEuros(result.droitsParEnfant)),
+              _StatColumn(label: 'Net / enfant', value: _fmtEuros(result.netParEnfant)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const _TransmissionDisclaimer(
+            text: 'Référentiel succession 2026 simplifié : conjoint/PACS exonéré, barème ligne directe pour enfants. '
+                'Ne tient pas compte des options civiles détaillées (usufruit légal du conjoint, quotité disponible, testament, assurance-vie).',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DemembrementResult {
+  final double nueProprietePct;
+  final double usufruitPct;
+  final double valeurNuePropriete;
+  final double droitsTotauxNue;
+  final double droitsTotauxPleine;
+  final double economiePotentielle;
+  final double droitsParEnfantNue;
+  final double taxableParEnfantNue;
+
+  _DemembrementResult({
+    required this.nueProprietePct,
+    required this.usufruitPct,
+    required this.valeurNuePropriete,
+    required this.droitsTotauxNue,
+    required this.droitsTotauxPleine,
+    required this.economiePotentielle,
+    required this.droitsParEnfantNue,
+    required this.taxableParEnfantNue,
+  });
+}
+
+class _DonationResult {
+  final double abattementParDonataire;
+  final double montantParDonataire;
+  final double taxableParDonataire;
+  final double droitsParDonataire;
+  final double droitsTotaux;
+  final double tauxEffectif;
+
+  _DonationResult({
+    required this.abattementParDonataire,
+    required this.montantParDonataire,
+    required this.taxableParDonataire,
+    required this.droitsParDonataire,
+    required this.droitsTotaux,
+    required this.tauxEffectif,
+  });
+}
+
+class _InheritanceResult {
+  final double partConjointExoneree;
+  final double masseTaxableEnfants;
+  final double partParEnfant;
+  final double taxableParEnfant;
+  final double droitsParEnfant;
+  final double droitsTotauxEnfants;
+  final double netParEnfant;
+
+  _InheritanceResult({
+    required this.partConjointExoneree,
+    required this.masseTaxableEnfants,
+    required this.partParEnfant,
+    required this.taxableParEnfant,
+    required this.droitsParEnfant,
+    required this.droitsTotauxEnfants,
+    required this.netParEnfant,
+  });
+}
+
+enum _DonationRelation { enfant, petitEnfant, conjoint }
+
+class _TaxBracket {
+  final double upper;
+  final double rate;
+
+  const _TaxBracket(this.upper, this.rate);
+}
+
+const _directLineBrackets = [
+  _TaxBracket(8072, 0.05),
+  _TaxBracket(12109, 0.10),
+  _TaxBracket(15932, 0.15),
+  _TaxBracket(552324, 0.20),
+  _TaxBracket(902838, 0.30),
+  _TaxBracket(1805677, 0.40),
+  _TaxBracket(double.infinity, 0.45),
+];
+
+const _spouseBrackets = [
+  _TaxBracket(8072, 0.05),
+  _TaxBracket(15109, 0.10),
+  _TaxBracket(31865, 0.15),
+  _TaxBracket(552324, 0.20),
+  _TaxBracket(902838, 0.30),
+  _TaxBracket(1805677, 0.40),
+  _TaxBracket(double.infinity, 0.45),
+];
+
+double _directLineRights(double taxable) => _computeRights(taxable, _directLineBrackets);
+
+double _spouseRights(double taxable) => _computeRights(taxable, _spouseBrackets);
+
+double _computeRights(double taxable, List<_TaxBracket> brackets) {
+  var remaining = max(0.0, taxable);
+  var previousUpper = 0.0;
+  var tax = 0.0;
+
+  for (final bracket in brackets) {
+    if (remaining <= 0) break;
+    final width = bracket.upper - previousUpper;
+    final taxableInBracket = min(remaining, width);
+    tax += taxableInBracket * bracket.rate;
+    remaining -= taxableInBracket;
+    previousUpper = bracket.upper;
+  }
+  return tax;
+}
+
+double _abattementFor(_DonationRelation relation) {
+  switch (relation) {
+    case _DonationRelation.enfant:
+      return 100000;
+    case _DonationRelation.petitEnfant:
+      return 31865;
+    case _DonationRelation.conjoint:
+      return 80724;
+  }
+}
+
+double _nueProprietePct(int ageUsufruitier) {
+  if (ageUsufruitier <= 20) return 10;
+  if (ageUsufruitier <= 30) return 20;
+  if (ageUsufruitier <= 40) return 30;
+  if (ageUsufruitier <= 50) return 40;
+  if (ageUsufruitier <= 60) return 50;
+  if (ageUsufruitier <= 70) return 60;
+  if (ageUsufruitier <= 80) return 70;
+  if (ageUsufruitier <= 90) return 80;
+  return 90;
+}
+
+double _readDouble(Map<String, dynamic> json, String key, double fallback) {
+  final value = json[key];
+  if (value is num) return value.toDouble();
+  return fallback;
+}
+
+int _readInt(Map<String, dynamic> json, String key, int fallback) {
+  final value = json[key];
+  if (value is int) return value;
+  if (value is num) return value.round();
+  return fallback;
+}
+
+bool _readBool(Map<String, dynamic> json, String key, bool fallback) {
+  final value = json[key];
+  if (value is bool) return value;
+  return fallback;
+}
+
+String _fmtEuros(double value) {
+  final rounded = value.round();
+  final negative = rounded < 0;
+  final s = rounded.abs().toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buffer.write(' ');
+    buffer.write(s[i]);
+  }
+  return '${negative ? '-' : ''}${buffer.toString()} €';
+}
+
+class _NumberField extends StatefulWidget {
+  final String label;
+  final String suffix;
+  final double value;
+  final double step;
+  final int decimals;
+  final ValueChanged<double> onChanged;
+
+  const _NumberField({
+    required this.label,
+    required this.suffix,
+    required this.value,
+    required this.step,
+    required this.onChanged,
+    this.decimals = 0,
+  });
+
+  @override
+  State<_NumberField> createState() => _NumberFieldState();
+}
+
+class _NumberFieldState extends State<_NumberField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _textFor(widget.value));
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NumberField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextText = _textFor(widget.value);
+    if (!_focusNode.hasFocus && _controller.text != nextText) {
+      _controller.text = nextText;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  String _textFor(double value) => widget.decimals == 0
+      ? value.round().toString()
+      : value.toStringAsFixed(widget.decimals).replaceAll('.', ',');
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        shadcn.Text(widget.label).muted().small(),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                border: Border.all(color: Colors.transparent),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (text) {
+                  final parsed = double.tryParse(text.replaceAll(',', '.'));
+                  if (parsed != null) widget.onChanged(parsed);
+                },
+                onSubmitted: (_) => _controller.text = _textFor(widget.value),
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton.ghost(
+                  icon: const Icon(LucideIcons.chevronUp, size: 14),
+                  onPressed: () => widget.onChanged(widget.value + widget.step),
+                ),
+                IconButton.ghost(
+                  icon: const Icon(LucideIcons.chevronDown, size: 14),
+                  onPressed: () => widget.onChanged(widget.value - widget.step),
+                ),
+              ],
+            ),
+            const SizedBox(width: 4),
+            shadcn.Text(widget.suffix).muted(),
+          ],
+        ),
+        const Divider(),
+      ],
+    );
+  }
+}
+
+class _StatColumn extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StatColumn({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          shadcn.Text(label).muted().small(),
+          const SizedBox(height: 4),
+          shadcn.Text(value).medium(),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProjectionHeader extends StatelessWidget {
+  final String title;
+  final String value;
+  final Widget? subtitle;
+
+  const _ProjectionHeader({
+    required this.title,
+    required this.value,
+    this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          shadcn.Text(title, textAlign: TextAlign.center).muted(),
+          const SizedBox(height: 8),
+          shadcn.Text(
+            value,
+            style: const TextStyle(fontSize: 44, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            DefaultTextStyle.merge(
+              textAlign: TextAlign.center,
+              child: subtitle!,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BarItem {
+  final String label;
+  final double value;
+  final Color color;
+
+  const _BarItem({required this.label, required this.value, required this.color});
+}
+
+class _MiniBarChart extends StatelessWidget {
+  final String title;
+  final List<_BarItem> items;
+
+  const _MiniBarChart({required this.title, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final maxValue = items.fold<double>(0, (maxSoFar, item) => max(maxSoFar, item.value));
+    final denominator = maxValue <= 0 ? 1.0 : maxValue;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.muted,
+        borderRadius: BorderRadius.circular(Theme.of(context).radiusMd),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          shadcn.Text(title).semiBold().small(),
+          const SizedBox(height: 12),
+          for (final item in items) ...[
+            Row(
+              children: [
+                Expanded(child: shadcn.Text(item.label).small()),
+                const SizedBox(width: 8),
+                shadcn.Text(_fmtEuros(item.value)).small(),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: (item.value / denominator).clamp(0.0, 1.0),
+                minHeight: 8,
+                color: item.color,
+                backgroundColor: Theme.of(context).colorScheme.border,
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TransmissionDisclaimer extends StatelessWidget {
+  final String text;
+
+  const _TransmissionDisclaimer({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.mutedForeground;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.border),
+        borderRadius: BorderRadius.circular(Theme.of(context).radiusMd),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(LucideIcons.info, size: 16, color: muted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: shadcn.Text(text).muted().small(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SimpleSwitch extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SimpleSwitch({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    final track = Theme.of(context).colorScheme.border;
+
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 40,
+        height: 22,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: value ? accent : track,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 150),
+          alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            width: 18,
+            height: 18,
+            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+          ),
+        ),
+      ),
+    );
+  }
+}
