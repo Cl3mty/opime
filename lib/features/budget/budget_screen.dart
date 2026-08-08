@@ -6,6 +6,8 @@ import 'package:flutter/rendering.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/date_format.dart';
+import '../../core/money_format.dart';
+import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/frosted_card.dart';
 import 'budget_models.dart';
 import 'budget_repository.dart';
@@ -13,7 +15,8 @@ import 'budget_sankey.dart';
 
 class BudgetScreen extends StatefulWidget {
   final String vaultPath;
-  const BudgetScreen({super.key, required this.vaultPath});
+  final AmountVisibilityController amountVisibility;
+  const BudgetScreen({super.key, required this.vaultPath, required this.amountVisibility});
 
   @override
   State<BudgetScreen> createState() => _BudgetScreenState();
@@ -149,6 +152,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
+    return AnimatedBuilder(
+      animation: widget.amountVisibility,
+      builder: (context, _) => _buildContent(context, widget.amountVisibility.hidden),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, bool hidden) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: FrostedCard(
@@ -222,14 +232,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
                               const TextSpan(text: ' (taux d\'épargne possible : '),
                               TextSpan(text: '${_data.possibleSavingsRate.round()} %', style: const TextStyle(fontWeight: FontWeight.bold)),
                               const TextSpan(text: '). Vous avez un revenu total de '),
-                              TextSpan(text: '${_data.totalRevenues.round()} €', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              TextSpan(text: displayEuros(_data.totalRevenues, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
                               const TextSpan(text: ', des dépenses de '),
-                              TextSpan(text: '${_data.totalExpenses.round()} €', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              TextSpan(text: displayEuros(_data.totalExpenses, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
                               const TextSpan(text: ' et investissez '),
-                              TextSpan(text: '${_data.totalInvestments.round()} €', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              TextSpan(text: displayEuros(_data.totalInvestments, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
                               const TextSpan(text: ' tous les mois, il vous reste '),
                               TextSpan(
-                                text: '${_data.balance.round()} €',
+                                text: displayEuros(_data.balance, hidden),
                                 style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
                               ),
                               const TextSpan(text: ' disponible.'),
@@ -260,7 +270,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                     const SizedBox(height: 12),
                     RepaintBoundary(
                       key: _sankeyKey,
-                      child: BudgetSankeyChart(data: _data),
+                      child: BudgetSankeyChart(data: _data, hidden: hidden),
                     ),
                   ],
                 ),

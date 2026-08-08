@@ -3,13 +3,16 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart' show Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/money_format.dart';
+import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
 
 class WealthSimulationScreen extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const WealthSimulationScreen({super.key, required this.vaultPath});
+  const WealthSimulationScreen({super.key, required this.vaultPath, required this.amountVisibility});
 
   @override
   State<WealthSimulationScreen> createState() => _WealthSimulationScreenState();
@@ -71,8 +74,8 @@ class _WealthSimulationScreenState extends State<WealthSimulationScreen> {
           const SizedBox(height: 16),
           Expanded(
             child: _tabIndex == 0
-                ? _SimpleSimulationTab(vaultPath: widget.vaultPath)
-                : _MonteCarloSimulationTab(vaultPath: widget.vaultPath),
+                ? _SimpleSimulationTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility)
+                : _MonteCarloSimulationTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility),
           ),
         ],
       ),
@@ -204,18 +207,6 @@ class _WealthMonteCarloDisclaimer extends StatelessWidget {
 // =======================================================================
 // Formatage partagé
 // =======================================================================
-
-String _fmtEuros(double value) {
-  final rounded = value.round();
-  final negative = rounded < 0;
-  final s = rounded.abs().toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buffer.write(' ');
-    buffer.write(s[i]);
-  }
-  return '${negative ? '-' : ''}${buffer.toString()} €';
-}
 
 double gaussianSample(Random rng, double mean, double stddev) {
   final u1 = rng.nextDouble().clamp(1e-9, 1.0);
@@ -499,8 +490,9 @@ class _StatColumn extends StatelessWidget {
 
 class _SimpleSimulationTab extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const _SimpleSimulationTab({required this.vaultPath});
+  const _SimpleSimulationTab({required this.vaultPath, required this.amountVisibility});
 
   @override
   State<_SimpleSimulationTab> createState() => _SimpleSimulationTabState();
@@ -525,6 +517,17 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  void _onAmountVisibilityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.amountVisibility.removeListener(_onAmountVisibilityChanged);
+    super.dispose();
   }
 
   Future<void> _loadState() async {
@@ -602,7 +605,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
     final result = _compute();
     return _SimulationSplitCard(
       left: _buildInputsContent(),
-      right: _buildResultsContent(result),
+      right: _buildResultsContent(result, widget.amountVisibility.hidden),
     );
   }
 
@@ -749,7 +752,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
     );
   }
 
-  Widget _buildResultsContent(SimulationResult result) {
+  Widget _buildResultsContent(SimulationResult result, bool hidden) {
     final accent = Theme.of(context).colorScheme.primary;
     final blue = const Color(0xFF7B8FE8);
     final grey = const Color(0xFF6B7280);
@@ -759,7 +762,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
         shadcn.Text('Valeur nette dans $_nombreAnnees ans').muted(),
         const SizedBox(height: 8),
         shadcn.Text(
-          _fmtEuros(result.valeurNette),
+          displayEuros(result.valeurNette, hidden),
           style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
@@ -769,7 +772,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
             children: [
               const TextSpan(text: "soit un revenu passif d'environ "),
               TextSpan(
-                text: '${_fmtEuros(result.revenuMensuel)} / mois',
+                text: '${displayEuros(result.revenuMensuel, hidden)} / mois',
                 style: TextStyle(color: accent, fontWeight: FontWeight.bold),
               ),
             ],
@@ -781,9 +784,9 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _LegendPill(color: grey, label: 'Patrimoine initial', value: _fmtEuros(result.patrimoineInitial)),
-            _LegendPill(color: blue, label: 'Versements', value: _fmtEuros(result.versements)),
-            _LegendPill(color: accent, label: 'Intérêts nets', value: _fmtEuros(result.plusValue)),
+            _LegendPill(color: grey, label: 'Patrimoine initial', value: displayEuros(result.patrimoineInitial, hidden)),
+            _LegendPill(color: blue, label: 'Versements', value: displayEuros(result.versements, hidden)),
+            _LegendPill(color: accent, label: 'Intérêts nets', value: displayEuros(result.plusValue, hidden)),
           ],
         ),
         const SizedBox(height: 24),
@@ -799,6 +802,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
             textColor: Theme.of(context).colorScheme.mutedForeground,
             gridColor: Theme.of(context).colorScheme.border,
             cardColor: Theme.of(context).colorScheme.popover,
+            hidden: hidden,
           ),
         ),
         const SizedBox(height: 24),
@@ -806,17 +810,17 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
         const SizedBox(height: 16),
         Row(
           children: [
-            _StatColumn(label: 'Valeur future', value: _fmtEuros(result.valeurFuture)),
-            _StatColumn(label: 'Dont plus-value', value: _fmtEuros(result.plusValue)),
-            _StatColumn(label: 'Valeur nette', value: _fmtEuros(result.valeurNette)),
-            _StatColumn(label: 'Revenu mensuel', value: _fmtEuros(result.revenuMensuel)),
+            _StatColumn(label: 'Valeur future', value: displayEuros(result.valeurFuture, hidden)),
+            _StatColumn(label: 'Dont plus-value', value: displayEuros(result.plusValue, hidden)),
+            _StatColumn(label: 'Valeur nette', value: displayEuros(result.valeurNette, hidden)),
+            _StatColumn(label: 'Revenu mensuel', value: displayEuros(result.revenuMensuel, hidden)),
           ],
         ),
         const SizedBox(height: 14),
         Row(
           children: [
-            _StatColumn(label: 'Valeur nette (pouvoir d\'achat actuel)', value: _fmtEuros(result.valeurNetteReelle)),
-            _StatColumn(label: 'Revenu mensuel (pouvoir d\'achat actuel)', value: _fmtEuros(result.revenuMensuelReel)),
+            _StatColumn(label: 'Valeur nette (pouvoir d\'achat actuel)', value: displayEuros(result.valeurNetteReelle, hidden)),
+            _StatColumn(label: 'Revenu mensuel (pouvoir d\'achat actuel)', value: displayEuros(result.revenuMensuelReel, hidden)),
           ],
         ),
         const SizedBox(height: 16),
@@ -944,6 +948,7 @@ class _ProjectionChart extends StatefulWidget {
   final Color textColor;
   final Color gridColor;
   final Color cardColor;
+  final bool hidden;
 
   const _ProjectionChart({
     required this.points,
@@ -955,6 +960,7 @@ class _ProjectionChart extends StatefulWidget {
     required this.textColor,
     required this.gridColor,
     required this.cardColor,
+    required this.hidden,
   });
 
   @override
@@ -1004,6 +1010,7 @@ class _ProjectionChartState extends State<_ProjectionChart> {
                   textColor: widget.textColor,
                   gridColor: widget.gridColor,
                   hoveredYear: _hoveredYear,
+                  hidden: widget.hidden,
                 ),
               ),
               if (hoveredPoint != null)
@@ -1020,6 +1027,7 @@ class _ProjectionChartState extends State<_ProjectionChart> {
                     gold: widget.gold,
                     grey: widget.grey,
                     cardColor: widget.cardColor,
+                    hidden: widget.hidden,
                   ),
                 ),
             ],
@@ -1040,6 +1048,7 @@ class _HoverTooltip extends StatelessWidget {
   final Color gold;
   final Color grey;
   final Color cardColor;
+  final bool hidden;
 
   const _HoverTooltip({
     required this.year,
@@ -1051,6 +1060,7 @@ class _HoverTooltip extends StatelessWidget {
     required this.gold,
     required this.grey,
     required this.cardColor,
+    required this.hidden,
   });
 
   @override
@@ -1072,7 +1082,7 @@ class _HoverTooltip extends StatelessWidget {
               children: [
                 shadcn.Text(year == 0 ? "Aujourd'hui" : 'Dans $year ans').muted(),
                 const SizedBox(height: 4),
-                shadcn.Text(_fmtEuros(total), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                shadcn.Text(displayEuros(total, hidden), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 const Divider(),
                 const SizedBox(height: 8),
@@ -1095,7 +1105,7 @@ class _HoverTooltip extends StatelessWidget {
         Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
         Expanded(child: shadcn.Text(label)),
-        shadcn.Text(_fmtEuros(value), style: const TextStyle(fontWeight: FontWeight.bold)),
+        shadcn.Text(displayEuros(value, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -1111,6 +1121,7 @@ class _ProjectionChartPainter extends CustomPainter {
   final Color textColor;
   final Color gridColor;
   final int? hoveredYear;
+  final bool hidden;
 
   _ProjectionChartPainter({
     required this.points,
@@ -1122,6 +1133,7 @@ class _ProjectionChartPainter extends CustomPainter {
     required this.textColor,
     required this.gridColor,
     required this.hoveredYear,
+    required this.hidden,
   });
 
   @override
@@ -1146,7 +1158,7 @@ class _ProjectionChartPainter extends CustomPainter {
         ..color = gridColor.withValues(alpha: 0.4)
         ..strokeWidth = 1);
       final tp = TextPainter(
-        text: TextSpan(text: _fmtAxis(v), style: TextStyle(color: textColor, fontSize: 11)),
+        text: TextSpan(text: displayEurosCompact(v, hidden), style: TextStyle(color: textColor, fontSize: 11)),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftAxisWidth - tp.width - 8, y - tp.height / 2));
@@ -1258,15 +1270,9 @@ class _ProjectionChartPainter extends CustomPainter {
     tp.paint(canvas, Offset(dx, y + 6));
   }
 
-  String _fmtAxis(double v) {
-    if (v == 0) return '0 €';
-    if (v >= 1000) return '${(v / 1000).round()} k €';
-    return '${v.round()} €';
-  }
-
   @override
   bool shouldRepaint(covariant _ProjectionChartPainter oldDelegate) =>
-      oldDelegate.hoveredYear != hoveredYear || oldDelegate.points != points;
+      oldDelegate.hoveredYear != hoveredYear || oldDelegate.points != points || oldDelegate.hidden != hidden;
 }
 
 // =======================================================================
@@ -1275,8 +1281,9 @@ class _ProjectionChartPainter extends CustomPainter {
 
 class _MonteCarloSimulationTab extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const _MonteCarloSimulationTab({required this.vaultPath});
+  const _MonteCarloSimulationTab({required this.vaultPath, required this.amountVisibility});
 
   @override
   State<_MonteCarloSimulationTab> createState() => _MonteCarloSimulationTabState();
@@ -1303,6 +1310,17 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  void _onAmountVisibilityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.amountVisibility.removeListener(_onAmountVisibilityChanged);
+    super.dispose();
   }
 
   Future<void> _loadState() async {
@@ -1386,7 +1404,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
     final result = _compute();
     return _SimulationSplitCard(
       left: _buildInputsContent(),
-      right: _buildResultsContent(result),
+      right: _buildResultsContent(result, widget.amountVisibility.hidden),
     );
   }
 
@@ -1561,7 +1579,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
     );
   }
 
-  Widget _buildResultsContent(MCResult result) {
+  Widget _buildResultsContent(MCResult result, bool hidden) {
     final accent = Theme.of(context).colorScheme.primary;
     final blue = const Color(0xFF7B8FE8);
     final grey = const Color(0xFF6B7280);
@@ -1571,7 +1589,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
         shadcn.Text('Valeur nette médiane dans $_nombreAnnees ans').muted(),
         const SizedBox(height: 8),
         shadcn.Text(
-          _fmtEuros(result.valeurNetteMediane),
+          displayEuros(result.valeurNetteMediane, hidden),
           style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
@@ -1581,7 +1599,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
             children: [
               const TextSpan(text: "soit un revenu passif médian d'environ "),
               TextSpan(
-                text: '${_fmtEuros(result.revenuMensuelMedian)} / mois',
+                text: '${displayEuros(result.revenuMensuelMedian, hidden)} / mois',
                 style: TextStyle(color: accent, fontWeight: FontWeight.bold),
               ),
             ],
@@ -1589,7 +1607,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
         ).muted(),
         const SizedBox(height: 4),
         shadcn.Text(
-          'Entre ${_fmtEuros(result.valeurNetteP10)} et ${_fmtEuros(result.valeurNetteP90)} selon les scénarios (10e-90e percentile)',
+          'Entre ${displayEuros(result.valeurNetteP10, hidden)} et ${displayEuros(result.valeurNetteP90, hidden)} selon les scénarios (10e-90e percentile)',
         ).muted().small(),
         const SizedBox(height: 16),
         Wrap(
@@ -1597,9 +1615,9 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _LegendPill(color: grey, label: 'Patrimoine initial', value: _fmtEuros(result.patrimoineInitial)),
-            _LegendPill(color: blue, label: 'Versements', value: _fmtEuros(result.versements)),
-            _LegendPill(color: accent, label: 'Médiane (intérêts nets)', value: _fmtEuros(result.plusValueMediane)),
+            _LegendPill(color: grey, label: 'Patrimoine initial', value: displayEuros(result.patrimoineInitial, hidden)),
+            _LegendPill(color: blue, label: 'Versements', value: displayEuros(result.versements, hidden)),
+            _LegendPill(color: accent, label: 'Médiane (intérêts nets)', value: displayEuros(result.plusValueMediane, hidden)),
           ],
         ),
         const SizedBox(height: 24),
@@ -1615,6 +1633,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
             textColor: Theme.of(context).colorScheme.mutedForeground,
             gridColor: Theme.of(context).colorScheme.border,
             cardColor: Theme.of(context).colorScheme.popover,
+            hidden: hidden,
           ),
         ),
         const SizedBox(height: 24),
@@ -1622,10 +1641,10 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
         const SizedBox(height: 16),
         Row(
           children: [
-            _StatColumn(label: 'Valeur future médiane', value: _fmtEuros(result.valeurFutureMediane)),
-            _StatColumn(label: 'Dont plus-value médiane', value: _fmtEuros(result.plusValueMediane)),
-            _StatColumn(label: 'Valeur nette médiane', value: _fmtEuros(result.valeurNetteMediane)),
-            _StatColumn(label: 'Revenu mensuel médian', value: _fmtEuros(result.revenuMensuelMedian)),
+            _StatColumn(label: 'Valeur future médiane', value: displayEuros(result.valeurFutureMediane, hidden)),
+            _StatColumn(label: 'Dont plus-value médiane', value: displayEuros(result.plusValueMediane, hidden)),
+            _StatColumn(label: 'Valeur nette médiane', value: displayEuros(result.valeurNetteMediane, hidden)),
+            _StatColumn(label: 'Revenu mensuel médian', value: displayEuros(result.revenuMensuelMedian, hidden)),
           ],
         ),
         const SizedBox(height: 16),
@@ -1783,6 +1802,7 @@ class _MonteCarloChart extends StatefulWidget {
   final Color textColor;
   final Color gridColor;
   final Color cardColor;
+  final bool hidden;
 
   const _MonteCarloChart({
     required this.points,
@@ -1794,6 +1814,7 @@ class _MonteCarloChart extends StatefulWidget {
     required this.textColor,
     required this.gridColor,
     required this.cardColor,
+    required this.hidden,
   });
 
   @override
@@ -1843,6 +1864,7 @@ class _MonteCarloChartState extends State<_MonteCarloChart> {
                   textColor: widget.textColor,
                   gridColor: widget.gridColor,
                   hoveredYear: _hoveredYear,
+                  hidden: widget.hidden,
                 ),
               ),
               if (hoveredPoint != null)
@@ -1860,6 +1882,7 @@ class _MonteCarloChartState extends State<_MonteCarloChart> {
                     gold: widget.gold,
                     grey: widget.grey,
                     cardColor: widget.cardColor,
+                    hidden: widget.hidden,
                   ),
                 ),
             ],
@@ -1881,6 +1904,7 @@ class _MCHoverTooltip extends StatelessWidget {
   final Color gold;
   final Color grey;
   final Color cardColor;
+  final bool hidden;
 
   const _MCHoverTooltip({
     required this.year,
@@ -1893,6 +1917,7 @@ class _MCHoverTooltip extends StatelessWidget {
     required this.gold,
     required this.grey,
     required this.cardColor,
+    required this.hidden,
   });
 
   @override
@@ -1914,7 +1939,7 @@ class _MCHoverTooltip extends StatelessWidget {
               children: [
                 shadcn.Text(year == 0 ? "Aujourd'hui" : 'Dans $year ans').muted(),
                 const SizedBox(height: 4),
-                shadcn.Text(_fmtEuros(p50), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                shadcn.Text(displayEuros(p50, hidden), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 shadcn.Text('Médiane').muted().small(),
                 const SizedBox(height: 12),
                 const Divider(),
@@ -1940,7 +1965,7 @@ class _MCHoverTooltip extends StatelessWidget {
         Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
         Expanded(child: shadcn.Text(label)),
-        shadcn.Text(_fmtEuros(value), style: const TextStyle(fontWeight: FontWeight.bold)),
+        shadcn.Text(displayEuros(value, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -1956,6 +1981,7 @@ class _MonteCarloChartPainter extends CustomPainter {
   final Color textColor;
   final Color gridColor;
   final int? hoveredYear;
+  final bool hidden;
 
   _MonteCarloChartPainter({
     required this.points,
@@ -1967,6 +1993,7 @@ class _MonteCarloChartPainter extends CustomPainter {
     required this.textColor,
     required this.gridColor,
     required this.hoveredYear,
+    required this.hidden,
   });
 
   @override
@@ -1991,7 +2018,7 @@ class _MonteCarloChartPainter extends CustomPainter {
         ..color = gridColor.withValues(alpha: 0.4)
         ..strokeWidth = 1);
       final tp = TextPainter(
-        text: TextSpan(text: _fmtAxis(v), style: TextStyle(color: textColor, fontSize: 11)),
+        text: TextSpan(text: displayEurosCompact(v, hidden), style: TextStyle(color: textColor, fontSize: 11)),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftAxisWidth - tp.width - 8, y - tp.height / 2));
@@ -2107,13 +2134,7 @@ class _MonteCarloChartPainter extends CustomPainter {
     tp.paint(canvas, Offset(dx, y + 6));
   }
 
-  String _fmtAxis(double v) {
-    if (v == 0) return '0 €';
-    if (v >= 1000) return '${(v / 1000).round()} k €';
-    return '${v.round()} €';
-  }
-
   @override
   bool shouldRepaint(covariant _MonteCarloChartPainter oldDelegate) =>
-      oldDelegate.hoveredYear != hoveredYear || oldDelegate.points != points;
+      oldDelegate.hoveredYear != hoveredYear || oldDelegate.points != points || oldDelegate.hidden != hidden;
 }

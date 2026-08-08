@@ -1,7 +1,9 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import '../core/privacy/amount_visibility_controller.dart';
 import '../core/profiles/profile_controller.dart';
 import '../core/profiles/sidebar_prefs_controller.dart';
 import '../features/navigation/app_sidebar.dart';
+import '../features/navigation/top_bar.dart';
 import 'theme_controller.dart';
 
 const _breakpoint = 800.0;
@@ -10,6 +12,7 @@ class AppShell extends StatefulWidget {
   final ThemeController themeController;
   final ProfileController profileController;
   final SidebarPrefsController sidebarPrefsController;
+  final AmountVisibilityController amountVisibilityController;
   final Map<String, WidgetBuilder> pages;
 
   const AppShell({
@@ -17,6 +20,7 @@ class AppShell extends StatefulWidget {
     required this.themeController,
     required this.profileController,
     required this.sidebarPrefsController,
+    required this.amountVisibilityController,
     required this.pages,
   });
 
@@ -70,7 +74,17 @@ class _AppShellState extends State<AppShell> {
           children: [
             sidebar,
             Container(width: 1, color: Theme.of(context).colorScheme.border),
-            Expanded(child: page),
+            Expanded(
+              child: Column(
+                children: [
+                  TopBar(
+                    amountVisibility: widget.amountVisibilityController,
+                    onSelect: _select,
+                  ),
+                  Expanded(child: page),
+                ],
+              ),
+            ),
           ],
         ),
       );
@@ -93,7 +107,16 @@ class _AppShellState extends State<AppShell> {
           ],
         ),
       ],
-      child: page,
+      child: Column(
+        children: [
+          TopBar(
+            amountVisibility: widget.amountVisibilityController,
+            onSelect: _select,
+            compact: true,
+          ),
+          Expanded(child: page),
+        ],
+      ),
     );
   }
 }

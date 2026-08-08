@@ -3,13 +3,16 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart' show Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/money_format.dart';
+import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
 
 class TaxationSimulationScreen extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const TaxationSimulationScreen({super.key, required this.vaultPath});
+  const TaxationSimulationScreen({super.key, required this.vaultPath, required this.amountVisibility});
 
   @override
   State<TaxationSimulationScreen> createState() => _TaxationScreenState();
@@ -68,7 +71,9 @@ class _TaxationScreenState extends State<TaxationSimulationScreen> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: _tabIndex == 0 ? _IRTab(vaultPath: widget.vaultPath) : _IFITab(vaultPath: widget.vaultPath),
+            child: _tabIndex == 0
+                ? _IRTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility)
+                : _IFITab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility),
           ),
         ],
       ),
@@ -200,24 +205,6 @@ class _TaxationSplitCard extends StatelessWidget {
 // ---------------------------------------------------------------------
 // Partagé
 // ---------------------------------------------------------------------
-
-String _fmtEuros(double value) {
-  final rounded = value.round();
-  final negative = rounded < 0;
-  final s = rounded.abs().toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buffer.write(' ');
-    buffer.write(s[i]);
-  }
-  return '${negative ? '-' : ''}${buffer.toString()} €';
-}
-
-String _fmtCompact(double value) {
-  if (value > 1000000) return '${(value / 1000000).round()} M€';
-  if (value > 1000) return '${(value / 1000).round()} k€';
-  return '${value.round()} €';
-}
 
 class BracketRow {
   final String label;
@@ -417,8 +404,9 @@ IFIResult computeIFI(double immobilierNet) {
 
 class _IFITab extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const _IFITab({required this.vaultPath});
+  const _IFITab({required this.vaultPath, required this.amountVisibility});
 
   @override
   State<_IFITab> createState() => _IFITabState();
@@ -433,6 +421,17 @@ class _IFITabState extends State<_IFITab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  void _onAmountVisibilityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.amountVisibility.removeListener(_onAmountVisibilityChanged);
+    super.dispose();
   }
 
   Future<void> _loadState() async {
@@ -464,6 +463,7 @@ class _IFITabState extends State<_IFITab> {
     final accent = Theme.of(context).colorScheme.primary;
     final violet = const Color(0xFF9B7BE8);
     final red = const Color(0xFFE07A6B);
+    final hidden = widget.amountVisibility.hidden;
 
     return _TaxationSplitCard(
       left: Column(
@@ -495,17 +495,17 @@ class _IFITabState extends State<_IFITab> {
               children: [
                 const TextSpan(text: 'Cette année, vous avez un patrimoine immobilier net de '),
                 TextSpan(
-                  text: _fmtEuros(_immobilierNet),
+                  text: displayEuros(_immobilierNet, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
                 const TextSpan(text: ', induisant un impôt sur la fortune immobilière total de '),
                 TextSpan(
-                  text: _fmtEuros(result.total),
+                  text: displayEuros(result.total, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
                 const TextSpan(text: ", soit l'équivalent de "),
                 TextSpan(
-                  text: '${_fmtEuros(result.total / 12)}/mois',
+                  text: '${displayEuros(result.total / 12, hidden)}/mois',
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -523,6 +523,7 @@ class _IFITabState extends State<_IFITab> {
               textColor: Theme.of(context).colorScheme.mutedForeground,
               gridColor: Theme.of(context).colorScheme.border,
               cardColor: Theme.of(context).colorScheme.popover,
+              hidden: hidden,
             ),
           ),
           const SizedBox(height: 8),
@@ -543,7 +544,7 @@ class _IFITabState extends State<_IFITab> {
               _StatColumn(label: "Taux maximal d'imposition", values: ['${result.tauxMax}%']),
               _StatColumn(
                 label: 'IFI (total & mensualisé)',
-                values: [_fmtEuros(result.total), '${_fmtEuros(result.total / 12)}/mois'],
+                values: [displayEuros(result.total, hidden), '${displayEuros(result.total / 12, hidden)}/mois'],
               ),
             ],
           ),
@@ -611,8 +612,9 @@ IRResult computeIR({required double netImposable, required double nbrParts}) {
 
 class _IRTab extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const _IRTab({required this.vaultPath});
+  const _IRTab({required this.vaultPath, required this.amountVisibility});
 
   @override
   State<_IRTab> createState() => _IRTabState();
@@ -628,6 +630,17 @@ class _IRTabState extends State<_IRTab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  void _onAmountVisibilityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.amountVisibility.removeListener(_onAmountVisibilityChanged);
+    super.dispose();
   }
 
   Future<void> _loadState() async {
@@ -665,6 +678,7 @@ class _IRTabState extends State<_IRTab> {
     final accent = Theme.of(context).colorScheme.primary;
     final violet = const Color(0xFF9B7BE8);
     final red = const Color(0xFFE07A6B);
+    final hidden = widget.amountVisibility.hidden;
 
     return _TaxationSplitCard(
       left: Column(
@@ -708,17 +722,17 @@ class _IRTabState extends State<_IRTab> {
               children: [
                 const TextSpan(text: 'Cette année, vous avez un net imposable de '),
                 TextSpan(
-                  text: _fmtEuros(_netImposable),
+                  text: displayEuros(_netImposable, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
                 const TextSpan(text: ", induisant un impôt sur le revenu total de "),
                 TextSpan(
-                  text: _fmtEuros(result.total),
+                  text: displayEuros(result.total, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
                 const TextSpan(text: ", soit l'équivalent de "),
                 TextSpan(
-                  text: '${_fmtEuros(result.total / 12)}/mois',
+                  text: '${displayEuros(result.total / 12, hidden)}/mois',
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -736,6 +750,7 @@ class _IRTabState extends State<_IRTab> {
               textColor: Theme.of(context).colorScheme.mutedForeground,
               gridColor: Theme.of(context).colorScheme.border,
               cardColor: Theme.of(context).colorScheme.popover,
+              hidden: hidden,
             ),
           ),
           const SizedBox(height: 8),
@@ -753,11 +768,11 @@ class _IRTabState extends State<_IRTab> {
           const SizedBox(height: 16),
           Row(
             children: [
-              _StatColumn(label: 'Quotient familial', values: [_fmtEuros(result.quotient)]),
+              _StatColumn(label: 'Quotient familial', values: [displayEuros(result.quotient, hidden)]),
               _StatColumn(label: "Taux marginal d'imposition", values: ['${result.tmi}%']),
               _StatColumn(
                 label: 'Impôt sur le revenu (total & mensualisé)',
-                values: [_fmtEuros(result.total), '${_fmtEuros(result.total / 12)}/mois'],
+                values: [displayEuros(result.total, hidden), '${displayEuros(result.total / 12, hidden)}/mois'],
               ),
             ],
           ),
@@ -781,6 +796,7 @@ class _BracketChart extends StatefulWidget {
   final Color textColor;
   final Color gridColor;
   final Color cardColor;
+  final bool hidden;
 
   const _BracketChart({
     required this.data,
@@ -790,6 +806,7 @@ class _BracketChart extends StatefulWidget {
     required this.textColor,
     required this.gridColor,
     required this.cardColor,
+    required this.hidden,
   });
 
   @override
@@ -836,6 +853,7 @@ class _BracketChartState extends State<_BracketChart> {
                   textColor: widget.textColor,
                   gridColor: widget.gridColor,
                   hoveredIndex: _hoveredIndex,
+                  hidden: widget.hidden,
                 ),
               ),
               if (hovered != null)
@@ -851,6 +869,7 @@ class _BracketChartState extends State<_BracketChart> {
                     violet: widget.violet,
                     red: widget.red,
                     cardColor: widget.cardColor,
+                    hidden: widget.hidden,
                   ),
                 ),
             ],
@@ -870,6 +889,7 @@ class _BracketTooltip extends StatelessWidget {
   final Color violet;
   final Color red;
   final Color cardColor;
+  final bool hidden;
 
   const _BracketTooltip({
     required this.title,
@@ -880,6 +900,7 @@ class _BracketTooltip extends StatelessWidget {
     required this.violet,
     required this.red,
     required this.cardColor,
+    required this.hidden,
   });
 
   @override
@@ -922,7 +943,7 @@ class _BracketTooltip extends StatelessWidget {
         Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
         Expanded(child: shadcn.Text(label)),
-        shadcn.Text(_fmtEuros(value), style: const TextStyle(fontWeight: FontWeight.bold)),
+        shadcn.Text(displayEuros(value, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -936,6 +957,7 @@ class _BracketChartPainter extends CustomPainter {
   final Color textColor;
   final Color gridColor;
   final int? hoveredIndex;
+  final bool hidden;
 
   _BracketChartPainter({
     required this.data,
@@ -945,6 +967,7 @@ class _BracketChartPainter extends CustomPainter {
     required this.textColor,
     required this.gridColor,
     required this.hoveredIndex,
+    required this.hidden,
   });
 
   @override
@@ -974,7 +997,7 @@ class _BracketChartPainter extends CustomPainter {
         ..color = gridColor.withValues(alpha: 0.4)
         ..strokeWidth = 1);
       final tp = TextPainter(
-        text: TextSpan(text: _fmtCompact(v), style: TextStyle(color: textColor, fontSize: 11)),
+        text: TextSpan(text: displayEurosCompact(v, hidden), style: TextStyle(color: textColor, fontSize: 11)),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftAxisWidth - tp.width - 8, y - tp.height / 2));
@@ -1035,5 +1058,5 @@ class _BracketChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BracketChartPainter oldDelegate) =>
-      oldDelegate.hoveredIndex != hoveredIndex || oldDelegate.data != data;
+      oldDelegate.hoveredIndex != hoveredIndex || oldDelegate.data != data || oldDelegate.hidden != hidden;
 }

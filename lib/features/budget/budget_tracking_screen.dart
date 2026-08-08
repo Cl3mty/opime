@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart' show Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/money_format.dart';
+import '../../core/privacy/amount_visibility_controller.dart';
 import 'budget_tracking_models.dart';
 import 'budget_tracking_repository.dart';
 import 'budget_categories_repository.dart';
@@ -15,21 +17,10 @@ const _moisNoms = [
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
 
-String _fmtEuros(double value) {
-  final rounded = value.round();
-  final negative = rounded < 0;
-  final s = rounded.abs().toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buffer.write(' ');
-    buffer.write(s[i]);
-  }
-  return '${negative ? '-' : ''}${buffer.toString()} €';
-}
-
 class BudgetTrackingScreen extends StatefulWidget {
   final String vaultPath;
-  const BudgetTrackingScreen({super.key, required this.vaultPath});
+  final AmountVisibilityController amountVisibility;
+  const BudgetTrackingScreen({super.key, required this.vaultPath, required this.amountVisibility});
 
   @override
   State<BudgetTrackingScreen> createState() => _BudgetTrackingScreenState();
@@ -100,6 +91,13 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading || _data == null) return const Center(child: CircularProgressIndicator());
+    return AnimatedBuilder(
+      animation: widget.amountVisibility,
+      builder: (context, _) => _buildContent(context, widget.amountVisibility.hidden),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, bool hidden) {
     final data = _data!;
     final accent = Theme.of(context).colorScheme.primary;
 
@@ -125,7 +123,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                     onPrev: () => _changeMonth(-1),
                     onNext: () => _changeMonth(1),
                   ),
-                  _RemainingGaugeCard(data: data, accent: accent),
+                  _RemainingGaugeCard(data: data, accent: accent, hidden: hidden),
                   _ComparisonCard(data: data, accent: accent),
                   _DistributionCard(data: data, accent: accent),
                 ];
@@ -161,7 +159,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                 final col1 = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SummaryCard(data: data, accent: accent),
+                    _SummaryCard(data: data, accent: accent, hidden: hidden),
                     const SizedBox(height: 12),
                     _CategoryCard(
                       title: 'REVENUS',
@@ -169,6 +167,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                       items: data.revenues,
                       idPrefix: 'revenue',
                       onChanged: (items) => _update((d) => d.copyWith(revenues: items)),
+                      hidden: hidden,
                     ),
                   ],
                 );
@@ -180,6 +179,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                   onChanged: (items) => _update((d) => d.copyWith(factures: items)),
                   categories: _categories,
                   onCreateCategory: _createCategory,
+                  hidden: hidden,
                 );
                 final col3 = _CategoryCard(
                   title: 'DÉPENSES',
@@ -189,6 +189,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                   onChanged: (items) => _update((d) => d.copyWith(depenses: items)),
                   categories: _categories,
                   onCreateCategory: _createCategory,
+                  hidden: hidden,
                 );
                 final col4 = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,6 +200,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                       items: data.investEpargnes,
                       idPrefix: 'invest',
                       onChanged: (items) => _update((d) => d.copyWith(investEpargnes: items)),
+                      hidden: hidden,
                     ),
                     const SizedBox(height: 12),
                     _CategoryCard(
@@ -207,6 +209,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                       items: data.projets,
                       idPrefix: 'projet',
                       onChanged: (items) => _update((d) => d.copyWith(projets: items)),
+                      hidden: hidden,
                     ),
                     const SizedBox(height: 12),
                     _CategoryCard(
@@ -215,6 +218,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                       items: data.dettes,
                       idPrefix: 'dette',
                       onChanged: (items) => _update((d) => d.copyWith(dettes: items)),
+                      hidden: hidden,
                     ),
                   ],
                 );
@@ -291,7 +295,8 @@ class _MonthTitleCard extends StatelessWidget {
 class _RemainingGaugeCard extends StatelessWidget {
   final BudgetTrackingMonth data;
   final Color accent;
-  const _RemainingGaugeCard({required this.data, required this.accent});
+  final bool hidden;
+  const _RemainingGaugeCard({required this.data, required this.accent, required this.hidden});
 
   @override
   Widget build(BuildContext context) {
@@ -312,7 +317,7 @@ class _RemainingGaugeCard extends StatelessWidget {
             ),
             child: Center(
               child: shadcn.Text(
-                _fmtEuros(data.restantRealite),
+                displayEuros(data.restantRealite, hidden),
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ),
@@ -554,7 +559,8 @@ class _DonutPainter extends CustomPainter {
 class _SummaryCard extends StatelessWidget {
   final BudgetTrackingMonth data;
   final Color accent;
-  const _SummaryCard({required this.data, required this.accent});
+  final bool hidden;
+  const _SummaryCard({required this.data, required this.accent, required this.hidden});
 
   @override
   Widget build(BuildContext context) {
@@ -613,8 +619,8 @@ class _SummaryCard extends StatelessWidget {
       child: Row(
         children: [
           Expanded(flex: 2, child: shadcn.Text(label, style: style)),
-          Expanded(child: shadcn.Text(_fmtEuros(budget), textAlign: TextAlign.end, style: style)),
-          Expanded(child: shadcn.Text(_fmtEuros(realite), textAlign: TextAlign.end, style: style)),
+          Expanded(child: shadcn.Text(displayEuros(budget, hidden), textAlign: TextAlign.end, style: style)),
+          Expanded(child: shadcn.Text(displayEuros(realite, hidden), textAlign: TextAlign.end, style: style)),
         ],
       ),
     );
@@ -633,6 +639,7 @@ class _CategoryCard extends StatelessWidget {
   final ValueChanged<List<TrackingItem>> onChanged;
   final List<String>? categories;
   final ValueChanged<String>? onCreateCategory;
+  final bool hidden;
 
   const _CategoryCard({
     required this.title,
@@ -642,6 +649,7 @@ class _CategoryCard extends StatelessWidget {
     required this.onChanged,
     this.categories,
     this.onCreateCategory,
+    required this.hidden,
   });
 
   bool get _showCategoryPicker => categories != null && onCreateCategory != null;
@@ -842,11 +850,11 @@ class _CategoryCard extends StatelessWidget {
                       const Expanded(child: shadcn.Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                       SizedBox(
                         width: 60,
-                        child: shadcn.Text(_fmtEuros(_totalBudget), textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        child: shadcn.Text(displayEuros(_totalBudget, hidden), textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                       SizedBox(
                         width: 60,
-                        child: shadcn.Text(_fmtEuros(_totalRealite), textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        child: shadcn.Text(displayEuros(_totalRealite, hidden), textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                       const SizedBox(width: 32),
                     ],

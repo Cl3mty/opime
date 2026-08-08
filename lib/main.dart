@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:window_manager/window_manager.dart';
+import 'core/privacy/amount_visibility_controller.dart';
 import 'core/storage/vault_folder_service.dart';
 import 'core/profiles/profile_controller.dart';
 import 'core/profiles/profile_repository.dart';
@@ -50,6 +51,7 @@ class _FreenaryAppState extends State<FreenaryApp> {
   static const _githubRepo = 'freenary';
 
   final _themeController = ThemeController();
+  final _amountVisibilityController = AmountVisibilityController();
   final _vaultFolderService = VaultFolderService();
 
   bool _checkingVault = true;
@@ -66,6 +68,7 @@ class _FreenaryAppState extends State<FreenaryApp> {
     super.initState();
     _themeController.load();
     _themeController.addListener(() => setState(() {}));
+    _amountVisibilityController.load();
     _loadVault();
   }
 
@@ -162,6 +165,7 @@ class _FreenaryAppState extends State<FreenaryApp> {
         themeController: _themeController,
         profileController: _profileController!,
         sidebarPrefsController: _sidebarPrefsController!,
+        amountVisibilityController: _amountVisibilityController,
         pages: {
           'dashboard': (_) => const Center(child: Text('Tableau de bord')),
           'actifs_actions_fonds': (_) => const Center(child: Text('Actions & Fonds')),
@@ -183,26 +187,32 @@ class _FreenaryAppState extends State<FreenaryApp> {
           'budget_ventilation': (_) => BudgetScreen(
             key: ValueKey(_profileController!.activeDataPath),
             vaultPath: _profileController!.activeDataPath,
+            amountVisibility: _amountVisibilityController,
           ),
           'budget_suivi': (_) => BudgetTrackingScreen(
             key: ValueKey(_profileController!.activeDataPath),
             vaultPath: _profileController!.activeDataPath,
+            amountVisibility: _amountVisibilityController,
           ),
           'simulation_taxation': (_) => TaxationSimulationScreen(
             key: ValueKey(_profileController!.activeDataPath),
             vaultPath: _profileController!.activeDataPath,
+            amountVisibility: _amountVisibilityController,
           ),
           'simulation_patrimoine': (_) => WealthSimulationScreen(
             key: ValueKey(_profileController!.activeDataPath),
             vaultPath: _profileController!.activeDataPath,
+            amountVisibility: _amountVisibilityController,
           ),
           'simulation_pret': (_) => LoanSimulationScreen(
             key: ValueKey(_profileController!.activeDataPath),
             vaultPath: _profileController!.activeDataPath,
+            amountVisibility: _amountVisibilityController,
           ),
           'simulation_transmission': (_) => TransmissionSimulationScreen(
             key: ValueKey(_profileController!.activeDataPath),
             vaultPath: _profileController!.activeDataPath,
+            amountVisibility: _amountVisibilityController,
           ),
           'assistant': (_) => const Center(child: Text('Assistant')),
           'account_management': (_) => AccountManagementScreen(profileController: _profileController!),

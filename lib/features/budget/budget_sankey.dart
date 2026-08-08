@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' show Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors;
+import '../../core/money_format.dart';
 import 'budget_models.dart';
 
 class _FlowNode {
@@ -23,7 +24,8 @@ class _FlowLink {
 
 class BudgetSankeyChart extends StatelessWidget {
   final BudgetData data;
-  const BudgetSankeyChart({super.key, required this.data});
+  final bool hidden;
+  const BudgetSankeyChart({super.key, required this.data, this.hidden = false});
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +119,7 @@ class BudgetSankeyChart extends StatelessWidget {
         return SizedBox(
           width: width,
           height: canvasHeight,
-          child: CustomPaint(painter: _SankeyPainter(nodes: nodes, links: links, canvasWidth: width)),
+          child: CustomPaint(painter: _SankeyPainter(nodes: nodes, links: links, canvasWidth: width, hidden: hidden)),
         );
       },
     );
@@ -190,12 +192,13 @@ class _SankeyPainter extends CustomPainter {
   final List<_FlowNode> nodes;
   final List<_FlowLink> links;
   final double canvasWidth;
+  final bool hidden;
 
   static const double _linkGap = 6.0;
   static const double _cornerRadius = 3.0;
   static const double _curvature = 0.55;
 
-  _SankeyPainter({required this.nodes, required this.links, required this.canvasWidth});
+  _SankeyPainter({required this.nodes, required this.links, required this.canvasWidth, required this.hidden});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -227,7 +230,7 @@ class _SankeyPainter extends CustomPainter {
         Paint()..color = node.color,
       );
 
-      final label = '${node.label} : ${node.value.round()} €';
+      final label = '${node.label} : ${displayEuros(node.value, hidden)}';
       final tp = TextPainter(
         text: TextSpan(
           text: label,

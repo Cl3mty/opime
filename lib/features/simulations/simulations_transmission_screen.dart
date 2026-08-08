@@ -4,13 +4,16 @@ import 'package:flutter/material.dart' show Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
+import '../../core/money_format.dart';
+import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
 
 class TransmissionSimulationScreen extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const TransmissionSimulationScreen({super.key, required this.vaultPath});
+  const TransmissionSimulationScreen({super.key, required this.vaultPath, required this.amountVisibility});
 
   @override
   State<TransmissionSimulationScreen> createState() => _TransmissionSimulationScreenState();
@@ -25,6 +28,17 @@ class _TransmissionSimulationScreenState extends State<TransmissionSimulationScr
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  void _onAmountVisibilityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.amountVisibility.removeListener(_onAmountVisibilityChanged);
+    super.dispose();
   }
 
   Future<void> _loadState() async {
@@ -71,10 +85,10 @@ class _TransmissionSimulationScreenState extends State<TransmissionSimulationScr
           const SizedBox(height: 16),
           Expanded(
             child: _tabIndex == 0
-                ? _DemembrementTab(vaultPath: widget.vaultPath)
+                ? _DemembrementTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility)
                 : _tabIndex == 1
-                    ? _DonationTab(vaultPath: widget.vaultPath)
-                    : _InheritanceTab(vaultPath: widget.vaultPath),
+                    ? _DonationTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility)
+                    : _InheritanceTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility),
           ),
         ],
       ),
@@ -141,8 +155,9 @@ class _TransmissionSplitCard extends StatelessWidget {
 
 class _DemembrementTab extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const _DemembrementTab({required this.vaultPath});
+  const _DemembrementTab({required this.vaultPath, required this.amountVisibility});
 
   @override
   State<_DemembrementTab> createState() => _DemembrementTabState();
@@ -161,6 +176,17 @@ class _DemembrementTabState extends State<_DemembrementTab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  void _onAmountVisibilityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.amountVisibility.removeListener(_onAmountVisibilityChanged);
+    super.dispose();
   }
 
   Future<void> _loadState() async {
@@ -210,6 +236,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
   Widget build(BuildContext context) {
     final result = _compute();
     final accent = Theme.of(context).colorScheme.primary;
+    final hidden = widget.amountVisibility.hidden;
 
     return _TransmissionSplitCard(
       left: Column(
@@ -258,7 +285,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
         children: [
           _ProjectionHeader(
             title: 'Projection des droits en démembrement',
-            value: _fmtEuros(result.droitsTotauxNue),
+            value: displayEuros(result.droitsTotauxNue, hidden),
             subtitle: shadcn.Text.rich(
               TextSpan(
                 style: DefaultTextStyle.of(context).style,
@@ -273,6 +300,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
           ),
           const SizedBox(height: 20),
           _MiniBarChart(
+            hidden: hidden,
             title: 'Comparaison des scénarios',
             items: [
               _BarItem(label: 'Droits pleine propriété', value: result.droitsTotauxPleine, color: const Color(0xFFE07A6B)),
@@ -283,17 +311,17 @@ class _DemembrementTabState extends State<_DemembrementTab> {
           const SizedBox(height: 18),
           Row(
             children: [
-              _StatColumn(label: 'Valeur NP', value: _fmtEuros(result.valeurNuePropriete)),
-              _StatColumn(label: 'Taxable NP / enfant', value: _fmtEuros(result.taxableParEnfantNue)),
-              _StatColumn(label: 'Droits NP / enfant', value: _fmtEuros(result.droitsParEnfantNue)),
+              _StatColumn(label: 'Valeur NP', value: displayEuros(result.valeurNuePropriete, hidden)),
+              _StatColumn(label: 'Taxable NP / enfant', value: displayEuros(result.taxableParEnfantNue, hidden)),
+              _StatColumn(label: 'Droits NP / enfant', value: displayEuros(result.droitsParEnfantNue, hidden)),
             ],
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              _StatColumn(label: 'Droits si pleine propriété', value: _fmtEuros(result.droitsTotauxPleine)),
-              _StatColumn(label: 'Droits en démembrement', value: _fmtEuros(result.droitsTotauxNue)),
-              _StatColumn(label: 'Économie potentielle', value: _fmtEuros(result.economiePotentielle)),
+              _StatColumn(label: 'Droits si pleine propriété', value: displayEuros(result.droitsTotauxPleine, hidden)),
+              _StatColumn(label: 'Droits en démembrement', value: displayEuros(result.droitsTotauxNue, hidden)),
+              _StatColumn(label: 'Économie potentielle', value: displayEuros(result.economiePotentielle, hidden)),
             ],
           ),
           const SizedBox(height: 16),
@@ -309,8 +337,9 @@ class _DemembrementTabState extends State<_DemembrementTab> {
 
 class _DonationTab extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const _DonationTab({required this.vaultPath});
+  const _DonationTab({required this.vaultPath, required this.amountVisibility});
 
   @override
   State<_DonationTab> createState() => _DonationTabState();
@@ -328,6 +357,17 @@ class _DonationTabState extends State<_DonationTab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  void _onAmountVisibilityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.amountVisibility.removeListener(_onAmountVisibilityChanged);
+    super.dispose();
   }
 
   Future<void> _loadState() async {
@@ -379,6 +419,7 @@ class _DonationTabState extends State<_DonationTab> {
   Widget build(BuildContext context) {
     final result = _compute();
     final accent = Theme.of(context).colorScheme.primary;
+    final hidden = widget.amountVisibility.hidden;
 
     return _TransmissionSplitCard(
       left: Column(
@@ -421,7 +462,7 @@ class _DonationTabState extends State<_DonationTab> {
             ],
           ),
           const SizedBox(height: 8),
-          shadcn.Text('Abattement pris en compte : ${_fmtEuros(result.abattementParDonataire)} / bénéficiaire').muted().small(),
+          shadcn.Text('Abattement pris en compte : ${displayEuros(result.abattementParDonataire, hidden)} / bénéficiaire').muted().small(),
           const SizedBox(height: 8),
           OutlineButton(
             onPressed: _resetState,
@@ -435,7 +476,7 @@ class _DonationTabState extends State<_DonationTab> {
         children: [
           _ProjectionHeader(
             title: 'Droits de donation estimés',
-            value: _fmtEuros(result.droitsTotaux),
+            value: displayEuros(result.droitsTotaux, hidden),
             subtitle: shadcn.Text.rich(
               TextSpan(
                 style: DefaultTextStyle.of(context).style,
@@ -449,6 +490,7 @@ class _DonationTabState extends State<_DonationTab> {
           ),
           const SizedBox(height: 20),
           _MiniBarChart(
+            hidden: hidden,
             title: 'Répartition fiscale',
             items: [
               _BarItem(label: 'Montant total transmis', value: _montantDonation, color: const Color(0xFF6B7280)),
@@ -459,9 +501,9 @@ class _DonationTabState extends State<_DonationTab> {
           const SizedBox(height: 18),
           Row(
             children: [
-              _StatColumn(label: 'Montant / bénéficiaire', value: _fmtEuros(result.montantParDonataire)),
-              _StatColumn(label: 'Taxable / bénéficiaire', value: _fmtEuros(result.taxableParDonataire)),
-              _StatColumn(label: 'Droits / bénéficiaire', value: _fmtEuros(result.droitsParDonataire)),
+              _StatColumn(label: 'Montant / bénéficiaire', value: displayEuros(result.montantParDonataire, hidden)),
+              _StatColumn(label: 'Taxable / bénéficiaire', value: displayEuros(result.taxableParDonataire, hidden)),
+              _StatColumn(label: 'Droits / bénéficiaire', value: displayEuros(result.droitsParDonataire, hidden)),
             ],
           ),
           const SizedBox(height: 16),
@@ -477,8 +519,9 @@ class _DonationTabState extends State<_DonationTab> {
 
 class _InheritanceTab extends StatefulWidget {
   final String vaultPath;
+  final AmountVisibilityController amountVisibility;
 
-  const _InheritanceTab({required this.vaultPath});
+  const _InheritanceTab({required this.vaultPath, required this.amountVisibility});
 
   @override
   State<_InheritanceTab> createState() => _InheritanceTabState();
@@ -498,6 +541,17 @@ class _InheritanceTabState extends State<_InheritanceTab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  void _onAmountVisibilityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.amountVisibility.removeListener(_onAmountVisibilityChanged);
+    super.dispose();
   }
 
   Future<void> _loadState() async {
@@ -550,6 +604,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
   @override
   Widget build(BuildContext context) {
     final result = _compute();
+    final hidden = widget.amountVisibility.hidden;
 
     return _TransmissionSplitCard(
       left: Column(
@@ -610,10 +665,11 @@ class _InheritanceTabState extends State<_InheritanceTab> {
         children: [
           _ProjectionHeader(
             title: 'Droits de succession estimés',
-            value: _fmtEuros(result.droitsTotauxEnfants),
+            value: displayEuros(result.droitsTotauxEnfants, hidden),
           ),
           const SizedBox(height: 20),
           _MiniBarChart(
+            hidden: hidden,
             title: 'Répartition de la succession',
             items: [
               _BarItem(label: 'Part conjoint exonérée', value: result.partConjointExoneree, color: const Color(0xFF6B7280)),
@@ -624,17 +680,17 @@ class _InheritanceTabState extends State<_InheritanceTab> {
           const SizedBox(height: 18),
           Row(
             children: [
-              _StatColumn(label: 'Part conjoint exonérée', value: _fmtEuros(result.partConjointExoneree)),
-              _StatColumn(label: 'Masse transmise aux enfants', value: _fmtEuros(result.masseTaxableEnfants)),
-              _StatColumn(label: 'Part brute / enfant', value: _fmtEuros(result.partParEnfant)),
+              _StatColumn(label: 'Part conjoint exonérée', value: displayEuros(result.partConjointExoneree, hidden)),
+              _StatColumn(label: 'Masse transmise aux enfants', value: displayEuros(result.masseTaxableEnfants, hidden)),
+              _StatColumn(label: 'Part brute / enfant', value: displayEuros(result.partParEnfant, hidden)),
             ],
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              _StatColumn(label: 'Taxable / enfant', value: _fmtEuros(result.taxableParEnfant)),
-              _StatColumn(label: 'Droits / enfant', value: _fmtEuros(result.droitsParEnfant)),
-              _StatColumn(label: 'Net / enfant', value: _fmtEuros(result.netParEnfant)),
+              _StatColumn(label: 'Taxable / enfant', value: displayEuros(result.taxableParEnfant, hidden)),
+              _StatColumn(label: 'Droits / enfant', value: displayEuros(result.droitsParEnfant, hidden)),
+              _StatColumn(label: 'Net / enfant', value: displayEuros(result.netParEnfant, hidden)),
             ],
           ),
           const SizedBox(height: 16),
@@ -897,18 +953,6 @@ bool _readBool(Map<String, dynamic> json, String key, bool fallback) {
   return fallback;
 }
 
-String _fmtEuros(double value) {
-  final rounded = value.round();
-  final negative = rounded < 0;
-  final s = rounded.abs().toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buffer.write(' ');
-    buffer.write(s[i]);
-  }
-  return '${negative ? '-' : ''}${buffer.toString()} €';
-}
-
 class _NumberField extends StatefulWidget {
   final String label;
   final String suffix;
@@ -1075,8 +1119,9 @@ class _BarItem {
 class _MiniBarChart extends StatelessWidget {
   final String title;
   final List<_BarItem> items;
+  final bool hidden;
 
-  const _MiniBarChart({required this.title, required this.items});
+  const _MiniBarChart({required this.title, required this.items, required this.hidden});
 
   @override
   Widget build(BuildContext context) {
@@ -1099,7 +1144,7 @@ class _MiniBarChart extends StatelessWidget {
               children: [
                 Expanded(child: shadcn.Text(item.label).small()),
                 const SizedBox(width: 8),
-                shadcn.Text(_fmtEuros(item.value)).small(),
+                shadcn.Text(displayEuros(item.value, hidden)).small(),
               ],
             ),
             const SizedBox(height: 6),
