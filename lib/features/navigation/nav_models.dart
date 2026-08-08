@@ -50,6 +50,15 @@ const patrimoineGroup = NavGroup(
   ],
 );
 
+const academieGroup = NavGroup(
+  label: 'Académie',
+  items: [
+    NavItem(key: 'enveloppes', label: 'Enveloppes', icon: LucideIcons.library),
+    NavItem(key: 'investissement', label: 'Investissement', icon: LucideIcons.university),
+    NavItem(key: 'formation', label: 'Formation', icon: LucideIcons.graduationCap),    
+  ],
+);
+
 const outilsGroup = NavGroup(
   label: 'Outils',
   items: [

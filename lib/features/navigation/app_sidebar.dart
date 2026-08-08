@@ -228,6 +228,8 @@ class AppSidebar extends StatelessWidget {
           children: [
             _buildGroup(patrimoineGroup, hiddenKeys),
             const NavigationDivider(),
+            _buildGroup(academieGroup, hiddenKeys),
+            const NavigationDivider(),
             _buildGroup(outilsGroup, hiddenKeys),
           ],
         );

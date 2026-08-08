@@ -219,12 +219,12 @@ String _fmtCompact(double value) {
   return '${value.round()} €';
 }
 
-class _BracketRow {
+class BracketRow {
   final String label;
   final double montant;
   final double montantMax;
   final double impot;
-  _BracketRow({required this.label, required this.montant, required this.montantMax, required this.impot});
+  BracketRow({required this.label, required this.montant, required this.montantMax, required this.impot});
 }
 
 class _NumberField extends StatefulWidget {
@@ -366,11 +366,53 @@ class _StatColumn extends StatelessWidget {
 // Onglet IFI
 // ---------------------------------------------------------------------
 
-class _IFIResult {
+class IFIResult {
   final double tauxMax;
   final double total;
-  final List<_BracketRow> chartData;
-  _IFIResult({required this.tauxMax, required this.total, required this.chartData});
+  final List<BracketRow> chartData;
+  IFIResult({required this.tauxMax, required this.total, required this.chartData});
+}
+
+/// Barème IFI (article 977 CGI) : seuils de patrimoine immobilier net
+/// et taux marginaux par tranche.
+const ifiLimits = [800000.0, 1300000.0, 2570000.0, 5000000.0, 10000000.0];
+const ifiRates = [0.0, 0.5, 0.7, 1.0, 1.25, 1.5];
+
+/// Largeur de chaque tranche, utilisée uniquement pour l'échelle du
+/// graphique (la dernière tranche est en réalité non plafonnée).
+const ifiMontantMax = [800000.0, 500000.0, 1270000.0, 2430000.0, 5000000.0, 1200000.0];
+
+/// L'IFI n'est dû qu'au-delà de 1 300 000 € de patrimoine net (en-dessous,
+/// exonération totale) ; au-delà, le barème s'applique sur la totalité du
+/// patrimoine à partir de 800 000 € (pas de décote implémentée ici, voir
+/// [_IFIDisclaimer]).
+IFIResult computeIFI(double immobilierNet) {
+  double c0(double v) => v < 0 ? 0 : v;
+  final montants = [
+    c0(min(immobilierNet, ifiLimits[0])),
+    c0(min(immobilierNet - ifiLimits[0], ifiLimits[1] - ifiLimits[0])),
+    c0(min(immobilierNet - ifiLimits[1], ifiLimits[2] - ifiLimits[1])),
+    c0(min(immobilierNet - ifiLimits[2], ifiLimits[3] - ifiLimits[2])),
+    c0(min(immobilierNet - ifiLimits[3], ifiLimits[4] - ifiLimits[3])),
+    c0(immobilierNet - ifiLimits[4]),
+  ];
+
+  var maxIndex = 0;
+  for (var i = 0; i < montants.length; i++) {
+    if (montants[i] > 0) maxIndex = i;
+  }
+  final exonere = immobilierNet <= 1300000;
+  final tauxMax = exonere ? 0.0 : ifiRates[maxIndex];
+
+  final impots = List.generate(6, (i) => exonere ? 0.0 : montants[i] * ifiRates[i] / 100);
+  final total = impots.fold<double>(0, (s, v) => s + v);
+
+  final chartData = List.generate(
+    6,
+    (i) => BracketRow(label: '${ifiRates[i]}%', montant: montants[i], montantMax: ifiMontantMax[i], impot: impots[i]),
+  );
+
+  return IFIResult(tauxMax: tauxMax, total: total, chartData: chartData);
 }
 
 class _IFITab extends StatefulWidget {
@@ -414,38 +456,7 @@ class _IFITabState extends State<_IFITab> {
     });
   }
 
-  static const _limits = [800000.0, 1300000.0, 2570000.0, 5000000.0, 10000000.0];
-  static const _rates = [0.0, 0.5, 0.7, 1.0, 1.25, 1.5];
-  static const _montantMax = [800000.0, 500000.0, 1270000.0, 2430000.0, 5000000.0, 1200000.0];
-
-  _IFIResult _compute() {
-    double c0(double v) => v < 0 ? 0 : v;
-    final montants = [
-      c0(min(_immobilierNet, _limits[0])),
-      c0(min(_immobilierNet - _limits[0], _limits[1] - _limits[0])),
-      c0(min(_immobilierNet - _limits[1], _limits[2] - _limits[1])),
-      c0(min(_immobilierNet - _limits[2], _limits[3] - _limits[2])),
-      c0(min(_immobilierNet - _limits[3], _limits[4] - _limits[3])),
-      c0(_immobilierNet - _limits[4]),
-    ];
-
-    var maxIndex = 0;
-    for (var i = 0; i < montants.length; i++) {
-      if (montants[i] > 0) maxIndex = i;
-    }
-    final exonere = _immobilierNet <= 1300000;
-    final tauxMax = exonere ? 0.0 : _rates[maxIndex];
-
-    final impots = List.generate(6, (i) => exonere ? 0.0 : montants[i] * _rates[i] / 100);
-    final total = impots.fold<double>(0, (s, v) => s + v);
-
-    final chartData = List.generate(
-      6,
-      (i) => _BracketRow(label: '${_rates[i]}%', montant: montants[i], montantMax: _montantMax[i], impot: impots[i]),
-    );
-
-    return _IFIResult(tauxMax: tauxMax, total: total, chartData: chartData);
-  }
+  IFIResult _compute() => computeIFI(_immobilierNet);
 
   @override
   Widget build(BuildContext context) {
@@ -548,12 +559,54 @@ class _IFITabState extends State<_IFITab> {
 // Onglet Impôt sur le revenu
 // ---------------------------------------------------------------------
 
-class _IRResult {
+class IRResult {
   final double quotient;
   final double tmi;
   final double total;
-  final List<_BracketRow> chartData;
-  _IRResult({required this.quotient, required this.tmi, required this.total, required this.chartData});
+  final List<BracketRow> chartData;
+  IRResult({required this.quotient, required this.tmi, required this.total, required this.chartData});
+}
+
+/// Barème de l'impôt sur le revenu par part de quotient familial (revenus
+/// 2024, dernier barème connu, non révisé depuis pour l'année suivante).
+const irLimits = [11294.0, 28797.0, 82341.0, 177106.0];
+const irRates = [0.0, 11.0, 30.0, 41.0, 45.0];
+
+/// Largeur de chaque tranche, utilisée uniquement pour l'échelle du
+/// graphique (la dernière tranche est en réalité non plafonnée).
+const irMontantMax = [11294.0, 17503.0, 53544.0, 94765.0, 120000.0];
+
+/// Quotient familial simplifié : le revenu net imposable est divisé par le
+/// nombre de parts pour obtenir le taux marginal, puis l'impôt par part est
+/// multiplié par le nombre de parts pour obtenir l'impôt total du foyer.
+IRResult computeIR({required double netImposable, required double nbrParts}) {
+  double c0(double v) => v < 0 ? 0 : v;
+  final parts = nbrParts < 1 ? 1.0 : nbrParts;
+  final quotient = netImposable / parts;
+
+  final montants = [
+    c0(min(quotient, irLimits[0])),
+    c0(min(quotient - irLimits[0], irLimits[1] - irLimits[0])),
+    c0(min(quotient - irLimits[1], irLimits[2] - irLimits[1])),
+    c0(min(quotient - irLimits[2], irLimits[3] - irLimits[2])),
+    c0(quotient - irLimits[3]),
+  ];
+
+  var maxIndex = 0;
+  for (var i = 0; i < montants.length; i++) {
+    if (montants[i] > 0) maxIndex = i;
+  }
+  final tmi = irRates[maxIndex];
+
+  final impots = List.generate(5, (i) => montants[i] * irRates[i] / 100);
+  final total = impots.fold<double>(0, (s, v) => s + v) * parts;
+
+  final chartData = List.generate(
+    5,
+    (i) => BracketRow(label: '${irRates[i]}%', montant: montants[i], montantMax: irMontantMax[i], impot: impots[i]),
+  );
+
+  return IRResult(quotient: quotient, tmi: tmi, total: total, chartData: chartData);
 }
 
 class _IRTab extends StatefulWidget {
@@ -604,39 +657,7 @@ class _IRTabState extends State<_IRTab> {
     });
   }
 
-  static const _limits = [11294.0, 28797.0, 82341.0, 177106.0];
-  static const _rates = [0.0, 11.0, 30.0, 41.0, 45.0];
-  static const _montantMax = [11294.0, 17503.0, 53544.0, 94765.0, 120000.0];
-
-  _IRResult _compute() {
-    double c0(double v) => v < 0 ? 0 : v;
-    final parts = _nbrParts < 1 ? 1.0 : _nbrParts;
-    final quotient = _netImposable / parts;
-
-    final montants = [
-      c0(min(quotient, _limits[0])),
-      c0(min(quotient - _limits[0], _limits[1] - _limits[0])),
-      c0(min(quotient - _limits[1], _limits[2] - _limits[1])),
-      c0(min(quotient - _limits[2], _limits[3] - _limits[2])),
-      c0(quotient - _limits[3]),
-    ];
-
-    var maxIndex = 0;
-    for (var i = 0; i < montants.length; i++) {
-      if (montants[i] > 0) maxIndex = i;
-    }
-    final tmi = _rates[maxIndex];
-
-    final impots = List.generate(5, (i) => montants[i] * _rates[i] / 100);
-    final total = impots.fold<double>(0, (s, v) => s + v) * parts;
-
-    final chartData = List.generate(
-      5,
-      (i) => _BracketRow(label: '${_rates[i]}%', montant: montants[i], montantMax: _montantMax[i], impot: impots[i]),
-    );
-
-    return _IRResult(quotient: quotient, tmi: tmi, total: total, chartData: chartData);
-  }
+  IRResult _compute() => computeIR(netImposable: _netImposable, nbrParts: _nbrParts);
 
   @override
   Widget build(BuildContext context) {
@@ -753,7 +774,7 @@ class _IRTabState extends State<_IRTab> {
 // ---------------------------------------------------------------------
 
 class _BracketChart extends StatefulWidget {
-  final List<_BracketRow> data;
+  final List<BracketRow> data;
   final Color amber;
   final Color violet;
   final Color red;
@@ -908,7 +929,7 @@ class _BracketTooltip extends StatelessWidget {
 }
 
 class _BracketChartPainter extends CustomPainter {
-  final List<_BracketRow> data;
+  final List<BracketRow> data;
   final Color amber;
   final Color violet;
   final Color red;

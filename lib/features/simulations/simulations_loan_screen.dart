@@ -6,9 +6,9 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
 
-enum _LoanType { amortissable, inFine }
+enum LoanType { amortissable, inFine }
 
-enum _DeferType { totale, partielle }
+enum DeferType { totale, partielle }
 
 class LoanSimulationScreen extends StatefulWidget {
   final String vaultPath;
@@ -27,10 +27,10 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
   double _fraisDossier = 800;
   double _fraisGarantie = 1200;
 
-  _LoanType _type = _LoanType.amortissable;
+  LoanType _type = LoanType.amortissable;
   bool _differeActif = false;
   int _dureeDiffereMois = 12;
-  _DeferType _typeDiffere = _DeferType.partielle;
+  DeferType _typeDiffere = DeferType.partielle;
   late final SimulationStateRepository _stateRepo;
 
   @override
@@ -97,20 +97,20 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     return fallback;
   }
 
-  _LoanType _readLoanType(Map<String, dynamic> json, String key, {required _LoanType fallback}) {
+  LoanType _readLoanType(Map<String, dynamic> json, String key, {required LoanType fallback}) {
     final value = json[key];
     if (value is String) {
-      for (final t in _LoanType.values) {
+      for (final t in LoanType.values) {
         if (t.name == value) return t;
       }
     }
     return fallback;
   }
 
-  _DeferType _readDeferType(Map<String, dynamic> json, String key, {required _DeferType fallback}) {
+  DeferType _readDeferType(Map<String, dynamic> json, String key, {required DeferType fallback}) {
     final value = json[key];
     if (value is String) {
-      for (final t in _DeferType.values) {
+      for (final t in DeferType.values) {
         if (t.name == value) return t;
       }
     }
@@ -127,10 +127,10 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
       _tauxAssurance = 0.15;
       _fraisDossier = 800;
       _fraisGarantie = 1200;
-      _type = _LoanType.amortissable;
+      _type = LoanType.amortissable;
       _differeActif = false;
       _dureeDiffereMois = 12;
-      _typeDiffere = _DeferType.partielle;
+      _typeDiffere = DeferType.partielle;
     });
   }
 
@@ -164,87 +164,18 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Calcul — table d'amortissement mois par mois
-  // ---------------------------------------------------------------------
-
-  _LoanResult _simulate() {
-    final i = _tauxInteret / 100 / 12;
-    final totalMonths = _dureeAnnees * 12;
-    final insuranceMonthly = _montantEmprunte * _tauxAssurance / 100 / 12;
-    final months = <_MonthEntry>[];
-
-    if (_type == _LoanType.inFine) {
-      for (var m = 1; m <= totalMonths; m++) {
-        final interest = _montantEmprunte * i;
-        final capital = (m == totalMonths) ? _montantEmprunte : 0.0;
-        months.add(_MonthEntry(capital: capital, interest: interest, insurance: insuranceMonthly));
-      }
-    } else {
-      var remaining = _montantEmprunte;
-      final deferMonths = _differeActif ? _dureeDiffereMois.clamp(0, totalMonths - 1) : 0;
-
-      for (var m = 1; m <= deferMonths; m++) {
-        final interest = remaining * i;
-        if (_typeDiffere == _DeferType.totale) {
-          remaining += interest; // intérêts capitalisés, rien n'est décaissé
-        }
-        months.add(_MonthEntry(capital: 0, interest: interest, insurance: insuranceMonthly));
-      }
-
-      final remainingMonths = totalMonths - deferMonths;
-      if (remainingMonths > 0) {
-        final monthlyPayment = i == 0
-            ? remaining / remainingMonths
-            : remaining * i / (1 - pow(1 + i, -remainingMonths));
-        for (var m = 1; m <= remainingMonths; m++) {
-          final interest = remaining * i;
-          final capital = monthlyPayment - interest;
-          remaining -= capital;
-          months.add(_MonthEntry(capital: capital, interest: interest, insurance: insuranceMonthly));
-        }
-      }
-    }
-
-    // Agrégation par année (moyenne mensuelle de l'année, pour le graphique).
-    final years = <_YearBar>[];
-    for (var y = 0; y < _dureeAnnees; y++) {
-      final slice = months.skip(y * 12).take(12).toList();
-      if (slice.isEmpty) continue;
-      final capital = slice.map((m) => m.capital).reduce((a, b) => a + b) / slice.length;
-      final interest = slice.map((m) => m.interest).reduce((a, b) => a + b) / slice.length;
-      final insurance = slice.map((m) => m.insurance).reduce((a, b) => a + b) / slice.length;
-      years.add(_YearBar(year: y, capital: capital, interest: interest, insurance: insurance));
-    }
-
-    final totalInterest = months.fold<double>(0, (s, m) => s + m.interest);
-    final totalInsurance = months.fold<double>(0, (s, m) => s + m.insurance);
-    final coutTotalCredit = totalInterest + totalInsurance;
-    final coutTotalAvecFrais = coutTotalCredit + _fraisDossier + _fraisGarantie;
-
-    final deferMonths = (_type == _LoanType.amortissable && _differeActif)
-        ? _dureeDiffereMois.clamp(0, totalMonths - 1)
-        : 0;
-    // Pour un amortissable classique, la mensualité est constante hors dernier mois d'arrondi :
-    // on prend plutôt le paiement du premier mois de la phase d'amortissement.
-    final mensualiteAffichee = _type == _LoanType.inFine
-        ? _montantEmprunte * i + insuranceMonthly
-        : (deferMonths < months.length ? (months[deferMonths].capital + months[deferMonths].interest + months[deferMonths].insurance) : 0.0);
-
-    final mensualiteDifferee = deferMonths > 0 ? (months[0].capital + months[0].interest + months[0].insurance) : null;
-
-    return _LoanResult(
-      years: years,
-      mensualite: mensualiteAffichee,
-      mensualiteDifferee: mensualiteDifferee,
-      assuranceMensuelle: insuranceMonthly,
-      coutTotalCredit: coutTotalCredit,
-      totalAssurance: totalInsurance,
-      coutTotalAvecFrais: coutTotalAvecFrais,
-      montantEmprunte: _montantEmprunte,
-      capitalRembourseInFine: _type == _LoanType.inFine ? _montantEmprunte : null,
-    );
-  }
+  LoanResult _simulate() => simulateLoan(
+        montantEmprunte: _montantEmprunte,
+        dureeAnnees: _dureeAnnees,
+        tauxInteret: _tauxInteret,
+        tauxAssurance: _tauxAssurance,
+        fraisDossier: _fraisDossier,
+        fraisGarantie: _fraisGarantie,
+        type: _type,
+        differeActif: _differeActif,
+        dureeDiffereMois: _dureeDiffereMois,
+        typeDiffere: _typeDiffere,
+      );
 
   // ---------------------------------------------------------------------
   // Colonne de gauche : formulaire
@@ -259,13 +190,13 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
         ButtonGroup(
           children: [
             SelectedButton(
-              value: _type == _LoanType.amortissable,
-              onChanged: (_) => _update(() => _type = _LoanType.amortissable),
+              value: _type == LoanType.amortissable,
+              onChanged: (_) => _update(() => _type = LoanType.amortissable),
               child: const shadcn.Text('Amortissable'),
             ),
             SelectedButton(
-              value: _type == _LoanType.inFine,
-              onChanged: (_) => _update(() => _type = _LoanType.inFine),
+              value: _type == LoanType.inFine,
+              onChanged: (_) => _update(() => _type = LoanType.inFine),
               child: const shadcn.Text('In fine'),
             ),
           ],
@@ -341,7 +272,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
             ),
           ],
         ),
-        if (_type == _LoanType.amortissable) ...[
+        if (_type == LoanType.amortissable) ...[
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 12),
@@ -359,20 +290,20 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
             ButtonGroup(
               children: [
                 SelectedButton(
-                  value: _typeDiffere == _DeferType.partielle,
-                  onChanged: (_) => _update(() => _typeDiffere = _DeferType.partielle),
+                  value: _typeDiffere == DeferType.partielle,
+                  onChanged: (_) => _update(() => _typeDiffere = DeferType.partielle),
                   child: const shadcn.Text('Franchise partielle'),
                 ),
                 SelectedButton(
-                  value: _typeDiffere == _DeferType.totale,
-                  onChanged: (_) => _update(() => _typeDiffere = _DeferType.totale),
+                  value: _typeDiffere == DeferType.totale,
+                  onChanged: (_) => _update(() => _typeDiffere = DeferType.totale),
                   child: const shadcn.Text('Franchise totale'),
                 ),
               ],
             ),
             const SizedBox(height: 4),
             shadcn.Text(
-              _typeDiffere == _DeferType.partielle
+              _typeDiffere == DeferType.partielle
                   ? "Seuls les intérêts sont payés pendant le différé, le capital ne bouge pas."
                   : "Aucun paiement pendant le différé, les intérêts s'ajoutent au capital restant dû.",
             ).muted().small(),
@@ -401,7 +332,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
   // Colonne de droite : résultats
   // ---------------------------------------------------------------------
 
-  Widget _buildResultsContent(_LoanResult result) {
+  Widget _buildResultsContent(LoanResult result) {
     final accent = Theme.of(context).colorScheme.primary;
     final red = const Color(0xFFE07A6B);
     final blue = const Color(0xFF7B8FE8);
@@ -555,23 +486,23 @@ class _LoanDisclaimer extends StatelessWidget {
 // Modèles
 // ---------------------------------------------------------------------
 
-class _MonthEntry {
+class MonthEntry {
   final double capital;
   final double interest;
   final double insurance;
-  _MonthEntry({required this.capital, required this.interest, required this.insurance});
+  MonthEntry({required this.capital, required this.interest, required this.insurance});
 }
 
-class _YearBar {
+class YearBar {
   final int year;
   final double capital;
   final double interest;
   final double insurance;
-  _YearBar({required this.year, required this.capital, required this.interest, required this.insurance});
+  YearBar({required this.year, required this.capital, required this.interest, required this.insurance});
 }
 
-class _LoanResult {
-  final List<_YearBar> years;
+class LoanResult {
+  final List<YearBar> years;
   final double mensualite;
   final double? mensualiteDifferee;
   final double assuranceMensuelle;
@@ -581,7 +512,7 @@ class _LoanResult {
   final double montantEmprunte;
   final double? capitalRembourseInFine;
 
-  _LoanResult({
+  LoanResult({
     required this.years,
     required this.mensualite,
     required this.mensualiteDifferee,
@@ -592,6 +523,107 @@ class _LoanResult {
     required this.montantEmprunte,
     required this.capitalRembourseInFine,
   });
+}
+
+/// Construit la table d'amortissement mois par mois, puis l'agrège.
+///
+/// - In fine : intérêts constants sur le capital initial chaque mois,
+///   capital remboursé en une fois au dernier mois.
+/// - Amortissable : mensualité constante calculée par la formule standard
+///   `M = C·i / (1 - (1+i)^-n)`, avec un différé optionnel où le capital
+///   restant dû n'est pas encore amorti (franchise partielle : seuls les
+///   intérêts sont payés ; franchise totale : les intérêts s'ajoutent au
+///   capital restant dû, rien n'est décaissé).
+LoanResult simulateLoan({
+  required double montantEmprunte,
+  required int dureeAnnees,
+  required double tauxInteret,
+  required double tauxAssurance,
+  required double fraisDossier,
+  required double fraisGarantie,
+  required LoanType type,
+  required bool differeActif,
+  required int dureeDiffereMois,
+  required DeferType typeDiffere,
+}) {
+  final i = tauxInteret / 100 / 12;
+  final totalMonths = dureeAnnees * 12;
+  final insuranceMonthly = montantEmprunte * tauxAssurance / 100 / 12;
+  final months = <MonthEntry>[];
+
+  if (type == LoanType.inFine) {
+    for (var m = 1; m <= totalMonths; m++) {
+      final interest = montantEmprunte * i;
+      final capital = (m == totalMonths) ? montantEmprunte : 0.0;
+      months.add(MonthEntry(capital: capital, interest: interest, insurance: insuranceMonthly));
+    }
+  } else {
+    var remaining = montantEmprunte;
+    final deferMonths = differeActif ? dureeDiffereMois.clamp(0, totalMonths - 1) : 0;
+
+    for (var m = 1; m <= deferMonths; m++) {
+      final interest = remaining * i;
+      if (typeDiffere == DeferType.totale) {
+        remaining += interest; // intérêts capitalisés, rien n'est décaissé
+      }
+      months.add(MonthEntry(capital: 0, interest: interest, insurance: insuranceMonthly));
+    }
+
+    final remainingMonths = totalMonths - deferMonths;
+    if (remainingMonths > 0) {
+      final monthlyPayment = i == 0
+          ? remaining / remainingMonths
+          : remaining * i / (1 - pow(1 + i, -remainingMonths));
+      for (var m = 1; m <= remainingMonths; m++) {
+        final interest = remaining * i;
+        final capital = monthlyPayment - interest;
+        remaining -= capital;
+        months.add(MonthEntry(capital: capital, interest: interest, insurance: insuranceMonthly));
+      }
+    }
+  }
+
+  // Agrégation par année (moyenne mensuelle de l'année, pour le graphique).
+  final years = <YearBar>[];
+  for (var y = 0; y < dureeAnnees; y++) {
+    final slice = months.skip(y * 12).take(12).toList();
+    if (slice.isEmpty) continue;
+    final capital = slice.map((m) => m.capital).reduce((a, b) => a + b) / slice.length;
+    final interest = slice.map((m) => m.interest).reduce((a, b) => a + b) / slice.length;
+    final insurance = slice.map((m) => m.insurance).reduce((a, b) => a + b) / slice.length;
+    years.add(YearBar(year: y, capital: capital, interest: interest, insurance: insurance));
+  }
+
+  final totalInterest = months.fold<double>(0, (s, m) => s + m.interest);
+  final totalInsurance = months.fold<double>(0, (s, m) => s + m.insurance);
+  final coutTotalCredit = totalInterest + totalInsurance;
+  final coutTotalAvecFrais = coutTotalCredit + fraisDossier + fraisGarantie;
+
+  final deferMonths = (type == LoanType.amortissable && differeActif) ? dureeDiffereMois.clamp(0, totalMonths - 1) : 0;
+  // Pour un amortissable classique, la mensualité est constante hors dernier mois d'arrondi :
+  // on prend plutôt le paiement du premier mois de la phase d'amortissement.
+  final mensualiteAffichee = type == LoanType.inFine
+      ? montantEmprunte * i + insuranceMonthly
+      : (deferMonths < months.length ? (months[deferMonths].capital + months[deferMonths].interest + months[deferMonths].insurance) : 0.0);
+
+  // En franchise totale, les intérêts du différé sont capitalisés (ajoutés au
+  // capital restant dû) et non décaissés : seule l'assurance est réellement
+  // payée chaque mois. En franchise partielle, les intérêts sont, eux, payés.
+  final mensualiteDifferee = deferMonths > 0
+      ? (typeDiffere == DeferType.totale ? insuranceMonthly : months[0].capital + months[0].interest + months[0].insurance)
+      : null;
+
+  return LoanResult(
+    years: years,
+    mensualite: mensualiteAffichee,
+    mensualiteDifferee: mensualiteDifferee,
+    assuranceMensuelle: insuranceMonthly,
+    coutTotalCredit: coutTotalCredit,
+    totalAssurance: totalInsurance,
+    coutTotalAvecFrais: coutTotalAvecFrais,
+    montantEmprunte: montantEmprunte,
+    capitalRembourseInFine: type == LoanType.inFine ? montantEmprunte : null,
+  );
 }
 
 String _fmtEuros(double value) {
@@ -779,7 +811,7 @@ class _LegendPill extends StatelessWidget {
 // ---------------------------------------------------------------------
 
 class _LoanChart extends StatefulWidget {
-  final List<_YearBar> years;
+  final List<YearBar> years;
   final Color red;
   final Color blue;
   final Color gold;
@@ -825,7 +857,7 @@ class _LoanChartState extends State<_LoanChart> {
           if (idx != _hoveredYear) setState(() => _hoveredYear = idx);
         }
 
-        _YearBar? hovered = _hoveredYear != null ? widget.years[_hoveredYear!] : null;
+        YearBar? hovered = _hoveredYear != null ? widget.years[_hoveredYear!] : null;
 
         return MouseRegion(
           onHover: (e) => updateHover(e.localPosition),
@@ -941,7 +973,7 @@ class _ChartTooltip extends StatelessWidget {
 }
 
 class _LoanChartPainter extends CustomPainter {
-  final List<_YearBar> years;
+  final List<YearBar> years;
   final Color red;
   final Color blue;
   final Color gold;

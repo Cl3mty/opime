@@ -173,6 +173,9 @@ class _FreenaryAppState extends State<FreenaryApp> {
           'actifs_autres': (_) => const Center(child: Text('Autres')),
           'passifs_emprunts': (_) => const Center(child: Text('Emprunts')),
           'passifs_prets_immobiliers': (_) => const Center(child: Text('Prêts immobiliers')),
+          'enveloppes': (_) => const Center(child: Text('Enveloppes')),
+          'investissement': (_) => const Center(child: Text('Investissement')),
+          'formation': (_) => const Center(child: Text('Formation')),
           'strategie': (_) => StrategyScreen(
             key: ValueKey(_profileController!.activeDataPath),
             vaultPath: _profileController!.activeDataPath,

@@ -199,34 +199,12 @@ class _DemembrementTabState extends State<_DemembrementTab> {
     });
   }
 
-  _DemembrementResult _compute() {
-    final nueProprietePct = _nueProprietePct(_ageUsufruitier);
-    final usufruitPct = 100 - nueProprietePct;
-
-    final valeurNuePropriete = _valeurPleinePropriete * nueProprietePct / 100;
-    final valeurNueProprieteParEnfant = valeurNuePropriete / _nombreEnfants;
-    final valeurPleineParEnfant = _valeurPleinePropriete / _nombreEnfants;
-
-    final taxableNueParEnfant = max(0.0, valeurNueProprieteParEnfant - _abattementParEnfant);
-    final taxablePleineParEnfant = max(0.0, valeurPleineParEnfant - _abattementParEnfant);
-
-    final droitsNueParEnfant = _directLineRights(taxableNueParEnfant);
-    final droitsPleineParEnfant = _directLineRights(taxablePleineParEnfant);
-
-    final droitsTotauxNue = droitsNueParEnfant * _nombreEnfants;
-    final droitsTotauxPleine = droitsPleineParEnfant * _nombreEnfants;
-
-    return _DemembrementResult(
-      nueProprietePct: nueProprietePct,
-      usufruitPct: usufruitPct,
-      valeurNuePropriete: valeurNuePropriete,
-      droitsTotauxNue: droitsTotauxNue,
-      droitsTotauxPleine: droitsTotauxPleine,
-      economiePotentielle: droitsTotauxPleine - droitsTotauxNue,
-      droitsParEnfantNue: droitsNueParEnfant,
-      taxableParEnfantNue: taxableNueParEnfant,
-    );
-  }
+  DemembrementResult _compute() => computeDemembrement(
+        valeurPleinePropriete: _valeurPleinePropriete,
+        ageUsufruitier: _ageUsufruitier,
+        nombreEnfants: _nombreEnfants,
+        abattementParEnfant: _abattementParEnfant,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -341,7 +319,7 @@ class _DonationTab extends StatefulWidget {
 class _DonationTabState extends State<_DonationTab> {
   double _montantDonation = 400000;
   int _nombreDonataires = 2;
-  _DonationRelation _relation = _DonationRelation.enfant;
+  DonationRelation _relation = DonationRelation.enfant;
 
   late final SimulationStateRepository _stateRepo;
 
@@ -360,7 +338,7 @@ class _DonationTabState extends State<_DonationTab> {
       _nombreDonataires = _readInt(data, 'nombreDonataires', _nombreDonataires).clamp(1, 20);
       final relation = data['relation'];
       if (relation is String) {
-        _relation = _DonationRelation.values.firstWhere(
+        _relation = DonationRelation.values.firstWhere(
           (r) => r.name == relation,
           orElse: () => _relation,
         );
@@ -387,29 +365,15 @@ class _DonationTabState extends State<_DonationTab> {
     setState(() {
       _montantDonation = 400000;
       _nombreDonataires = 2;
-      _relation = _DonationRelation.enfant;
+      _relation = DonationRelation.enfant;
     });
   }
 
-  _DonationResult _compute() {
-    final montantParDonataire = _montantDonation / _nombreDonataires;
-    final abattement = _abattementFor(_relation);
-    final taxableParDonataire = max(0.0, montantParDonataire - abattement);
-    final droitsParDonataire = _relation == _DonationRelation.conjoint
-        ? _spouseRights(taxableParDonataire)
-        : _directLineRights(taxableParDonataire);
-
-    final droitsTotaux = droitsParDonataire * _nombreDonataires;
-
-    return _DonationResult(
-      abattementParDonataire: abattement,
-      montantParDonataire: montantParDonataire,
-      taxableParDonataire: taxableParDonataire,
-      droitsParDonataire: droitsParDonataire,
-      droitsTotaux: droitsTotaux,
-      tauxEffectif: _montantDonation <= 0 ? 0 : droitsTotaux / _montantDonation * 100,
-    );
-  }
+  DonationResult _compute() => computeDonation(
+        montantDonation: _montantDonation,
+        nombreDonataires: _nombreDonataires,
+        relation: _relation,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -440,18 +404,18 @@ class _DonationTabState extends State<_DonationTab> {
           ButtonGroup(
             children: [
               SelectedButton(
-                value: _relation == _DonationRelation.enfant,
-                onChanged: (_) => _update(() => _relation = _DonationRelation.enfant),
+                value: _relation == DonationRelation.enfant,
+                onChanged: (_) => _update(() => _relation = DonationRelation.enfant),
                 child: const shadcn.Text('Enfant'),
               ),
               SelectedButton(
-                value: _relation == _DonationRelation.petitEnfant,
-                onChanged: (_) => _update(() => _relation = _DonationRelation.petitEnfant),
+                value: _relation == DonationRelation.petitEnfant,
+                onChanged: (_) => _update(() => _relation = DonationRelation.petitEnfant),
                 child: const shadcn.Text('Petit-enfant'),
               ),
               SelectedButton(
-                value: _relation == _DonationRelation.conjoint,
-                onChanged: (_) => _update(() => _relation = _DonationRelation.conjoint),
+                value: _relation == DonationRelation.conjoint,
+                onChanged: (_) => _update(() => _relation = DonationRelation.conjoint),
                 child: const shadcn.Text('Conjoint/PACS'),
               ),
             ],
@@ -575,23 +539,13 @@ class _InheritanceTabState extends State<_InheritanceTab> {
     });
   }
 
-  _InheritanceResult _compute() {
-    final partConjoint = _conjointSurvivant ? _actifNetSuccessoral * _partConjointPct / 100 : 0.0;
-    final masseEnfants = max(0.0, _actifNetSuccessoral - partConjoint);
-    final partParEnfant = masseEnfants / _nombreEnfants;
-    final taxableParEnfant = max(0.0, partParEnfant - _abattementParEnfant);
-    final droitsParEnfant = _directLineRights(taxableParEnfant);
-
-    return _InheritanceResult(
-      partConjointExoneree: partConjoint,
-      masseTaxableEnfants: masseEnfants,
-      partParEnfant: partParEnfant,
-      taxableParEnfant: taxableParEnfant,
-      droitsParEnfant: droitsParEnfant,
-      droitsTotauxEnfants: droitsParEnfant * _nombreEnfants,
-      netParEnfant: partParEnfant - droitsParEnfant,
-    );
-  }
+  InheritanceResult _compute() => computeInheritance(
+        actifNetSuccessoral: _actifNetSuccessoral,
+        conjointSurvivant: _conjointSurvivant,
+        partConjointPct: _partConjointPct,
+        nombreEnfants: _nombreEnfants,
+        abattementParEnfant: _abattementParEnfant,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -694,7 +648,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
   }
 }
 
-class _DemembrementResult {
+class DemembrementResult {
   final double nueProprietePct;
   final double usufruitPct;
   final double valeurNuePropriete;
@@ -704,7 +658,7 @@ class _DemembrementResult {
   final double droitsParEnfantNue;
   final double taxableParEnfantNue;
 
-  _DemembrementResult({
+  DemembrementResult({
     required this.nueProprietePct,
     required this.usufruitPct,
     required this.valeurNuePropriete,
@@ -716,7 +670,7 @@ class _DemembrementResult {
   });
 }
 
-class _DonationResult {
+class DonationResult {
   final double abattementParDonataire;
   final double montantParDonataire;
   final double taxableParDonataire;
@@ -724,7 +678,7 @@ class _DonationResult {
   final double droitsTotaux;
   final double tauxEffectif;
 
-  _DonationResult({
+  DonationResult({
     required this.abattementParDonataire,
     required this.montantParDonataire,
     required this.taxableParDonataire,
@@ -734,7 +688,7 @@ class _DonationResult {
   });
 }
 
-class _InheritanceResult {
+class InheritanceResult {
   final double partConjointExoneree;
   final double masseTaxableEnfants;
   final double partParEnfant;
@@ -743,7 +697,7 @@ class _InheritanceResult {
   final double droitsTotauxEnfants;
   final double netParEnfant;
 
-  _InheritanceResult({
+  InheritanceResult({
     required this.partConjointExoneree,
     required this.masseTaxableEnfants,
     required this.partParEnfant,
@@ -754,40 +708,138 @@ class _InheritanceResult {
   });
 }
 
-enum _DonationRelation { enfant, petitEnfant, conjoint }
+/// Donation avec réserve d'usufruit : seule la nue-propriété (valorisée selon
+/// l'âge de l'usufruitier, cf. [nueProprietePct]) est transmise et taxée,
+/// l'abattement s'appliquant sur cette base réduite — d'où l'économie fiscale
+/// par rapport à une transmission en pleine propriété.
+DemembrementResult computeDemembrement({
+  required double valeurPleinePropriete,
+  required int ageUsufruitier,
+  required int nombreEnfants,
+  required double abattementParEnfant,
+}) {
+  final nuePct = nueProprietePct(ageUsufruitier);
+  final usufruitPct = 100 - nuePct;
 
-class _TaxBracket {
+  final valeurNuePropriete = valeurPleinePropriete * nuePct / 100;
+  final valeurNueProprieteParEnfant = valeurNuePropriete / nombreEnfants;
+  final valeurPleineParEnfant = valeurPleinePropriete / nombreEnfants;
+
+  final taxableNueParEnfant = max(0.0, valeurNueProprieteParEnfant - abattementParEnfant);
+  final taxablePleineParEnfant = max(0.0, valeurPleineParEnfant - abattementParEnfant);
+
+  final droitsNueParEnfant = directLineRights(taxableNueParEnfant);
+  final droitsPleineParEnfant = directLineRights(taxablePleineParEnfant);
+
+  final droitsTotauxNue = droitsNueParEnfant * nombreEnfants;
+  final droitsTotauxPleine = droitsPleineParEnfant * nombreEnfants;
+
+  return DemembrementResult(
+    nueProprietePct: nuePct,
+    usufruitPct: usufruitPct,
+    valeurNuePropriete: valeurNuePropriete,
+    droitsTotauxNue: droitsTotauxNue,
+    droitsTotauxPleine: droitsTotauxPleine,
+    economiePotentielle: droitsTotauxPleine - droitsTotauxNue,
+    droitsParEnfantNue: droitsNueParEnfant,
+    taxableParEnfantNue: taxableNueParEnfant,
+  );
+}
+
+/// Donation simple répartie à parts égales entre bénéficiaires, avec
+/// abattement et barème dépendant du lien de parenté avec le donateur.
+DonationResult computeDonation({
+  required double montantDonation,
+  required int nombreDonataires,
+  required DonationRelation relation,
+}) {
+  final montantParDonataire = montantDonation / nombreDonataires;
+  final abattement = abattementFor(relation);
+  final taxableParDonataire = max(0.0, montantParDonataire - abattement);
+  final droitsParDonataire = relation == DonationRelation.conjoint
+      ? spouseRights(taxableParDonataire)
+      : directLineRights(taxableParDonataire);
+
+  final droitsTotaux = droitsParDonataire * nombreDonataires;
+
+  return DonationResult(
+    abattementParDonataire: abattement,
+    montantParDonataire: montantParDonataire,
+    taxableParDonataire: taxableParDonataire,
+    droitsParDonataire: droitsParDonataire,
+    droitsTotaux: droitsTotaux,
+    tauxEffectif: montantDonation <= 0 ? 0 : droitsTotaux / montantDonation * 100,
+  );
+}
+
+/// Succession simplifiée : la part attribuée au conjoint survivant est
+/// totalement exonérée (loi TEPA 2007) et retranchée de la masse taxable ;
+/// le solde est réparti à parts égales entre les enfants, chacun bénéficiant
+/// de son propre abattement en ligne directe.
+InheritanceResult computeInheritance({
+  required double actifNetSuccessoral,
+  required bool conjointSurvivant,
+  required double partConjointPct,
+  required int nombreEnfants,
+  required double abattementParEnfant,
+}) {
+  final partConjoint = conjointSurvivant ? actifNetSuccessoral * partConjointPct / 100 : 0.0;
+  final masseEnfants = max(0.0, actifNetSuccessoral - partConjoint);
+  final partParEnfant = masseEnfants / nombreEnfants;
+  final taxableParEnfant = max(0.0, partParEnfant - abattementParEnfant);
+  final droitsParEnfant = directLineRights(taxableParEnfant);
+
+  return InheritanceResult(
+    partConjointExoneree: partConjoint,
+    masseTaxableEnfants: masseEnfants,
+    partParEnfant: partParEnfant,
+    taxableParEnfant: taxableParEnfant,
+    droitsParEnfant: droitsParEnfant,
+    droitsTotauxEnfants: droitsParEnfant * nombreEnfants,
+    netParEnfant: partParEnfant - droitsParEnfant,
+  );
+}
+
+enum DonationRelation { enfant, petitEnfant, conjoint }
+
+class TaxBracket {
   final double upper;
   final double rate;
 
-  const _TaxBracket(this.upper, this.rate);
+  const TaxBracket(this.upper, this.rate);
 }
 
-const _directLineBrackets = [
-  _TaxBracket(8072, 0.05),
-  _TaxBracket(12109, 0.10),
-  _TaxBracket(15932, 0.15),
-  _TaxBracket(552324, 0.20),
-  _TaxBracket(902838, 0.30),
-  _TaxBracket(1805677, 0.40),
-  _TaxBracket(double.infinity, 0.45),
+/// Barème des droits de mutation à titre gratuit en ligne directe
+/// (parent/enfant), article 777 CGI. Inchangé depuis 2011 (non indexé).
+const directLineBrackets = [
+  TaxBracket(8072, 0.05),
+  TaxBracket(12109, 0.10),
+  TaxBracket(15932, 0.15),
+  TaxBracket(552324, 0.20),
+  TaxBracket(902838, 0.30),
+  TaxBracket(1805677, 0.40),
+  TaxBracket(double.infinity, 0.45),
 ];
 
-const _spouseBrackets = [
-  _TaxBracket(8072, 0.05),
-  _TaxBracket(15109, 0.10),
-  _TaxBracket(31865, 0.15),
-  _TaxBracket(552324, 0.20),
-  _TaxBracket(902838, 0.30),
-  _TaxBracket(1805677, 0.40),
-  _TaxBracket(double.infinity, 0.45),
+/// Barème des droits de donation entre époux ou partenaires de PACS,
+/// article 777 CGI (la succession entre époux est, elle, totalement
+/// exonérée depuis la loi TEPA de 2007 — ce barème ne s'applique donc
+/// qu'aux donations).
+const spouseBrackets = [
+  TaxBracket(8072, 0.05),
+  TaxBracket(15932, 0.10),
+  TaxBracket(31865, 0.15),
+  TaxBracket(552324, 0.20),
+  TaxBracket(902838, 0.30),
+  TaxBracket(1805677, 0.40),
+  TaxBracket(double.infinity, 0.45),
 ];
 
-double _directLineRights(double taxable) => _computeRights(taxable, _directLineBrackets);
+double directLineRights(double taxable) => computeRights(taxable, directLineBrackets);
 
-double _spouseRights(double taxable) => _computeRights(taxable, _spouseBrackets);
+double spouseRights(double taxable) => computeRights(taxable, spouseBrackets);
 
-double _computeRights(double taxable, List<_TaxBracket> brackets) {
+double computeRights(double taxable, List<TaxBracket> brackets) {
   var remaining = max(0.0, taxable);
   var previousUpper = 0.0;
   var tax = 0.0;
@@ -803,18 +855,18 @@ double _computeRights(double taxable, List<_TaxBracket> brackets) {
   return tax;
 }
 
-double _abattementFor(_DonationRelation relation) {
+double abattementFor(DonationRelation relation) {
   switch (relation) {
-    case _DonationRelation.enfant:
+    case DonationRelation.enfant:
       return 100000;
-    case _DonationRelation.petitEnfant:
+    case DonationRelation.petitEnfant:
       return 31865;
-    case _DonationRelation.conjoint:
+    case DonationRelation.conjoint:
       return 80724;
   }
 }
 
-double _nueProprietePct(int ageUsufruitier) {
+double nueProprietePct(int ageUsufruitier) {
   if (ageUsufruitier <= 20) return 10;
   if (ageUsufruitier <= 30) return 20;
   if (ageUsufruitier <= 40) return 30;

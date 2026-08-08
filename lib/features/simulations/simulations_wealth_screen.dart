@@ -161,6 +161,8 @@ class _WealthSimpleDisclaimer extends StatelessWidget {
           Expanded(
             child: shadcn.Text(
               "Projection déterministe indicative fondée sur des rendements constants et une fiscalité simplifiée. "
+              "Les valeurs « pouvoir d'achat actuel » actualisent le résultat nominal avec le taux d'inflation renseigné "
+              "(valeur réelle = valeur nominale ÷ (1 + inflation)^années). "
               "Les marchés, frais, impôts réels et aléas de vie peuvent modifier significativement les résultats.",
             ).muted().small(),
           ),
@@ -215,14 +217,14 @@ String _fmtEuros(double value) {
   return '${negative ? '-' : ''}${buffer.toString()} €';
 }
 
-double _gaussian(Random rng, double mean, double stddev) {
+double gaussianSample(Random rng, double mean, double stddev) {
   final u1 = rng.nextDouble().clamp(1e-9, 1.0);
   final u2 = rng.nextDouble();
   final z0 = sqrt(-2 * log(u1)) * cos(2 * pi * u2);
   return mean + z0 * stddev;
 }
 
-double _monthlyRateFromAnnualPct(double annualPct) {
+double monthlyRateFromAnnualPct(double annualPct) {
   final annualGrowthFactor = (1 + annualPct / 100).clamp(0.0, double.infinity);
   if (annualGrowthFactor == 0) return -1;
   return pow(annualGrowthFactor, 1 / 12).toDouble() - 1;
@@ -604,54 +606,19 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
     );
   }
 
-  _SimulationResult _compute() {
-    final initialBourse = _patrimoineActuel * _repartitionInitialeBourse / 100;
-    final initialAutre = _patrimoineActuel * (100 - _repartitionInitialeBourse) / 100;
-    final investBourseMensuel = _investissementsMensuels * _repartitionInvestBourse / 100;
-    final investAutreMensuel = _investissementsMensuels * (100 - _repartitionInvestBourse) / 100;
-    final monthlyRateBourse = _monthlyRateFromAnnualPct(_rendementBourse);
-    final monthlyRateAutre = _monthlyRateFromAnnualPct(_rendementAutre);
-    final totalMonths = _nombreAnnees * 12;
-
-    var bourse = initialBourse;
-    var autre = initialAutre;
-
-    final points = <_YearPoint>[
-      _YearPoint(year: 0, principal: _patrimoineActuel, total: _patrimoineActuel),
-    ];
-
-    for (var month = 1; month <= totalMonths; month++) {
-      bourse = bourse * (1 + monthlyRateBourse) + investBourseMensuel;
-      autre = autre * (1 + monthlyRateAutre) + investAutreMensuel;
-      if (month % 12 == 0) {
-        final year = month ~/ 12;
-        final principal = _patrimoineActuel + _investissementsMensuels * month;
-        points.add(_YearPoint(year: year, principal: principal, total: bourse + autre));
-      }
-    }
-
-    final valeurFuture = bourse + autre;
-    final versements = _investissementsMensuels * totalMonths;
-    final plusValue = valeurFuture - _patrimoineActuel - versements;
-
-    final contributionsBourse = initialBourse + investBourseMensuel * totalMonths;
-    final contributionsAutre = initialAutre + investAutreMensuel * totalMonths;
-    final gainsBourse = (bourse - contributionsBourse).clamp(0, double.infinity);
-    final gainsAutre = (autre - contributionsAutre).clamp(0, double.infinity);
-    final taxes = gainsBourse * _impositionBourse / 100 + gainsAutre * _impositionAutre / 100;
-    final valeurNette = valeurFuture - taxes;
-    final revenuMensuel = valeurNette * _tauxRetrait / 100 / 12;
-
-    return _SimulationResult(
-      points: points,
-      patrimoineInitial: _patrimoineActuel,
-      versements: versements,
-      valeurFuture: valeurFuture,
-      plusValue: plusValue,
-      valeurNette: valeurNette,
-      revenuMensuel: revenuMensuel,
-    );
-  }
+  SimulationResult _compute() => computeWealthProjection(
+        patrimoineActuel: _patrimoineActuel,
+        repartitionInitialeBourse: _repartitionInitialeBourse,
+        investissementsMensuels: _investissementsMensuels,
+        repartitionInvestBourse: _repartitionInvestBourse,
+        nombreAnnees: _nombreAnnees,
+        rendementBourse: _rendementBourse,
+        rendementAutre: _rendementAutre,
+        impositionBourse: _impositionBourse,
+        impositionAutre: _impositionAutre,
+        tauxRetrait: _tauxRetrait,
+        tauxInflation: _tauxInflation,
+      );
 
   Widget _buildInputsContent() {
     return Column(
@@ -782,7 +749,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
     );
   }
 
-  Widget _buildResultsContent(_SimulationResult result) {
+  Widget _buildResultsContent(SimulationResult result) {
     final accent = Theme.of(context).colorScheme.primary;
     final blue = const Color(0xFF7B8FE8);
     final grey = const Color(0xFF6B7280);
@@ -845,6 +812,13 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
             _StatColumn(label: 'Revenu mensuel', value: _fmtEuros(result.revenuMensuel)),
           ],
         ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            _StatColumn(label: 'Valeur nette (pouvoir d\'achat actuel)', value: _fmtEuros(result.valeurNetteReelle)),
+            _StatColumn(label: 'Revenu mensuel (pouvoir d\'achat actuel)', value: _fmtEuros(result.revenuMensuelReel)),
+          ],
+        ),
         const SizedBox(height: 16),
         const _WealthSimpleDisclaimer(),
       ],
@@ -852,23 +826,25 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
   }
 }
 
-class _YearPoint {
+class YearPoint {
   final int year;
   final double principal;
   final double total;
-  _YearPoint({required this.year, required this.principal, required this.total});
+  YearPoint({required this.year, required this.principal, required this.total});
 }
 
-class _SimulationResult {
-  final List<_YearPoint> points;
+class SimulationResult {
+  final List<YearPoint> points;
   final double patrimoineInitial;
   final double versements;
   final double valeurFuture;
   final double plusValue;
   final double valeurNette;
   final double revenuMensuel;
+  final double valeurNetteReelle;
+  final double revenuMensuelReel;
 
-  _SimulationResult({
+  SimulationResult({
     required this.points,
     required this.patrimoineInitial,
     required this.versements,
@@ -876,11 +852,90 @@ class _SimulationResult {
     required this.plusValue,
     required this.valeurNette,
     required this.revenuMensuel,
+    required this.valeurNetteReelle,
+    required this.revenuMensuelReel,
   });
 }
 
+/// Projection déterministe à taux constants, avec versements mensuels
+/// répartis entre les deux "poches" (bourse / autre) selon leurs proportions
+/// respectives, et fiscalité forfaitaire appliquée aux seules plus-values.
+///
+/// [tauxInflation] sert à convertir la valeur nette et le revenu mensuel
+/// nominaux en euros constants (pouvoir d'achat d'aujourd'hui), via
+/// l'actualisation standard `valeur réelle = valeur nominale / (1 + inflation)^n`.
+SimulationResult computeWealthProjection({
+  required double patrimoineActuel,
+  required double repartitionInitialeBourse,
+  required double investissementsMensuels,
+  required double repartitionInvestBourse,
+  required int nombreAnnees,
+  required double rendementBourse,
+  required double rendementAutre,
+  required double impositionBourse,
+  required double impositionAutre,
+  required double tauxRetrait,
+  required double tauxInflation,
+}) {
+  final initialBourse = patrimoineActuel * repartitionInitialeBourse / 100;
+  final initialAutre = patrimoineActuel * (100 - repartitionInitialeBourse) / 100;
+  final investBourseMensuel = investissementsMensuels * repartitionInvestBourse / 100;
+  final investAutreMensuel = investissementsMensuels * (100 - repartitionInvestBourse) / 100;
+  final monthlyRateBourse = monthlyRateFromAnnualPct(rendementBourse);
+  final monthlyRateAutre = monthlyRateFromAnnualPct(rendementAutre);
+  final totalMonths = nombreAnnees * 12;
+
+  var bourse = initialBourse;
+  var autre = initialAutre;
+
+  final points = <YearPoint>[
+    YearPoint(year: 0, principal: patrimoineActuel, total: patrimoineActuel),
+  ];
+
+  for (var month = 1; month <= totalMonths; month++) {
+    bourse = bourse * (1 + monthlyRateBourse) + investBourseMensuel;
+    autre = autre * (1 + monthlyRateAutre) + investAutreMensuel;
+    if (month % 12 == 0) {
+      final year = month ~/ 12;
+      final principal = patrimoineActuel + investissementsMensuels * month;
+      points.add(YearPoint(year: year, principal: principal, total: bourse + autre));
+    }
+  }
+
+  final valeurFuture = bourse + autre;
+  final versements = investissementsMensuels * totalMonths;
+  final plusValue = valeurFuture - patrimoineActuel - versements;
+
+  final contributionsBourse = initialBourse + investBourseMensuel * totalMonths;
+  final contributionsAutre = initialAutre + investAutreMensuel * totalMonths;
+  final gainsBourse = (bourse - contributionsBourse).clamp(0, double.infinity);
+  final gainsAutre = (autre - contributionsAutre).clamp(0, double.infinity);
+  final taxes = gainsBourse * impositionBourse / 100 + gainsAutre * impositionAutre / 100;
+  final valeurNette = valeurFuture - taxes;
+  final revenuMensuel = valeurNette * tauxRetrait / 100 / 12;
+
+  // Actualisation en euros constants : on protège la division contre un
+  // taux d'inflation aberrant (<= -100 %) saisi par l'utilisateur.
+  final croissancePrix = max(0.0001, 1 + tauxInflation / 100);
+  final facteurActualisation = pow(croissancePrix, nombreAnnees).toDouble();
+  final valeurNetteReelle = valeurNette / facteurActualisation;
+  final revenuMensuelReel = revenuMensuel / facteurActualisation;
+
+  return SimulationResult(
+    points: points,
+    patrimoineInitial: patrimoineActuel,
+    versements: versements,
+    valeurFuture: valeurFuture,
+    plusValue: plusValue,
+    valeurNette: valeurNette,
+    revenuMensuel: revenuMensuel,
+    valeurNetteReelle: valeurNetteReelle,
+    revenuMensuelReel: revenuMensuelReel,
+  );
+}
+
 class _ProjectionChart extends StatefulWidget {
-  final List<_YearPoint> points;
+  final List<YearPoint> points;
   final int nombreAnnees;
   final double patrimoineInitial;
   final Color blue;
@@ -929,7 +984,7 @@ class _ProjectionChartState extends State<_ProjectionChart> {
         final chartHeight = height - _bottomAxisHeight;
         double xFor(int year) => _leftAxisWidth + chartWidth * (year / widget.nombreAnnees);
 
-        _YearPoint? hoveredPoint;
+        YearPoint? hoveredPoint;
         if (_hoveredYear != null) hoveredPoint = widget.points[_hoveredYear!];
 
         return MouseRegion(
@@ -1047,7 +1102,7 @@ class _HoverTooltip extends StatelessWidget {
 }
 
 class _ProjectionChartPainter extends CustomPainter {
-  final List<_YearPoint> points;
+  final List<YearPoint> points;
   final int nombreAnnees;
   final double patrimoineInitial;
   final Color blue;
@@ -1335,79 +1390,21 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
     );
   }
 
-  _MCResult _compute() {
-    final rng = Random(12345); // seed fixe : la courbe ne bouge que si les paramètres changent
-    final initialBourse = _patrimoineActuel * _repartitionInitialeBourse / 100;
-    final initialAutre = _patrimoineActuel * (100 - _repartitionInitialeBourse) / 100;
-    final investBourseMensuel = _investissementsMensuels * _repartitionInvestBourse / 100;
-    final investAutreMensuel = _investissementsMensuels * (100 - _repartitionInvestBourse) / 100;
-    final totalMonths = _nombreAnnees * 12;
-
-    final nSims = _nombreSimulations;
-    final totalsByYear = List.generate(_nombreAnnees + 1, (_) => <double>[]);
-    final netValues = <double>[];
-
-    for (var s = 0; s < nSims; s++) {
-      var bourse = initialBourse;
-      var autre = initialAutre;
-      totalsByYear[0].add(_patrimoineActuel);
-      for (var year = 1; year <= _nombreAnnees; year++) {
-        final rBourse = _gaussian(rng, _rendementBourse, _ecartTypeBourse);
-        final rAutre = _gaussian(rng, _rendementAutre, _ecartTypeAutre);
-        final monthlyRateBourse = _monthlyRateFromAnnualPct(rBourse);
-        final monthlyRateAutre = _monthlyRateFromAnnualPct(rAutre);
-        for (var monthInYear = 0; monthInYear < 12; monthInYear++) {
-          bourse = bourse * (1 + monthlyRateBourse) + investBourseMensuel;
-          autre = autre * (1 + monthlyRateAutre) + investAutreMensuel;
-        }
-        totalsByYear[year].add(bourse + autre);
-      }
-      final contributionsBourse = initialBourse + investBourseMensuel * totalMonths;
-      final contributionsAutre = initialAutre + investAutreMensuel * totalMonths;
-      final gainsBourse = (bourse - contributionsBourse).clamp(0, double.infinity);
-      final gainsAutre = (autre - contributionsAutre).clamp(0, double.infinity);
-      final taxes = gainsBourse * _impositionBourse / 100 + gainsAutre * _impositionAutre / 100;
-      netValues.add((bourse + autre) - taxes);
-    }
-
-    double percentile(List<double> sorted, double p) {
-      final idx = ((sorted.length - 1) * p).round().clamp(0, sorted.length - 1);
-      return sorted[idx];
-    }
-
-    final points = <_MCYearPoint>[];
-    for (var year = 0; year <= _nombreAnnees; year++) {
-      final sorted = [...totalsByYear[year]]..sort();
-      points.add(_MCYearPoint(
-        year: year,
-        principal: _patrimoineActuel + _investissementsMensuels * year * 12,
-        p10: percentile(sorted, 0.10),
-        p50: percentile(sorted, 0.50),
-        p90: percentile(sorted, 0.90),
-      ));
-    }
-
-    final sortedNet = [...netValues]..sort();
-    final valeurNetteMediane = percentile(sortedNet, 0.50);
-    final valeurNetteP10 = percentile(sortedNet, 0.10);
-    final valeurNetteP90 = percentile(sortedNet, 0.90);
-    final versements = _investissementsMensuels * totalMonths;
-    final valeurFutureMediane = points.last.p50;
-    final plusValueMediane = valeurFutureMediane - _patrimoineActuel - versements;
-    final revenuMensuelMedian = valeurNetteMediane * _tauxRetrait / 100 / 12;
-
-    return _MCResult(
-      points: points,
-      patrimoineInitial: _patrimoineActuel,
-      versements: versements,
-      valeurFutureMediane: valeurFutureMediane,
-      plusValueMediane: plusValueMediane,
-      valeurNetteMediane: valeurNetteMediane,
-      revenuMensuelMedian: revenuMensuelMedian,
-      valeurNetteP10: valeurNetteP10,
-      valeurNetteP90: valeurNetteP90,
-    );
-  }
+  MCResult _compute() => computeMonteCarloProjection(
+        patrimoineActuel: _patrimoineActuel,
+        repartitionInitialeBourse: _repartitionInitialeBourse,
+        investissementsMensuels: _investissementsMensuels,
+        repartitionInvestBourse: _repartitionInvestBourse,
+        nombreAnnees: _nombreAnnees,
+        rendementBourse: _rendementBourse,
+        ecartTypeBourse: _ecartTypeBourse,
+        rendementAutre: _rendementAutre,
+        ecartTypeAutre: _ecartTypeAutre,
+        impositionBourse: _impositionBourse,
+        impositionAutre: _impositionAutre,
+        tauxRetrait: _tauxRetrait,
+        nombreSimulations: _nombreSimulations,
+      );
 
   Widget _buildInputsContent() {
     return Column(
@@ -1564,7 +1561,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
     );
   }
 
-  Widget _buildResultsContent(_MCResult result) {
+  Widget _buildResultsContent(MCResult result) {
     final accent = Theme.of(context).colorScheme.primary;
     final blue = const Color(0xFF7B8FE8);
     final grey = const Color(0xFF6B7280);
@@ -1638,13 +1635,13 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
   }
 }
 
-class _MCYearPoint {
+class MCYearPoint {
   final int year;
   final double principal;
   final double p10;
   final double p50;
   final double p90;
-  _MCYearPoint({
+  MCYearPoint({
     required this.year,
     required this.principal,
     required this.p10,
@@ -1653,8 +1650,8 @@ class _MCYearPoint {
   });
 }
 
-class _MCResult {
-  final List<_MCYearPoint> points;
+class MCResult {
+  final List<MCYearPoint> points;
   final double patrimoineInitial;
   final double versements;
   final double valeurFutureMediane;
@@ -1664,7 +1661,7 @@ class _MCResult {
   final double valeurNetteP10;
   final double valeurNetteP90;
 
-  _MCResult({
+  MCResult({
     required this.points,
     required this.patrimoineInitial,
     required this.versements,
@@ -1677,8 +1674,107 @@ class _MCResult {
   });
 }
 
+/// Simule [nombreSimulations] trajectoires de patrimoine, en tirant chaque
+/// année un rendement annuel gaussien indépendant par poche (bourse / autre)
+/// autour de la moyenne et de l'écart-type fournis, converti en taux mensuel
+/// composé pour les 12 versements de l'année. Les percentiles (P10/P50/P90)
+/// sont ensuite lus par rang sur les trajectoires triées année par année.
+///
+/// Le générateur aléatoire est initialisé avec une graine fixe par défaut
+/// (comme le faisait l'implémentation d'origine) afin que la courbe affichée
+/// à l'écran ne bouge que lorsque les paramètres changent, pas à chaque
+/// rebuild ; les tests peuvent injecter leur propre [random] pour vérifier
+/// le comportement avec d'autres tirages.
+MCResult computeMonteCarloProjection({
+  required double patrimoineActuel,
+  required double repartitionInitialeBourse,
+  required double investissementsMensuels,
+  required double repartitionInvestBourse,
+  required int nombreAnnees,
+  required double rendementBourse,
+  required double ecartTypeBourse,
+  required double rendementAutre,
+  required double ecartTypeAutre,
+  required double impositionBourse,
+  required double impositionAutre,
+  required double tauxRetrait,
+  required int nombreSimulations,
+  Random? random,
+}) {
+  final rng = random ?? Random(12345);
+  final initialBourse = patrimoineActuel * repartitionInitialeBourse / 100;
+  final initialAutre = patrimoineActuel * (100 - repartitionInitialeBourse) / 100;
+  final investBourseMensuel = investissementsMensuels * repartitionInvestBourse / 100;
+  final investAutreMensuel = investissementsMensuels * (100 - repartitionInvestBourse) / 100;
+  final totalMonths = nombreAnnees * 12;
+
+  final totalsByYear = List.generate(nombreAnnees + 1, (_) => <double>[]);
+  final netValues = <double>[];
+
+  for (var s = 0; s < nombreSimulations; s++) {
+    var bourse = initialBourse;
+    var autre = initialAutre;
+    totalsByYear[0].add(patrimoineActuel);
+    for (var year = 1; year <= nombreAnnees; year++) {
+      final rBourse = gaussianSample(rng, rendementBourse, ecartTypeBourse);
+      final rAutre = gaussianSample(rng, rendementAutre, ecartTypeAutre);
+      final monthlyRateBourse = monthlyRateFromAnnualPct(rBourse);
+      final monthlyRateAutre = monthlyRateFromAnnualPct(rAutre);
+      for (var monthInYear = 0; monthInYear < 12; monthInYear++) {
+        bourse = bourse * (1 + monthlyRateBourse) + investBourseMensuel;
+        autre = autre * (1 + monthlyRateAutre) + investAutreMensuel;
+      }
+      totalsByYear[year].add(bourse + autre);
+    }
+    final contributionsBourse = initialBourse + investBourseMensuel * totalMonths;
+    final contributionsAutre = initialAutre + investAutreMensuel * totalMonths;
+    final gainsBourse = (bourse - contributionsBourse).clamp(0, double.infinity);
+    final gainsAutre = (autre - contributionsAutre).clamp(0, double.infinity);
+    final taxes = gainsBourse * impositionBourse / 100 + gainsAutre * impositionAutre / 100;
+    netValues.add((bourse + autre) - taxes);
+  }
+
+  double percentile(List<double> sorted, double p) {
+    final idx = ((sorted.length - 1) * p).round().clamp(0, sorted.length - 1);
+    return sorted[idx];
+  }
+
+  final points = <MCYearPoint>[];
+  for (var year = 0; year <= nombreAnnees; year++) {
+    final sorted = [...totalsByYear[year]]..sort();
+    points.add(MCYearPoint(
+      year: year,
+      principal: patrimoineActuel + investissementsMensuels * year * 12,
+      p10: percentile(sorted, 0.10),
+      p50: percentile(sorted, 0.50),
+      p90: percentile(sorted, 0.90),
+    ));
+  }
+
+  final sortedNet = [...netValues]..sort();
+  final valeurNetteMediane = percentile(sortedNet, 0.50);
+  final valeurNetteP10 = percentile(sortedNet, 0.10);
+  final valeurNetteP90 = percentile(sortedNet, 0.90);
+  final versements = investissementsMensuels * totalMonths;
+  final valeurFutureMediane = points.last.p50;
+  final plusValueMediane = valeurFutureMediane - patrimoineActuel - versements;
+  final revenuMensuelMedian = valeurNetteMediane * tauxRetrait / 100 / 12;
+
+  return MCResult(
+    points: points,
+    patrimoineInitial: patrimoineActuel,
+    versements: versements,
+    valeurFutureMediane: valeurFutureMediane,
+    plusValueMediane: plusValueMediane,
+    valeurNetteMediane: valeurNetteMediane,
+    revenuMensuelMedian: revenuMensuelMedian,
+    valeurNetteP10: valeurNetteP10,
+    valeurNetteP90: valeurNetteP90,
+  );
+}
+
 class _MonteCarloChart extends StatefulWidget {
-  final List<_MCYearPoint> points;
+  final List<MCYearPoint> points;
   final int nombreAnnees;
   final double patrimoineInitial;
   final Color blue;
@@ -1727,7 +1823,7 @@ class _MonteCarloChartState extends State<_MonteCarloChart> {
         final chartHeight = height - _bottomAxisHeight;
         double xFor(int year) => _leftAxisWidth + chartWidth * (year / widget.nombreAnnees);
 
-        _MCYearPoint? hoveredPoint;
+        MCYearPoint? hoveredPoint;
         if (_hoveredYear != null) hoveredPoint = widget.points[_hoveredYear!];
 
         return MouseRegion(
@@ -1851,7 +1947,7 @@ class _MCHoverTooltip extends StatelessWidget {
 }
 
 class _MonteCarloChartPainter extends CustomPainter {
-  final List<_MCYearPoint> points;
+  final List<MCYearPoint> points;
   final int nombreAnnees;
   final double patrimoineInitial;
   final Color blue;
