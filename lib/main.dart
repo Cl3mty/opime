@@ -14,6 +14,7 @@ import 'app/app_shell.dart';
 import 'core/platform_info.dart';
 import 'core/ui/load_error_view.dart';
 import 'core/ui/mobile_orientation.dart';
+import 'features/dashboard/dashboard_screen.dart';
 import 'features/strategy/strategy_screen.dart';
 import 'package:flutter_quill/flutter_quill.dart'
     show FlutterQuillLocalizations;
@@ -215,7 +216,8 @@ class _FreenaryAppState extends State<FreenaryApp> {
         sidebarPrefsController: _sidebarPrefsController!,
         amountVisibilityController: _amountVisibilityController,
         pages: {
-          'dashboard': (_) => const Center(child: Text('Tableau de bord')),
+          'dashboard': (_) =>
+              DashboardScreen(amountVisibility: _amountVisibilityController),
           'actifs_actions_fonds': (_) =>
               const Center(child: Text('Actions & Fonds')),
           'actifs_private_equity': (_) =>

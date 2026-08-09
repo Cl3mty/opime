@@ -38,7 +38,9 @@ class TopBar extends StatelessWidget {
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.card,
+        // Semi-transparent : le halo/dégradé de AppBackground (qui
+        // enveloppe la TopBar) doit rester visible en transparence.
+        color: theme.colorScheme.card.withValues(alpha: 0.82),
         border: Border(bottom: BorderSide(color: theme.colorScheme.border)),
       ),
       child: Row(

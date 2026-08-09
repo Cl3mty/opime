@@ -127,7 +127,9 @@ class AppSidebar extends StatelessWidget {
         }
 
         return NavigationRail(
-          backgroundColor: theme.colorScheme.card,
+          // Semi-transparent : le halo/dégradé de AppBackground (qui
+          // enveloppe la sidebar) doit rester visible en transparence.
+          backgroundColor: theme.colorScheme.card.withValues(alpha: 0.82),
           labelType: NavigationLabelType.expanded,
           labelPosition: NavigationLabelPosition.end,
           alignment: NavigationRailAlignment.start,

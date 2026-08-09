@@ -9,7 +9,11 @@ class AcademyTakeawayBox extends StatelessWidget {
   final String text;
   final AcademyLevel level;
 
-  const AcademyTakeawayBox({super.key, required this.text, required this.level});
+  const AcademyTakeawayBox({
+    super.key,
+    required this.text,
+    required this.level,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,15 +30,17 @@ class AcademyTakeawayBox extends StatelessWidget {
         children: [
           Icon(LucideIcons.sparkles, size: 16, color: color),
           const SizedBox(width: 10),
+          // Deux Text séparés plutôt qu'un Text.rich/TextSpan : répété
+          // plusieurs fois d'un coup dans un Stepper (formation), ce
+          // dernier bloquait le rendu indéfiniment (SelectableText de
+          // shadcn_flutter dans ce contexte précis).
           Expanded(
-            child: shadcn.Text.rich(
-              TextSpan(
-                style: DefaultTextStyle.of(context).style,
-                children: [
-                  const TextSpan(text: 'À retenir — ', style: TextStyle(fontWeight: FontWeight.w700)),
-                  TextSpan(text: text),
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                shadcn.Text('À retenir').semiBold(),
+                shadcn.Text(text),
+              ],
             ),
           ),
         ],

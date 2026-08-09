@@ -78,12 +78,6 @@ void main() {
       }
     });
 
-    test('le parcours "Lire les comptes" explique ses termes techniques en contexte', () {
-      final track = formationTracks.firstWhere((t) => t.id == 'formation_comptes');
-      for (final step in track.steps) {
-        expect(step.vocabulary, isNotEmpty, reason: step.id);
-      }
-    });
   });
 
   test('tous les identifiants de notions sont uniques (clé de progression partagée)', () {

@@ -34,30 +34,30 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Réglages').large().medium(),
-            const SizedBox(height: 24),
-            _ThemeCard(themeController: themeController),
-            const SizedBox(height: 16),
-            _VersionCard(githubOwner: githubOwner, githubRepo: githubRepo),
-            const SizedBox(height: 16),
-            SidebarVisibilityCard(
-              profileController: profileController,
-              sidebarPrefsController: sidebarPrefsController,
-            ),
-            const SizedBox(height: 16),
-            _VaultCard(
-              vaultFolderService: vaultFolderService,
-              onVaultActivated: onVaultActivated,
-              onNoVaultSelected: onNoVaultSelected,
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
+      // Toute la largeur disponible, comme les autres pages : plus de
+      // ConstrainedBox(maxWidth) qui cantonnait les cartes à une colonne
+      // centrale étroite.
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Réglages').large().medium(),
+          const SizedBox(height: 24),
+          _ThemeCard(themeController: themeController),
+          const SizedBox(height: 16),
+          _VersionCard(githubOwner: githubOwner, githubRepo: githubRepo),
+          const SizedBox(height: 16),
+          SidebarVisibilityCard(
+            profileController: profileController,
+            sidebarPrefsController: sidebarPrefsController,
+          ),
+          const SizedBox(height: 16),
+          _VaultCard(
+            vaultFolderService: vaultFolderService,
+            onVaultActivated: onVaultActivated,
+            onNoVaultSelected: onNoVaultSelected,
+          ),
+          const SizedBox(height: 32),
+        ],
       ),
     );
   }
@@ -226,6 +226,11 @@ class _ThemeCard extends StatelessWidget {
                       children: [
                         SelectedButton(
                           value: mode == ThemeMode.light,
+                          // Le style "selected" par défaut (secondary) est
+                          // presque blanc en thème clair — quasi invisible
+                          // sur le fond de carte, lui aussi clair. primary()
+                          // garantit un contraste net dans les deux thèmes.
+                          selectedStyle: const ButtonStyle.primary(),
                           onChanged: (_) =>
                               themeController.setMode(ThemeMode.light),
                           child: const Row(
@@ -239,6 +244,7 @@ class _ThemeCard extends StatelessWidget {
                         ),
                         SelectedButton(
                           value: mode == ThemeMode.dark,
+                          selectedStyle: const ButtonStyle.primary(),
                           onChanged: (_) =>
                               themeController.setMode(ThemeMode.dark),
                           child: const Row(
@@ -252,6 +258,7 @@ class _ThemeCard extends StatelessWidget {
                         ),
                         SelectedButton(
                           value: mode == ThemeMode.system,
+                          selectedStyle: const ButtonStyle.primary(),
                           onChanged: (_) =>
                               themeController.setMode(ThemeMode.system),
                           child: const Row(

@@ -393,30 +393,32 @@ class _BudgetEditorState extends State<_BudgetEditor> {
             ),
           ),
           const SizedBox(height: 16),
-          IndexedStack(
-            index: _tabIndex,
-            children: [
-              _RevenuesCard(
-                revenues: _data.revenues,
-                onChanged: (revenues) =>
-                    setState(() => _data = _data.copyWith(revenues: revenues)),
+          // Sélection directe plutôt qu'IndexedStack : celui-ci réserve la
+          // hauteur du plus grand des 3 onglets même quand l'onglet actif
+          // est plus court, ce qui décollait le texte/graphique du dessous
+          // d'un écart variable. La donnée vit dans _data (pas dans l'état
+          // interne des cartes), donc rien n'est perdu en changeant d'onglet.
+          [
+            _RevenuesCard(
+              revenues: _data.revenues,
+              onChanged: (revenues) =>
+                  setState(() => _data = _data.copyWith(revenues: revenues)),
+            ),
+            _CategoriesCard(
+              categories: _data.investmentCategories,
+              itemIdPrefix: 'investment',
+              onChanged: (cats) => setState(
+                () => _data = _data.copyWith(investmentCategories: cats),
               ),
-              _CategoriesCard(
-                categories: _data.investmentCategories,
-                itemIdPrefix: 'investment',
-                onChanged: (cats) => setState(
-                  () => _data = _data.copyWith(investmentCategories: cats),
-                ),
+            ),
+            _CategoriesCard(
+              categories: _data.expenseCategories,
+              itemIdPrefix: 'expense',
+              onChanged: (cats) => setState(
+                () => _data = _data.copyWith(expenseCategories: cats),
               ),
-              _CategoriesCard(
-                categories: _data.expenseCategories,
-                itemIdPrefix: 'expense',
-                onChanged: (cats) => setState(
-                  () => _data = _data.copyWith(expenseCategories: cats),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ][_tabIndex],
           const SizedBox(height: 24),
           const Divider(),
           const SizedBox(height: 16),

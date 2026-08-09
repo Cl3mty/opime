@@ -190,14 +190,14 @@ const academieGroup = NavGroup(
           icon: LucideIcons.gem,
         ),
         NavItem(
+          key: 'formation_crypto',
+          label: 'Crypto',
+          icon: LucideIcons.bitcoin,
+        ),
+        NavItem(
           key: 'formation_immobilier',
           label: 'Immobilier',
           icon: LucideIcons.house,
-        ),
-        NavItem(
-          key: 'formation_comptes',
-          label: 'Lire les comptes',
-          icon: LucideIcons.fileSpreadsheet,
         ),
       ],
     ),

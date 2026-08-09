@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../core/privacy/amount_visibility_controller.dart';
 import '../core/profiles/profile_controller.dart';
+import '../core/ui/app_background.dart';
 import '../core/profiles/sidebar_prefs_controller.dart';
 import '../features/navigation/account_switcher_menu.dart';
 import '../features/navigation/app_sidebar.dart';
@@ -181,13 +182,19 @@ class _AppShellState extends State<AppShell> {
       final page =
           widget.pages[_selectedKey]?.call(context) ??
           const Center(child: Text('Page introuvable'));
-      final sidebar = AppSidebar(
-        selectedKey: _selectedKey,
-        onSelect: _select,
-        collapsed: _collapsed,
-        onToggleCollapse: () => setState(() => _collapsed = !_collapsed),
-        profileController: widget.profileController,
-        sidebarPrefsController: widget.sidebarPrefsController,
+      // AppBackground (halo/dégradé) habille uniquement la sidebar et la
+      // TopBar — le contenu de page reste un aplat uni (theme.background),
+      // pas de dégradé dessus. Leur propre fond est semi-transparent (voir
+      // AppSidebar/TopBar) pour laisser le halo transparaître.
+      final sidebar = AppBackground(
+        child: AppSidebar(
+          selectedKey: _selectedKey,
+          onSelect: _select,
+          collapsed: _collapsed,
+          onToggleCollapse: () => setState(() => _collapsed = !_collapsed),
+          profileController: widget.profileController,
+          sidebarPrefsController: widget.sidebarPrefsController,
+        ),
       );
       return Scaffold(
         // SafeArea : sans elle, la sidebar et la TopBar démarrent au tout
@@ -203,9 +210,11 @@ class _AppShellState extends State<AppShell> {
               Expanded(
                 child: Column(
                   children: [
-                    TopBar(
-                      amountVisibility: widget.amountVisibilityController,
-                      onSelect: _select,
+                    AppBackground(
+                      child: TopBar(
+                        amountVisibility: widget.amountVisibilityController,
+                        onSelect: _select,
+                      ),
                     ),
                     Expanded(child: page),
                   ],
@@ -263,6 +272,9 @@ class _AppShellState extends State<AppShell> {
           ],
         ),
       ],
+      // Contenu de page en aplat uni, comme en desktop : pas de dégradé
+      // ici (réservé aux barres — AppBar/NavigationBar restent telles
+      // quelles pour l'instant côté mobile).
       child: _mobileContent(context),
     );
   }

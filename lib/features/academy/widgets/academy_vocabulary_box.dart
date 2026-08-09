@@ -25,7 +25,11 @@ class AcademyVocabularyBox extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(LucideIcons.bookOpenCheck, size: 15, color: theme.colorScheme.mutedForeground),
+              Icon(
+                LucideIcons.bookOpenCheck,
+                size: 15,
+                color: theme.colorScheme.mutedForeground,
+              ),
               const SizedBox(width: 6),
               shadcn.Text('Vocabulaire').semiBold().small(),
             ],
@@ -34,14 +38,16 @@ class AcademyVocabularyBox extends StatelessWidget {
           for (final term in terms)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: shadcn.Text.rich(
-                TextSpan(
-                  style: DefaultTextStyle.of(context).style.copyWith(fontSize: 13),
-                  children: [
-                    TextSpan(text: '${term.term} — ', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    TextSpan(text: term.definition),
-                  ],
-                ),
+              // Deux Text séparés plutôt qu'un seul Text.rich/TextSpan :
+              // ce dernier, répété plusieurs fois dans un Stepper, bloquait
+              // le rendu indéfiniment (SelectableText de shadcn_flutter
+              // dans ce contexte précis colonne+scroll imbriqués).
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  shadcn.Text('${term.term} — ').small().semiBold(),
+                  Expanded(child: shadcn.Text(term.definition).small()),
+                ],
               ),
             ),
         ],

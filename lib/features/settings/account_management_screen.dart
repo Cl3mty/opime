@@ -70,45 +70,42 @@ class _AccountManagementScreenState extends State<AccountManagementScreen> {
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(32),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const shadcn.Text('Comptes').large().medium(),
-                const SizedBox(height: 4),
-                const shadcn.Text(
-                  "Sépare le patrimoine, les budgets et les notes de stratégie de chaque personne. "
-                  "Toutes les données (stratégie, budget, actifs/passifs) sont propres à chaque compte.",
-                ).muted().small(),
-                const SizedBox(height: 20),
-                FrostedCard(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (final profile in profiles) ...[
-                          if (_editingId == profile.id)
-                            _buildEditRow(profile)
-                          else
-                            _buildProfileRow(
-                              profile,
-                              isActive: profile.id == activeId,
-                            ),
-                          const Divider(),
-                        ],
-                        const SizedBox(height: 8),
-                        if (_creating)
-                          _buildCreateForm()
+          // Toute la largeur disponible, comme les autres pages : plus de
+          // ConstrainedBox(maxWidth) qui cantonnait la carte à une colonne
+          // centrale étroite.
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const shadcn.Text('Comptes').large().medium(),
+              const SizedBox(height: 4),
+              const shadcn.Text(
+                "Sépare le patrimoine, les budgets et les notes de stratégie de chaque personne. "
+                "Toutes les données (stratégie, budget, actifs/passifs) sont propres à chaque compte.",
+              ).muted().small(),
+              const SizedBox(height: 20),
+              FrostedCard(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final profile in profiles) ...[
+                        if (_editingId == profile.id)
+                          _buildEditRow(profile)
                         else
-                          _buildAddButton(),
+                          _buildProfileRow(
+                            profile,
+                            isActive: profile.id == activeId,
+                          ),
+                        const Divider(),
                       ],
-                    ),
+                      const SizedBox(height: 8),
+                      if (_creating) _buildCreateForm() else _buildAddButton(),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },

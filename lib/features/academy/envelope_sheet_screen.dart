@@ -5,6 +5,7 @@ import '../../core/academy/academy_progress_controller.dart';
 import '../../core/academy/academy_progress_repository.dart';
 import '../../core/ui/frosted_card.dart';
 import 'academy_theme.dart';
+import 'widgets/academy_disclaimer.dart';
 import 'widgets/academy_level_badge.dart';
 import 'widgets/academy_progress_toggle.dart';
 
@@ -51,6 +52,7 @@ class _EnvelopeSheetScreenState extends State<EnvelopeSheetScreen> {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: FrostedCard(
+        expand: true,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
@@ -150,6 +152,8 @@ class _EnvelopeSheetScreenState extends State<EnvelopeSheetScreen> {
                   stepId: envelope.id,
                   level: envelope.level,
                 ),
+                const SizedBox(height: 20),
+                const AcademyDisclaimer(),
               ],
             ),
           ),
