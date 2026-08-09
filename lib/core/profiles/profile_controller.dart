@@ -22,7 +22,7 @@ class ProfileController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Profile _findOrMaster(String? id) {
+  Profile? _findOrMaster(String? id) {
     if (id != null) {
       for (final p in profiles) {
         if (p.id == id) return p;
@@ -31,7 +31,7 @@ class ProfileController extends ChangeNotifier {
     for (final p in profiles) {
       if (p.isMaster) return p;
     }
-    return profiles.first;
+    return profiles.firstOrNull;
   }
 
   Future<void> switchTo(String id) async {
@@ -46,13 +46,23 @@ class ProfileController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createProfile({required String name, required String relationship}) async {
-    final profile = await repository.create(name: name, relationship: relationship);
+  Future<void> createProfile({
+    required String name,
+    required String relationship,
+  }) async {
+    final profile = await repository.create(
+      name: name,
+      relationship: relationship,
+    );
     profiles = await repository.listAll();
     await switchTo(profile.id);
   }
 
-  Future<void> renameProfile(String id, {required String name, required String relationship}) async {
+  Future<void> renameProfile(
+    String id, {
+    required String name,
+    required String relationship,
+  }) async {
     await repository.rename(id, name: name, relationship: relationship);
     profiles = await repository.listAll();
     active = _findOrMaster(active?.id);

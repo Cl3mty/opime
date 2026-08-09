@@ -12,7 +12,11 @@ class WealthSimulationScreen extends StatefulWidget {
   final String vaultPath;
   final AmountVisibilityController amountVisibility;
 
-  const WealthSimulationScreen({super.key, required this.vaultPath, required this.amountVisibility});
+  const WealthSimulationScreen({
+    super.key,
+    required this.vaultPath,
+    required this.amountVisibility,
+  });
 
   @override
   State<WealthSimulationScreen> createState() => _WealthSimulationScreenState();
@@ -55,27 +59,56 @@ class _WealthSimulationScreenState extends State<WealthSimulationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TabList(
-                index: _tabIndex,
-                onChanged: (value) {
-                  setState(() => _tabIndex = value);
-                  _saveState();
-                },
-                children: const [
-                  TabItem(child: shadcn.Text('Déterministe (Intérêts composés)')),
-                  TabItem(child: shadcn.Text('Stochastique (Monte-Carlo)')),
-                ],
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compactLabels = constraints.maxWidth < 500;
+              // Align + scroll horizontal plutôt qu'un simple Row centré :
+              // même en version courte, "Intérêts composés" peut forcer les
+              // tabs à passer sur deux lignes sur les téléphones les plus
+              // étroits (le Row leur donne une largeur non bornée dans
+              // laquelle Text s'enroule). Centré quand tout tient, défilable
+              // sinon.
+              return Align(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: TabList(
+                    index: _tabIndex,
+                    onChanged: (value) {
+                      setState(() => _tabIndex = value);
+                      _saveState();
+                    },
+                    children: [
+                      TabItem(
+                        child: shadcn.Text(
+                          compactLabels
+                              ? 'Intérêts composés'
+                              : 'Déterministe (Intérêts composés)',
+                        ),
+                      ),
+                      TabItem(
+                        child: shadcn.Text(
+                          compactLabels
+                              ? 'Monte-Carlo'
+                              : 'Stochastique (Monte-Carlo)',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 16),
           Expanded(
             child: _tabIndex == 0
-                ? _SimpleSimulationTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility)
-                : _MonteCarloSimulationTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility),
+                ? _SimpleSimulationTab(
+                    vaultPath: widget.vaultPath,
+                    amountVisibility: widget.amountVisibility,
+                  )
+                : _MonteCarloSimulationTab(
+                    vaultPath: widget.vaultPath,
+                    amountVisibility: widget.amountVisibility,
+                  ),
           ),
         ],
       ),
@@ -101,15 +134,9 @@ class _SimulationSplitCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: left,
-                  ),
+                  Padding(padding: const EdgeInsets.all(20), child: left),
                   const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: right,
-                  ),
+                  Padding(padding: const EdgeInsets.all(20), child: right),
                 ],
               ),
             );
@@ -122,18 +149,14 @@ class _SimulationSplitCard extends StatelessWidget {
                 width: 360,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: SingleChildScrollView(
-                    child: left,
-                  ),
+                  child: SingleChildScrollView(child: left),
                 ),
               ),
               const VerticalDivider(width: 1),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: SingleChildScrollView(
-                    child: right,
-                  ),
+                  child: SingleChildScrollView(child: right),
                 ),
               ),
             ],
@@ -311,8 +334,13 @@ class _NumberFieldState extends State<_NumberField> {
                 controller: _controller,
                 focusNode: _focusNode,
                 border: Border.all(color: Colors.transparent),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 onChanged: (text) {
                   final parsed = double.tryParse(text.replaceAll(',', '.'));
                   if (parsed != null) widget.onChanged(parsed);
@@ -387,12 +415,18 @@ class _SplitSlider extends StatelessWidget {
                   children: [
                     Container(
                       height: 4,
-                      decoration: BoxDecoration(color: track, borderRadius: BorderRadius.circular(2)),
+                      decoration: BoxDecoration(
+                        color: track,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                     Container(
                       height: 4,
                       width: width * (value / 100),
-                      decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(2)),
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                     Positioned(
                       left: (width * (value / 100) - 10).clamp(0, width - 20),
@@ -416,20 +450,30 @@ class _SplitSlider extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            shadcn.Text.rich(TextSpan(
-              style: DefaultTextStyle.of(context).style,
-              children: [
-                TextSpan(text: '$leftLabel '),
-                TextSpan(text: '${value.round()} %', style: const TextStyle(fontWeight: FontWeight.bold)),
-              ],
-            )),
-            shadcn.Text.rich(TextSpan(
-              style: DefaultTextStyle.of(context).style,
-              children: [
-                TextSpan(text: '$rightLabel '),
-                TextSpan(text: '${(100 - value).round()} %', style: const TextStyle(fontWeight: FontWeight.bold)),
-              ],
-            )),
+            shadcn.Text.rich(
+              TextSpan(
+                style: DefaultTextStyle.of(context).style,
+                children: [
+                  TextSpan(text: '$leftLabel '),
+                  TextSpan(
+                    text: '${value.round()} %',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            shadcn.Text.rich(
+              TextSpan(
+                style: DefaultTextStyle.of(context).style,
+                children: [
+                  TextSpan(text: '$rightLabel '),
+                  TextSpan(
+                    text: '${(100 - value).round()} %',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ],
@@ -441,7 +485,11 @@ class _LegendPill extends StatelessWidget {
   final Color color;
   final String label;
   final String value;
-  const _LegendPill({required this.color, required this.label, required this.value});
+  const _LegendPill({
+    required this.color,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -454,11 +502,18 @@ class _LegendPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 8),
           shadcn.Text(label).small(),
           const SizedBox(width: 6),
-          shadcn.Text(value, style: const TextStyle(fontWeight: FontWeight.bold)).small(),
+          shadcn.Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ).small(),
         ],
       ),
     );
@@ -468,18 +523,62 @@ class _LegendPill extends StatelessWidget {
 class _StatColumn extends StatelessWidget {
   final String label;
   final String value;
-  const _StatColumn({required this.label, required this.value});
+  final bool expand;
+  const _StatColumn({
+    required this.label,
+    required this.value,
+    this.expand = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          shadcn.Text(label).muted().small(),
-          const SizedBox(height: 4),
-          shadcn.Text(value).medium(),
-        ],
-      ),
+    final content = Column(
+      crossAxisAlignment: expand
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        shadcn.Text(label).muted().small(),
+        const SizedBox(height: 4),
+        shadcn.Text(value).medium(),
+      ],
+    );
+    return expand ? Expanded(child: content) : content;
+  }
+}
+
+/// Ligne de statistiques sous un graphique : les valeurs restent côte à
+/// côte si la largeur le permet, sinon s'empilent en colonne pour ne pas
+/// écraser des montants qui peuvent être grands (notamment sur mobile).
+class _StatRow extends StatelessWidget {
+  final List<(String, String)> items;
+  const _StatRow({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 420) {
+          return Row(
+            children: [
+              for (final item in items)
+                _StatColumn(label: item.$1, value: item.$2),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              _StatColumn(
+                label: items[i].$1,
+                value: items[i].$2,
+                expand: false,
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -492,7 +591,10 @@ class _SimpleSimulationTab extends StatefulWidget {
   final String vaultPath;
   final AmountVisibilityController amountVisibility;
 
-  const _SimpleSimulationTab({required this.vaultPath, required this.amountVisibility});
+  const _SimpleSimulationTab({
+    required this.vaultPath,
+    required this.amountVisibility,
+  });
 
   @override
   State<_SimpleSimulationTab> createState() => _SimpleSimulationTabState();
@@ -534,17 +636,57 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
     final data = await _stateRepo.read('wealth_simple');
     if (!mounted || data.isEmpty) return;
     setState(() {
-      _patrimoineActuel = _readDouble(data, 'patrimoineActuel', fallback: _patrimoineActuel);
-      _repartitionInitialeBourse = _readDouble(data, 'repartitionInitialeBourse', fallback: _repartitionInitialeBourse).clamp(0, 100);
-      _investissementsMensuels = _readDouble(data, 'investissementsMensuels', fallback: _investissementsMensuels);
-      _repartitionInvestBourse = _readDouble(data, 'repartitionInvestBourse', fallback: _repartitionInvestBourse).clamp(0, 100);
-      _nombreAnnees = _readInt(data, 'nombreAnnees', fallback: _nombreAnnees).clamp(1, 60);
-      _rendementBourse = _readDouble(data, 'rendementBourse', fallback: _rendementBourse);
-      _rendementAutre = _readDouble(data, 'rendementAutre', fallback: _rendementAutre);
-      _impositionBourse = _readDouble(data, 'impositionBourse', fallback: _impositionBourse);
-      _impositionAutre = _readDouble(data, 'impositionAutre', fallback: _impositionAutre);
+      _patrimoineActuel = _readDouble(
+        data,
+        'patrimoineActuel',
+        fallback: _patrimoineActuel,
+      );
+      _repartitionInitialeBourse = _readDouble(
+        data,
+        'repartitionInitialeBourse',
+        fallback: _repartitionInitialeBourse,
+      ).clamp(0, 100);
+      _investissementsMensuels = _readDouble(
+        data,
+        'investissementsMensuels',
+        fallback: _investissementsMensuels,
+      );
+      _repartitionInvestBourse = _readDouble(
+        data,
+        'repartitionInvestBourse',
+        fallback: _repartitionInvestBourse,
+      ).clamp(0, 100);
+      _nombreAnnees = _readInt(
+        data,
+        'nombreAnnees',
+        fallback: _nombreAnnees,
+      ).clamp(1, 60);
+      _rendementBourse = _readDouble(
+        data,
+        'rendementBourse',
+        fallback: _rendementBourse,
+      );
+      _rendementAutre = _readDouble(
+        data,
+        'rendementAutre',
+        fallback: _rendementAutre,
+      );
+      _impositionBourse = _readDouble(
+        data,
+        'impositionBourse',
+        fallback: _impositionBourse,
+      );
+      _impositionAutre = _readDouble(
+        data,
+        'impositionAutre',
+        fallback: _impositionAutre,
+      );
       _tauxRetrait = _readDouble(data, 'tauxRetrait', fallback: _tauxRetrait);
-      _tauxInflation = _readDouble(data, 'tauxInflation', fallback: _tauxInflation);
+      _tauxInflation = _readDouble(
+        data,
+        'tauxInflation',
+        fallback: _tauxInflation,
+      );
     });
   }
 
@@ -587,7 +729,11 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
     });
   }
 
-  double _readDouble(Map<String, dynamic> json, String key, {required double fallback}) {
+  double _readDouble(
+    Map<String, dynamic> json,
+    String key, {
+    required double fallback,
+  }) {
     final value = json[key];
     if (value is num) return value.toDouble();
     return fallback;
@@ -610,18 +756,18 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
   }
 
   SimulationResult _compute() => computeWealthProjection(
-        patrimoineActuel: _patrimoineActuel,
-        repartitionInitialeBourse: _repartitionInitialeBourse,
-        investissementsMensuels: _investissementsMensuels,
-        repartitionInvestBourse: _repartitionInvestBourse,
-        nombreAnnees: _nombreAnnees,
-        rendementBourse: _rendementBourse,
-        rendementAutre: _rendementAutre,
-        impositionBourse: _impositionBourse,
-        impositionAutre: _impositionAutre,
-        tauxRetrait: _tauxRetrait,
-        tauxInflation: _tauxInflation,
-      );
+    patrimoineActuel: _patrimoineActuel,
+    repartitionInitialeBourse: _repartitionInitialeBourse,
+    investissementsMensuels: _investissementsMensuels,
+    repartitionInvestBourse: _repartitionInvestBourse,
+    nombreAnnees: _nombreAnnees,
+    rendementBourse: _rendementBourse,
+    rendementAutre: _rendementAutre,
+    impositionBourse: _impositionBourse,
+    impositionAutre: _impositionAutre,
+    tauxRetrait: _tauxRetrait,
+    tauxInflation: _tauxInflation,
+  );
 
   Widget _buildInputsContent() {
     return Column(
@@ -662,7 +808,8 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
           value: _nombreAnnees.toDouble(),
           step: 1,
           decimals: 0,
-          onChanged: (v) => _update(() => _nombreAnnees = v.round().clamp(1, 60)),
+          onChanged: (v) =>
+              _update(() => _nombreAnnees = v.round().clamp(1, 60)),
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -784,9 +931,21 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _LegendPill(color: grey, label: 'Patrimoine initial', value: displayEuros(result.patrimoineInitial, hidden)),
-            _LegendPill(color: blue, label: 'Versements', value: displayEuros(result.versements, hidden)),
-            _LegendPill(color: accent, label: 'Intérêts nets', value: displayEuros(result.plusValue, hidden)),
+            _LegendPill(
+              color: grey,
+              label: 'Patrimoine initial',
+              value: displayEuros(result.patrimoineInitial, hidden),
+            ),
+            _LegendPill(
+              color: blue,
+              label: 'Versements',
+              value: displayEuros(result.versements, hidden),
+            ),
+            _LegendPill(
+              color: accent,
+              label: 'Intérêts nets',
+              value: displayEuros(result.plusValue, hidden),
+            ),
           ],
         ),
         const SizedBox(height: 24),
@@ -808,19 +967,25 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
         const SizedBox(height: 24),
         const Divider(),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            _StatColumn(label: 'Valeur future', value: displayEuros(result.valeurFuture, hidden)),
-            _StatColumn(label: 'Dont plus-value', value: displayEuros(result.plusValue, hidden)),
-            _StatColumn(label: 'Valeur nette', value: displayEuros(result.valeurNette, hidden)),
-            _StatColumn(label: 'Revenu mensuel', value: displayEuros(result.revenuMensuel, hidden)),
+        _StatRow(
+          items: [
+            ('Valeur future', displayEuros(result.valeurFuture, hidden)),
+            ('Dont plus-value', displayEuros(result.plusValue, hidden)),
+            ('Valeur nette', displayEuros(result.valeurNette, hidden)),
+            ('Revenu mensuel', displayEuros(result.revenuMensuel, hidden)),
           ],
         ),
         const SizedBox(height: 14),
-        Row(
-          children: [
-            _StatColumn(label: 'Valeur nette (pouvoir d\'achat actuel)', value: displayEuros(result.valeurNetteReelle, hidden)),
-            _StatColumn(label: 'Revenu mensuel (pouvoir d\'achat actuel)', value: displayEuros(result.revenuMensuelReel, hidden)),
+        _StatRow(
+          items: [
+            (
+              'Valeur nette (pouvoir d\'achat actuel)',
+              displayEuros(result.valeurNetteReelle, hidden),
+            ),
+            (
+              'Revenu mensuel (pouvoir d\'achat actuel)',
+              displayEuros(result.revenuMensuelReel, hidden),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -882,9 +1047,12 @@ SimulationResult computeWealthProjection({
   required double tauxInflation,
 }) {
   final initialBourse = patrimoineActuel * repartitionInitialeBourse / 100;
-  final initialAutre = patrimoineActuel * (100 - repartitionInitialeBourse) / 100;
-  final investBourseMensuel = investissementsMensuels * repartitionInvestBourse / 100;
-  final investAutreMensuel = investissementsMensuels * (100 - repartitionInvestBourse) / 100;
+  final initialAutre =
+      patrimoineActuel * (100 - repartitionInitialeBourse) / 100;
+  final investBourseMensuel =
+      investissementsMensuels * repartitionInvestBourse / 100;
+  final investAutreMensuel =
+      investissementsMensuels * (100 - repartitionInvestBourse) / 100;
   final monthlyRateBourse = monthlyRateFromAnnualPct(rendementBourse);
   final monthlyRateAutre = monthlyRateFromAnnualPct(rendementAutre);
   final totalMonths = nombreAnnees * 12;
@@ -902,7 +1070,9 @@ SimulationResult computeWealthProjection({
     if (month % 12 == 0) {
       final year = month ~/ 12;
       final principal = patrimoineActuel + investissementsMensuels * month;
-      points.add(YearPoint(year: year, principal: principal, total: bourse + autre));
+      points.add(
+        YearPoint(year: year, principal: principal, total: bourse + autre),
+      );
     }
   }
 
@@ -914,7 +1084,8 @@ SimulationResult computeWealthProjection({
   final contributionsAutre = initialAutre + investAutreMensuel * totalMonths;
   final gainsBourse = (bourse - contributionsBourse).clamp(0, double.infinity);
   final gainsAutre = (autre - contributionsAutre).clamp(0, double.infinity);
-  final taxes = gainsBourse * impositionBourse / 100 + gainsAutre * impositionAutre / 100;
+  final taxes =
+      gainsBourse * impositionBourse / 100 + gainsAutre * impositionAutre / 100;
   final valeurNette = valeurFuture - taxes;
   final revenuMensuel = valeurNette * tauxRetrait / 100 / 12;
 
@@ -975,8 +1146,14 @@ class _ProjectionChartState extends State<_ProjectionChart> {
 
   void _updateHover(Offset localPosition, double width) {
     final chartWidth = width - _leftAxisWidth;
-    final fraction = ((localPosition.dx - _leftAxisWidth) / chartWidth).clamp(0.0, 1.0);
-    final year = (fraction * widget.nombreAnnees).round().clamp(0, widget.nombreAnnees);
+    final fraction = ((localPosition.dx - _leftAxisWidth) / chartWidth).clamp(
+      0.0,
+      1.0,
+    );
+    final year = (fraction * widget.nombreAnnees).round().clamp(
+      0,
+      widget.nombreAnnees,
+    );
     if (year != _hoveredYear) setState(() => _hoveredYear = year);
   }
 
@@ -988,7 +1165,8 @@ class _ProjectionChartState extends State<_ProjectionChart> {
         final height = constraints.maxHeight;
         final chartWidth = width - _leftAxisWidth;
         final chartHeight = height - _bottomAxisHeight;
-        double xFor(int year) => _leftAxisWidth + chartWidth * (year / widget.nombreAnnees);
+        double xFor(int year) =>
+            _leftAxisWidth + chartWidth * (year / widget.nombreAnnees);
 
         YearPoint? hoveredPoint;
         if (_hoveredYear != null) hoveredPoint = widget.points[_hoveredYear!];
@@ -996,41 +1174,54 @@ class _ProjectionChartState extends State<_ProjectionChart> {
         return MouseRegion(
           onHover: (event) => _updateHover(event.localPosition, width),
           onExit: (_) => setState(() => _hoveredYear = null),
-          child: Stack(
-            children: [
-              CustomPaint(
-                size: Size(width, height),
-                painter: _ProjectionChartPainter(
-                  points: widget.points,
-                  nombreAnnees: widget.nombreAnnees,
-                  patrimoineInitial: widget.patrimoineInitial,
-                  blue: widget.blue,
-                  gold: widget.gold,
-                  grey: widget.grey,
-                  textColor: widget.textColor,
-                  gridColor: widget.gridColor,
-                  hoveredYear: _hoveredYear,
-                  hidden: widget.hidden,
-                ),
-              ),
-              if (hoveredPoint != null)
-                Positioned(
-                  left: (xFor(_hoveredYear!) - 150).clamp(_leftAxisWidth, width - 300),
-                  top: (chartHeight / 2 - 90).clamp(0, chartHeight - 180),
-                  child: _HoverTooltip(
-                    year: _hoveredYear!,
-                    total: hoveredPoint.total,
-                    interet: hoveredPoint.total - hoveredPoint.principal,
-                    versements: hoveredPoint.principal - widget.patrimoineInitial,
+          child: GestureDetector(
+            onPanDown: (details) => _updateHover(details.localPosition, width),
+            onPanUpdate: (details) =>
+                _updateHover(details.localPosition, width),
+            onPanEnd: (_) => setState(() => _hoveredYear = null),
+            child: Stack(
+              children: [
+                CustomPaint(
+                  size: Size(width, height),
+                  painter: _ProjectionChartPainter(
+                    points: widget.points,
+                    nombreAnnees: widget.nombreAnnees,
                     patrimoineInitial: widget.patrimoineInitial,
                     blue: widget.blue,
                     gold: widget.gold,
                     grey: widget.grey,
-                    cardColor: widget.cardColor,
+                    textColor: widget.textColor,
+                    gridColor: widget.gridColor,
+                    hoveredYear: _hoveredYear,
                     hidden: widget.hidden,
                   ),
                 ),
-            ],
+                if (hoveredPoint != null)
+                  Positioned(
+                    left: (xFor(_hoveredYear!) - 150).clamp(
+                      _leftAxisWidth,
+                      max(_leftAxisWidth, width - 300),
+                    ),
+                    top: (chartHeight / 2 - 90).clamp(
+                      0,
+                      max(0.0, chartHeight - 180),
+                    ),
+                    child: _HoverTooltip(
+                      year: _hoveredYear!,
+                      total: hoveredPoint.total,
+                      interet: hoveredPoint.total - hoveredPoint.principal,
+                      versements:
+                          hoveredPoint.principal - widget.patrimoineInitial,
+                      patrimoineInitial: widget.patrimoineInitial,
+                      blue: widget.blue,
+                      gold: widget.gold,
+                      grey: widget.grey,
+                      cardColor: widget.cardColor,
+                      hidden: widget.hidden,
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -1080,9 +1271,17 @@ class _HoverTooltip extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                shadcn.Text(year == 0 ? "Aujourd'hui" : 'Dans $year ans').muted(),
+                shadcn.Text(
+                  year == 0 ? "Aujourd'hui" : 'Dans $year ans',
+                ).muted(),
                 const SizedBox(height: 4),
-                shadcn.Text(displayEuros(total, hidden), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                shadcn.Text(
+                  displayEuros(total, hidden),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 const Divider(),
                 const SizedBox(height: 8),
@@ -1102,10 +1301,17 @@ class _HoverTooltip extends StatelessWidget {
   Widget _row(String label, double value, Color color) {
     return Row(
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 8),
         Expanded(child: shadcn.Text(label)),
-        shadcn.Text(displayEuros(value, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
+        shadcn.Text(
+          displayEuros(value, hidden),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
@@ -1154,11 +1360,18 @@ class _ProjectionChartPainter extends CustomPainter {
     for (var i = 0; i <= gridLines; i++) {
       final v = step * i;
       final y = yFor(v);
-      canvas.drawLine(Offset(leftAxisWidth, y), Offset(size.width, y), Paint()
-        ..color = gridColor.withValues(alpha: 0.4)
-        ..strokeWidth = 1);
+      canvas.drawLine(
+        Offset(leftAxisWidth, y),
+        Offset(size.width, y),
+        Paint()
+          ..color = gridColor.withValues(alpha: 0.4)
+          ..strokeWidth = 1,
+      );
       final tp = TextPainter(
-        text: TextSpan(text: displayEurosCompact(v, hidden), style: TextStyle(color: textColor, fontSize: 11)),
+        text: TextSpan(
+          text: displayEurosCompact(v, hidden),
+          style: TextStyle(color: textColor, fontSize: 11),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftAxisWidth - tp.width - 8, y - tp.height / 2));
@@ -1172,7 +1385,10 @@ class _ProjectionChartPainter extends CustomPainter {
       ..lineTo(xFor(nombreAnnees), chartHeight)
       ..lineTo(xFor(0), chartHeight)
       ..close();
-    canvas.drawPath(baselineAreaPath, Paint()..color = grey.withValues(alpha: 0.15));
+    canvas.drawPath(
+      baselineAreaPath,
+      Paint()..color = grey.withValues(alpha: 0.15),
+    );
 
     final principalBandPath = Path()..moveTo(xFor(0), baselineY);
     for (final p in points) {
@@ -1181,7 +1397,10 @@ class _ProjectionChartPainter extends CustomPainter {
     principalBandPath
       ..lineTo(xFor(nombreAnnees), baselineY)
       ..close();
-    canvas.drawPath(principalBandPath, Paint()..color = blue.withValues(alpha: 0.15));
+    canvas.drawPath(
+      principalBandPath,
+      Paint()..color = blue.withValues(alpha: 0.15),
+    );
 
     final interestPath = Path()..moveTo(xFor(0), yFor(points.first.principal));
     for (final p in points) {
@@ -1191,29 +1410,42 @@ class _ProjectionChartPainter extends CustomPainter {
       interestPath.lineTo(xFor(points[i].year), yFor(points[i].principal));
     }
     interestPath.close();
-    canvas.drawPath(interestPath, Paint()..color = gold.withValues(alpha: 0.18));
+    canvas.drawPath(
+      interestPath,
+      Paint()..color = gold.withValues(alpha: 0.18),
+    );
 
-    canvas.drawLine(Offset(leftAxisWidth, baselineY), Offset(size.width, baselineY), Paint()
-      ..color = grey.withValues(alpha: 0.6)
-      ..strokeWidth = 1.5);
+    canvas.drawLine(
+      Offset(leftAxisWidth, baselineY),
+      Offset(size.width, baselineY),
+      Paint()
+        ..color = grey.withValues(alpha: 0.6)
+        ..strokeWidth = 1.5,
+    );
 
     final bluePath = Path()..moveTo(xFor(0), yFor(points.first.principal));
     for (final p in points) {
       bluePath.lineTo(xFor(p.year), yFor(p.principal));
     }
-    canvas.drawPath(bluePath, Paint()
-      ..color = blue
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2);
+    canvas.drawPath(
+      bluePath,
+      Paint()
+        ..color = blue
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
 
     final goldPath = Path()..moveTo(xFor(0), yFor(points.first.total));
     for (final p in points) {
       goldPath.lineTo(xFor(p.year), yFor(p.total));
     }
-    canvas.drawPath(goldPath, Paint()
-      ..color = gold
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2);
+    canvas.drawPath(
+      goldPath,
+      Paint()
+        ..color = gold
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
 
     if (hoveredYear != null) {
       final p = points[hoveredYear!];
@@ -1224,9 +1456,29 @@ class _ProjectionChartPainter extends CustomPainter {
       _drawDot(canvas, Offset(x, baselineY), grey);
     }
 
-    _drawXLabel(canvas, "Aujourd'hui", xFor(0), chartHeight, textColor, alignLeft: true);
-    _drawXLabel(canvas, '${nombreAnnees ~/ 2} ans', xFor(nombreAnnees ~/ 2), chartHeight, textColor);
-    _drawXLabel(canvas, 'dans $nombreAnnees ans', xFor(nombreAnnees), chartHeight, textColor, alignLeft: false);
+    _drawXLabel(
+      canvas,
+      "Aujourd'hui",
+      xFor(0),
+      chartHeight,
+      textColor,
+      alignLeft: true,
+    );
+    _drawXLabel(
+      canvas,
+      '${nombreAnnees ~/ 2} ans',
+      xFor(nombreAnnees ~/ 2),
+      chartHeight,
+      textColor,
+    );
+    _drawXLabel(
+      canvas,
+      'dans $nombreAnnees ans',
+      xFor(nombreAnnees),
+      chartHeight,
+      textColor,
+      alignLeft: false,
+    );
   }
 
   void _drawDashedLine(Canvas canvas, Offset start, Offset end, Color color) {
@@ -1240,7 +1492,8 @@ class _ProjectionChartPainter extends CustomPainter {
     final direction = (end - start) / totalLength;
     while (covered < totalLength) {
       final segStart = start + direction * covered;
-      final segEnd = start + direction * (covered + dashLength).clamp(0, totalLength);
+      final segEnd =
+          start + direction * (covered + dashLength).clamp(0, totalLength);
       canvas.drawLine(segStart, segEnd, paint);
       covered += dashLength + gapLength;
     }
@@ -1248,15 +1501,29 @@ class _ProjectionChartPainter extends CustomPainter {
 
   void _drawDot(Canvas canvas, Offset center, Color color) {
     canvas.drawCircle(center, 6, Paint()..color = color);
-    canvas.drawCircle(center, 6, Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2);
+    canvas.drawCircle(
+      center,
+      6,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
   }
 
-  void _drawXLabel(Canvas canvas, String text, double x, double y, Color color, {bool? alignLeft}) {
+  void _drawXLabel(
+    Canvas canvas,
+    String text,
+    double x,
+    double y,
+    Color color, {
+    bool? alignLeft,
+  }) {
     final tp = TextPainter(
-      text: TextSpan(text: text, style: TextStyle(color: color, fontSize: 11)),
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: color, fontSize: 11),
+      ),
       textDirection: TextDirection.ltr,
     )..layout();
     double dx;
@@ -1272,7 +1539,9 @@ class _ProjectionChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ProjectionChartPainter oldDelegate) =>
-      oldDelegate.hoveredYear != hoveredYear || oldDelegate.points != points || oldDelegate.hidden != hidden;
+      oldDelegate.hoveredYear != hoveredYear ||
+      oldDelegate.points != points ||
+      oldDelegate.hidden != hidden;
 }
 
 // =======================================================================
@@ -1283,10 +1552,14 @@ class _MonteCarloSimulationTab extends StatefulWidget {
   final String vaultPath;
   final AmountVisibilityController amountVisibility;
 
-  const _MonteCarloSimulationTab({required this.vaultPath, required this.amountVisibility});
+  const _MonteCarloSimulationTab({
+    required this.vaultPath,
+    required this.amountVisibility,
+  });
 
   @override
-  State<_MonteCarloSimulationTab> createState() => _MonteCarloSimulationTabState();
+  State<_MonteCarloSimulationTab> createState() =>
+      _MonteCarloSimulationTabState();
 }
 
 class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
@@ -1327,19 +1600,67 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
     final data = await _stateRepo.read('wealth_monte_carlo');
     if (!mounted || data.isEmpty) return;
     setState(() {
-      _patrimoineActuel = _readDouble(data, 'patrimoineActuel', fallback: _patrimoineActuel);
-      _repartitionInitialeBourse = _readDouble(data, 'repartitionInitialeBourse', fallback: _repartitionInitialeBourse).clamp(0, 100);
-      _investissementsMensuels = _readDouble(data, 'investissementsMensuels', fallback: _investissementsMensuels);
-      _repartitionInvestBourse = _readDouble(data, 'repartitionInvestBourse', fallback: _repartitionInvestBourse).clamp(0, 100);
-      _nombreAnnees = _readInt(data, 'nombreAnnees', fallback: _nombreAnnees).clamp(1, 60);
-      _rendementBourse = _readDouble(data, 'rendementBourse', fallback: _rendementBourse);
-      _ecartTypeBourse = _readDouble(data, 'ecartTypeBourse', fallback: _ecartTypeBourse);
-      _rendementAutre = _readDouble(data, 'rendementAutre', fallback: _rendementAutre);
-      _ecartTypeAutre = _readDouble(data, 'ecartTypeAutre', fallback: _ecartTypeAutre);
-      _impositionBourse = _readDouble(data, 'impositionBourse', fallback: _impositionBourse);
-      _impositionAutre = _readDouble(data, 'impositionAutre', fallback: _impositionAutre);
+      _patrimoineActuel = _readDouble(
+        data,
+        'patrimoineActuel',
+        fallback: _patrimoineActuel,
+      );
+      _repartitionInitialeBourse = _readDouble(
+        data,
+        'repartitionInitialeBourse',
+        fallback: _repartitionInitialeBourse,
+      ).clamp(0, 100);
+      _investissementsMensuels = _readDouble(
+        data,
+        'investissementsMensuels',
+        fallback: _investissementsMensuels,
+      );
+      _repartitionInvestBourse = _readDouble(
+        data,
+        'repartitionInvestBourse',
+        fallback: _repartitionInvestBourse,
+      ).clamp(0, 100);
+      _nombreAnnees = _readInt(
+        data,
+        'nombreAnnees',
+        fallback: _nombreAnnees,
+      ).clamp(1, 60);
+      _rendementBourse = _readDouble(
+        data,
+        'rendementBourse',
+        fallback: _rendementBourse,
+      );
+      _ecartTypeBourse = _readDouble(
+        data,
+        'ecartTypeBourse',
+        fallback: _ecartTypeBourse,
+      );
+      _rendementAutre = _readDouble(
+        data,
+        'rendementAutre',
+        fallback: _rendementAutre,
+      );
+      _ecartTypeAutre = _readDouble(
+        data,
+        'ecartTypeAutre',
+        fallback: _ecartTypeAutre,
+      );
+      _impositionBourse = _readDouble(
+        data,
+        'impositionBourse',
+        fallback: _impositionBourse,
+      );
+      _impositionAutre = _readDouble(
+        data,
+        'impositionAutre',
+        fallback: _impositionAutre,
+      );
       _tauxRetrait = _readDouble(data, 'tauxRetrait', fallback: _tauxRetrait);
-      _nombreSimulations = _readInt(data, 'nombreSimulations', fallback: _nombreSimulations).clamp(50, 2000);
+      _nombreSimulations = _readInt(
+        data,
+        'nombreSimulations',
+        fallback: _nombreSimulations,
+      ).clamp(50, 2000);
     });
   }
 
@@ -1386,7 +1707,11 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
     });
   }
 
-  double _readDouble(Map<String, dynamic> json, String key, {required double fallback}) {
+  double _readDouble(
+    Map<String, dynamic> json,
+    String key, {
+    required double fallback,
+  }) {
     final value = json[key];
     if (value is num) return value.toDouble();
     return fallback;
@@ -1409,20 +1734,20 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
   }
 
   MCResult _compute() => computeMonteCarloProjection(
-        patrimoineActuel: _patrimoineActuel,
-        repartitionInitialeBourse: _repartitionInitialeBourse,
-        investissementsMensuels: _investissementsMensuels,
-        repartitionInvestBourse: _repartitionInvestBourse,
-        nombreAnnees: _nombreAnnees,
-        rendementBourse: _rendementBourse,
-        ecartTypeBourse: _ecartTypeBourse,
-        rendementAutre: _rendementAutre,
-        ecartTypeAutre: _ecartTypeAutre,
-        impositionBourse: _impositionBourse,
-        impositionAutre: _impositionAutre,
-        tauxRetrait: _tauxRetrait,
-        nombreSimulations: _nombreSimulations,
-      );
+    patrimoineActuel: _patrimoineActuel,
+    repartitionInitialeBourse: _repartitionInitialeBourse,
+    investissementsMensuels: _investissementsMensuels,
+    repartitionInvestBourse: _repartitionInvestBourse,
+    nombreAnnees: _nombreAnnees,
+    rendementBourse: _rendementBourse,
+    ecartTypeBourse: _ecartTypeBourse,
+    rendementAutre: _rendementAutre,
+    ecartTypeAutre: _ecartTypeAutre,
+    impositionBourse: _impositionBourse,
+    impositionAutre: _impositionAutre,
+    tauxRetrait: _tauxRetrait,
+    nombreSimulations: _nombreSimulations,
+  );
 
   Widget _buildInputsContent() {
     return Column(
@@ -1463,7 +1788,8 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
           value: _nombreAnnees.toDouble(),
           step: 1,
           decimals: 0,
-          onChanged: (v) => _update(() => _nombreAnnees = v.round().clamp(1, 60)),
+          onChanged: (v) =>
+              _update(() => _nombreAnnees = v.round().clamp(1, 60)),
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1564,7 +1890,9 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
                 value: _nombreSimulations.toDouble(),
                 step: 50,
                 decimals: 0,
-                onChanged: (v) => _update(() => _nombreSimulations = v.round().clamp(50, 2000)),
+                onChanged: (v) => _update(
+                  () => _nombreSimulations = v.round().clamp(50, 2000),
+                ),
               ),
             ),
           ],
@@ -1599,7 +1927,8 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
             children: [
               const TextSpan(text: "soit un revenu passif médian d'environ "),
               TextSpan(
-                text: '${displayEuros(result.revenuMensuelMedian, hidden)} / mois',
+                text:
+                    '${displayEuros(result.revenuMensuelMedian, hidden)} / mois',
                 style: TextStyle(color: accent, fontWeight: FontWeight.bold),
               ),
             ],
@@ -1615,9 +1944,21 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _LegendPill(color: grey, label: 'Patrimoine initial', value: displayEuros(result.patrimoineInitial, hidden)),
-            _LegendPill(color: blue, label: 'Versements', value: displayEuros(result.versements, hidden)),
-            _LegendPill(color: accent, label: 'Médiane (intérêts nets)', value: displayEuros(result.plusValueMediane, hidden)),
+            _LegendPill(
+              color: grey,
+              label: 'Patrimoine initial',
+              value: displayEuros(result.patrimoineInitial, hidden),
+            ),
+            _LegendPill(
+              color: blue,
+              label: 'Versements',
+              value: displayEuros(result.versements, hidden),
+            ),
+            _LegendPill(
+              color: accent,
+              label: 'Médiane (intérêts nets)',
+              value: displayEuros(result.plusValueMediane, hidden),
+            ),
           ],
         ),
         const SizedBox(height: 24),
@@ -1639,12 +1980,24 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
         const SizedBox(height: 24),
         const Divider(),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            _StatColumn(label: 'Valeur future médiane', value: displayEuros(result.valeurFutureMediane, hidden)),
-            _StatColumn(label: 'Dont plus-value médiane', value: displayEuros(result.plusValueMediane, hidden)),
-            _StatColumn(label: 'Valeur nette médiane', value: displayEuros(result.valeurNetteMediane, hidden)),
-            _StatColumn(label: 'Revenu mensuel médian', value: displayEuros(result.revenuMensuelMedian, hidden)),
+        _StatRow(
+          items: [
+            (
+              'Valeur future médiane',
+              displayEuros(result.valeurFutureMediane, hidden),
+            ),
+            (
+              'Dont plus-value médiane',
+              displayEuros(result.plusValueMediane, hidden),
+            ),
+            (
+              'Valeur nette médiane',
+              displayEuros(result.valeurNetteMediane, hidden),
+            ),
+            (
+              'Revenu mensuel médian',
+              displayEuros(result.revenuMensuelMedian, hidden),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -1722,9 +2075,12 @@ MCResult computeMonteCarloProjection({
 }) {
   final rng = random ?? Random(12345);
   final initialBourse = patrimoineActuel * repartitionInitialeBourse / 100;
-  final initialAutre = patrimoineActuel * (100 - repartitionInitialeBourse) / 100;
-  final investBourseMensuel = investissementsMensuels * repartitionInvestBourse / 100;
-  final investAutreMensuel = investissementsMensuels * (100 - repartitionInvestBourse) / 100;
+  final initialAutre =
+      patrimoineActuel * (100 - repartitionInitialeBourse) / 100;
+  final investBourseMensuel =
+      investissementsMensuels * repartitionInvestBourse / 100;
+  final investAutreMensuel =
+      investissementsMensuels * (100 - repartitionInvestBourse) / 100;
   final totalMonths = nombreAnnees * 12;
 
   final totalsByYear = List.generate(nombreAnnees + 1, (_) => <double>[]);
@@ -1745,11 +2101,17 @@ MCResult computeMonteCarloProjection({
       }
       totalsByYear[year].add(bourse + autre);
     }
-    final contributionsBourse = initialBourse + investBourseMensuel * totalMonths;
+    final contributionsBourse =
+        initialBourse + investBourseMensuel * totalMonths;
     final contributionsAutre = initialAutre + investAutreMensuel * totalMonths;
-    final gainsBourse = (bourse - contributionsBourse).clamp(0, double.infinity);
+    final gainsBourse = (bourse - contributionsBourse).clamp(
+      0,
+      double.infinity,
+    );
     final gainsAutre = (autre - contributionsAutre).clamp(0, double.infinity);
-    final taxes = gainsBourse * impositionBourse / 100 + gainsAutre * impositionAutre / 100;
+    final taxes =
+        gainsBourse * impositionBourse / 100 +
+        gainsAutre * impositionAutre / 100;
     netValues.add((bourse + autre) - taxes);
   }
 
@@ -1761,13 +2123,15 @@ MCResult computeMonteCarloProjection({
   final points = <MCYearPoint>[];
   for (var year = 0; year <= nombreAnnees; year++) {
     final sorted = [...totalsByYear[year]]..sort();
-    points.add(MCYearPoint(
-      year: year,
-      principal: patrimoineActuel + investissementsMensuels * year * 12,
-      p10: percentile(sorted, 0.10),
-      p50: percentile(sorted, 0.50),
-      p90: percentile(sorted, 0.90),
-    ));
+    points.add(
+      MCYearPoint(
+        year: year,
+        principal: patrimoineActuel + investissementsMensuels * year * 12,
+        p10: percentile(sorted, 0.10),
+        p50: percentile(sorted, 0.50),
+        p90: percentile(sorted, 0.90),
+      ),
+    );
   }
 
   final sortedNet = [...netValues]..sort();
@@ -1829,8 +2193,14 @@ class _MonteCarloChartState extends State<_MonteCarloChart> {
 
   void _updateHover(Offset localPosition, double width) {
     final chartWidth = width - _leftAxisWidth;
-    final fraction = ((localPosition.dx - _leftAxisWidth) / chartWidth).clamp(0.0, 1.0);
-    final year = (fraction * widget.nombreAnnees).round().clamp(0, widget.nombreAnnees);
+    final fraction = ((localPosition.dx - _leftAxisWidth) / chartWidth).clamp(
+      0.0,
+      1.0,
+    );
+    final year = (fraction * widget.nombreAnnees).round().clamp(
+      0,
+      widget.nombreAnnees,
+    );
     if (year != _hoveredYear) setState(() => _hoveredYear = year);
   }
 
@@ -1842,7 +2212,8 @@ class _MonteCarloChartState extends State<_MonteCarloChart> {
         final height = constraints.maxHeight;
         final chartWidth = width - _leftAxisWidth;
         final chartHeight = height - _bottomAxisHeight;
-        double xFor(int year) => _leftAxisWidth + chartWidth * (year / widget.nombreAnnees);
+        double xFor(int year) =>
+            _leftAxisWidth + chartWidth * (year / widget.nombreAnnees);
 
         MCYearPoint? hoveredPoint;
         if (_hoveredYear != null) hoveredPoint = widget.points[_hoveredYear!];
@@ -1850,42 +2221,55 @@ class _MonteCarloChartState extends State<_MonteCarloChart> {
         return MouseRegion(
           onHover: (event) => _updateHover(event.localPosition, width),
           onExit: (_) => setState(() => _hoveredYear = null),
-          child: Stack(
-            children: [
-              CustomPaint(
-                size: Size(width, height),
-                painter: _MonteCarloChartPainter(
-                  points: widget.points,
-                  nombreAnnees: widget.nombreAnnees,
-                  patrimoineInitial: widget.patrimoineInitial,
-                  blue: widget.blue,
-                  gold: widget.gold,
-                  grey: widget.grey,
-                  textColor: widget.textColor,
-                  gridColor: widget.gridColor,
-                  hoveredYear: _hoveredYear,
-                  hidden: widget.hidden,
-                ),
-              ),
-              if (hoveredPoint != null)
-                Positioned(
-                  left: (xFor(_hoveredYear!) - 150).clamp(_leftAxisWidth, width - 300),
-                  top: (chartHeight / 2 - 100).clamp(0, chartHeight - 200),
-                  child: _MCHoverTooltip(
-                    year: _hoveredYear!,
-                    p10: hoveredPoint.p10,
-                    p50: hoveredPoint.p50,
-                    p90: hoveredPoint.p90,
-                    versements: hoveredPoint.principal - widget.patrimoineInitial,
+          child: GestureDetector(
+            onPanDown: (details) => _updateHover(details.localPosition, width),
+            onPanUpdate: (details) =>
+                _updateHover(details.localPosition, width),
+            onPanEnd: (_) => setState(() => _hoveredYear = null),
+            child: Stack(
+              children: [
+                CustomPaint(
+                  size: Size(width, height),
+                  painter: _MonteCarloChartPainter(
+                    points: widget.points,
+                    nombreAnnees: widget.nombreAnnees,
                     patrimoineInitial: widget.patrimoineInitial,
                     blue: widget.blue,
                     gold: widget.gold,
                     grey: widget.grey,
-                    cardColor: widget.cardColor,
+                    textColor: widget.textColor,
+                    gridColor: widget.gridColor,
+                    hoveredYear: _hoveredYear,
                     hidden: widget.hidden,
                   ),
                 ),
-            ],
+                if (hoveredPoint != null)
+                  Positioned(
+                    left: (xFor(_hoveredYear!) - 150).clamp(
+                      _leftAxisWidth,
+                      max(_leftAxisWidth, width - 300),
+                    ),
+                    top: (chartHeight / 2 - 100).clamp(
+                      0,
+                      max(0.0, chartHeight - 200),
+                    ),
+                    child: _MCHoverTooltip(
+                      year: _hoveredYear!,
+                      p10: hoveredPoint.p10,
+                      p50: hoveredPoint.p50,
+                      p90: hoveredPoint.p90,
+                      versements:
+                          hoveredPoint.principal - widget.patrimoineInitial,
+                      patrimoineInitial: widget.patrimoineInitial,
+                      blue: widget.blue,
+                      gold: widget.gold,
+                      grey: widget.grey,
+                      cardColor: widget.cardColor,
+                      hidden: widget.hidden,
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -1937,9 +2321,17 @@ class _MCHoverTooltip extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                shadcn.Text(year == 0 ? "Aujourd'hui" : 'Dans $year ans').muted(),
+                shadcn.Text(
+                  year == 0 ? "Aujourd'hui" : 'Dans $year ans',
+                ).muted(),
                 const SizedBox(height: 4),
-                shadcn.Text(displayEuros(p50, hidden), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                shadcn.Text(
+                  displayEuros(p50, hidden),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 shadcn.Text('Médiane').muted().small(),
                 const SizedBox(height: 12),
                 const Divider(),
@@ -1962,10 +2354,17 @@ class _MCHoverTooltip extends StatelessWidget {
   Widget _row(String label, double value, Color color) {
     return Row(
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 8),
         Expanded(child: shadcn.Text(label)),
-        shadcn.Text(displayEuros(value, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
+        shadcn.Text(
+          displayEuros(value, hidden),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
@@ -2014,11 +2413,18 @@ class _MonteCarloChartPainter extends CustomPainter {
     for (var i = 0; i <= gridLines; i++) {
       final v = step * i;
       final y = yFor(v);
-      canvas.drawLine(Offset(leftAxisWidth, y), Offset(size.width, y), Paint()
-        ..color = gridColor.withValues(alpha: 0.4)
-        ..strokeWidth = 1);
+      canvas.drawLine(
+        Offset(leftAxisWidth, y),
+        Offset(size.width, y),
+        Paint()
+          ..color = gridColor.withValues(alpha: 0.4)
+          ..strokeWidth = 1,
+      );
       final tp = TextPainter(
-        text: TextSpan(text: displayEurosCompact(v, hidden), style: TextStyle(color: textColor, fontSize: 11)),
+        text: TextSpan(
+          text: displayEurosCompact(v, hidden),
+          style: TextStyle(color: textColor, fontSize: 11),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftAxisWidth - tp.width - 8, y - tp.height / 2));
@@ -2033,7 +2439,10 @@ class _MonteCarloChartPainter extends CustomPainter {
       ..lineTo(xFor(nombreAnnees), chartHeight)
       ..lineTo(xFor(0), chartHeight)
       ..close();
-    canvas.drawPath(baselineAreaPath, Paint()..color = grey.withValues(alpha: 0.15));
+    canvas.drawPath(
+      baselineAreaPath,
+      Paint()..color = grey.withValues(alpha: 0.15),
+    );
 
     // Aire bleue : entre "Patrimoine initial" et "Versements cumulés".
     final principalBandPath = Path()..moveTo(xFor(0), baselineY);
@@ -2043,7 +2452,10 @@ class _MonteCarloChartPainter extends CustomPainter {
     principalBandPath
       ..lineTo(xFor(nombreAnnees), baselineY)
       ..close();
-    canvas.drawPath(principalBandPath, Paint()..color = blue.withValues(alpha: 0.15));
+    canvas.drawPath(
+      principalBandPath,
+      Paint()..color = blue.withValues(alpha: 0.15),
+    );
 
     // Bande d'incertitude p10-p90 (au-dessus des versements cumulés).
     final bandPath = Path()..moveTo(xFor(0), yFor(points.first.p10));
@@ -2056,28 +2468,38 @@ class _MonteCarloChartPainter extends CustomPainter {
     bandPath.close();
     canvas.drawPath(bandPath, Paint()..color = gold.withValues(alpha: 0.18));
 
-    canvas.drawLine(Offset(leftAxisWidth, baselineY), Offset(size.width, baselineY), Paint()
-      ..color = grey.withValues(alpha: 0.6)
-      ..strokeWidth = 1.5);
+    canvas.drawLine(
+      Offset(leftAxisWidth, baselineY),
+      Offset(size.width, baselineY),
+      Paint()
+        ..color = grey.withValues(alpha: 0.6)
+        ..strokeWidth = 1.5,
+    );
 
     final bluePath = Path()..moveTo(xFor(0), yFor(points.first.principal));
     for (final p in points) {
       bluePath.lineTo(xFor(p.year), yFor(p.principal));
     }
-    canvas.drawPath(bluePath, Paint()
-      ..color = blue
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2);
+    canvas.drawPath(
+      bluePath,
+      Paint()
+        ..color = blue
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
 
     // Ligne médiane (p50).
     final medianPath = Path()..moveTo(xFor(0), yFor(points.first.p50));
     for (final p in points) {
       medianPath.lineTo(xFor(p.year), yFor(p.p50));
     }
-    canvas.drawPath(medianPath, Paint()
-      ..color = gold
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2);
+    canvas.drawPath(
+      medianPath,
+      Paint()
+        ..color = gold
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
 
     if (hoveredYear != null) {
       final p = points[hoveredYear!];
@@ -2088,9 +2510,29 @@ class _MonteCarloChartPainter extends CustomPainter {
       _drawDot(canvas, Offset(x, baselineY), grey);
     }
 
-    _drawXLabel(canvas, "Aujourd'hui", xFor(0), chartHeight, textColor, alignLeft: true);
-    _drawXLabel(canvas, '${nombreAnnees ~/ 2} ans', xFor(nombreAnnees ~/ 2), chartHeight, textColor);
-    _drawXLabel(canvas, 'dans $nombreAnnees ans', xFor(nombreAnnees), chartHeight, textColor, alignLeft: false);
+    _drawXLabel(
+      canvas,
+      "Aujourd'hui",
+      xFor(0),
+      chartHeight,
+      textColor,
+      alignLeft: true,
+    );
+    _drawXLabel(
+      canvas,
+      '${nombreAnnees ~/ 2} ans',
+      xFor(nombreAnnees ~/ 2),
+      chartHeight,
+      textColor,
+    );
+    _drawXLabel(
+      canvas,
+      'dans $nombreAnnees ans',
+      xFor(nombreAnnees),
+      chartHeight,
+      textColor,
+      alignLeft: false,
+    );
   }
 
   void _drawDashedLine(Canvas canvas, Offset start, Offset end, Color color) {
@@ -2104,7 +2546,8 @@ class _MonteCarloChartPainter extends CustomPainter {
     final direction = (end - start) / totalLength;
     while (covered < totalLength) {
       final segStart = start + direction * covered;
-      final segEnd = start + direction * (covered + dashLength).clamp(0, totalLength);
+      final segEnd =
+          start + direction * (covered + dashLength).clamp(0, totalLength);
       canvas.drawLine(segStart, segEnd, paint);
       covered += dashLength + gapLength;
     }
@@ -2112,15 +2555,29 @@ class _MonteCarloChartPainter extends CustomPainter {
 
   void _drawDot(Canvas canvas, Offset center, Color color) {
     canvas.drawCircle(center, 6, Paint()..color = color);
-    canvas.drawCircle(center, 6, Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2);
+    canvas.drawCircle(
+      center,
+      6,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
   }
 
-  void _drawXLabel(Canvas canvas, String text, double x, double y, Color color, {bool? alignLeft}) {
+  void _drawXLabel(
+    Canvas canvas,
+    String text,
+    double x,
+    double y,
+    Color color, {
+    bool? alignLeft,
+  }) {
     final tp = TextPainter(
-      text: TextSpan(text: text, style: TextStyle(color: color, fontSize: 11)),
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: color, fontSize: 11),
+      ),
       textDirection: TextDirection.ltr,
     )..layout();
     double dx;
@@ -2136,5 +2593,7 @@ class _MonteCarloChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MonteCarloChartPainter oldDelegate) =>
-      oldDelegate.hoveredYear != hoveredYear || oldDelegate.points != points || oldDelegate.hidden != hidden;
+      oldDelegate.hoveredYear != hoveredYear ||
+      oldDelegate.points != points ||
+      oldDelegate.hidden != hidden;
 }

@@ -131,3 +131,7 @@ flutter_launcher_icons:
     generate: true
   linux:
     generate: true
+  android:
+    generate: true
+  ios:
+    generate: true

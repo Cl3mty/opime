@@ -13,13 +13,19 @@ class TransmissionSimulationScreen extends StatefulWidget {
   final String vaultPath;
   final AmountVisibilityController amountVisibility;
 
-  const TransmissionSimulationScreen({super.key, required this.vaultPath, required this.amountVisibility});
+  const TransmissionSimulationScreen({
+    super.key,
+    required this.vaultPath,
+    required this.amountVisibility,
+  });
 
   @override
-  State<TransmissionSimulationScreen> createState() => _TransmissionSimulationScreenState();
+  State<TransmissionSimulationScreen> createState() =>
+      _TransmissionSimulationScreenState();
 }
 
-class _TransmissionSimulationScreenState extends State<TransmissionSimulationScreen> {
+class _TransmissionSimulationScreenState
+    extends State<TransmissionSimulationScreen> {
   int _tabIndex = 0;
   late final SimulationStateRepository _stateRepo;
 
@@ -65,10 +71,15 @@ class _TransmissionSimulationScreenState extends State<TransmissionSimulationScr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TabList(
+          // Align + scroll horizontal plutôt qu'un simple Row centré : sur
+          // téléphone étroit, "Démembrement" force sinon les tabs à passer
+          // sur deux lignes (le Row leur donne une largeur non bornée dans
+          // laquelle Text s'enroule). Centré quand tout tient, défilable
+          // sinon.
+          Align(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: TabList(
                 index: _tabIndex,
                 onChanged: (value) {
                   setState(() => _tabIndex = value);
@@ -80,15 +91,24 @@ class _TransmissionSimulationScreenState extends State<TransmissionSimulationScr
                   TabItem(child: shadcn.Text('Héritage')),
                 ],
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 16),
           Expanded(
             child: _tabIndex == 0
-                ? _DemembrementTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility)
+                ? _DemembrementTab(
+                    vaultPath: widget.vaultPath,
+                    amountVisibility: widget.amountVisibility,
+                  )
                 : _tabIndex == 1
-                    ? _DonationTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility)
-                    : _InheritanceTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility),
+                ? _DonationTab(
+                    vaultPath: widget.vaultPath,
+                    amountVisibility: widget.amountVisibility,
+                  )
+                : _InheritanceTab(
+                    vaultPath: widget.vaultPath,
+                    amountVisibility: widget.amountVisibility,
+                  ),
           ),
         ],
       ),
@@ -114,15 +134,9 @@ class _TransmissionSplitCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: left,
-                  ),
+                  Padding(padding: const EdgeInsets.all(20), child: left),
                   const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: right,
-                  ),
+                  Padding(padding: const EdgeInsets.all(20), child: right),
                 ],
               ),
             );
@@ -157,7 +171,10 @@ class _DemembrementTab extends StatefulWidget {
   final String vaultPath;
   final AmountVisibilityController amountVisibility;
 
-  const _DemembrementTab({required this.vaultPath, required this.amountVisibility});
+  const _DemembrementTab({
+    required this.vaultPath,
+    required this.amountVisibility,
+  });
 
   @override
   State<_DemembrementTab> createState() => _DemembrementTabState();
@@ -193,10 +210,26 @@ class _DemembrementTabState extends State<_DemembrementTab> {
     final data = await _stateRepo.read('transmission_demembrement');
     if (!mounted || data.isEmpty) return;
     setState(() {
-      _valeurPleinePropriete = _readDouble(data, 'valeurPleinePropriete', _valeurPleinePropriete);
-      _ageUsufruitier = _readInt(data, 'ageUsufruitier', _ageUsufruitier).clamp(18, 110);
-      _nombreEnfants = _readInt(data, 'nombreEnfants', _nombreEnfants).clamp(1, 10);
-      _abattementParEnfant = _readDouble(data, 'abattementParEnfant', _abattementParEnfant);
+      _valeurPleinePropriete = _readDouble(
+        data,
+        'valeurPleinePropriete',
+        _valeurPleinePropriete,
+      );
+      _ageUsufruitier = _readInt(
+        data,
+        'ageUsufruitier',
+        _ageUsufruitier,
+      ).clamp(18, 110);
+      _nombreEnfants = _readInt(
+        data,
+        'nombreEnfants',
+        _nombreEnfants,
+      ).clamp(1, 10);
+      _abattementParEnfant = _readDouble(
+        data,
+        'abattementParEnfant',
+        _abattementParEnfant,
+      );
     });
   }
 
@@ -226,11 +259,11 @@ class _DemembrementTabState extends State<_DemembrementTab> {
   }
 
   DemembrementResult _compute() => computeDemembrement(
-        valeurPleinePropriete: _valeurPleinePropriete,
-        ageUsufruitier: _ageUsufruitier,
-        nombreEnfants: _nombreEnfants,
-        abattementParEnfant: _abattementParEnfant,
-      );
+    valeurPleinePropriete: _valeurPleinePropriete,
+    ageUsufruitier: _ageUsufruitier,
+    nombreEnfants: _nombreEnfants,
+    abattementParEnfant: _abattementParEnfant,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +288,8 @@ class _DemembrementTabState extends State<_DemembrementTab> {
             value: _ageUsufruitier.toDouble(),
             step: 1,
             decimals: 0,
-            onChanged: (v) => _update(() => _ageUsufruitier = v.round().clamp(18, 110)),
+            onChanged: (v) =>
+                _update(() => _ageUsufruitier = v.round().clamp(18, 110)),
           ),
           _NumberField(
             label: "Nombre d'enfants bénéficiaires",
@@ -263,7 +297,8 @@ class _DemembrementTabState extends State<_DemembrementTab> {
             value: _nombreEnfants.toDouble(),
             step: 1,
             decimals: 0,
-            onChanged: (v) => _update(() => _nombreEnfants = v.round().clamp(1, 10)),
+            onChanged: (v) =>
+                _update(() => _nombreEnfants = v.round().clamp(1, 10)),
           ),
           _NumberField(
             label: 'Abattement par enfant (restant)',
@@ -291,9 +326,21 @@ class _DemembrementTabState extends State<_DemembrementTab> {
                 style: DefaultTextStyle.of(context).style,
                 children: [
                   const TextSpan(text: 'Hypothèse 2026 : nue-propriété '),
-                  TextSpan(text: '${result.nueProprietePct.toStringAsFixed(0)}%', style: TextStyle(color: accent, fontWeight: FontWeight.bold)),
+                  TextSpan(
+                    text: '${result.nueProprietePct.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const TextSpan(text: ' / usufruit '),
-                  TextSpan(text: '${result.usufruitPct.toStringAsFixed(0)}%', style: TextStyle(color: accent, fontWeight: FontWeight.bold)),
+                  TextSpan(
+                    text: '${result.usufruitPct.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ).muted(),
@@ -303,30 +350,58 @@ class _DemembrementTabState extends State<_DemembrementTab> {
             hidden: hidden,
             title: 'Comparaison des scénarios',
             items: [
-              _BarItem(label: 'Droits pleine propriété', value: result.droitsTotauxPleine, color: const Color(0xFFE07A6B)),
-              _BarItem(label: 'Droits démembrement', value: result.droitsTotauxNue, color: const Color(0xFF7B8FE8)),
-              _BarItem(label: 'Économie potentielle', value: max(0, result.economiePotentielle), color: accent),
+              _BarItem(
+                label: 'Droits pleine propriété',
+                value: result.droitsTotauxPleine,
+                color: const Color(0xFFE07A6B),
+              ),
+              _BarItem(
+                label: 'Droits démembrement',
+                value: result.droitsTotauxNue,
+                color: const Color(0xFF7B8FE8),
+              ),
+              _BarItem(
+                label: 'Économie potentielle',
+                value: max(0, result.economiePotentielle),
+                color: accent,
+              ),
             ],
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              _StatColumn(label: 'Valeur NP', value: displayEuros(result.valeurNuePropriete, hidden)),
-              _StatColumn(label: 'Taxable NP / enfant', value: displayEuros(result.taxableParEnfantNue, hidden)),
-              _StatColumn(label: 'Droits NP / enfant', value: displayEuros(result.droitsParEnfantNue, hidden)),
+          _StatRow(
+            items: [
+              ('Valeur NP', displayEuros(result.valeurNuePropriete, hidden)),
+              (
+                'Taxable NP / enfant',
+                displayEuros(result.taxableParEnfantNue, hidden),
+              ),
+              (
+                'Droits NP / enfant',
+                displayEuros(result.droitsParEnfantNue, hidden),
+              ),
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              _StatColumn(label: 'Droits si pleine propriété', value: displayEuros(result.droitsTotauxPleine, hidden)),
-              _StatColumn(label: 'Droits en démembrement', value: displayEuros(result.droitsTotauxNue, hidden)),
-              _StatColumn(label: 'Économie potentielle', value: displayEuros(result.economiePotentielle, hidden)),
+          _StatRow(
+            items: [
+              (
+                'Droits si pleine propriété',
+                displayEuros(result.droitsTotauxPleine, hidden),
+              ),
+              (
+                'Droits en démembrement',
+                displayEuros(result.droitsTotauxNue, hidden),
+              ),
+              (
+                'Économie potentielle',
+                displayEuros(result.economiePotentielle, hidden),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           const _TransmissionDisclaimer(
-            text: "Barème de valorisation usufruit/nue-propriété selon l'article 669 CGI (référentiel 2026). "
+            text:
+                "Barème de valorisation usufruit/nue-propriété selon l'article 669 CGI (référentiel 2026). "
                 'Simulation indicative, hors clauses civiles spécifiques, réserve/usufruit successif et optimisation notariale personnalisée.',
           ),
         ],
@@ -375,7 +450,11 @@ class _DonationTabState extends State<_DonationTab> {
     if (!mounted || data.isEmpty) return;
     setState(() {
       _montantDonation = _readDouble(data, 'montantDonation', _montantDonation);
-      _nombreDonataires = _readInt(data, 'nombreDonataires', _nombreDonataires).clamp(1, 20);
+      _nombreDonataires = _readInt(
+        data,
+        'nombreDonataires',
+        _nombreDonataires,
+      ).clamp(1, 20);
       final relation = data['relation'];
       if (relation is String) {
         _relation = DonationRelation.values.firstWhere(
@@ -410,10 +489,10 @@ class _DonationTabState extends State<_DonationTab> {
   }
 
   DonationResult _compute() => computeDonation(
-        montantDonation: _montantDonation,
-        nombreDonataires: _nombreDonataires,
-        relation: _relation,
-      );
+    montantDonation: _montantDonation,
+    nombreDonataires: _nombreDonataires,
+    relation: _relation,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -438,7 +517,8 @@ class _DonationTabState extends State<_DonationTab> {
             value: _nombreDonataires.toDouble(),
             step: 1,
             decimals: 0,
-            onChanged: (v) => _update(() => _nombreDonataires = v.round().clamp(1, 20)),
+            onChanged: (v) =>
+                _update(() => _nombreDonataires = v.round().clamp(1, 20)),
           ),
           shadcn.Text('Lien donateur / donataire').muted().small(),
           const SizedBox(height: 8),
@@ -446,23 +526,28 @@ class _DonationTabState extends State<_DonationTab> {
             children: [
               SelectedButton(
                 value: _relation == DonationRelation.enfant,
-                onChanged: (_) => _update(() => _relation = DonationRelation.enfant),
+                onChanged: (_) =>
+                    _update(() => _relation = DonationRelation.enfant),
                 child: const shadcn.Text('Enfant'),
               ),
               SelectedButton(
                 value: _relation == DonationRelation.petitEnfant,
-                onChanged: (_) => _update(() => _relation = DonationRelation.petitEnfant),
+                onChanged: (_) =>
+                    _update(() => _relation = DonationRelation.petitEnfant),
                 child: const shadcn.Text('Petit-enfant'),
               ),
               SelectedButton(
                 value: _relation == DonationRelation.conjoint,
-                onChanged: (_) => _update(() => _relation = DonationRelation.conjoint),
+                onChanged: (_) =>
+                    _update(() => _relation = DonationRelation.conjoint),
                 child: const shadcn.Text('Conjoint/PACS'),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          shadcn.Text('Abattement pris en compte : ${displayEuros(result.abattementParDonataire, hidden)} / bénéficiaire').muted().small(),
+          shadcn.Text(
+            'Abattement pris en compte : ${displayEuros(result.abattementParDonataire, hidden)} / bénéficiaire',
+          ).muted().small(),
           const SizedBox(height: 8),
           OutlineButton(
             onPressed: _resetState,
@@ -482,7 +567,13 @@ class _DonationTabState extends State<_DonationTab> {
                 style: DefaultTextStyle.of(context).style,
                 children: [
                   const TextSpan(text: 'Taux effectif '),
-                  TextSpan(text: '${result.tauxEffectif.toStringAsFixed(1)}%', style: TextStyle(color: accent, fontWeight: FontWeight.bold)),
+                  TextSpan(
+                    text: '${result.tauxEffectif.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const TextSpan(text: ' sur le montant transmis.'),
                 ],
               ),
@@ -493,22 +584,44 @@ class _DonationTabState extends State<_DonationTab> {
             hidden: hidden,
             title: 'Répartition fiscale',
             items: [
-              _BarItem(label: 'Montant total transmis', value: _montantDonation, color: const Color(0xFF6B7280)),
-              _BarItem(label: 'Base taxable totale', value: result.taxableParDonataire * _nombreDonataires, color: const Color(0xFF7B8FE8)),
-              _BarItem(label: 'Droits totaux', value: result.droitsTotaux, color: accent),
+              _BarItem(
+                label: 'Montant total transmis',
+                value: _montantDonation,
+                color: const Color(0xFF6B7280),
+              ),
+              _BarItem(
+                label: 'Base taxable totale',
+                value: result.taxableParDonataire * _nombreDonataires,
+                color: const Color(0xFF7B8FE8),
+              ),
+              _BarItem(
+                label: 'Droits totaux',
+                value: result.droitsTotaux,
+                color: accent,
+              ),
             ],
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              _StatColumn(label: 'Montant / bénéficiaire', value: displayEuros(result.montantParDonataire, hidden)),
-              _StatColumn(label: 'Taxable / bénéficiaire', value: displayEuros(result.taxableParDonataire, hidden)),
-              _StatColumn(label: 'Droits / bénéficiaire', value: displayEuros(result.droitsParDonataire, hidden)),
+          _StatRow(
+            items: [
+              (
+                'Montant / bénéficiaire',
+                displayEuros(result.montantParDonataire, hidden),
+              ),
+              (
+                'Taxable / bénéficiaire',
+                displayEuros(result.taxableParDonataire, hidden),
+              ),
+              (
+                'Droits / bénéficiaire',
+                displayEuros(result.droitsParDonataire, hidden),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           const _TransmissionDisclaimer(
-            text: 'Barèmes simplifiés de droits de donation 2026. Abattements simulés par lien de parenté, '
+            text:
+                'Barèmes simplifiés de droits de donation 2026. Abattements simulés par lien de parenté, '
                 'hors dons familiaux de sommes d\'argent, rapport fiscal, réductions spécifiques ou passif déductible.',
           ),
         ],
@@ -521,7 +634,10 @@ class _InheritanceTab extends StatefulWidget {
   final String vaultPath;
   final AmountVisibilityController amountVisibility;
 
-  const _InheritanceTab({required this.vaultPath, required this.amountVisibility});
+  const _InheritanceTab({
+    required this.vaultPath,
+    required this.amountVisibility,
+  });
 
   @override
   State<_InheritanceTab> createState() => _InheritanceTabState();
@@ -558,11 +674,31 @@ class _InheritanceTabState extends State<_InheritanceTab> {
     final data = await _stateRepo.read('transmission_heritage');
     if (!mounted || data.isEmpty) return;
     setState(() {
-      _actifNetSuccessoral = _readDouble(data, 'actifNetSuccessoral', _actifNetSuccessoral);
-      _conjointSurvivant = _readBool(data, 'conjointSurvivant', _conjointSurvivant);
-      _partConjointPct = _readDouble(data, 'partConjointPct', _partConjointPct).clamp(0, 100);
-      _nombreEnfants = _readInt(data, 'nombreEnfants', _nombreEnfants).clamp(1, 10);
-      _abattementParEnfant = _readDouble(data, 'abattementParEnfant', _abattementParEnfant);
+      _actifNetSuccessoral = _readDouble(
+        data,
+        'actifNetSuccessoral',
+        _actifNetSuccessoral,
+      );
+      _conjointSurvivant = _readBool(
+        data,
+        'conjointSurvivant',
+        _conjointSurvivant,
+      );
+      _partConjointPct = _readDouble(
+        data,
+        'partConjointPct',
+        _partConjointPct,
+      ).clamp(0, 100);
+      _nombreEnfants = _readInt(
+        data,
+        'nombreEnfants',
+        _nombreEnfants,
+      ).clamp(1, 10);
+      _abattementParEnfant = _readDouble(
+        data,
+        'abattementParEnfant',
+        _abattementParEnfant,
+      );
     });
   }
 
@@ -594,12 +730,12 @@ class _InheritanceTabState extends State<_InheritanceTab> {
   }
 
   InheritanceResult _compute() => computeInheritance(
-        actifNetSuccessoral: _actifNetSuccessoral,
-        conjointSurvivant: _conjointSurvivant,
-        partConjointPct: _partConjointPct,
-        nombreEnfants: _nombreEnfants,
-        abattementParEnfant: _abattementParEnfant,
-      );
+    actifNetSuccessoral: _actifNetSuccessoral,
+    conjointSurvivant: _conjointSurvivant,
+    partConjointPct: _partConjointPct,
+    nombreEnfants: _nombreEnfants,
+    abattementParEnfant: _abattementParEnfant,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -619,7 +755,9 @@ class _InheritanceTabState extends State<_InheritanceTab> {
           ),
           Row(
             children: [
-              Expanded(child: shadcn.Text('Conjoint survivant').muted().small()),
+              Expanded(
+                child: shadcn.Text('Conjoint survivant').muted().small(),
+              ),
               _SimpleSwitch(
                 value: _conjointSurvivant,
                 onChanged: (v) => _update(() => _conjointSurvivant = v),
@@ -634,7 +772,8 @@ class _InheritanceTabState extends State<_InheritanceTab> {
               value: _partConjointPct,
               step: 1,
               decimals: 0,
-              onChanged: (v) => _update(() => _partConjointPct = v.clamp(0, 100)),
+              onChanged: (v) =>
+                  _update(() => _partConjointPct = v.clamp(0, 100)),
             ),
           ],
           _NumberField(
@@ -643,7 +782,8 @@ class _InheritanceTabState extends State<_InheritanceTab> {
             value: _nombreEnfants.toDouble(),
             step: 1,
             decimals: 0,
-            onChanged: (v) => _update(() => _nombreEnfants = v.round().clamp(1, 10)),
+            onChanged: (v) =>
+                _update(() => _nombreEnfants = v.round().clamp(1, 10)),
           ),
           _NumberField(
             label: 'Abattement par enfant',
@@ -672,30 +812,55 @@ class _InheritanceTabState extends State<_InheritanceTab> {
             hidden: hidden,
             title: 'Répartition de la succession',
             items: [
-              _BarItem(label: 'Part conjoint exonérée', value: result.partConjointExoneree, color: const Color(0xFF6B7280)),
-              _BarItem(label: 'Masse enfants', value: result.masseTaxableEnfants, color: const Color(0xFF7B8FE8)),
-              _BarItem(label: 'Droits totaux enfants', value: result.droitsTotauxEnfants, color: const Color(0xFFE07A6B)),
+              _BarItem(
+                label: 'Part conjoint exonérée',
+                value: result.partConjointExoneree,
+                color: const Color(0xFF6B7280),
+              ),
+              _BarItem(
+                label: 'Masse enfants',
+                value: result.masseTaxableEnfants,
+                color: const Color(0xFF7B8FE8),
+              ),
+              _BarItem(
+                label: 'Droits totaux enfants',
+                value: result.droitsTotauxEnfants,
+                color: const Color(0xFFE07A6B),
+              ),
             ],
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              _StatColumn(label: 'Part conjoint exonérée', value: displayEuros(result.partConjointExoneree, hidden)),
-              _StatColumn(label: 'Masse transmise aux enfants', value: displayEuros(result.masseTaxableEnfants, hidden)),
-              _StatColumn(label: 'Part brute / enfant', value: displayEuros(result.partParEnfant, hidden)),
+          _StatRow(
+            items: [
+              (
+                'Part conjoint exonérée',
+                displayEuros(result.partConjointExoneree, hidden),
+              ),
+              (
+                'Masse transmise aux enfants',
+                displayEuros(result.masseTaxableEnfants, hidden),
+              ),
+              (
+                'Part brute / enfant',
+                displayEuros(result.partParEnfant, hidden),
+              ),
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              _StatColumn(label: 'Taxable / enfant', value: displayEuros(result.taxableParEnfant, hidden)),
-              _StatColumn(label: 'Droits / enfant', value: displayEuros(result.droitsParEnfant, hidden)),
-              _StatColumn(label: 'Net / enfant', value: displayEuros(result.netParEnfant, hidden)),
+          _StatRow(
+            items: [
+              (
+                'Taxable / enfant',
+                displayEuros(result.taxableParEnfant, hidden),
+              ),
+              ('Droits / enfant', displayEuros(result.droitsParEnfant, hidden)),
+              ('Net / enfant', displayEuros(result.netParEnfant, hidden)),
             ],
           ),
           const SizedBox(height: 16),
           const _TransmissionDisclaimer(
-            text: 'Référentiel succession 2026 simplifié : conjoint/PACS exonéré, barème ligne directe pour enfants. '
+            text:
+                'Référentiel succession 2026 simplifié : conjoint/PACS exonéré, barème ligne directe pour enfants. '
                 'Ne tient pas compte des options civiles détaillées (usufruit légal du conjoint, quotité disponible, testament, assurance-vie).',
           ),
         ],
@@ -781,8 +946,14 @@ DemembrementResult computeDemembrement({
   final valeurNueProprieteParEnfant = valeurNuePropriete / nombreEnfants;
   final valeurPleineParEnfant = valeurPleinePropriete / nombreEnfants;
 
-  final taxableNueParEnfant = max(0.0, valeurNueProprieteParEnfant - abattementParEnfant);
-  final taxablePleineParEnfant = max(0.0, valeurPleineParEnfant - abattementParEnfant);
+  final taxableNueParEnfant = max(
+    0.0,
+    valeurNueProprieteParEnfant - abattementParEnfant,
+  );
+  final taxablePleineParEnfant = max(
+    0.0,
+    valeurPleineParEnfant - abattementParEnfant,
+  );
 
   final droitsNueParEnfant = directLineRights(taxableNueParEnfant);
   final droitsPleineParEnfant = directLineRights(taxablePleineParEnfant);
@@ -824,7 +995,9 @@ DonationResult computeDonation({
     taxableParDonataire: taxableParDonataire,
     droitsParDonataire: droitsParDonataire,
     droitsTotaux: droitsTotaux,
-    tauxEffectif: montantDonation <= 0 ? 0 : droitsTotaux / montantDonation * 100,
+    tauxEffectif: montantDonation <= 0
+        ? 0
+        : droitsTotaux / montantDonation * 100,
   );
 }
 
@@ -839,7 +1012,9 @@ InheritanceResult computeInheritance({
   required int nombreEnfants,
   required double abattementParEnfant,
 }) {
-  final partConjoint = conjointSurvivant ? actifNetSuccessoral * partConjointPct / 100 : 0.0;
+  final partConjoint = conjointSurvivant
+      ? actifNetSuccessoral * partConjointPct / 100
+      : 0.0;
   final masseEnfants = max(0.0, actifNetSuccessoral - partConjoint);
   final partParEnfant = masseEnfants / nombreEnfants;
   final taxableParEnfant = max(0.0, partParEnfant - abattementParEnfant);
@@ -891,7 +1066,8 @@ const spouseBrackets = [
   TaxBracket(double.infinity, 0.45),
 ];
 
-double directLineRights(double taxable) => computeRights(taxable, directLineBrackets);
+double directLineRights(double taxable) =>
+    computeRights(taxable, directLineBrackets);
 
 double spouseRights(double taxable) => computeRights(taxable, spouseBrackets);
 
@@ -1019,8 +1195,13 @@ class _NumberFieldState extends State<_NumberField> {
                 controller: _controller,
                 focusNode: _focusNode,
                 border: Border.all(color: Colors.transparent),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 onChanged: (text) {
                   final parsed = double.tryParse(text.replaceAll(',', '.'));
                   if (parsed != null) widget.onChanged(parsed);
@@ -1054,19 +1235,63 @@ class _NumberFieldState extends State<_NumberField> {
 class _StatColumn extends StatelessWidget {
   final String label;
   final String value;
+  final bool expand;
 
-  const _StatColumn({required this.label, required this.value});
+  const _StatColumn({
+    required this.label,
+    required this.value,
+    this.expand = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          shadcn.Text(label).muted().small(),
-          const SizedBox(height: 4),
-          shadcn.Text(value).medium(),
-        ],
-      ),
+    final content = Column(
+      crossAxisAlignment: expand
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        shadcn.Text(label).muted().small(),
+        const SizedBox(height: 4),
+        shadcn.Text(value).medium(),
+      ],
+    );
+    return expand ? Expanded(child: content) : content;
+  }
+}
+
+/// Ligne de statistiques sous un graphique : côte à côte si la largeur le
+/// permet, sinon empilées en colonne pour ne pas écraser des montants qui
+/// peuvent être grands (notamment sur mobile).
+class _StatRow extends StatelessWidget {
+  final List<(String, String)> items;
+  const _StatRow({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 420) {
+          return Row(
+            children: [
+              for (final item in items)
+                _StatColumn(label: item.$1, value: item.$2),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              _StatColumn(
+                label: items[i].$1,
+                value: items[i].$2,
+                expand: false,
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -1113,7 +1338,11 @@ class _BarItem {
   final double value;
   final Color color;
 
-  const _BarItem({required this.label, required this.value, required this.color});
+  const _BarItem({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 }
 
 class _MiniBarChart extends StatelessWidget {
@@ -1121,11 +1350,18 @@ class _MiniBarChart extends StatelessWidget {
   final List<_BarItem> items;
   final bool hidden;
 
-  const _MiniBarChart({required this.title, required this.items, required this.hidden});
+  const _MiniBarChart({
+    required this.title,
+    required this.items,
+    required this.hidden,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final maxValue = items.fold<double>(0, (maxSoFar, item) => max(maxSoFar, item.value));
+    final maxValue = items.fold<double>(
+      0,
+      (maxSoFar, item) => max(maxSoFar, item.value),
+    );
     final denominator = maxValue <= 0 ? 1.0 : maxValue;
 
     return Container(
@@ -1184,9 +1420,7 @@ class _TransmissionDisclaimer extends StatelessWidget {
         children: [
           Icon(LucideIcons.info, size: 16, color: muted),
           const SizedBox(width: 10),
-          Expanded(
-            child: shadcn.Text(text).muted().small(),
-          ),
+          Expanded(child: shadcn.Text(text).muted().small()),
         ],
       ),
     );
@@ -1221,7 +1455,10 @@ class _SimpleSwitch extends StatelessWidget {
           child: Container(
             width: 18,
             height: 18,
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
           ),
         ),
       ),

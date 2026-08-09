@@ -1,7 +1,9 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/platform_info.dart';
 import '../../core/profiles/profile_controller.dart';
 import '../../core/profiles/sidebar_prefs_controller.dart';
+import 'account_switcher_menu.dart';
 import 'nav_models.dart';
 
 class AppSidebar extends StatelessWidget {
@@ -28,10 +30,7 @@ class AppSidebar extends StatelessWidget {
     return SizedBox.square(
       dimension: size,
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: bg,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
         child: Center(
           child: shadcn.Text(
             initials,
@@ -43,6 +42,14 @@ class AppSidebar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _openAccountSwitcher(BuildContext anchorContext) {
+    openAccountSwitcherMenu(
+      anchorContext,
+      profileController: profileController,
+      onSelect: onSelect,
     );
   }
 
@@ -86,8 +93,13 @@ class AppSidebar extends StatelessWidget {
 
   /// Filtre les sous-items (postes Actifs/Passifs) selon les préférences du
   /// compte actif. Si tout est masqué, le parent disparaît aussi.
-  Widget _buildParentWithFilteredChildren(NavItem item, Set<String> hiddenKeys) {
-    final visibleChildren = item.children.where((c) => !hiddenKeys.contains(c.key)).toList();
+  Widget _buildParentWithFilteredChildren(
+    NavItem item,
+    Set<String> hiddenKeys,
+  ) {
+    final visibleChildren = item.children
+        .where((c) => !hiddenKeys.contains(c.key))
+        .toList();
     if (visibleChildren.isEmpty) return const SizedBox.shrink();
 
     return _withTooltip(
@@ -100,73 +112,6 @@ class AppSidebar extends StatelessWidget {
     );
   }
 
-  void _openAccountSwitcher(BuildContext anchorContext) {
-    showDropdown(
-      context: anchorContext,
-      anchorAlignment: AlignmentDirectional.topEnd,
-      alignment: AlignmentDirectional.bottomEnd,
-      offset: const Offset(0, -8),
-      builder: (context) {
-        return AnimatedBuilder(
-          animation: profileController,
-          builder: (context, _) {
-            final profiles = profileController.profiles;
-            final activeId = profileController.active?.id;
-            return ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 280, maxWidth: 320),
-              child: DropdownMenu(children: [
-                for (final profile in profiles)
-                  MenuButton(
-                    leading: _profileAvatar(context, profile.initials, 24),
-                    trailing: profile.id == activeId ? const Icon(LucideIcons.check, size: 16) : null,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        shadcn.Text(profile.name),
-                        if (profile.relationship.isNotEmpty) shadcn.Text(profile.relationship).muted.xSmall,
-                      ],
-                    ),
-                    onPressed: (ctx) {
-                      profileController.switchTo(profile.id);
-                      final toastContext =
-                          Navigator.maybeOf(anchorContext, rootNavigator: true)?.context ?? anchorContext;
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (!toastContext.mounted) return;
-                        showToast(
-                          context: toastContext,
-                          location: ToastLocation.bottomRight,
-                          builder: (context, overlay) => SurfaceCard(
-                            child: Basic(
-                              title: shadcn.Text('Profil actif: ${profile.name}'),
-                              subtitle: shadcn.Text(
-                                profile.relationship.isNotEmpty ? profile.relationship : 'Compte activé',
-                              ),
-                            ),
-                          ),
-                        );
-                      });
-                    },
-                  ),
-                const MenuDivider(),
-                MenuButton(
-                  leading: const Icon(LucideIcons.userPlus),
-                  child: const shadcn.Text('Gérer les comptes'),
-                  onPressed: (ctx) => onSelect('account_management'),
-                ),
-                MenuButton(
-                  leading: const Icon(LucideIcons.settings),
-                  child: const shadcn.Text('Paramètres'),
-                  onPressed: (ctx) => onSelect('settings'),
-                ),
-              ]),
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -174,7 +119,9 @@ class AppSidebar extends StatelessWidget {
       animation: Listenable.merge([profileController, sidebarPrefsController]),
       builder: (context, _) {
         final active = profileController.active;
-        final hiddenKeys = active != null ? sidebarPrefsController.hiddenKeysFor(active.id) : <String>{};
+        final hiddenKeys = active != null
+            ? sidebarPrefsController.hiddenKeysFor(active.id)
+            : <String>{};
         if (active != null) {
           sidebarPrefsController.loadFor(active.id);
         }
@@ -191,19 +138,21 @@ class AppSidebar extends StatelessWidget {
               collapsed ? 'Étendre' : 'Réduire',
               NavigationSlot(
                 leading: SizedBox(
-                width: 35,
-                height: 35,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Image.asset(
-                    'assets/icon/icon.png',
-                    fit: BoxFit.cover,
+                  width: 35,
+                  height: 35,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.asset(
+                      'assets/icon/icon.png',
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
-              ),
                 title: const shadcn.Text('Freenary').medium.small,
                 trailing: Icon(
-                  collapsed ? LucideIcons.panelLeftOpen : LucideIcons.panelLeftClose,
+                  collapsed
+                      ? LucideIcons.panelLeftOpen
+                      : LucideIcons.panelLeftClose,
                 ).iconSmall,
                 onPressed: onToggleCollapse,
               ),
@@ -214,10 +163,16 @@ class AppSidebar extends StatelessWidget {
               active != null ? '${active.name} — changer de compte' : 'Comptes',
               Builder(
                 builder: (slotContext) => NavigationSlot(
-                  leading: _profileAvatar(slotContext, active?.initials ?? '?', 32),
+                  leading: _profileAvatar(
+                    slotContext,
+                    active?.initials ?? '?',
+                    32,
+                  ),
                   title: shadcn.Text(active?.name ?? 'Compte').medium.small,
                   subtitle: shadcn.Text(
-                    active?.relationship.isNotEmpty == true ? active!.relationship : 'Compte',
+                    active?.relationship.isNotEmpty == true
+                        ? active!.relationship
+                        : 'Compte',
                   ).xSmall.normal,
                   trailing: const Icon(LucideIcons.chevronsUpDown).iconSmall,
                   onPressed: () => _openAccountSwitcher(slotContext),
@@ -230,7 +185,16 @@ class AppSidebar extends StatelessWidget {
             const NavigationDivider(),
             _buildGroup(academieGroup, hiddenKeys),
             const NavigationDivider(),
-            _buildGroup(outilsGroup, hiddenKeys),
+            // L'Assistant est réservé au desktop, y compris sur tablette
+            // (où la largeur d'écran déclenche par ailleurs cette même
+            // sidebar) : toolsTabItems l'exclut déjà pour la navigation
+            // mobile, on le réutilise ici plutôt que dupliquer le filtre.
+            _buildGroup(
+              isDesktopPlatform
+                  ? outilsGroup
+                  : NavGroup(label: outilsGroup.label, items: toolsTabItems),
+              hiddenKeys,
+            ),
           ],
         );
       },

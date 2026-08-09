@@ -139,13 +139,22 @@ class _VersionCardState extends State<_VersionCard> {
             if (_loading)
               Row(
                 children: [
-                  const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                   const SizedBox(width: 10),
                   const Text('Vérification des releases GitHub...').muted(),
                 ],
               )
             else if (_error != null)
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.destructive))
+              Text(
+                _error!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.destructive,
+                ),
+              )
             else if (_update != null) ...[
               Text(
                 'Nouvelle version détectée : ${_update!.latestVersion}',
@@ -205,33 +214,58 @@ class _ThemeCard extends StatelessWidget {
               children: [
                 const Text('Apparence').large().medium(),
                 const SizedBox(height: 12),
-                ButtonGroup(
-                  children: [
-                    SelectedButton(
-                      value: mode == ThemeMode.light,
-                      onChanged: (_) => themeController.setMode(ThemeMode.light),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [Icon(LucideIcons.sun), SizedBox(width: 8), Text('Clair')],
-                      ),
-                    ),
-                    SelectedButton(
-                      value: mode == ThemeMode.dark,
-                      onChanged: (_) => themeController.setMode(ThemeMode.dark),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [Icon(LucideIcons.moon), SizedBox(width: 8), Text('Sombre')],
-                      ),
-                    ),
-                    SelectedButton(
-                      value: mode == ThemeMode.system,
-                      onChanged: (_) => themeController.setMode(ThemeMode.system),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [Icon(LucideIcons.monitor), SizedBox(width: 8), Text('Système')],
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Les 3 boutons icône+texte ne tiennent pas côte à côte
+                    // en dessous de ce seuil (ex: "Système" tronqué) :
+                    // ButtonGroup passe alors en colonne pleine largeur.
+                    final narrow = constraints.maxWidth < 360;
+                    return ButtonGroup(
+                      direction: narrow ? Axis.vertical : Axis.horizontal,
+                      expands: narrow,
+                      children: [
+                        SelectedButton(
+                          value: mode == ThemeMode.light,
+                          onChanged: (_) =>
+                              themeController.setMode(ThemeMode.light),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.sun),
+                              SizedBox(width: 8),
+                              Text('Clair'),
+                            ],
+                          ),
+                        ),
+                        SelectedButton(
+                          value: mode == ThemeMode.dark,
+                          onChanged: (_) =>
+                              themeController.setMode(ThemeMode.dark),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.moon),
+                              SizedBox(width: 8),
+                              Text('Sombre'),
+                            ],
+                          ),
+                        ),
+                        SelectedButton(
+                          value: mode == ThemeMode.system,
+                          onChanged: (_) =>
+                              themeController.setMode(ThemeMode.system),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.monitor),
+                              SizedBox(width: 8),
+                              Text('Système'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -265,6 +299,7 @@ class _VaultCardState extends State<_VaultCard> {
   String? _editingId;
   bool _loading = true;
   String? _error;
+  final Set<String> _pathVisibleIds = {};
 
   @override
   void initState() {
@@ -302,7 +337,9 @@ class _VaultCardState extends State<_VaultCard> {
         await widget.onVaultActivated(vault.vaultPath);
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Impossible d\'ajouter un vault : $e');
+      if (mounted) {
+        setState(() => _error = 'Impossible d\'ajouter un vault : $e');
+      }
     } finally {
       await _loadVaults();
     }
@@ -329,14 +366,18 @@ class _VaultCardState extends State<_VaultCard> {
       _error = null;
     });
     try {
-      final activeVault = await widget.vaultFolderService.setActiveVault(vault.id);
+      final activeVault = await widget.vaultFolderService.setActiveVault(
+        vault.id,
+      );
       if (activeVault == null) {
         widget.onNoVaultSelected();
       } else {
         await widget.onVaultActivated(activeVault.vaultPath);
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Impossible d\'activer ce vault : $e');
+      if (mounted) {
+        setState(() => _error = 'Impossible d\'activer ce vault : $e');
+      }
     } finally {
       await _loadVaults();
     }
@@ -355,7 +396,9 @@ class _VaultCardState extends State<_VaultCard> {
         await widget.onVaultActivated(nextVault.vaultPath);
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Impossible d\'oublier ce vault : $e');
+      if (mounted) {
+        setState(() => _error = 'Impossible d\'oublier ce vault : $e');
+      }
     } finally {
       await _loadVaults();
     }
@@ -379,13 +422,21 @@ class _VaultCardState extends State<_VaultCard> {
             ).muted().small(),
             const SizedBox(height: 16),
             if (_loading)
-              const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
             else ...[
               for (final vault in _vaults) ...[
                 if (_editingId == vault.id)
                   _buildEditRow(vault)
                 else
-                  _buildVaultRow(vault, isActive: vault.id == activeId, theme: theme),
+                  _buildVaultRow(
+                    vault,
+                    isActive: vault.id == activeId,
+                    theme: theme,
+                  ),
                 const Divider(),
               ],
               OutlineButton(
@@ -396,59 +447,95 @@ class _VaultCardState extends State<_VaultCard> {
             ],
             if (_error != null) ...[
               const SizedBox(height: 16),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.destructive)),
+              Text(
+                _error!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.destructive,
+                ),
+              ),
             ],
           ],
         ),
       ),
     );
   }
-  Widget _buildVaultRow(SavedVault vault, {required bool isActive, required ThemeData theme}) {
+
+  Widget _buildVaultRow(
+    SavedVault vault, {
+    required bool isActive,
+    required ThemeData theme,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Peu de place sur mobile pour un chemin de fichier complet :
+          // il est masqué par défaut et révélé à la demande via l'icône info.
+          final narrow = constraints.maxWidth < 500;
+          final pathVisible = !narrow || _pathVisibleIds.contains(vault.id);
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.database, size: 16),
-                    const SizedBox(width: 8),
-                    Flexible(child: Text(vault.name).medium()),
-                    if (isActive) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.accent,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Text('Actif').small(),
-                      ),
-                    ],
-                  ],
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(LucideIcons.database, size: 16),
+                        const SizedBox(width: 8),
+                        Flexible(child: Text(vault.name).medium()),
+                        if (isActive) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.accent,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text('Actif').small(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (narrow)
+                    IconButton.ghost(
+                      icon: const Icon(LucideIcons.info, size: 16),
+                      onPressed: () => setState(() {
+                        if (!_pathVisibleIds.add(vault.id)) {
+                          _pathVisibleIds.remove(vault.id);
+                        }
+                      }),
+                    ),
+                  if (!isActive)
+                    OutlineButton(
+                      onPressed: () => _switchTo(vault),
+                      child: const Text('Basculer'),
+                    ),
+                  IconButton.ghost(
+                    icon: const Icon(LucideIcons.pencil, size: 16),
+                    onPressed: () => _startEdit(vault),
+                  ),
+                  IconButton.ghost(
+                    icon: const Icon(LucideIcons.trash2, size: 16),
+                    onPressed: () => _forgetVault(vault),
+                  ),
+                ],
               ),
-              if (!isActive)
-                OutlineButton(
-                  onPressed: () => _switchTo(vault),
-                  child: const Text('Basculer'),
-                ),
-              IconButton.ghost(
-                icon: const Icon(LucideIcons.pencil, size: 16),
-                onPressed: () => _startEdit(vault),
-              ),
-              IconButton.ghost(
-                icon: const Icon(LucideIcons.trash2, size: 16),
-                onPressed: () => _forgetVault(vault),
-              ),
+              if (pathVisible) ...[
+                const SizedBox(height: 6),
+                Text(
+                  vault.vaultPath,
+                  style: const TextStyle(fontFamily: 'monospace'),
+                ).muted().small(),
+              ],
             ],
-          ),
-          const SizedBox(height: 6),
-          Text(vault.vaultPath, style: const TextStyle(fontFamily: 'monospace')).muted().small(),
-        ],
+          );
+        },
       ),
     );
   }

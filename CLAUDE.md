@@ -62,3 +62,4 @@ The UI is in French and domain code mirrors French financial terminology directl
 - Be rigourous
 - Make the code as readable and clear as possible (and comment it)
 - Prefer reusable components
+- Always clearly state you intended course of actions with an updated as you go unchecked/checked todo list.

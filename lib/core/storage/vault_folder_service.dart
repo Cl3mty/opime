@@ -33,7 +33,9 @@ class SavedVault {
       id: id ?? this.id,
       name: name ?? this.name,
       vaultPath: vaultPath ?? this.vaultPath,
-      bookmarkData: identical(bookmarkData, _missingBookmarkData) ? this.bookmarkData : bookmarkData as String?,
+      bookmarkData: identical(bookmarkData, _missingBookmarkData)
+          ? this.bookmarkData
+          : bookmarkData as String?,
       bookmarkTargetsVault: bookmarkTargetsVault ?? this.bookmarkTargetsVault,
     );
   }
@@ -145,7 +147,9 @@ class VaultFolderService {
     }
 
     final activeId = prefs.getString(_activeVaultIdKey);
-    final nextVault = remaining.where((vault) => vault.id == activeId).firstOrNull ?? remaining.first;
+    final nextVault =
+        remaining.where((vault) => vault.id == activeId).firstOrNull ??
+        remaining.first;
     await prefs.setString(_activeVaultIdKey, nextVault.id);
     return _resolveAccessibleVault(nextVault);
   }
@@ -165,7 +169,9 @@ class VaultFolderService {
 
     final prefs = await SharedPreferences.getInstance();
     final vaults = await listVaults();
-    final existing = vaults.where((vault) => p.equals(vault.vaultPath, picked.vaultPath)).firstOrNull;
+    final existing = vaults
+        .where((vault) => p.equals(vault.vaultPath, picked.vaultPath))
+        .firstOrNull;
     if (existing != null) {
       await prefs.setString(_activeVaultIdKey, existing.id);
       return _resolveAccessibleVault(existing);
@@ -211,17 +217,45 @@ class VaultFolderService {
     String? currentVaultPath,
     void Function(int copied, int total)? onMigrationProgress,
   }) async {
-    final result = await FilePicker.getDirectoryPath(dialogTitle: dialogTitle);
-    if (result == null) return null;
+    String result;
+    String? iosBookmarkData;
+
+    if (Platform.isIOS) {
+      // file_picker ne renvoie sur iOS qu'un chemin texte brut : l'URL du
+      // UIDocumentPickerViewController système a déjà perdu son "security
+      // scope" au moment où on la reconstruit nous-mêmes pour créer un
+      // bookmark, ce qui échoue silencieusement sur un vrai appareil (le
+      // simulateur n'applique pas le bac à sable de la même façon, d'où
+      // l'illusion que ça fonctionnait). Notre propre picker natif
+      // (voir AppDelegate.swift) garde l'URL scopée assez longtemps pour
+      // créer le bookmark dessus directement et nous renvoie les deux.
+      final picked = await _channel.invokeMapMethod<String, dynamic>(
+        'pickFolder',
+      );
+      if (picked == null) return null;
+      final path = picked['path'] as String?;
+      if (path == null) return null;
+      result = path;
+      iosBookmarkData = picked['bookmarkData'] as String?;
+    } else {
+      final picked = await FilePicker.getDirectoryPath(
+        dialogTitle: dialogTitle,
+      );
+      if (picked == null) return null;
+      result = picked;
+    }
 
     final selectedIsAlreadyVault = p.basename(result) == '.freenary';
-    final vaultDir = selectedIsAlreadyVault ? Directory(result) : Directory(p.join(result, '.freenary'));
+    final vaultDir = selectedIsAlreadyVault
+        ? Directory(result)
+        : Directory(p.join(result, '.freenary'));
     final alreadyExists = await vaultDir.exists();
 
     if (!alreadyExists) {
       await vaultDir.create(recursive: true);
 
-      if (currentVaultPath != null && !p.equals(currentVaultPath, vaultDir.path)) {
+      if (currentVaultPath != null &&
+          !p.equals(currentVaultPath, vaultDir.path)) {
         final oldDir = Directory(currentVaultPath);
         if (await oldDir.exists()) {
           final total = await _countFiles(oldDir);
@@ -234,7 +268,9 @@ class VaultFolderService {
           });
 
           if (errors.isNotEmpty) {
-            debugPrint('Erreurs de migration (${errors.length} fichier(s) non copiés) :');
+            debugPrint(
+              'Erreurs de migration (${errors.length} fichier(s) non copiés) :',
+            );
             for (final e in errors) {
               debugPrint('  - $e');
             }
@@ -243,11 +279,15 @@ class VaultFolderService {
       }
     }
 
-    String? bookmarkData;
+    String? bookmarkData = iosBookmarkData;
     if (Platform.isMacOS) {
-      final bookmarkTarget = result;
-      bookmarkData = await _channel.invokeMethod<String>('createBookmark', bookmarkTarget);
+      bookmarkData = await _channel.invokeMethod<String>(
+        'createBookmark',
+        result,
+      );
       if (bookmarkData == null) return null;
+    } else if (Platform.isIOS && bookmarkData == null) {
+      return null;
     }
 
     return _PickedVault(
@@ -277,7 +317,13 @@ class VaultFolderService {
       final newPath = p.join(destination.path, p.basename(entity.path));
       try {
         if (entity is Directory) {
-          errors.addAll(await _copyDirectoryContents(entity, Directory(newPath), onFileCopied));
+          errors.addAll(
+            await _copyDirectoryContents(
+              entity,
+              Directory(newPath),
+              onFileCopied,
+            ),
+          );
         } else if (entity is File) {
           await entity.copy(newPath);
           onFileCopied();
@@ -302,7 +348,9 @@ class VaultFolderService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _vaultsKey,
-      const JsonEncoder.withIndent('  ').convert(vaults.map((vault) => vault.toJson()).toList()),
+      const JsonEncoder.withIndent(
+        '  ',
+      ).convert(vaults.map((vault) => vault.toJson()).toList()),
     );
   }
 
@@ -313,11 +361,14 @@ class VaultFolderService {
     String? legacyBookmarkData;
     var bookmarkTargetsVault = false;
 
-    if (Platform.isMacOS) {
+    if (Platform.isMacOS || Platform.isIOS) {
       legacyBookmarkData = prefs.getString(_bookmarkKey);
       if (legacyBookmarkData != null) {
         try {
-          final parentPath = await _channel.invokeMethod<String>('resolveAndAccess', legacyBookmarkData);
+          final parentPath = await _channel.invokeMethod<String>(
+            'resolveAndAccess',
+            legacyBookmarkData,
+          );
           if (parentPath != null) {
             legacyPath = p.join(parentPath, '.freenary');
           }
@@ -343,7 +394,7 @@ class VaultFolderService {
   }
 
   Future<SavedVault?> _resolveAccessibleVault(SavedVault vault) async {
-    if (!Platform.isMacOS) {
+    if (!Platform.isMacOS && !Platform.isIOS) {
       return await Directory(vault.vaultPath).exists() ? vault : null;
     }
     final bookmarkData = vault.bookmarkData;
@@ -352,9 +403,14 @@ class VaultFolderService {
     }
 
     try {
-      final bookmarkTarget = await _channel.invokeMethod<String>('resolveAndAccess', bookmarkData);
+      final bookmarkTarget = await _channel.invokeMethod<String>(
+        'resolveAndAccess',
+        bookmarkData,
+      );
       if (bookmarkTarget == null) return null;
-      final resolvedVaultPath = vault.bookmarkTargetsVault ? bookmarkTarget : p.join(bookmarkTarget, '.freenary');
+      final resolvedVaultPath = vault.bookmarkTargetsVault
+          ? bookmarkTarget
+          : p.join(bookmarkTarget, '.freenary');
       final resolvedVault = vault.copyWith(vaultPath: resolvedVaultPath);
       if (!p.equals(resolvedVault.vaultPath, vault.vaultPath)) {
         final vaults = await listVaults();
@@ -363,7 +419,9 @@ class VaultFolderService {
             if (entry.id == resolvedVault.id) resolvedVault else entry,
         ]);
       }
-      return await Directory(resolvedVault.vaultPath).exists() ? resolvedVault : null;
+      return await Directory(resolvedVault.vaultPath).exists()
+          ? resolvedVault
+          : null;
     } catch (_) {
       return null;
     }

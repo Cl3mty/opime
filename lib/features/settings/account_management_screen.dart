@@ -9,7 +9,8 @@ class AccountManagementScreen extends StatefulWidget {
   const AccountManagementScreen({super.key, required this.profileController});
 
   @override
-  State<AccountManagementScreen> createState() => _AccountManagementScreenState();
+  State<AccountManagementScreen> createState() =>
+      _AccountManagementScreenState();
 }
 
 class _AccountManagementScreenState extends State<AccountManagementScreen> {
@@ -67,7 +68,7 @@ class _AccountManagementScreenState extends State<AccountManagementScreen> {
         final profiles = widget.profileController.profiles;
         final activeId = widget.profileController.active?.id;
 
-        return Padding(
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
@@ -91,11 +92,17 @@ class _AccountManagementScreenState extends State<AccountManagementScreen> {
                           if (_editingId == profile.id)
                             _buildEditRow(profile)
                           else
-                            _buildProfileRow(profile, isActive: profile.id == activeId),
+                            _buildProfileRow(
+                              profile,
+                              isActive: profile.id == activeId,
+                            ),
                           const Divider(),
                         ],
                         const SizedBox(height: 8),
-                        if (_creating) _buildCreateForm() else _buildAddButton(),
+                        if (_creating)
+                          _buildCreateForm()
+                        else
+                          _buildAddButton(),
                       ],
                     ),
                   ),
@@ -110,57 +117,101 @@ class _AccountManagementScreenState extends State<AccountManagementScreen> {
 
   Widget _buildProfileRow(Profile profile, {required bool isActive}) {
     final theme = Theme.of(context);
+
+    final identity = Row(
+      children: [
+        Avatar(size: 36, initials: profile.initials),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: shadcn.Text(
+                      profile.name,
+                      overflow: TextOverflow.ellipsis,
+                    ).medium(),
+                  ),
+                  if (profile.isMaster) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.accent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const shadcn.Text('Principal').small(),
+                    ),
+                  ],
+                  if (isActive) ...[
+                    const SizedBox(width: 6),
+                    Icon(
+                      LucideIcons.check,
+                      size: 14,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ],
+                ],
+              ),
+              if (profile.relationship.isNotEmpty)
+                shadcn.Text(profile.relationship).muted().small(),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!isActive)
+          OutlineButton(
+            onPressed: () => widget.profileController.switchTo(profile.id),
+            child: const shadcn.Text('Basculer'),
+          ),
+        IconButton.ghost(
+          icon: const Icon(LucideIcons.pencil, size: 16),
+          onPressed: () => _startEdit(profile),
+        ),
+        if (!profile.isMaster)
+          IconButton.ghost(
+            icon: const Icon(LucideIcons.trash2, size: 16),
+            onPressed: () => widget.profileController.deleteProfile(profile.id),
+          ),
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Avatar(size: 36, initials: profile.initials),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // En dessous de ce seuil, le nom + les 3 actions (Basculer, crayon,
+          // poubelle) ne tiennent plus sur une seule ligne sans se chevaucher :
+          // les actions passent sur leur propre ligne, alignées à droite.
+          final narrow = constraints.maxWidth < 420;
+          if (narrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    shadcn.Text(profile.name).medium(),
-                    if (profile.isMaster) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.accent,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const shadcn.Text('Principal').small(),
-                      ),
-                    ],
-                    if (isActive) ...[
-                      const SizedBox(width: 6),
-                      Icon(LucideIcons.check, size: 14, color: theme.colorScheme.primary),
-                    ],
-                  ],
-                ),
-                if (profile.relationship.isNotEmpty)
-                  shadcn.Text(profile.relationship).muted().small(),
+                identity,
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: actions),
               ],
-            ),
-          ),
-          if (!isActive)
-            OutlineButton(
-              onPressed: () => widget.profileController.switchTo(profile.id),
-              child: const shadcn.Text('Basculer'),
-            ),
-          IconButton.ghost(
-            icon: const Icon(LucideIcons.pencil, size: 16),
-            onPressed: () => _startEdit(profile),
-          ),
-          if (!profile.isMaster)
-            IconButton.ghost(
-              icon: const Icon(LucideIcons.trash2, size: 16),
-              onPressed: () => widget.profileController.deleteProfile(profile.id),
-            ),
-        ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: identity),
+              actions,
+            ],
+          );
+        },
       ),
     );
   }
@@ -243,9 +294,16 @@ class _AccountManagementScreenState extends State<AccountManagementScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(LucideIcons.userPlus, size: 16, color: Theme.of(context).colorScheme.primary),
+          Icon(
+            LucideIcons.userPlus,
+            size: 16,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const SizedBox(width: 8),
-          shadcn.Text('Ajouter un compte', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+          shadcn.Text(
+            'Ajouter un compte',
+            style: TextStyle(color: Theme.of(context).colorScheme.primary),
+          ),
         ],
       ),
     );

@@ -16,7 +16,11 @@ class LoanSimulationScreen extends StatefulWidget {
   final String vaultPath;
   final AmountVisibilityController amountVisibility;
 
-  const LoanSimulationScreen({super.key, required this.vaultPath, required this.amountVisibility});
+  const LoanSimulationScreen({
+    super.key,
+    required this.vaultPath,
+    required this.amountVisibility,
+  });
 
   @override
   State<LoanSimulationScreen> createState() => _LoanSimulationScreenState();
@@ -59,16 +63,44 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     if (!mounted || data.isEmpty) return;
 
     setState(() {
-      _montantEmprunte = _readDouble(data, 'montantEmprunte', fallback: _montantEmprunte);
-      _dureeAnnees = _readInt(data, 'dureeAnnees', fallback: _dureeAnnees).clamp(1, 35);
+      _montantEmprunte = _readDouble(
+        data,
+        'montantEmprunte',
+        fallback: _montantEmprunte,
+      );
+      _dureeAnnees = _readInt(
+        data,
+        'dureeAnnees',
+        fallback: _dureeAnnees,
+      ).clamp(1, 35);
       _tauxInteret = _readDouble(data, 'tauxInteret', fallback: _tauxInteret);
-      _tauxAssurance = _readDouble(data, 'tauxAssurance', fallback: _tauxAssurance);
-      _fraisDossier = _readDouble(data, 'fraisDossier', fallback: _fraisDossier);
-      _fraisGarantie = _readDouble(data, 'fraisGarantie', fallback: _fraisGarantie);
+      _tauxAssurance = _readDouble(
+        data,
+        'tauxAssurance',
+        fallback: _tauxAssurance,
+      );
+      _fraisDossier = _readDouble(
+        data,
+        'fraisDossier',
+        fallback: _fraisDossier,
+      );
+      _fraisGarantie = _readDouble(
+        data,
+        'fraisGarantie',
+        fallback: _fraisGarantie,
+      );
       _type = _readLoanType(data, 'type', fallback: _type);
       _differeActif = _readBool(data, 'differeActif', fallback: _differeActif);
-      _dureeDiffereMois = _readInt(data, 'dureeDiffereMois', fallback: _dureeDiffereMois).clamp(1, _dureeAnnees * 12 - 1);
-      _typeDiffere = _readDeferType(data, 'typeDiffere', fallback: _typeDiffere);
+      _dureeDiffereMois = _readInt(
+        data,
+        'dureeDiffereMois',
+        fallback: _dureeDiffereMois,
+      ).clamp(1, _dureeAnnees * 12 - 1);
+      _typeDiffere = _readDeferType(
+        data,
+        'typeDiffere',
+        fallback: _typeDiffere,
+      );
     });
   }
 
@@ -92,7 +124,11 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     _saveState();
   }
 
-  double _readDouble(Map<String, dynamic> json, String key, {required double fallback}) {
+  double _readDouble(
+    Map<String, dynamic> json,
+    String key, {
+    required double fallback,
+  }) {
     final value = json[key];
     if (value is num) return value.toDouble();
     return fallback;
@@ -105,13 +141,21 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     return fallback;
   }
 
-  bool _readBool(Map<String, dynamic> json, String key, {required bool fallback}) {
+  bool _readBool(
+    Map<String, dynamic> json,
+    String key, {
+    required bool fallback,
+  }) {
     final value = json[key];
     if (value is bool) return value;
     return fallback;
   }
 
-  LoanType _readLoanType(Map<String, dynamic> json, String key, {required LoanType fallback}) {
+  LoanType _readLoanType(
+    Map<String, dynamic> json,
+    String key, {
+    required LoanType fallback,
+  }) {
     final value = json[key];
     if (value is String) {
       for (final t in LoanType.values) {
@@ -121,7 +165,11 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     return fallback;
   }
 
-  DeferType _readDeferType(Map<String, dynamic> json, String key, {required DeferType fallback}) {
+  DeferType _readDeferType(
+    Map<String, dynamic> json,
+    String key, {
+    required DeferType fallback,
+  }) {
     final value = json[key];
     if (value is String) {
       for (final t in DeferType.values) {
@@ -155,42 +203,25 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
 
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: FrostedCard(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: 360,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: SingleChildScrollView(child: _buildInputsContent()),
-              ),
-            ),
-            const VerticalDivider(width: 1),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: SingleChildScrollView(child: _buildResultsContent(result, hidden)),
-              ),
-            ),
-          ],
-        ),
+      child: _LoanSplitCard(
+        left: _buildInputsContent(),
+        right: _buildResultsContent(result, hidden),
       ),
     );
   }
 
   LoanResult _simulate() => simulateLoan(
-        montantEmprunte: _montantEmprunte,
-        dureeAnnees: _dureeAnnees,
-        tauxInteret: _tauxInteret,
-        tauxAssurance: _tauxAssurance,
-        fraisDossier: _fraisDossier,
-        fraisGarantie: _fraisGarantie,
-        type: _type,
-        differeActif: _differeActif,
-        dureeDiffereMois: _dureeDiffereMois,
-        typeDiffere: _typeDiffere,
-      );
+    montantEmprunte: _montantEmprunte,
+    dureeAnnees: _dureeAnnees,
+    tauxInteret: _tauxInteret,
+    tauxAssurance: _tauxAssurance,
+    fraisDossier: _fraisDossier,
+    fraisGarantie: _fraisGarantie,
+    type: _type,
+    differeActif: _differeActif,
+    dureeDiffereMois: _dureeDiffereMois,
+    typeDiffere: _typeDiffere,
+  );
 
   // ---------------------------------------------------------------------
   // Colonne de gauche : formulaire
@@ -231,7 +262,8 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
           value: _dureeAnnees.toDouble(),
           step: 1,
           decimals: 0,
-          onChanged: (v) => _update(() => _dureeAnnees = v.round().clamp(1, 35)),
+          onChanged: (v) =>
+              _update(() => _dureeAnnees = v.round().clamp(1, 35)),
         ),
         const SizedBox(height: 16),
         Row(
@@ -293,7 +325,11 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: shadcn.Text('Différé de remboursement').semiBold().small()),
+              Expanded(
+                child: shadcn.Text(
+                  'Différé de remboursement',
+                ).semiBold().small(),
+              ),
               _SimpleSwitch(
                 value: _differeActif,
                 onChanged: (v) => _update(() => _differeActif = v),
@@ -306,12 +342,14 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
               children: [
                 SelectedButton(
                   value: _typeDiffere == DeferType.partielle,
-                  onChanged: (_) => _update(() => _typeDiffere = DeferType.partielle),
+                  onChanged: (_) =>
+                      _update(() => _typeDiffere = DeferType.partielle),
                   child: const shadcn.Text('Franchise partielle'),
                 ),
                 SelectedButton(
                   value: _typeDiffere == DeferType.totale,
-                  onChanged: (_) => _update(() => _typeDiffere = DeferType.totale),
+                  onChanged: (_) =>
+                      _update(() => _typeDiffere = DeferType.totale),
                   child: const shadcn.Text('Franchise totale'),
                 ),
               ],
@@ -329,7 +367,12 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
               value: _dureeDiffereMois.toDouble(),
               step: 1,
               decimals: 0,
-              onChanged: (v) => _update(() => _dureeDiffereMois = v.round().clamp(1, _dureeAnnees * 12 - 1)),
+              onChanged: (v) => _update(
+                () => _dureeDiffereMois = v.round().clamp(
+                  1,
+                  _dureeAnnees * 12 - 1,
+                ),
+              ),
             ),
           ],
         ],
@@ -386,32 +429,16 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
           ).muted().small(),
         ],
         const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(
-              children: [
-                shadcn.Text('Coût total du crédit').muted().small(),
-                const SizedBox(height: 4),
-                shadcn.Text(displayEuros(result.coutTotalCredit, hidden)).large().semiBold(),
-              ],
+        _LoanCostStats(
+          items: [
+            (
+              'Coût total du crédit',
+              displayEuros(result.coutTotalCredit, hidden),
             ),
-            const SizedBox(width: 40),
-            Column(
-              children: [
-                shadcn.Text('Dont assurance').muted().small(),
-                const SizedBox(height: 4),
-                shadcn.Text(displayEuros(result.totalAssurance, hidden)).large().semiBold(),
-              ],
-            ),
-            const SizedBox(width: 40),
-            Column(
-              children: [
-                shadcn.Text('Coût total (frais inclus)').muted().small(),
-                const SizedBox(height: 4),
-                shadcn.Text(displayEuros(result.coutTotalAvecFrais, hidden)).large().semiBold(),
-              ],
+            ('Dont assurance', displayEuros(result.totalAssurance, hidden)),
+            (
+              'Coût total (frais inclus)',
+              displayEuros(result.coutTotalAvecFrais, hidden),
             ),
           ],
         ),
@@ -421,9 +448,24 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _LegendPill(color: red, label: 'Capital', value: displayEuros(result.montantEmprunte, hidden)),
-            _LegendPill(color: blue, label: 'Intérêts', value: displayEuros(result.coutTotalCredit - result.totalAssurance, hidden)),
-            _LegendPill(color: accent, label: 'Assurance', value: displayEuros(result.totalAssurance, hidden)),
+            _LegendPill(
+              color: red,
+              label: 'Capital',
+              value: displayEuros(result.montantEmprunte, hidden),
+            ),
+            _LegendPill(
+              color: blue,
+              label: 'Intérêts',
+              value: displayEuros(
+                result.coutTotalCredit - result.totalAssurance,
+                hidden,
+              ),
+            ),
+            _LegendPill(
+              color: accent,
+              label: 'Assurance',
+              value: displayEuros(result.totalAssurance, hidden),
+            ),
           ],
         ),
         const SizedBox(height: 24),
@@ -448,9 +490,15 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
             style: DefaultTextStyle.of(context).style,
             children: [
               const TextSpan(text: 'Pour un emprunt de '),
-              TextSpan(text: displayEuros(result.montantEmprunte, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
+              TextSpan(
+                text: displayEuros(result.montantEmprunte, hidden),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               const TextSpan(text: ' sur '),
-              TextSpan(text: '$_dureeAnnees ans', style: const TextStyle(fontWeight: FontWeight.bold)),
+              TextSpan(
+                text: '$_dureeAnnees ans',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               const TextSpan(text: ', votre mensualité s\'élève à '),
               TextSpan(
                 text: displayEuros(result.mensualite, hidden),
@@ -464,6 +512,57 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
         const SizedBox(height: 16),
         const _LoanDisclaimer(),
       ],
+    );
+  }
+}
+
+class _LoanSplitCard extends StatelessWidget {
+  final Widget left;
+  final Widget right;
+
+  const _LoanSplitCard({required this.left, required this.right});
+
+  @override
+  Widget build(BuildContext context) {
+    return FrostedCard(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 980;
+
+          if (compact) {
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(padding: const EdgeInsets.all(20), child: left),
+                  const Divider(height: 1),
+                  Padding(padding: const EdgeInsets.all(20), child: right),
+                ],
+              ),
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 360,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: SingleChildScrollView(child: left),
+                ),
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: SingleChildScrollView(child: right),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -506,7 +605,11 @@ class MonthEntry {
   final double capital;
   final double interest;
   final double insurance;
-  MonthEntry({required this.capital, required this.interest, required this.insurance});
+  MonthEntry({
+    required this.capital,
+    required this.interest,
+    required this.insurance,
+  });
 }
 
 class YearBar {
@@ -514,7 +617,12 @@ class YearBar {
   final double capital;
   final double interest;
   final double insurance;
-  YearBar({required this.year, required this.capital, required this.interest, required this.insurance});
+  YearBar({
+    required this.year,
+    required this.capital,
+    required this.interest,
+    required this.insurance,
+  });
 }
 
 class LoanResult {
@@ -571,18 +679,28 @@ LoanResult simulateLoan({
     for (var m = 1; m <= totalMonths; m++) {
       final interest = montantEmprunte * i;
       final capital = (m == totalMonths) ? montantEmprunte : 0.0;
-      months.add(MonthEntry(capital: capital, interest: interest, insurance: insuranceMonthly));
+      months.add(
+        MonthEntry(
+          capital: capital,
+          interest: interest,
+          insurance: insuranceMonthly,
+        ),
+      );
     }
   } else {
     var remaining = montantEmprunte;
-    final deferMonths = differeActif ? dureeDiffereMois.clamp(0, totalMonths - 1) : 0;
+    final deferMonths = differeActif
+        ? dureeDiffereMois.clamp(0, totalMonths - 1)
+        : 0;
 
     for (var m = 1; m <= deferMonths; m++) {
       final interest = remaining * i;
       if (typeDiffere == DeferType.totale) {
         remaining += interest; // intérêts capitalisés, rien n'est décaissé
       }
-      months.add(MonthEntry(capital: 0, interest: interest, insurance: insuranceMonthly));
+      months.add(
+        MonthEntry(capital: 0, interest: interest, insurance: insuranceMonthly),
+      );
     }
 
     final remainingMonths = totalMonths - deferMonths;
@@ -594,7 +712,13 @@ LoanResult simulateLoan({
         final interest = remaining * i;
         final capital = monthlyPayment - interest;
         remaining -= capital;
-        months.add(MonthEntry(capital: capital, interest: interest, insurance: insuranceMonthly));
+        months.add(
+          MonthEntry(
+            capital: capital,
+            interest: interest,
+            insurance: insuranceMonthly,
+          ),
+        );
       }
     }
   }
@@ -604,10 +728,20 @@ LoanResult simulateLoan({
   for (var y = 0; y < dureeAnnees; y++) {
     final slice = months.skip(y * 12).take(12).toList();
     if (slice.isEmpty) continue;
-    final capital = slice.map((m) => m.capital).reduce((a, b) => a + b) / slice.length;
-    final interest = slice.map((m) => m.interest).reduce((a, b) => a + b) / slice.length;
-    final insurance = slice.map((m) => m.insurance).reduce((a, b) => a + b) / slice.length;
-    years.add(YearBar(year: y, capital: capital, interest: interest, insurance: insurance));
+    final capital =
+        slice.map((m) => m.capital).reduce((a, b) => a + b) / slice.length;
+    final interest =
+        slice.map((m) => m.interest).reduce((a, b) => a + b) / slice.length;
+    final insurance =
+        slice.map((m) => m.insurance).reduce((a, b) => a + b) / slice.length;
+    years.add(
+      YearBar(
+        year: y,
+        capital: capital,
+        interest: interest,
+        insurance: insurance,
+      ),
+    );
   }
 
   final totalInterest = months.fold<double>(0, (s, m) => s + m.interest);
@@ -615,18 +749,26 @@ LoanResult simulateLoan({
   final coutTotalCredit = totalInterest + totalInsurance;
   final coutTotalAvecFrais = coutTotalCredit + fraisDossier + fraisGarantie;
 
-  final deferMonths = (type == LoanType.amortissable && differeActif) ? dureeDiffereMois.clamp(0, totalMonths - 1) : 0;
+  final deferMonths = (type == LoanType.amortissable && differeActif)
+      ? dureeDiffereMois.clamp(0, totalMonths - 1)
+      : 0;
   // Pour un amortissable classique, la mensualité est constante hors dernier mois d'arrondi :
   // on prend plutôt le paiement du premier mois de la phase d'amortissement.
   final mensualiteAffichee = type == LoanType.inFine
       ? montantEmprunte * i + insuranceMonthly
-      : (deferMonths < months.length ? (months[deferMonths].capital + months[deferMonths].interest + months[deferMonths].insurance) : 0.0);
+      : (deferMonths < months.length
+            ? (months[deferMonths].capital +
+                  months[deferMonths].interest +
+                  months[deferMonths].insurance)
+            : 0.0);
 
   // En franchise totale, les intérêts du différé sont capitalisés (ajoutés au
   // capital restant dû) et non décaissés : seule l'assurance est réellement
   // payée chaque mois. En franchise partielle, les intérêts sont, eux, payés.
   final mensualiteDifferee = deferMonths > 0
-      ? (typeDiffere == DeferType.totale ? insuranceMonthly : months[0].capital + months[0].interest + months[0].insurance)
+      ? (typeDiffere == DeferType.totale
+            ? insuranceMonthly
+            : months[0].capital + months[0].interest + months[0].insurance)
       : null;
 
   return LoanResult(
@@ -672,7 +814,10 @@ class _SimpleSwitch extends StatelessWidget {
           child: Container(
             width: 18,
             height: 18,
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
           ),
         ),
       ),
@@ -750,8 +895,13 @@ class _NumberFieldState extends State<_NumberField> {
                 controller: _controller,
                 focusNode: _focusNode,
                 border: Border.all(color: Colors.transparent),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 onChanged: (text) {
                   final parsed = double.tryParse(text.replaceAll(',', '.'));
                   if (parsed != null) widget.onChanged(parsed);
@@ -782,11 +932,61 @@ class _NumberFieldState extends State<_NumberField> {
   }
 }
 
+/// Ligne de statistiques de coût sous le graphique : côte à côte si la
+/// largeur le permet, sinon empilées en colonne pour ne pas écraser des
+/// montants qui peuvent être grands (notamment sur mobile).
+class _LoanCostStats extends StatelessWidget {
+  final List<(String, String)> items;
+  const _LoanCostStats({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget stat(String label, String value) {
+      return Column(
+        children: [
+          shadcn.Text(label).muted().small(),
+          const SizedBox(height: 4),
+          shadcn.Text(value).large().semiBold(),
+        ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 420) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                if (i > 0) const SizedBox(width: 40),
+                stat(items[i].$1, items[i].$2),
+              ],
+            ],
+          );
+        }
+        return Column(
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(height: 12),
+              stat(items[i].$1, items[i].$2),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _LegendPill extends StatelessWidget {
   final Color color;
   final String label;
   final String value;
-  const _LegendPill({required this.color, required this.label, required this.value});
+  const _LegendPill({
+    required this.color,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -799,11 +999,18 @@ class _LegendPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 8),
           shadcn.Text(label).small(),
           const SizedBox(width: 6),
-          shadcn.Text(value, style: const TextStyle(fontWeight: FontWeight.bold)).small(),
+          shadcn.Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ).small(),
         ],
       ),
     );
@@ -859,47 +1066,64 @@ class _LoanChartState extends State<_LoanChart> {
         final barSlot = chartWidth / n;
 
         void updateHover(Offset local) {
-          final idx = ((local.dx - _leftAxisWidth) / barSlot).floor().clamp(0, n - 1);
+          final idx = ((local.dx - _leftAxisWidth) / barSlot).floor().clamp(
+            0,
+            n - 1,
+          );
           if (idx != _hoveredYear) setState(() => _hoveredYear = idx);
         }
 
-        YearBar? hovered = _hoveredYear != null ? widget.years[_hoveredYear!] : null;
+        YearBar? hovered = _hoveredYear != null
+            ? widget.years[_hoveredYear!]
+            : null;
 
         return MouseRegion(
           onHover: (e) => updateHover(e.localPosition),
           onExit: (_) => setState(() => _hoveredYear = null),
-          child: Stack(
-            children: [
-              CustomPaint(
-                size: Size(width, height),
-                painter: _LoanChartPainter(
-                  years: widget.years,
-                  red: widget.red,
-                  blue: widget.blue,
-                  gold: widget.gold,
-                  textColor: widget.textColor,
-                  gridColor: widget.gridColor,
-                  hoveredYear: _hoveredYear,
-                  hidden: widget.hidden,
-                ),
-              ),
-              if (hovered != null)
-                Positioned(
-                  left: (_leftAxisWidth + barSlot * _hoveredYear! - 130).clamp(_leftAxisWidth, width - 280),
-                  top: (chartHeight / 2 - 90).clamp(0, chartHeight - 180),
-                  child: _ChartTooltip(
-                    title: 'Année ${hovered.year + 1}',
-                    capital: hovered.capital,
-                    interest: hovered.interest,
-                    insurance: hovered.insurance,
+          child: GestureDetector(
+            onPanDown: (details) => updateHover(details.localPosition),
+            onPanUpdate: (details) => updateHover(details.localPosition),
+            onPanEnd: (_) => setState(() => _hoveredYear = null),
+            child: Stack(
+              children: [
+                CustomPaint(
+                  size: Size(width, height),
+                  painter: _LoanChartPainter(
+                    years: widget.years,
                     red: widget.red,
                     blue: widget.blue,
                     gold: widget.gold,
-                    cardColor: widget.cardColor,
+                    textColor: widget.textColor,
+                    gridColor: widget.gridColor,
+                    hoveredYear: _hoveredYear,
                     hidden: widget.hidden,
                   ),
                 ),
-            ],
+                if (hovered != null)
+                  Positioned(
+                    left: (_leftAxisWidth + barSlot * _hoveredYear! - 130)
+                        .clamp(
+                          _leftAxisWidth,
+                          max(_leftAxisWidth, width - 280),
+                        ),
+                    top: (chartHeight / 2 - 90).clamp(
+                      0,
+                      max(0.0, chartHeight - 180),
+                    ),
+                    child: _ChartTooltip(
+                      title: 'Année ${hovered.year + 1}',
+                      capital: hovered.capital,
+                      interest: hovered.interest,
+                      insurance: hovered.insurance,
+                      red: widget.red,
+                      blue: widget.blue,
+                      gold: widget.gold,
+                      cardColor: widget.cardColor,
+                      hidden: widget.hidden,
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -951,7 +1175,10 @@ class _ChartTooltip extends StatelessWidget {
                 const SizedBox(height: 8),
                 shadcn.Text(
                   displayEuros(capital + interest + insurance, hidden),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 shadcn.Text('mensualité moyenne').muted().small(),
                 const SizedBox(height: 10),
@@ -973,10 +1200,17 @@ class _ChartTooltip extends StatelessWidget {
   Widget _row(String label, double value, Color color) {
     return Row(
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 8),
         Expanded(child: shadcn.Text(label)),
-        shadcn.Text(displayEuros(value, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
+        shadcn.Text(
+          displayEuros(value, hidden),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
@@ -1013,7 +1247,9 @@ class _LoanChartPainter extends CustomPainter {
     final barSlot = chartWidth / n;
     final barWidth = barSlot * 0.6;
 
-    final maxTotal = years.map((y) => y.capital + y.interest + y.insurance).reduce((a, b) => a > b ? a : b);
+    final maxTotal = years
+        .map((y) => y.capital + y.interest + y.insurance)
+        .reduce((a, b) => a > b ? a : b);
     final axisMax = _niceCeil(maxTotal * 1.15);
     const gridLines = 4;
     final step = axisMax / gridLines;
@@ -1023,11 +1259,18 @@ class _LoanChartPainter extends CustomPainter {
     for (var i = 0; i <= gridLines; i++) {
       final v = step * i;
       final y = yFor(v);
-      canvas.drawLine(Offset(leftAxisWidth, y), Offset(size.width, y), Paint()
-        ..color = gridColor.withValues(alpha: 0.4)
-        ..strokeWidth = 1);
+      canvas.drawLine(
+        Offset(leftAxisWidth, y),
+        Offset(size.width, y),
+        Paint()
+          ..color = gridColor.withValues(alpha: 0.4)
+          ..strokeWidth = 1,
+      );
       final tp = TextPainter(
-        text: TextSpan(text: displayEurosCompact(v, hidden), style: TextStyle(color: textColor, fontSize: 11)),
+        text: TextSpan(
+          text: displayEurosCompact(v, hidden),
+          style: TextStyle(color: textColor, fontSize: 11),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftAxisWidth - tp.width - 8, y - tp.height / 2));
@@ -1043,26 +1286,72 @@ class _LoanChartPainter extends CustomPainter {
       // Capital (bas).
       final capitalTop = yFor(bar.capital);
       final capitalHeight = yCursor - capitalTop;
-      _drawBarSegment(canvas, x, capitalTop, barWidth, capitalHeight, red.withValues(alpha: opacity), topRadius: bar.interest == 0 && bar.insurance == 0);
+      _drawBarSegment(
+        canvas,
+        x,
+        capitalTop,
+        barWidth,
+        capitalHeight,
+        red.withValues(alpha: opacity),
+        topRadius: bar.interest == 0 && bar.insurance == 0,
+      );
       yCursor = capitalTop;
 
       // Intérêts (milieu).
       final interestTop = yFor(bar.capital + bar.interest);
       final interestHeight = yCursor - interestTop;
-      _drawBarSegment(canvas, x, interestTop, barWidth, interestHeight, blue.withValues(alpha: opacity), topRadius: bar.insurance == 0);
+      _drawBarSegment(
+        canvas,
+        x,
+        interestTop,
+        barWidth,
+        interestHeight,
+        blue.withValues(alpha: opacity),
+        topRadius: bar.insurance == 0,
+      );
       yCursor = interestTop;
 
       // Assurance (haut).
       final insuranceTop = yFor(bar.capital + bar.interest + bar.insurance);
       final insuranceHeight = yCursor - insuranceTop;
-      _drawBarSegment(canvas, x, insuranceTop, barWidth, insuranceHeight, gold.withValues(alpha: opacity), topRadius: true);
+      _drawBarSegment(
+        canvas,
+        x,
+        insuranceTop,
+        barWidth,
+        insuranceHeight,
+        gold.withValues(alpha: opacity),
+        topRadius: true,
+      );
     }
 
-    _drawXLabel(canvas, "Aujourd'hui", leftAxisWidth, chartHeight, textColor, alignLeft: true);
-    _drawXLabel(canvas, '${years.length} ans', size.width, chartHeight, textColor, alignLeft: false);
+    _drawXLabel(
+      canvas,
+      "Aujourd'hui",
+      leftAxisWidth,
+      chartHeight,
+      textColor,
+      alignLeft: true,
+    );
+    _drawXLabel(
+      canvas,
+      '${years.length} ans',
+      size.width,
+      chartHeight,
+      textColor,
+      alignLeft: false,
+    );
   }
 
-  void _drawBarSegment(Canvas canvas, double x, double top, double width, double height, Color color, {bool topRadius = false}) {
+  void _drawBarSegment(
+    Canvas canvas,
+    double x,
+    double top,
+    double width,
+    double height,
+    Color color, {
+    bool topRadius = false,
+  }) {
     if (height <= 0) return;
     final rect = Rect.fromLTWH(x, top, width, height);
     if (topRadius) {
@@ -1077,9 +1366,19 @@ class _LoanChartPainter extends CustomPainter {
     }
   }
 
-  void _drawXLabel(Canvas canvas, String text, double x, double y, Color color, {bool? alignLeft}) {
+  void _drawXLabel(
+    Canvas canvas,
+    String text,
+    double x,
+    double y,
+    Color color, {
+    bool? alignLeft,
+  }) {
     final tp = TextPainter(
-      text: TextSpan(text: text, style: TextStyle(color: color, fontSize: 11)),
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: color, fontSize: 11),
+      ),
       textDirection: TextDirection.ltr,
     )..layout();
     double dx;
@@ -1115,5 +1414,7 @@ class _LoanChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _LoanChartPainter oldDelegate) =>
-      oldDelegate.hoveredYear != hoveredYear || oldDelegate.years != years || oldDelegate.hidden != hidden;
+      oldDelegate.hoveredYear != hoveredYear ||
+      oldDelegate.years != years ||
+      oldDelegate.hidden != hidden;
 }

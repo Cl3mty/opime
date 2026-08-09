@@ -14,7 +14,11 @@ class EnvelopeSheetScreen extends StatefulWidget {
   final String vaultPath;
   final Envelope envelope;
 
-  const EnvelopeSheetScreen({super.key, required this.vaultPath, required this.envelope});
+  const EnvelopeSheetScreen({
+    super.key,
+    required this.vaultPath,
+    required this.envelope,
+  });
 
   @override
   State<EnvelopeSheetScreen> createState() => _EnvelopeSheetScreenState();
@@ -26,7 +30,9 @@ class _EnvelopeSheetScreenState extends State<EnvelopeSheetScreen> {
   @override
   void initState() {
     super.initState();
-    _progress = AcademyProgressController(AcademyProgressRepository(widget.vaultPath));
+    _progress = AcademyProgressController(
+      AcademyProgressRepository(widget.vaultPath),
+    );
     _progress.load();
   }
 
@@ -89,7 +95,10 @@ class _EnvelopeSheetScreenState extends State<EnvelopeSheetScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(padding: const EdgeInsets.only(top: 3), child: Icon(LucideIcons.dot, size: 18, color: color)),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Icon(LucideIcons.dot, size: 18, color: color),
+                        ),
                         const SizedBox(width: 4),
                         Expanded(child: shadcn.Text(point).small()),
                       ],
@@ -99,21 +108,34 @@ class _EnvelopeSheetScreenState extends State<EnvelopeSheetScreen> {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.destructive.withValues(alpha: 0.08),
+                    color: theme.colorScheme.destructive.withValues(
+                      alpha: 0.08,
+                    ),
                     borderRadius: BorderRadius.circular(theme.radiusMd),
-                    border: Border.all(color: theme.colorScheme.destructive.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: theme.colorScheme.destructive.withValues(
+                        alpha: 0.3,
+                      ),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(LucideIcons.triangleAlert, size: 16, color: theme.colorScheme.destructive),
+                      Icon(
+                        LucideIcons.triangleAlert,
+                        size: 16,
+                        color: theme.colorScheme.destructive,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: shadcn.Text.rich(
                           TextSpan(
                             style: DefaultTextStyle.of(context).style,
                             children: [
-                              const TextSpan(text: 'Piège à éviter — ', style: TextStyle(fontWeight: FontWeight.w700)),
+                              const TextSpan(
+                                text: 'Piège à éviter — ',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
                               TextSpan(text: envelope.pitfall),
                             ],
                           ),
@@ -123,7 +145,11 @@ class _EnvelopeSheetScreenState extends State<EnvelopeSheetScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                AcademyProgressToggle(progress: _progress, stepId: envelope.id, level: envelope.level),
+                AcademyProgressToggle(
+                  progress: _progress,
+                  stepId: envelope.id,
+                  level: envelope.level,
+                ),
               ],
             ),
           ),
@@ -143,12 +169,32 @@ class _FactRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 110, child: shadcn.Text(label).muted().small()),
-          Expanded(child: shadcn.Text(value).medium()),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // En dessous de ce seuil (écran téléphone), une colonne de label
+          // fixe à 110px laisse trop peu de place aux valeurs, qui sont
+          // souvent des phrases complètes : le label passe au-dessus.
+          final narrow = constraints.maxWidth < 340;
+
+          if (narrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                shadcn.Text(label).muted().small(),
+                const SizedBox(height: 2),
+                shadcn.Text(value).medium(),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 110, child: shadcn.Text(label).muted().small()),
+              Expanded(child: shadcn.Text(value).medium()),
+            ],
+          );
+        },
       ),
     );
   }

@@ -12,7 +12,11 @@ class TaxationSimulationScreen extends StatefulWidget {
   final String vaultPath;
   final AmountVisibilityController amountVisibility;
 
-  const TaxationSimulationScreen({super.key, required this.vaultPath, required this.amountVisibility});
+  const TaxationSimulationScreen({
+    super.key,
+    required this.vaultPath,
+    required this.amountVisibility,
+  });
 
   @override
   State<TaxationSimulationScreen> createState() => _TaxationScreenState();
@@ -63,7 +67,7 @@ class _TaxationScreenState extends State<TaxationSimulationScreen> {
                   _saveState();
                 },
                 children: const [
-                  TabItem(child: shadcn.Text('Impôt sur le revenu')),
+                  TabItem(child: shadcn.Text('IR')),
                   TabItem(child: shadcn.Text('IFI')),
                 ],
               ),
@@ -72,8 +76,14 @@ class _TaxationScreenState extends State<TaxationSimulationScreen> {
           const SizedBox(height: 16),
           Expanded(
             child: _tabIndex == 0
-                ? _IRTab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility)
-                : _IFITab(vaultPath: widget.vaultPath, amountVisibility: widget.amountVisibility),
+                ? _IRTab(
+                    vaultPath: widget.vaultPath,
+                    amountVisibility: widget.amountVisibility,
+                  )
+                : _IFITab(
+                    vaultPath: widget.vaultPath,
+                    amountVisibility: widget.amountVisibility,
+                  ),
           ),
         ],
       ),
@@ -159,15 +169,9 @@ class _TaxationSplitCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: left,
-                  ),
+                  Padding(padding: const EdgeInsets.all(20), child: left),
                   const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: right,
-                  ),
+                  Padding(padding: const EdgeInsets.all(20), child: right),
                 ],
               ),
             );
@@ -180,18 +184,14 @@ class _TaxationSplitCard extends StatelessWidget {
                 width: 300,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: SingleChildScrollView(
-                    child: left,
-                  ),
+                  child: SingleChildScrollView(child: left),
                 ),
               ),
               const VerticalDivider(width: 1),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: SingleChildScrollView(
-                    child: right,
-                  ),
+                  child: SingleChildScrollView(child: right),
                 ),
               ),
             ],
@@ -211,7 +211,12 @@ class BracketRow {
   final double montant;
   final double montantMax;
   final double impot;
-  BracketRow({required this.label, required this.montant, required this.montantMax, required this.impot});
+  BracketRow({
+    required this.label,
+    required this.montant,
+    required this.montantMax,
+    required this.impot,
+  });
 }
 
 class _NumberField extends StatefulWidget {
@@ -280,8 +285,13 @@ class _NumberFieldState extends State<_NumberField> {
                 controller: _controller,
                 focusNode: _focusNode,
                 border: Border.all(color: Colors.transparent),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 onChanged: (text) {
                   final parsed = double.tryParse(text.replaceAll(',', '.'));
                   if (parsed != null) widget.onChanged(parsed);
@@ -322,7 +332,11 @@ class _LegendPill extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 6),
         shadcn.Text(label).small(),
       ],
@@ -333,18 +347,62 @@ class _LegendPill extends StatelessWidget {
 class _StatColumn extends StatelessWidget {
   final String label;
   final List<String> values;
-  const _StatColumn({required this.label, required this.values});
+  final bool expand;
+  const _StatColumn({
+    required this.label,
+    required this.values,
+    this.expand = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          shadcn.Text(label).muted().small(),
-          const SizedBox(height: 4),
-          for (final v in values) shadcn.Text(v).medium(),
-        ],
-      ),
+    final content = Column(
+      crossAxisAlignment: expand
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        shadcn.Text(label).muted().small(),
+        const SizedBox(height: 4),
+        for (final v in values) shadcn.Text(v).medium(),
+      ],
+    );
+    return expand ? Expanded(child: content) : content;
+  }
+}
+
+/// Ligne de statistiques sous un graphique : côte à côte si la largeur le
+/// permet, sinon empilées en colonne pour ne pas écraser des montants qui
+/// peuvent être grands (notamment sur mobile).
+class _StatRow extends StatelessWidget {
+  final List<(String, List<String>)> items;
+  const _StatRow({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 420) {
+          return Row(
+            children: [
+              for (final item in items)
+                _StatColumn(label: item.$1, values: item.$2),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              _StatColumn(
+                label: items[i].$1,
+                values: items[i].$2,
+                expand: false,
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -357,7 +415,11 @@ class IFIResult {
   final double tauxMax;
   final double total;
   final List<BracketRow> chartData;
-  IFIResult({required this.tauxMax, required this.total, required this.chartData});
+  IFIResult({
+    required this.tauxMax,
+    required this.total,
+    required this.chartData,
+  });
 }
 
 /// Barème IFI (article 977 CGI) : seuils de patrimoine immobilier net
@@ -367,7 +429,14 @@ const ifiRates = [0.0, 0.5, 0.7, 1.0, 1.25, 1.5];
 
 /// Largeur de chaque tranche, utilisée uniquement pour l'échelle du
 /// graphique (la dernière tranche est en réalité non plafonnée).
-const ifiMontantMax = [800000.0, 500000.0, 1270000.0, 2430000.0, 5000000.0, 1200000.0];
+const ifiMontantMax = [
+  800000.0,
+  500000.0,
+  1270000.0,
+  2430000.0,
+  5000000.0,
+  1200000.0,
+];
 
 /// L'IFI n'est dû qu'au-delà de 1 300 000 € de patrimoine net (en-dessous,
 /// exonération totale) ; au-delà, le barème s'applique sur la totalité du
@@ -391,12 +460,20 @@ IFIResult computeIFI(double immobilierNet) {
   final exonere = immobilierNet <= 1300000;
   final tauxMax = exonere ? 0.0 : ifiRates[maxIndex];
 
-  final impots = List.generate(6, (i) => exonere ? 0.0 : montants[i] * ifiRates[i] / 100);
+  final impots = List.generate(
+    6,
+    (i) => exonere ? 0.0 : montants[i] * ifiRates[i] / 100,
+  );
   final total = impots.fold<double>(0, (s, v) => s + v);
 
   final chartData = List.generate(
     6,
-    (i) => BracketRow(label: '${ifiRates[i]}%', montant: montants[i], montantMax: ifiMontantMax[i], impot: impots[i]),
+    (i) => BracketRow(
+      label: '${ifiRates[i]}%',
+      montant: montants[i],
+      montantMax: ifiMontantMax[i],
+      impot: impots[i],
+    ),
   );
 
   return IFIResult(tauxMax: tauxMax, total: total, chartData: chartData);
@@ -493,12 +570,18 @@ class _IFITabState extends State<_IFITab> {
             TextSpan(
               style: const TextStyle(fontSize: 18),
               children: [
-                const TextSpan(text: 'Cette année, vous avez un patrimoine immobilier net de '),
+                const TextSpan(
+                  text:
+                      'Cette année, vous avez un patrimoine immobilier net de ',
+                ),
                 TextSpan(
                   text: displayEuros(_immobilierNet, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ', induisant un impôt sur la fortune immobilière total de '),
+                const TextSpan(
+                  text:
+                      ', induisant un impôt sur la fortune immobilière total de ',
+                ),
                 TextSpan(
                   text: displayEuros(result.total, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
@@ -539,12 +622,15 @@ class _IFITabState extends State<_IFITab> {
           const SizedBox(height: 24),
           const Divider(),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              _StatColumn(label: "Taux maximal d'imposition", values: ['${result.tauxMax}%']),
-              _StatColumn(
-                label: 'IFI (total & mensualisé)',
-                values: [displayEuros(result.total, hidden), '${displayEuros(result.total / 12, hidden)}/mois'],
+          _StatRow(
+            items: [
+              ("Taux maximal d'imposition", ['${result.tauxMax}%']),
+              (
+                'IFI (total & mensualisé)',
+                [
+                  displayEuros(result.total, hidden),
+                  '${displayEuros(result.total / 12, hidden)}/mois',
+                ],
               ),
             ],
           ),
@@ -565,7 +651,12 @@ class IRResult {
   final double tmi;
   final double total;
   final List<BracketRow> chartData;
-  IRResult({required this.quotient, required this.tmi, required this.total, required this.chartData});
+  IRResult({
+    required this.quotient,
+    required this.tmi,
+    required this.total,
+    required this.chartData,
+  });
 }
 
 /// Barème de l'impôt sur le revenu par part de quotient familial (revenus
@@ -604,10 +695,20 @@ IRResult computeIR({required double netImposable, required double nbrParts}) {
 
   final chartData = List.generate(
     5,
-    (i) => BracketRow(label: '${irRates[i]}%', montant: montants[i], montantMax: irMontantMax[i], impot: impots[i]),
+    (i) => BracketRow(
+      label: '${irRates[i]}%',
+      montant: montants[i],
+      montantMax: irMontantMax[i],
+      impot: impots[i],
+    ),
   );
 
-  return IRResult(quotient: quotient, tmi: tmi, total: total, chartData: chartData);
+  return IRResult(
+    quotient: quotient,
+    tmi: tmi,
+    total: total,
+    chartData: chartData,
+  );
 }
 
 class _IRTab extends StatefulWidget {
@@ -650,7 +751,9 @@ class _IRTabState extends State<_IRTab> {
       final netImposable = data['netImposable'];
       final nbrParts = data['nbrParts'];
       if (netImposable is num) _netImposable = netImposable.toDouble();
-      if (nbrParts is num) _nbrParts = nbrParts.toDouble().clamp(1, double.infinity);
+      if (nbrParts is num) {
+        _nbrParts = nbrParts.toDouble().clamp(1, double.infinity);
+      }
     });
   }
 
@@ -670,7 +773,8 @@ class _IRTabState extends State<_IRTab> {
     });
   }
 
-  IRResult _compute() => computeIR(netImposable: _netImposable, nbrParts: _nbrParts);
+  IRResult _compute() =>
+      computeIR(netImposable: _netImposable, nbrParts: _nbrParts);
 
   @override
   Widget build(BuildContext context) {
@@ -720,12 +824,16 @@ class _IRTabState extends State<_IRTab> {
             TextSpan(
               style: const TextStyle(fontSize: 18),
               children: [
-                const TextSpan(text: 'Cette année, vous avez un net imposable de '),
+                const TextSpan(
+                  text: 'Cette année, vous avez un net imposable de ',
+                ),
                 TextSpan(
                   text: displayEuros(_netImposable, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ", induisant un impôt sur le revenu total de "),
+                const TextSpan(
+                  text: ", induisant un impôt sur le revenu total de ",
+                ),
                 TextSpan(
                   text: displayEuros(result.total, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
@@ -766,13 +874,16 @@ class _IRTabState extends State<_IRTab> {
           const SizedBox(height: 24),
           const Divider(),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              _StatColumn(label: 'Quotient familial', values: [displayEuros(result.quotient, hidden)]),
-              _StatColumn(label: "Taux marginal d'imposition", values: ['${result.tmi}%']),
-              _StatColumn(
-                label: 'Impôt sur le revenu (total & mensualisé)',
-                values: [displayEuros(result.total, hidden), '${displayEuros(result.total / 12, hidden)}/mois'],
+          _StatRow(
+            items: [
+              ('Quotient familial', [displayEuros(result.quotient, hidden)]),
+              ("Taux marginal d'imposition", ['${result.tmi}%']),
+              (
+                'Impôt sur le revenu (total & mensualisé)',
+                [
+                  displayEuros(result.total, hidden),
+                  '${displayEuros(result.total / 12, hidden)}/mois',
+                ],
               ),
             ],
           ),
@@ -832,47 +943,64 @@ class _BracketChartState extends State<_BracketChart> {
         final groupSlot = (width - _leftAxisWidth) / n;
 
         void updateHover(Offset local) {
-          final idx = ((local.dx - _leftAxisWidth) / groupSlot).floor().clamp(0, n - 1);
+          final idx = ((local.dx - _leftAxisWidth) / groupSlot).floor().clamp(
+            0,
+            n - 1,
+          );
           if (idx != _hoveredIndex) setState(() => _hoveredIndex = idx);
         }
 
-        final hovered = _hoveredIndex != null ? widget.data[_hoveredIndex!] : null;
+        final hovered = _hoveredIndex != null
+            ? widget.data[_hoveredIndex!]
+            : null;
 
         return MouseRegion(
           onHover: (e) => updateHover(e.localPosition),
           onExit: (_) => setState(() => _hoveredIndex = null),
-          child: Stack(
-            children: [
-              CustomPaint(
-                size: Size(width, height),
-                painter: _BracketChartPainter(
-                  data: widget.data,
-                  amber: widget.amber,
-                  violet: widget.violet,
-                  red: widget.red,
-                  textColor: widget.textColor,
-                  gridColor: widget.gridColor,
-                  hoveredIndex: _hoveredIndex,
-                  hidden: widget.hidden,
-                ),
-              ),
-              if (hovered != null)
-                Positioned(
-                  left: (_leftAxisWidth + groupSlot * _hoveredIndex! - 120).clamp(_leftAxisWidth, width - 260),
-                  top: (chartHeight / 2 - 90).clamp(0, chartHeight - 180),
-                  child: _BracketTooltip(
-                    title: 'Tranche ${hovered.label}',
-                    montant: hovered.montant,
-                    montantMax: hovered.montantMax,
-                    impot: hovered.impot,
+          child: GestureDetector(
+            onPanDown: (details) => updateHover(details.localPosition),
+            onPanUpdate: (details) => updateHover(details.localPosition),
+            onPanEnd: (_) => setState(() => _hoveredIndex = null),
+            child: Stack(
+              children: [
+                CustomPaint(
+                  size: Size(width, height),
+                  painter: _BracketChartPainter(
+                    data: widget.data,
                     amber: widget.amber,
                     violet: widget.violet,
                     red: widget.red,
-                    cardColor: widget.cardColor,
+                    textColor: widget.textColor,
+                    gridColor: widget.gridColor,
+                    hoveredIndex: _hoveredIndex,
                     hidden: widget.hidden,
                   ),
                 ),
-            ],
+                if (hovered != null)
+                  Positioned(
+                    left: (_leftAxisWidth + groupSlot * _hoveredIndex! - 120)
+                        .clamp(
+                          _leftAxisWidth,
+                          max(_leftAxisWidth, width - 260),
+                        ),
+                    top: (chartHeight / 2 - 90).clamp(
+                      0,
+                      max(0.0, chartHeight - 180),
+                    ),
+                    child: _BracketTooltip(
+                      title: 'Tranche ${hovered.label}',
+                      montant: hovered.montant,
+                      montantMax: hovered.montantMax,
+                      impot: hovered.impot,
+                      amber: widget.amber,
+                      violet: widget.violet,
+                      red: widget.red,
+                      cardColor: widget.cardColor,
+                      hidden: widget.hidden,
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -940,10 +1068,17 @@ class _BracketTooltip extends StatelessWidget {
   Widget _row(String label, double value, Color color) {
     return Row(
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 8),
         Expanded(child: shadcn.Text(label)),
-        shadcn.Text(displayEuros(value, hidden), style: const TextStyle(fontWeight: FontWeight.bold)),
+        shadcn.Text(
+          displayEuros(value, hidden),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
@@ -982,7 +1117,13 @@ class _BracketChartPainter extends CustomPainter {
     final barGap = groupSlot * 0.06;
 
     final maxValue = data
-        .map((d) => [d.montant, d.montantMax, d.impot].reduce((a, b) => a > b ? a : b))
+        .map(
+          (d) => [
+            d.montant,
+            d.montantMax,
+            d.impot,
+          ].reduce((a, b) => a > b ? a : b),
+        )
         .reduce((a, b) => a > b ? a : b);
     final axisMax = _niceCeil(maxValue * 1.15);
     const gridLines = 4;
@@ -993,11 +1134,18 @@ class _BracketChartPainter extends CustomPainter {
     for (var i = 0; i <= gridLines; i++) {
       final v = step * i;
       final y = yFor(v);
-      canvas.drawLine(Offset(leftAxisWidth, y), Offset(size.width, y), Paint()
-        ..color = gridColor.withValues(alpha: 0.4)
-        ..strokeWidth = 1);
+      canvas.drawLine(
+        Offset(leftAxisWidth, y),
+        Offset(size.width, y),
+        Paint()
+          ..color = gridColor.withValues(alpha: 0.4)
+          ..strokeWidth = 1,
+      );
       final tp = TextPainter(
-        text: TextSpan(text: displayEurosCompact(v, hidden), style: TextStyle(color: textColor, fontSize: 11)),
+        text: TextSpan(
+          text: displayEurosCompact(v, hidden),
+          style: TextStyle(color: textColor, fontSize: 11),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftAxisWidth - tp.width - 8, y - tp.height / 2));
@@ -1014,19 +1162,50 @@ class _BracketChartPainter extends CustomPainter {
       final x2 = centerX - barWidth / 2;
       final x3 = centerX + barWidth / 2 + barGap;
 
-      _drawBar(canvas, x1, yFor(row.montant), barWidth, chartHeight - yFor(row.montant), amber.withValues(alpha: opacity));
-      _drawBar(canvas, x2, yFor(row.montantMax), barWidth, chartHeight - yFor(row.montantMax), violet.withValues(alpha: opacity));
-      _drawBar(canvas, x3, yFor(row.impot), barWidth, chartHeight - yFor(row.impot), red.withValues(alpha: opacity));
+      _drawBar(
+        canvas,
+        x1,
+        yFor(row.montant),
+        barWidth,
+        chartHeight - yFor(row.montant),
+        amber.withValues(alpha: opacity),
+      );
+      _drawBar(
+        canvas,
+        x2,
+        yFor(row.montantMax),
+        barWidth,
+        chartHeight - yFor(row.montantMax),
+        violet.withValues(alpha: opacity),
+      );
+      _drawBar(
+        canvas,
+        x3,
+        yFor(row.impot),
+        barWidth,
+        chartHeight - yFor(row.impot),
+        red.withValues(alpha: opacity),
+      );
 
       final tp = TextPainter(
-        text: TextSpan(text: row.label, style: TextStyle(color: textColor, fontSize: 11)),
+        text: TextSpan(
+          text: row.label,
+          style: TextStyle(color: textColor, fontSize: 11),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(centerX - tp.width / 2, chartHeight + 6));
     }
   }
 
-  void _drawBar(Canvas canvas, double x, double top, double width, double height, Color color) {
+  void _drawBar(
+    Canvas canvas,
+    double x,
+    double top,
+    double width,
+    double height,
+    Color color,
+  ) {
     if (height <= 0) return;
     final rrect = RRect.fromRectAndCorners(
       Rect.fromLTWH(x, top, width, height),
@@ -1058,5 +1237,7 @@ class _BracketChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BracketChartPainter oldDelegate) =>
-      oldDelegate.hoveredIndex != hoveredIndex || oldDelegate.data != data || oldDelegate.hidden != hidden;
+      oldDelegate.hoveredIndex != hoveredIndex ||
+      oldDelegate.data != data ||
+      oldDelegate.hidden != hidden;
 }

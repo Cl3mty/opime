@@ -31,20 +31,39 @@ class ProfileRepository {
     }
 
     final content = await _file.readAsString();
-    if (content.trim().isEmpty) return [];
+    if (content.trim().isEmpty) {
+      // Un profiles.json existant mais vide n'est jamais un état légitime
+      // (on n'écrit jamais un tableau vide nous-mêmes) : c'est le signe
+      // d'un dossier Vault synchronisé (iCloud Drive...) pas encore
+      // totalement téléchargé sur cet appareil. Le traiter comme "aucun
+      // profil" écraserait silencieusement les vrais profils au prochain
+      // appel de create()/rename() : on préfère un échec explicite,
+      // rattrapable par l'appelant, plutôt qu'une perte de données.
+      throw StateError(
+        'profiles.json existe mais est vide : le dossier Vault est peut-être '
+        'encore en cours de synchronisation.',
+      );
+    }
     final list = jsonDecode(content) as List;
-    return list.map((e) => Profile.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => Profile.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> _writeAll(List<Profile> profiles) async {
     final dir = Directory(vaultPath);
     if (!await dir.exists()) await dir.create(recursive: true);
     await _file.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(profiles.map((p) => p.toJson()).toList()),
+      const JsonEncoder.withIndent(
+        '  ',
+      ).convert(profiles.map((p) => p.toJson()).toList()),
     );
   }
 
-  Future<Profile> create({required String name, required String relationship}) async {
+  Future<Profile> create({
+    required String name,
+    required String relationship,
+  }) async {
     final all = await listAll();
     final profile = Profile(
       id: const Uuid().v4(),
@@ -59,7 +78,11 @@ class ProfileRepository {
     return profile;
   }
 
-  Future<void> rename(String id, {required String name, required String relationship}) async {
+  Future<void> rename(
+    String id, {
+    required String name,
+    required String relationship,
+  }) async {
     final all = await listAll();
     final idx = all.indexWhere((p) => p.id == id);
     if (idx == -1) return;
@@ -99,7 +122,10 @@ class ProfileRepository {
     }
   }
 
-  Future<void> _moveDirectoryContents(Directory source, Directory target) async {
+  Future<void> _moveDirectoryContents(
+    Directory source,
+    Directory target,
+  ) async {
     if (!await target.exists()) await target.create(recursive: true);
     await for (final entity in source.list()) {
       final newPath = p.join(target.path, p.basename(entity.path));
