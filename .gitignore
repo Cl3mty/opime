@@ -46,3 +46,8 @@ app.*.map.json
 
 # executable
 *.exe
+
+# Build artifacts uploaded to GitHub Releases (keep the Inno Setup source
+# script tracked, not the generated binaries)
+installer/*.dmg
+installer/*.exe
