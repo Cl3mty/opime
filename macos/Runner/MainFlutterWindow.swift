@@ -14,7 +14,7 @@ class MainFlutterWindow: NSWindow {
     // macos_secure_bookmarks, dont l'appel bookmark()/startAccessing()
     // renvoyait une erreur native non résolue en amont).
     let bookmarksChannel = FlutterMethodChannel(
-      name: "com.freenary/secure_bookmarks",
+      name: "com.opime/secure_bookmarks",
       binaryMessenger: flutterViewController.engine.binaryMessenger
     )
     bookmarksChannel.setMethodCallHandler { (call, result) in

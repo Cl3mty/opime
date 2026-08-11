@@ -28,7 +28,9 @@ class BudgetRepository {
   Future<void> _writeAll(List<BudgetSnapshot> all) async {
     await _ensureDir();
     final jsonList = all.map((s) => s.toJson()).toList();
-    await _file.writeAsString(const JsonEncoder.withIndent('  ').convert(jsonList));
+    await _file.writeAsString(
+      const JsonEncoder.withIndent('  ').convert(jsonList),
+    );
   }
 
   /// Liste tous les budgets sauvegardés, le plus récent en premier.
@@ -39,7 +41,10 @@ class BudgetRepository {
 
   Future<BudgetData> loadSnapshot(String id) async {
     final all = await _readAll();
-    final snap = all.firstWhere((s) => s.id == id, orElse: () => throw StateError('Budget introuvable'));
+    final snap = all.firstWhere(
+      (s) => s.id == id,
+      orElse: () => throw StateError('Budget introuvable'),
+    );
     return snap.data;
   }
 
@@ -47,7 +52,14 @@ class BudgetRepository {
   Future<String> saveNew(BudgetData data, {String? name}) async {
     final all = await _readAll();
     final id = const Uuid().v4();
-    all.add(BudgetSnapshot(id: id, name: name, savedAt: DateTime.now().toUtc(), data: data));
+    all.add(
+      BudgetSnapshot(
+        id: id,
+        name: name,
+        savedAt: DateTime.now().toUtc(),
+        data: data,
+      ),
+    );
     await _writeAll(all);
     return id;
   }
@@ -60,7 +72,12 @@ class BudgetRepository {
       await saveNew(data);
       return;
     }
-    all[idx] = BudgetSnapshot(id: id, name: all[idx].name, savedAt: DateTime.now().toUtc(), data: data);
+    all[idx] = BudgetSnapshot(
+      id: id,
+      name: all[idx].name,
+      savedAt: DateTime.now().toUtc(),
+      data: data,
+    );
     await _writeAll(all);
   }
 
@@ -68,7 +85,12 @@ class BudgetRepository {
     final all = await _readAll();
     final idx = all.indexWhere((s) => s.id == id);
     if (idx == -1) return;
-    all[idx] = BudgetSnapshot(id: id, name: name, savedAt: all[idx].savedAt, data: all[idx].data);
+    all[idx] = BudgetSnapshot(
+      id: id,
+      name: name,
+      savedAt: all[idx].savedAt,
+      data: all[idx].data,
+    );
     await _writeAll(all);
   }
 

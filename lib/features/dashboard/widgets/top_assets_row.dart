@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/ui/frosted_card.dart';
 import '../dashboard_dummy_data.dart';
+import 'net_worth_chart.dart' show PeriodTabs, dashboardPeriods;
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
@@ -19,33 +20,61 @@ const _avatarPalette = [
 ];
 
 /// Section "Mes meilleurs actifs" : une ligne de mini-cartes (nom, ticker,
-/// variation, sparkline), qui s'enroule sur plusieurs lignes si la
-/// largeur manque plutôt que de déborder.
-class TopAssetsRow extends StatelessWidget {
+/// variation, sparkline) qui défile horizontalement plutôt que de
+/// s'enrouler, pour rester lisible même avec une dizaine d'actifs. Triée
+/// par rendement décroissant sur la période choisie via [PeriodTabs].
+class TopAssetsRow extends StatefulWidget {
   final List<DashboardAsset> assets;
 
   const TopAssetsRow({super.key, required this.assets});
 
   @override
+  State<TopAssetsRow> createState() => _TopAssetsRowState();
+}
+
+class _TopAssetsRowState extends State<TopAssetsRow> {
+  int _periodIndex = 2;
+
+  @override
   Widget build(BuildContext context) {
+    final days = dashboardPeriods[_periodIndex].$2;
+    final sorted = [...widget.assets]
+      ..sort(
+        (a, b) => b
+            .changePercentForDays(days)
+            .compareTo(a.changePercentForDays(days)),
+      );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const shadcn.Text('Mes meilleurs actifs').large().medium(),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
+        Row(
           children: [
-            for (var i = 0; i < assets.length; i++)
-              SizedBox(
-                width: 200,
-                child: _AssetCard(
-                  asset: assets[i],
-                  avatarColor: _avatarPalette[i % _avatarPalette.length],
-                ),
-              ),
+            const shadcn.Text('Mes meilleurs actifs').large().medium(),
+            const Spacer(),
+            PeriodTabs(
+              labels: [for (final p in dashboardPeriods) p.$1],
+              index: _periodIndex,
+              onChanged: (i) => setState(() => _periodIndex = i),
+            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 116,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: sorted.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, i) => SizedBox(
+              width: 200,
+              child: _AssetCard(
+                asset: sorted[i],
+                changePercent: sorted[i].changePercentForDays(days),
+                avatarColor: _avatarPalette[i % _avatarPalette.length],
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -54,13 +83,18 @@ class TopAssetsRow extends StatelessWidget {
 
 class _AssetCard extends StatelessWidget {
   final DashboardAsset asset;
+  final double changePercent;
   final Color avatarColor;
 
-  const _AssetCard({required this.asset, required this.avatarColor});
+  const _AssetCard({
+    required this.asset,
+    required this.changePercent,
+    required this.avatarColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final positive = asset.changePercent >= 0;
+    final positive = changePercent >= 0;
     final color = positive ? _green : _red;
 
     return FrostedCard(
@@ -99,7 +133,7 @@ class _AssetCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 shadcn.Text(
-                  '${positive ? '+' : ''}${asset.changePercent.toStringAsFixed(2)} %',
+                  '${positive ? '+' : ''}${changePercent.toStringAsFixed(2)} %',
                   style: TextStyle(color: color, fontWeight: FontWeight.w600),
                 ).small(),
                 const Spacer(),

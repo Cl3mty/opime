@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/features/budget/budget_models.dart';
+import 'package:opime/features/budget/budget_models.dart';
 
 void main() {
   group('BudgetItem', () {
@@ -11,11 +11,14 @@ void main() {
       expect(restored.amount, item.amount);
     });
 
-    test('fromJson applique des valeurs par défaut sur des champs manquants', () {
-      final item = BudgetItem.fromJson({'id': 'x'});
-      expect(item.name, '');
-      expect(item.amount, 0);
-    });
+    test(
+      'fromJson applique des valeurs par défaut sur des champs manquants',
+      () {
+        final item = BudgetItem.fromJson({'id': 'x'});
+        expect(item.name, '');
+        expect(item.amount, 0);
+      },
+    );
 
     test('copyWith ne modifie pas l\'id', () {
       final item = BudgetItem(id: 'abc', name: 'Loyer', amount: 800);
@@ -50,26 +53,38 @@ void main() {
 
   group('BudgetData — totaux', () {
     BudgetData buildSample() => BudgetData(
-          revenues: [
-            BudgetItem(id: 'r1', name: 'Salaire', amount: 3000),
-            BudgetItem(id: 'r2', name: 'Primes', amount: 500),
-          ],
-          expenseCategories: [
-            BudgetCategory(name: 'Logement', items: [BudgetItem(id: 'e1', name: 'Loyer', amount: 1000)]),
-            BudgetCategory(name: 'Nourriture', items: [BudgetItem(id: 'e2', name: 'Courses', amount: 400)]),
-          ],
-          investmentCategories: [
-            BudgetCategory(name: 'Bourse', items: [BudgetItem(id: 'i1', name: 'ETF', amount: 500)]),
-          ],
-        );
+      revenues: [
+        BudgetItem(id: 'r1', name: 'Salaire', amount: 3000),
+        BudgetItem(id: 'r2', name: 'Primes', amount: 500),
+      ],
+      expenseCategories: [
+        BudgetCategory(
+          name: 'Logement',
+          items: [BudgetItem(id: 'e1', name: 'Loyer', amount: 1000)],
+        ),
+        BudgetCategory(
+          name: 'Nourriture',
+          items: [BudgetItem(id: 'e2', name: 'Courses', amount: 400)],
+        ),
+      ],
+      investmentCategories: [
+        BudgetCategory(
+          name: 'Bourse',
+          items: [BudgetItem(id: 'i1', name: 'ETF', amount: 500)],
+        ),
+      ],
+    );
 
     test('totalRevenues additionne tous les revenus', () {
       expect(buildSample().totalRevenues, 3500);
     });
 
-    test('totalExpenses additionne tous les items de toutes les catégories', () {
-      expect(buildSample().totalExpenses, 1400);
-    });
+    test(
+      'totalExpenses additionne tous les items de toutes les catégories',
+      () {
+        expect(buildSample().totalExpenses, 1400);
+      },
+    );
 
     test('totalInvestments additionne les investissements', () {
       expect(buildSample().totalInvestments, 500);
@@ -84,15 +99,21 @@ void main() {
     });
 
     test('possibleSavingsRate = (revenus - dépenses) / revenus * 100', () {
-      expect(buildSample().possibleSavingsRate, closeTo((3500 - 1400) / 3500 * 100, 0.001));
+      expect(
+        buildSample().possibleSavingsRate,
+        closeTo((3500 - 1400) / 3500 * 100, 0.001),
+      );
     });
 
-    test('taux à 0 quand il n\'y a aucun revenu (pas de division par zéro)', () {
-      final empty = BudgetData.empty();
-      expect(empty.savingsRate, 0);
-      expect(empty.possibleSavingsRate, 0);
-      expect(empty.balance, 0);
-    });
+    test(
+      'taux à 0 quand il n\'y a aucun revenu (pas de division par zéro)',
+      () {
+        final empty = BudgetData.empty();
+        expect(empty.savingsRate, 0);
+        expect(empty.possibleSavingsRate, 0);
+        expect(empty.balance, 0);
+      },
+    );
 
     test('round-trip JSON complet préserve les totaux', () {
       final sample = buildSample();
@@ -105,10 +126,19 @@ void main() {
 
   group('BudgetSnapshot', () {
     test('displayName utilise le nom si présent, sinon une date formatée', () {
-      final named = BudgetSnapshot(id: '1', name: 'Mon budget', savedAt: DateTime(2026, 1, 1), data: BudgetData.empty());
+      final named = BudgetSnapshot(
+        id: '1',
+        name: 'Mon budget',
+        savedAt: DateTime(2026, 1, 1),
+        data: BudgetData.empty(),
+      );
       expect(named.displayName, 'Mon budget');
 
-      final unnamed = BudgetSnapshot(id: '2', savedAt: DateTime(2026, 3, 15), data: BudgetData.empty());
+      final unnamed = BudgetSnapshot(
+        id: '2',
+        savedAt: DateTime(2026, 3, 15),
+        data: BudgetData.empty(),
+      );
       expect(unnamed.displayName, 'Budget du 15/03/2026');
     });
 

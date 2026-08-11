@@ -7,8 +7,11 @@ import '../features/navigation/account_switcher_menu.dart';
 import '../features/navigation/app_sidebar.dart';
 import '../features/navigation/mobile_nav_hub.dart';
 import '../features/navigation/nav_models.dart';
+import '../features/navigation/navigation_scope.dart';
 import '../features/navigation/top_bar.dart';
 import '../features/navigation/top_bar_actions.dart';
+import '../features/dashboard/onboarding_highlight_controller.dart';
+import '../features/investments/patrimoine_refresh_controller.dart';
 import 'theme_controller.dart';
 
 const _breakpoint = 800.0;
@@ -48,6 +51,8 @@ class AppShell extends StatefulWidget {
   final ProfileController profileController;
   final SidebarPrefsController sidebarPrefsController;
   final AmountVisibilityController amountVisibilityController;
+  final PatrimoineRefreshController patrimoineRefreshController;
+  final OnboardingHighlightController onboardingHighlightController;
   final Map<String, WidgetBuilder> pages;
 
   const AppShell({
@@ -56,6 +61,8 @@ class AppShell extends StatefulWidget {
     required this.profileController,
     required this.sidebarPrefsController,
     required this.amountVisibilityController,
+    required this.patrimoineRefreshController,
+    required this.onboardingHighlightController,
     required this.pages,
   });
 
@@ -66,6 +73,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   String _selectedKey = 'dashboard';
   bool _collapsed = false;
+  int _dashboardEpoch = 0;
 
   // --- État de la navigation mobile (bottom bar + hub de drill-down) ---
   String _mobileActiveTab = 'home';
@@ -79,6 +87,10 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _selectedKey = key;
       _mobileShowingHub = false;
+      // Incrémenté même si le Dashboard est déjà actif : une page qui gère
+      // un drill-down local (voir NavigationScope.dashboardEpoch) s'en sert
+      // pour revenir à sa racine sur un reclic de la sidebar.
+      if (key == 'dashboard') _dashboardEpoch++;
     });
   }
 
@@ -143,7 +155,7 @@ class _AppShellState extends State<AppShell> {
     if (_mobileShowingHub) {
       return _mobileDrillParent?.label ?? _currentMobileTab.label;
     }
-    if (_selectedKey == 'dashboard') return 'Freenary';
+    if (_selectedKey == 'dashboard') return 'Opime';
     if (_selectedKey == 'account_management') return 'Comptes';
     if (_selectedKey == 'settings') return 'Réglages';
     for (final item in _currentMobileTab.items()) {
@@ -157,8 +169,14 @@ class _AppShellState extends State<AppShell> {
 
   Widget _mobileContent(BuildContext context) {
     if (_mobileActiveTab == 'home' || !_mobileShowingHub) {
-      return widget.pages[_selectedKey]?.call(context) ??
+      final page =
+          widget.pages[_selectedKey]?.call(context) ??
           const Center(child: Text('Page introuvable'));
+      return NavigationScope(
+        onSelect: _select,
+        dashboardEpoch: _dashboardEpoch,
+        child: page,
+      );
     }
     final items = _mobileDrillParent?.children ?? _currentMobileTab.items();
     return MobileNavHub(
@@ -179,9 +197,13 @@ class _AppShellState extends State<AppShell> {
     final isWide = MediaQuery.of(context).size.shortestSide >= _breakpoint;
 
     if (isWide) {
-      final page =
-          widget.pages[_selectedKey]?.call(context) ??
-          const Center(child: Text('Page introuvable'));
+      final page = NavigationScope(
+        onSelect: _select,
+        dashboardEpoch: _dashboardEpoch,
+        child:
+            widget.pages[_selectedKey]?.call(context) ??
+            const Center(child: Text('Page introuvable')),
+      );
       // AppBackground (halo/dégradé) habille uniquement la sidebar et la
       // TopBar — le contenu de page reste un aplat uni (theme.background),
       // pas de dégradé dessus. Leur propre fond est semi-transparent (voir
@@ -213,6 +235,12 @@ class _AppShellState extends State<AppShell> {
                     AppBackground(
                       child: TopBar(
                         amountVisibility: widget.amountVisibilityController,
+                        profileController: widget.profileController,
+                        patrimoineRefreshController:
+                            widget.patrimoineRefreshController,
+                        onboardingHighlight:
+                            widget.onboardingHighlightController,
+                        currentPageKey: _selectedKey,
                         onSelect: _select,
                       ),
                     ),
@@ -241,7 +269,13 @@ class _AppShellState extends State<AppShell> {
             AmountVisibilityToggleButton(
               amountVisibility: widget.amountVisibilityController,
             ),
-            const AddMenuButton(),
+            AddMenuButton(
+              profileController: widget.profileController,
+              patrimoineRefreshController: widget.patrimoineRefreshController,
+              onboardingHighlight: widget.onboardingHighlightController,
+              compact: true,
+              currentPageKey: _selectedKey,
+            ),
             Builder(
               builder: (barContext) => IconButton.ghost(
                 icon: const Icon(LucideIcons.userRound),

@@ -10,7 +10,12 @@ class AcademyProgressToggle extends StatelessWidget {
   final String stepId;
   final AcademyLevel level;
 
-  const AcademyProgressToggle({super.key, required this.progress, required this.stepId, required this.level});
+  const AcademyProgressToggle({
+    super.key,
+    required this.progress,
+    required this.stepId,
+    required this.level,
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -16,7 +16,8 @@ class AcademyProgressController extends ChangeNotifier {
 
   bool isCompleted(String id) => _completed.contains(id);
 
-  int completedCountAmong(Iterable<String> ids) => ids.where(_completed.contains).length;
+  int completedCountAmong(Iterable<String> ids) =>
+      ids.where(_completed.contains).length;
 
   Future<void> setCompleted(String id, bool value) async {
     final changed = value ? _completed.add(id) : _completed.remove(id);

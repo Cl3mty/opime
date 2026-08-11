@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/core/privacy/amount_visibility_controller.dart';
+import 'package:opime/core/privacy/amount_visibility_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -13,11 +13,14 @@ void main() {
     expect(AmountVisibilityController().hidden, isFalse);
   });
 
-  test('load() sans préférence sauvegardée conserve la visibilité par défaut', () async {
-    final controller = AmountVisibilityController();
-    await controller.load();
-    expect(controller.hidden, isFalse);
-  });
+  test(
+    'load() sans préférence sauvegardée conserve la visibilité par défaut',
+    () async {
+      final controller = AmountVisibilityController();
+      await controller.load();
+      expect(controller.hidden, isFalse);
+    },
+  );
 
   test('setHidden met à jour l\'état et notifie les auditeurs', () async {
     final controller = AmountVisibilityController();

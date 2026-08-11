@@ -46,9 +46,15 @@ class _NoteEditorState extends State<NoteEditor> {
     r'''<u>|</u>|<span\b[^>]*>|</span>|<a\b[^>]*>|</a>''',
     caseSensitive: false,
   );
-  static final RegExp _hrefPattern = RegExp(r'''href=(?:"([^"]+)"|'([^']+)')''');
-  static final RegExp _stylePattern = RegExp(r'''style\s*=\s*(?:"([^"]*)"|'([^']*)')''');
-  static final RegExp _cssColorPattern = RegExp(r'''(?:^|;)\s*color\s*:\s*([^;]+)\s*(?:;|$)''');
+  static final RegExp _hrefPattern = RegExp(
+    r'''href=(?:"([^"]+)"|'([^']+)')''',
+  );
+  static final RegExp _stylePattern = RegExp(
+    r'''style\s*=\s*(?:"([^"]*)"|'([^']*)')''',
+  );
+  static final RegExp _cssColorPattern = RegExp(
+    r'''(?:^|;)\s*color\s*:\s*([^;]+)\s*(?:;|$)''',
+  );
 
   @override
   void initState() {
@@ -64,7 +70,9 @@ class _NoteEditorState extends State<NoteEditor> {
         extensionSet: md.ExtensionSet.gitHubFlavored,
       ),
     );
-    final rawDelta = mdToDelta.convert(markdown.isEmpty ? '# Nouvelle note\n' : markdown);
+    final rawDelta = mdToDelta.convert(
+      markdown.isEmpty ? '# Nouvelle note\n' : markdown,
+    );
     final delta = _applyHeadingParagraphIndentation(
       _stripDisallowedColorAttributes(
         _normalizeLinkedTextAttributes(_applyRawHtmlFormatting(rawDelta)),
@@ -156,10 +164,7 @@ class _NoteEditorState extends State<NoteEditor> {
 
       final normalizedAttrs = Map<String, dynamic>.from(attrs)
         ..remove(Attribute.color.key);
-      result.insert(
-        op.data,
-        normalizedAttrs.isEmpty ? null : normalizedAttrs,
-      );
+      result.insert(op.data, normalizedAttrs.isEmpty ? null : normalizedAttrs);
     }
     return result;
   }
@@ -192,7 +197,8 @@ class _NoteEditorState extends State<NoteEditor> {
         continue;
       }
 
-      final shouldKeepIndent = attrs.containsKey(Attribute.list.key) ||
+      final shouldKeepIndent =
+          attrs.containsKey(Attribute.list.key) ||
           attrs.containsKey(Attribute.blockQuote.key) ||
           attrs.containsKey(Attribute.codeBlock.key) ||
           attrs.containsKey(Attribute.header.key);
@@ -222,7 +228,9 @@ class _NoteEditorState extends State<NoteEditor> {
     if (rawColor == null || rawColor.isEmpty) return null;
 
     // Conserve uniquement les couleurs hex compatibles Quill.
-    final hexMatch = RegExp(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$').firstMatch(rawColor);
+    final hexMatch = RegExp(
+      r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$',
+    ).firstMatch(rawColor);
     if (hexMatch == null) return null;
 
     final hex = hexMatch.group(1)!;
@@ -343,6 +351,14 @@ class _NoteEditorState extends State<NoteEditor> {
   Widget build(BuildContext context) {
     final controller = _controller;
     final accentColor = Theme.of(context).colorScheme.primary;
+    // flutter_quill code en dur la couleur des blocs de code
+    // (`Colors.blue.shade900`, voir `default_styles.dart`) au lieu de la
+    // dériver du thème — donc tout texte importé du Markdown comme bloc de
+    // code (par ex. des lignes indentées de 4 espaces, traitées comme un
+    // bloc de code indenté par le parseur CommonMark) s'affiche en bleu
+    // quel que soit le thème de l'app. On force explicitement sa couleur,
+    // comme pour les titres.
+    final foregroundColor = Theme.of(context).colorScheme.foreground;
     final headingColor100 = accentColor;
     final headingColor80 = accentColor.withValues(alpha: 0.8);
     final headingColor60 = accentColor.withValues(alpha: 0.6);
@@ -416,25 +432,50 @@ class _NoteEditorState extends State<NoteEditor> {
                   h2: headingStyle(defaultStyles.h2, 10, color: headingColor80),
                   h3: headingStyle(defaultStyles.h3, 20, color: headingColor60),
                   h4: headingStyle(defaultStyles.h4, 30, color: headingColor40),
-                  h5: headingStyle(defaultStyles.h5, 40),
-                  h6: headingStyle(defaultStyles.h6, 50),
+                  h5: headingStyle(
+                    defaultStyles.h5,
+                    40,
+                    color: foregroundColor,
+                  ),
+                  h6: headingStyle(
+                    defaultStyles.h6,
+                    50,
+                    color: foregroundColor,
+                  ),
+                  paragraph: headingStyle(
+                    defaultStyles.paragraph,
+                    0,
+                    color: foregroundColor,
+                  ),
+                  quote: headingStyle(
+                    defaultStyles.quote,
+                    0,
+                    color: foregroundColor.withValues(alpha: 0.6),
+                  ),
+                  code: headingStyle(
+                    defaultStyles.code,
+                    0,
+                    color: foregroundColor,
+                  ),
                   lists: defaultListStyle.copyWith(
-                    indentWidthBuilder: (block, buildContext, count, numberPointWidthBuilder) {
-                      final attrs = block.style.attributes;
-                      if (attrs.containsKey(Attribute.list.key) ||
-                          attrs.containsKey(Attribute.blockQuote.key) ||
-                          attrs.containsKey(Attribute.codeBlock.key)) {
-                        return baseIndentWidthBuilder(
-                          block,
-                          buildContext,
-                          count,
-                          numberPointWidthBuilder,
-                        );
-                      }
+                    indentWidthBuilder:
+                        (block, buildContext, count, numberPointWidthBuilder) {
+                          final attrs = block.style.attributes;
+                          if (attrs.containsKey(Attribute.list.key) ||
+                              attrs.containsKey(Attribute.blockQuote.key) ||
+                              attrs.containsKey(Attribute.codeBlock.key)) {
+                            return baseIndentWidthBuilder(
+                              block,
+                              buildContext,
+                              count,
+                              numberPointWidthBuilder,
+                            );
+                          }
 
-                      final indentLevel = attrs[Attribute.indent.key]?.value as int? ?? 0;
-                      return HorizontalSpacing(indentLevel * 10, 0);
-                    },
+                          final indentLevel =
+                              attrs[Attribute.indent.key]?.value as int? ?? 0;
+                          return HorizontalSpacing(indentLevel * 10, 0);
+                        },
                   ),
                   link: TextStyle(
                     color: accentColor,

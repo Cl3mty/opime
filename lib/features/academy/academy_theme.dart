@@ -6,8 +6,8 @@ import '../../core/academy/academy_level.dart';
 /// à comprendre.
 extension AcademyLevelColor on AcademyLevel {
   Color get color => switch (this) {
-        AcademyLevel.debutant => const Color(0xFF22C55E),
-        AcademyLevel.intermediaire => const Color(0xFF7B8FE8),
-        AcademyLevel.avance => const Color(0xFFE07A6B),
-      };
+    AcademyLevel.debutant => const Color(0xFF22C55E),
+    AcademyLevel.intermediaire => const Color(0xFF7B8FE8),
+    AcademyLevel.avance => const Color(0xFFE07A6B),
+  };
 }

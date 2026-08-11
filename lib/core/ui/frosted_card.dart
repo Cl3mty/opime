@@ -66,12 +66,14 @@ class FrostedCard extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: radius,
                 color: fillColor.withValues(alpha: baseAlpha),
-                border: Border(
-                  top: BorderSide(color: topHighlight),
-                  left: BorderSide(color: borderColor),
-                  right: BorderSide(color: borderColor),
-                  bottom: BorderSide(color: borderColor),
-                ),
+                // Border.all plutôt qu'un Border par côté : un BoxDecoration
+                // combinant borderRadius avec une bordure aux couleurs non
+                // uniformes lève "A borderRadius can only be given on
+                // borders with uniform colors" (Flutter ne sait pas peindre
+                // des coins arrondis avec des côtés de couleurs différentes).
+                // Le liseré du haut plus clair, en sombre, est redessiné à
+                // part ci-dessous plutôt que via `border`.
+                border: Border.all(color: borderColor),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: shadowAlpha),
@@ -82,6 +84,18 @@ class FrostedCard extends StatelessWidget {
               ),
             ),
           ),
+          // Liseré du haut légèrement éclairci en sombre — un simple trait
+          // plutôt qu'un Border (voir ci-dessus) ; le ClipRRect englobant
+          // le Stack lui donne déjà des coins arrondis cohérents avec le
+          // reste de la carte.
+          if (isDark)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 1,
+              child: ColoredBox(color: topHighlight),
+            ),
           child,
         ],
       ),

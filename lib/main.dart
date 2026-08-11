@@ -14,7 +14,15 @@ import 'app/app_shell.dart';
 import 'core/platform_info.dart';
 import 'core/ui/load_error_view.dart';
 import 'core/ui/mobile_orientation.dart';
+import 'features/dashboard/category_detail_screen.dart';
+import 'features/dashboard/dashboard_dummy_data.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/dashboard/onboarding_highlight_controller.dart';
+import 'features/investments/patrimoine_refresh_controller.dart';
+import 'features/investments/price_sync_banner.dart';
+import 'features/investments/price_sync_status_controller.dart';
+import 'features/investments/real_category_detail_screen.dart';
+import 'features/liabilities/real_passif_detail_screen.dart';
 import 'features/strategy/strategy_screen.dart';
 import 'package:flutter_quill/flutter_quill.dart'
     show FlutterQuillLocalizations;
@@ -48,7 +56,7 @@ void main() async {
       size: Size(1440, 900),
       minimumSize: Size(1024, 700),
       center: true,
-      title: 'Freenary',
+      title: 'Opime',
     );
 
     windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -57,22 +65,28 @@ void main() async {
     });
   }
 
-  runApp(const FreenaryApp());
+  runApp(const OpimeApp());
 }
 
-class FreenaryApp extends StatefulWidget {
-  const FreenaryApp({super.key});
+class OpimeApp extends StatefulWidget {
+  const OpimeApp({super.key});
 
   @override
-  State<FreenaryApp> createState() => _FreenaryAppState();
+  State<OpimeApp> createState() => _OpimeAppState();
 }
 
-class _FreenaryAppState extends State<FreenaryApp> {
+class _OpimeAppState extends State<OpimeApp> {
   static const _githubOwner = 'Cl3mty';
+  // Le dépôt GitHub utilisé pour la vérification de mise à jour n'a pas
+  // été renommé lors du passage à Opime — laissé tel quel jusqu'à ce que
+  // ce soit le cas.
   static const _githubRepo = 'freenary';
 
   final _themeController = ThemeController();
   final _amountVisibilityController = AmountVisibilityController();
+  final _patrimoineRefreshController = PatrimoineRefreshController();
+  final _priceSyncStatusController = PriceSyncStatusController();
+  final _onboardingHighlightController = OnboardingHighlightController();
   final _vaultFolderService = VaultFolderService();
 
   bool _checkingVault = true;
@@ -164,7 +178,7 @@ class _FreenaryAppState extends State<FreenaryApp> {
   @override
   Widget build(BuildContext context) {
     return ShadcnApp(
-      title: 'Freenary',
+      title: 'Opime',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: LegacyColorSchemes.lightZinc().recolor(
@@ -210,97 +224,131 @@ class _FreenaryAppState extends State<FreenaryApp> {
     return UpdateBanner(
       githubOwner: _githubOwner,
       githubRepo: _githubRepo,
-      child: AppShell(
-        themeController: _themeController,
-        profileController: _profileController!,
-        sidebarPrefsController: _sidebarPrefsController!,
-        amountVisibilityController: _amountVisibilityController,
-        pages: {
-          'dashboard': (_) =>
-              DashboardScreen(amountVisibility: _amountVisibilityController),
-          'actifs_actions_fonds': (_) =>
-              const Center(child: Text('Actions & Fonds')),
-          'actifs_private_equity': (_) =>
-              const Center(child: Text('Private Equity')),
-          'actifs_immobilier': (_) => const Center(child: Text('Immobilier')),
-          'actifs_crypto': (_) => const Center(child: Text('Crypto')),
-          'actifs_metaux_precieux': (_) =>
-              const Center(child: Text('Métaux précieux')),
-          'actifs_epargne': (_) => const Center(child: Text('Épargne')),
-          'actifs_autres': (_) => const Center(child: Text('Autres')),
-          'passifs_emprunts': (_) => const Center(child: Text('Emprunts')),
-          'passifs_prets_immobiliers': (_) =>
-              const Center(child: Text('Prêts immobiliers')),
-          for (final envelope in envelopes)
-            envelope.id: (_) => EnvelopeSheetScreen(
-              key: ValueKey(
-                '${_profileController!.activeDataPath}_${envelope.id}',
+      child: PriceSyncBanner(
+        controller: _priceSyncStatusController,
+        child: AppShell(
+          themeController: _themeController,
+          profileController: _profileController!,
+          sidebarPrefsController: _sidebarPrefsController!,
+          amountVisibilityController: _amountVisibilityController,
+          patrimoineRefreshController: _patrimoineRefreshController,
+          onboardingHighlightController: _onboardingHighlightController,
+          pages: {
+            // Les données d'exemple restent réservées au profil "Lou" (démo) :
+            // tout autre profil voit son vrai Dashboard, vide au départ, où
+            // il crée ses propres comptes de placement.
+            'dashboard': (_) => DashboardScreen(
+              key: ValueKey(_profileController!.activeDataPath),
+              vaultPath: _profileController!.activeDataPath,
+              isDemoProfile: _profileController!.active?.name == 'Lou',
+              amountVisibility: _amountVisibilityController,
+              refreshSignal: _patrimoineRefreshController,
+              priceSyncStatus: _priceSyncStatusController,
+              onboardingHighlight: _onboardingHighlightController,
+            ),
+            for (final category in dashboardActifsCategories)
+              category.id: (_) => _profileController!.active?.name == 'Lou'
+                  ? CategoryDetailScreen(
+                      category: category,
+                      amountVisibility: _amountVisibilityController,
+                    )
+                  : RealCategoryDetailScreen(
+                      key: ValueKey(
+                        '${_profileController!.activeDataPath}_${category.id}',
+                      ),
+                      vaultPath: _profileController!.activeDataPath,
+                      categoryId: category.id,
+                      amountVisibility: _amountVisibilityController,
+                      patrimoineRefreshController: _patrimoineRefreshController,
+                    ),
+            for (final category in dashboardPassifsCategories)
+              category.id: (_) => _profileController!.active?.name == 'Lou'
+                  ? CategoryDetailScreen(
+                      category: category,
+                      amountVisibility: _amountVisibilityController,
+                      showAvatar: false,
+                      accountsCardTitle: 'Passifs',
+                    )
+                  : RealPassifDetailScreen(
+                      key: ValueKey(
+                        '${_profileController!.activeDataPath}_${category.id}',
+                      ),
+                      vaultPath: _profileController!.activeDataPath,
+                      categoryId: category.id,
+                      amountVisibility: _amountVisibilityController,
+                      patrimoineRefreshController: _patrimoineRefreshController,
+                    ),
+            for (final envelope in envelopes)
+              envelope.id: (_) => EnvelopeSheetScreen(
+                key: ValueKey(
+                  '${_profileController!.activeDataPath}_${envelope.id}',
+                ),
+                vaultPath: _profileController!.activeDataPath,
+                envelope: envelope,
               ),
-              vaultPath: _profileController!.activeDataPath,
-              envelope: envelope,
-            ),
-          for (final card in investissementCards)
-            card.id: (_) => InvestissementCardScreen(
-              key: ValueKey('${_profileController!.activeDataPath}_${card.id}'),
-              vaultPath: _profileController!.activeDataPath,
-              card: card,
-            ),
-          for (final track in formationTracks)
-            track.id: (_) => FormationTrackScreen(
-              key: ValueKey(
-                '${_profileController!.activeDataPath}_${track.id}',
+            for (final card in investissementCards)
+              card.id: (_) => InvestissementCardScreen(
+                key: ValueKey(
+                  '${_profileController!.activeDataPath}_${card.id}',
+                ),
+                vaultPath: _profileController!.activeDataPath,
+                card: card,
               ),
+            for (final track in formationTracks)
+              track.id: (_) => FormationTrackScreen(
+                key: ValueKey(
+                  '${_profileController!.activeDataPath}_${track.id}',
+                ),
+                vaultPath: _profileController!.activeDataPath,
+                track: track,
+              ),
+            'strategie': (_) => StrategyScreen(
+              key: ValueKey(_profileController!.activeDataPath),
               vaultPath: _profileController!.activeDataPath,
-              track: track,
             ),
-          'strategie': (_) => StrategyScreen(
-            key: ValueKey(_profileController!.activeDataPath),
-            vaultPath: _profileController!.activeDataPath,
-          ),
-          'budget_ventilation': (_) => BudgetScreen(
-            key: ValueKey(_profileController!.activeDataPath),
-            vaultPath: _profileController!.activeDataPath,
-            amountVisibility: _amountVisibilityController,
-          ),
-          'budget_suivi': (_) => BudgetTrackingScreen(
-            key: ValueKey(_profileController!.activeDataPath),
-            vaultPath: _profileController!.activeDataPath,
-            amountVisibility: _amountVisibilityController,
-          ),
-          'simulation_taxation': (_) => TaxationSimulationScreen(
-            key: ValueKey(_profileController!.activeDataPath),
-            vaultPath: _profileController!.activeDataPath,
-            amountVisibility: _amountVisibilityController,
-          ),
-          'simulation_patrimoine': (_) => WealthSimulationScreen(
-            key: ValueKey(_profileController!.activeDataPath),
-            vaultPath: _profileController!.activeDataPath,
-            amountVisibility: _amountVisibilityController,
-          ),
-          'simulation_pret': (_) => LoanSimulationScreen(
-            key: ValueKey(_profileController!.activeDataPath),
-            vaultPath: _profileController!.activeDataPath,
-            amountVisibility: _amountVisibilityController,
-          ),
-          'simulation_transmission': (_) => TransmissionSimulationScreen(
-            key: ValueKey(_profileController!.activeDataPath),
-            vaultPath: _profileController!.activeDataPath,
-            amountVisibility: _amountVisibilityController,
-          ),
-          'assistant': (_) => const Center(child: Text('Assistant')),
-          'account_management': (_) =>
-              AccountManagementScreen(profileController: _profileController!),
-          'settings': (_) => SettingsScreen(
-            vaultFolderService: _vaultFolderService,
-            onVaultActivated: _onVaultReady,
-            onNoVaultSelected: _resetVault,
-            themeController: _themeController,
-            profileController: _profileController!,
-            sidebarPrefsController: _sidebarPrefsController!,
-            githubOwner: _githubOwner,
-            githubRepo: _githubRepo,
-          ),
-        },
+            'budget_ventilation': (_) => BudgetScreen(
+              key: ValueKey(_profileController!.activeDataPath),
+              vaultPath: _profileController!.activeDataPath,
+              amountVisibility: _amountVisibilityController,
+            ),
+            'budget_suivi': (_) => BudgetTrackingScreen(
+              key: ValueKey(_profileController!.activeDataPath),
+              vaultPath: _profileController!.activeDataPath,
+              amountVisibility: _amountVisibilityController,
+            ),
+            'simulation_taxation': (_) => TaxationSimulationScreen(
+              key: ValueKey(_profileController!.activeDataPath),
+              vaultPath: _profileController!.activeDataPath,
+              amountVisibility: _amountVisibilityController,
+            ),
+            'simulation_patrimoine': (_) => WealthSimulationScreen(
+              key: ValueKey(_profileController!.activeDataPath),
+              vaultPath: _profileController!.activeDataPath,
+              amountVisibility: _amountVisibilityController,
+            ),
+            'simulation_pret': (_) => LoanSimulationScreen(
+              key: ValueKey(_profileController!.activeDataPath),
+              vaultPath: _profileController!.activeDataPath,
+              amountVisibility: _amountVisibilityController,
+            ),
+            'simulation_transmission': (_) => TransmissionSimulationScreen(
+              key: ValueKey(_profileController!.activeDataPath),
+              vaultPath: _profileController!.activeDataPath,
+              amountVisibility: _amountVisibilityController,
+            ),
+            'assistant': (_) => const Center(child: Text('Assistant')),
+            'account_management': (_) =>
+                AccountManagementScreen(profileController: _profileController!),
+            'settings': (_) => SettingsScreen(
+              vaultFolderService: _vaultFolderService,
+              onVaultActivated: _onVaultReady,
+              onNoVaultSelected: _resetVault,
+              themeController: _themeController,
+              githubOwner: _githubOwner,
+              githubRepo: _githubRepo,
+            ),
+          },
+        ),
       ),
     );
   }

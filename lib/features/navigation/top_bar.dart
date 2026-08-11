@@ -2,6 +2,9 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/platform_info.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
+import '../../core/profiles/profile_controller.dart';
+import '../dashboard/onboarding_highlight_controller.dart';
+import '../investments/patrimoine_refresh_controller.dart';
 import 'top_bar_actions.dart';
 
 /// Barre persistante au-dessus du contenu de la page en mise en page
@@ -17,11 +20,19 @@ import 'top_bar_actions.dart';
 /// place verticale.
 class TopBar extends StatelessWidget {
   final AmountVisibilityController amountVisibility;
+  final ProfileController profileController;
+  final PatrimoineRefreshController patrimoineRefreshController;
+  final OnboardingHighlightController onboardingHighlight;
+  final String currentPageKey;
   final ValueChanged<String> onSelect;
 
   const TopBar({
     super.key,
     required this.amountVisibility,
+    required this.profileController,
+    required this.patrimoineRefreshController,
+    required this.onboardingHighlight,
+    required this.currentPageKey,
     required this.onSelect,
   });
 
@@ -67,7 +78,12 @@ class TopBar extends StatelessWidget {
           const SizedBox(width: 8),
           AmountVisibilityToggleButton(amountVisibility: amountVisibility),
           const SizedBox(width: 4),
-          const AddMenuButton(),
+          AddMenuButton(
+            profileController: profileController,
+            patrimoineRefreshController: patrimoineRefreshController,
+            onboardingHighlight: onboardingHighlight,
+            currentPageKey: currentPageKey,
+          ),
         ],
       ),
     );

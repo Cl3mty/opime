@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/features/simulations/simulations_transmission_screen.dart';
+import 'package:opime/features/simulations/simulations_transmission_screen.dart';
 
 void main() {
   group('computeRights (barème progressif par tranches)', () {
@@ -13,28 +13,40 @@ void main() {
       expect(directLineRights(100000), closeTo(18194.35, 0.01));
     });
 
-    test('barème ligne directe : taxable dans la première tranche uniquement', () {
-      expect(directLineRights(8072), closeTo(403.6, 0.01));
-    });
+    test(
+      'barème ligne directe : taxable dans la première tranche uniquement',
+      () {
+        expect(directLineRights(8072), closeTo(403.6, 0.01));
+      },
+    );
 
     test('barème ligne directe est croissant avec le taxable', () {
       expect(directLineRights(50000), greaterThan(directLineRights(10000)));
       expect(directLineRights(2000000), greaterThan(directLineRights(1000000)));
     });
 
-    test('barème conjoint/PACS : 2e tranche correcte (8 072 à 15 932 €, pas 15 109 €)', () {
-      // Régression : la 2e tranche du barème conjoint était plafonnée à 15 109 €
-      // au lieu de 15 932 € (seuil officiel, identique à la ligne directe à ce niveau).
-      // Pour un taxable de 20 000 € :
-      // 8 072 * 5% + 7 860 * 10% + 4 068 * 15% = 403.6 + 786.0 + 610.2 = 1 799.8
-      expect(spouseRights(20000), closeTo(1799.8, 0.01));
-    });
+    test(
+      'barème conjoint/PACS : 2e tranche correcte (8 072 à 15 932 €, pas 15 109 €)',
+      () {
+        // Régression : la 2e tranche du barème conjoint était plafonnée à 15 109 €
+        // au lieu de 15 932 € (seuil officiel, identique à la ligne directe à ce niveau).
+        // Pour un taxable de 20 000 € :
+        // 8 072 * 5% + 7 860 * 10% + 4 068 * 15% = 403.6 + 786.0 + 610.2 = 1 799.8
+        expect(spouseRights(20000), closeTo(1799.8, 0.01));
+      },
+    );
 
-    test('barème conjoint/PACS diffère du barème ligne directe entre 15 932 € et 31 865 €', () {
-      // Dans cette fourchette, le taux ligne directe est déjà à 20% alors que
-      // le taux conjoint est encore à 15% : les deux barèmes doivent diverger.
-      expect(spouseRights(25000), isNot(closeTo(directLineRights(25000), 0.01)));
-    });
+    test(
+      'barème conjoint/PACS diffère du barème ligne directe entre 15 932 € et 31 865 €',
+      () {
+        // Dans cette fourchette, le taux ligne directe est déjà à 20% alors que
+        // le taux conjoint est encore à 15% : les deux barèmes doivent diverger.
+        expect(
+          spouseRights(25000),
+          isNot(closeTo(directLineRights(25000), 0.01)),
+        );
+      },
+    );
   });
 
   group('abattementFor', () {
@@ -79,18 +91,24 @@ void main() {
       expect(result.economiePotentielle, closeTo(80000, 0.02));
     });
 
-    test('le démembrement ne coûte jamais plus cher que la pleine propriété', () {
-      for (final age in [18, 25, 45, 65, 85, 105]) {
-        final result = computeDemembrement(
-          valeurPleinePropriete: 750000,
-          ageUsufruitier: age,
-          nombreEnfants: 3,
-          abattementParEnfant: 100000,
-        );
-        expect(result.droitsTotauxNue, lessThanOrEqualTo(result.droitsTotauxPleine));
-        expect(result.economiePotentielle, greaterThanOrEqualTo(0));
-      }
-    });
+    test(
+      'le démembrement ne coûte jamais plus cher que la pleine propriété',
+      () {
+        for (final age in [18, 25, 45, 65, 85, 105]) {
+          final result = computeDemembrement(
+            valeurPleinePropriete: 750000,
+            ageUsufruitier: age,
+            nombreEnfants: 3,
+            abattementParEnfant: 100000,
+          );
+          expect(
+            result.droitsTotauxNue,
+            lessThanOrEqualTo(result.droitsTotauxPleine),
+          );
+          expect(result.economiePotentielle, greaterThanOrEqualTo(0));
+        }
+      },
+    );
   });
 
   group('computeDonation', () {
@@ -109,28 +127,34 @@ void main() {
       expect(result.tauxEffectif, closeTo(9.0972, 0.01));
     });
 
-    test('donation au conjoint utilise le barème spécifique (régression 15 932 €)', () {
-      final result = computeDonation(
-        montantDonation: 100724,
-        nombreDonataires: 1,
-        relation: DonationRelation.conjoint,
-      );
+    test(
+      'donation au conjoint utilise le barème spécifique (régression 15 932 €)',
+      () {
+        final result = computeDonation(
+          montantDonation: 100724,
+          nombreDonataires: 1,
+          relation: DonationRelation.conjoint,
+        );
 
-      expect(result.abattementParDonataire, 80724);
-      expect(result.taxableParDonataire, closeTo(20000, 0.01));
-      expect(result.droitsParDonataire, closeTo(1799.8, 0.01));
-    });
+        expect(result.abattementParDonataire, 80724);
+        expect(result.taxableParDonataire, closeTo(20000, 0.01));
+        expect(result.droitsParDonataire, closeTo(1799.8, 0.01));
+      },
+    );
 
-    test('donation entièrement couverte par l\'abattement ne génère aucun droit', () {
-      final result = computeDonation(
-        montantDonation: 150000,
-        nombreDonataires: 2,
-        relation: DonationRelation.enfant,
-      );
-      expect(result.taxableParDonataire, 0);
-      expect(result.droitsTotaux, 0);
-      expect(result.tauxEffectif, 0);
-    });
+    test(
+      'donation entièrement couverte par l\'abattement ne génère aucun droit',
+      () {
+        final result = computeDonation(
+          montantDonation: 150000,
+          nombreDonataires: 2,
+          relation: DonationRelation.enfant,
+        );
+        expect(result.taxableParDonataire, 0);
+        expect(result.droitsTotaux, 0);
+        expect(result.tauxEffectif, 0);
+      },
+    );
   });
 
   group('computeInheritance', () {

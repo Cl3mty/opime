@@ -3,7 +3,10 @@ import 'dart:math';
 String generateTrackingItemId(String prefix) {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   final rand = Random();
-  final suffix = List.generate(8, (_) => chars[rand.nextInt(chars.length)]).join();
+  final suffix = List.generate(
+    8,
+    (_) => chars[rand.nextInt(chars.length)],
+  ).join();
   return '${prefix}_$suffix';
 }
 
@@ -24,33 +27,38 @@ class TrackingItem {
     this.category = '',
   }) : id = id ?? generateTrackingItemId('item');
 
-  TrackingItem copyWith({String? name, double? budget, double? realite, bool? checked, String? category}) =>
-      TrackingItem(
-        id: id,
-        name: name ?? this.name,
-        budget: budget ?? this.budget,
-        realite: realite ?? this.realite,
-        checked: checked ?? this.checked,
-        category: category ?? this.category,
-      );
+  TrackingItem copyWith({
+    String? name,
+    double? budget,
+    double? realite,
+    bool? checked,
+    String? category,
+  }) => TrackingItem(
+    id: id,
+    name: name ?? this.name,
+    budget: budget ?? this.budget,
+    realite: realite ?? this.realite,
+    checked: checked ?? this.checked,
+    category: category ?? this.category,
+  );
 
   factory TrackingItem.fromJson(Map<String, dynamic> json) => TrackingItem(
-        id: json['id'] as String?,
-        name: json['name'] as String? ?? '',
-        budget: (json['budget'] as num?)?.toDouble() ?? 0,
-        realite: (json['realite'] as num?)?.toDouble() ?? 0,
-        checked: json['checked'] as bool? ?? false,
-        category: json['category'] as String? ?? '',
-      );
+    id: json['id'] as String?,
+    name: json['name'] as String? ?? '',
+    budget: (json['budget'] as num?)?.toDouble() ?? 0,
+    realite: (json['realite'] as num?)?.toDouble() ?? 0,
+    checked: json['checked'] as bool? ?? false,
+    category: json['category'] as String? ?? '',
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'budget': budget,
-        'realite': realite,
-        'checked': checked,
-        'category': category,
-      };
+    'id': id,
+    'name': name,
+    'budget': budget,
+    'realite': realite,
+    'checked': checked,
+    'category': category,
+  };
 }
 
 class BudgetTrackingMonth {
@@ -75,15 +83,15 @@ class BudgetTrackingMonth {
   });
 
   factory BudgetTrackingMonth.empty(int month, int year) => BudgetTrackingMonth(
-        month: month,
-        year: year,
-        revenues: [],
-        factures: [],
-        depenses: [],
-        investEpargnes: [],
-        projets: [],
-        dettes: [],
-      );
+    month: month,
+    year: year,
+    revenues: [],
+    factures: [],
+    depenses: [],
+    investEpargnes: [],
+    projets: [],
+    dettes: [],
+  );
 
   BudgetTrackingMonth copyWith({
     List<TrackingItem>? revenues,
@@ -92,20 +100,21 @@ class BudgetTrackingMonth {
     List<TrackingItem>? investEpargnes,
     List<TrackingItem>? projets,
     List<TrackingItem>? dettes,
-  }) =>
-      BudgetTrackingMonth(
-        month: month,
-        year: year,
-        revenues: revenues ?? this.revenues,
-        factures: factures ?? this.factures,
-        depenses: depenses ?? this.depenses,
-        investEpargnes: investEpargnes ?? this.investEpargnes,
-        projets: projets ?? this.projets,
-        dettes: dettes ?? this.dettes,
-      );
+  }) => BudgetTrackingMonth(
+    month: month,
+    year: year,
+    revenues: revenues ?? this.revenues,
+    factures: factures ?? this.factures,
+    depenses: depenses ?? this.depenses,
+    investEpargnes: investEpargnes ?? this.investEpargnes,
+    projets: projets ?? this.projets,
+    dettes: dettes ?? this.dettes,
+  );
 
-  static double _sum(List<TrackingItem> items, double Function(TrackingItem) f) =>
-      items.fold(0, (s, i) => s + f(i));
+  static double _sum(
+    List<TrackingItem> items,
+    double Function(TrackingItem) f,
+  ) => items.fold(0, (s, i) => s + f(i));
 
   double get totalRevenuesBudget => _sum(revenues, (i) => i.budget);
   double get totalRevenuesRealite => _sum(revenues, (i) => i.realite);
@@ -121,12 +130,23 @@ class BudgetTrackingMonth {
   double get totalDettesRealite => _sum(dettes, (i) => i.realite);
 
   double get restantBudget =>
-      totalRevenuesBudget - totalFacturesBudget - totalDepensesBudget - totalInvestBudget - totalProjetsBudget - totalDettesBudget;
+      totalRevenuesBudget -
+      totalFacturesBudget -
+      totalDepensesBudget -
+      totalInvestBudget -
+      totalProjetsBudget -
+      totalDettesBudget;
 
   double get restantRealite =>
-      totalRevenuesRealite - totalFacturesRealite - totalDepensesRealite - totalInvestRealite - totalProjetsRealite - totalDettesRealite;
+      totalRevenuesRealite -
+      totalFacturesRealite -
+      totalDepensesRealite -
+      totalInvestRealite -
+      totalProjetsRealite -
+      totalDettesRealite;
 
-  factory BudgetTrackingMonth.fromJson(Map<String, dynamic> json) => BudgetTrackingMonth(
+  factory BudgetTrackingMonth.fromJson(Map<String, dynamic> json) =>
+      BudgetTrackingMonth(
         month: json['month'] as int,
         year: json['year'] as int,
         revenues: _listFromJson(json['revenues']),
@@ -137,17 +157,18 @@ class BudgetTrackingMonth {
         dettes: _listFromJson(json['dettes']),
       );
 
-  static List<TrackingItem> _listFromJson(dynamic raw) =>
-      (raw as List? ?? []).map((e) => TrackingItem.fromJson(e as Map<String, dynamic>)).toList();
+  static List<TrackingItem> _listFromJson(dynamic raw) => (raw as List? ?? [])
+      .map((e) => TrackingItem.fromJson(e as Map<String, dynamic>))
+      .toList();
 
   Map<String, dynamic> toJson() => {
-        'month': month,
-        'year': year,
-        'revenues': revenues.map((i) => i.toJson()).toList(),
-        'factures': factures.map((i) => i.toJson()).toList(),
-        'depenses': depenses.map((i) => i.toJson()).toList(),
-        'investEpargnes': investEpargnes.map((i) => i.toJson()).toList(),
-        'projets': projets.map((i) => i.toJson()).toList(),
-        'dettes': dettes.map((i) => i.toJson()).toList(),
-      };
+    'month': month,
+    'year': year,
+    'revenues': revenues.map((i) => i.toJson()).toList(),
+    'factures': factures.map((i) => i.toJson()).toList(),
+    'depenses': depenses.map((i) => i.toJson()).toList(),
+    'investEpargnes': investEpargnes.map((i) => i.toJson()).toList(),
+    'projets': projets.map((i) => i.toJson()).toList(),
+    'dettes': dettes.map((i) => i.toJson()).toList(),
+  };
 }

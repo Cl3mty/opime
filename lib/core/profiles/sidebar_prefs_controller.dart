@@ -14,8 +14,12 @@ class SidebarPrefsController extends ChangeNotifier {
 
   final Map<String, Set<String>> _cache = {};
 
-  File _fileFor(String profileId) =>
-      File(p.join(profileController.repository.pathFor(profileId), 'sidebar_prefs.json'));
+  File _fileFor(String profileId) => File(
+    p.join(
+      profileController.repository.pathFor(profileId),
+      'sidebar_prefs.json',
+    ),
+  );
 
   /// Clés actuellement masquées pour ce compte (vide si jamais chargé/aucune préférence).
   Set<String> hiddenKeysFor(String profileId) => _cache[profileId] ?? const {};
@@ -27,7 +31,9 @@ class SidebarPrefsController extends ChangeNotifier {
       try {
         final content = await file.readAsString();
         final json = jsonDecode(content) as Map<String, dynamic>;
-        final keys = (json['hiddenKeys'] as List? ?? []).map((e) => e as String).toSet();
+        final keys = (json['hiddenKeys'] as List? ?? [])
+            .map((e) => e as String)
+            .toSet();
         _cache[profileId] = keys;
       } catch (_) {
         _cache[profileId] = {};

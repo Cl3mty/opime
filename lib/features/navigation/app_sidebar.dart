@@ -150,7 +150,7 @@ class AppSidebar extends StatelessWidget {
                     ),
                   ),
                 ),
-                title: const shadcn.Text('Freenary').medium.small,
+                title: const shadcn.Text('Opime').medium.small,
                 trailing: Icon(
                   collapsed
                       ? LucideIcons.panelLeftOpen

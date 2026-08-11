@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/app/theme_controller.dart';
+import 'package:opime/app/theme_controller.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' show ThemeMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,11 +14,14 @@ void main() {
     expect(ThemeController().mode, ThemeMode.system);
   });
 
-  test('load() sans préférence sauvegardée conserve ThemeMode.system', () async {
-    final controller = ThemeController();
-    await controller.load();
-    expect(controller.mode, ThemeMode.system);
-  });
+  test(
+    'load() sans préférence sauvegardée conserve ThemeMode.system',
+    () async {
+      final controller = ThemeController();
+      await controller.load();
+      expect(controller.mode, ThemeMode.system);
+    },
+  );
 
   test('setMode met à jour le mode et notifie les auditeurs', () async {
     final controller = ThemeController();

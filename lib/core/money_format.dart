@@ -38,3 +38,18 @@ String displayEurosCompact(double value, bool hidden) {
   final formatted = formatEurosCompact(value);
   return hidden ? maskAmount(formatted) : formatted;
 }
+
+/// Formatte une variation en pourcentage avec signe explicite :
+/// `1.5` -> `"+1.50 %"`, `-3` -> `"-3.00 %"`.
+String displayPercent(double value) {
+  return '${value >= 0 ? '+' : ''}${value.toStringAsFixed(2)} %';
+}
+
+/// Arrondit à 2 décimales une valeur avant persistance sur disque (montants,
+/// quantités, cours...) : une précision au centime est amplement suffisante
+/// pour ces usages, et évite de stocker le bruit en fin de flottant que
+/// laissent les calculs en cascade (tableau d'amortissement, cours
+/// convertis...). Volontairement pas utilisé pour les cryptomonnaies, dont
+/// la quantité/le cours ont un sens en dessous du centime — voir les
+/// appelants (`investments_models.dart`, `liabilities_models.dart`).
+double round2(double value) => (value * 100).round() / 100;

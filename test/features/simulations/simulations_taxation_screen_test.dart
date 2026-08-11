@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/features/simulations/simulations_taxation_screen.dart';
+import 'package:opime/features/simulations/simulations_taxation_screen.dart';
 
 void main() {
   group('computeIR (impôt sur le revenu, quotient familial)', () {
@@ -42,7 +42,13 @@ void main() {
 
   group('computeIFI (impôt sur la fortune immobilière)', () {
     test('barème : seuils et taux officiels', () {
-      expect(ifiLimits, [800000.0, 1300000.0, 2570000.0, 5000000.0, 10000000.0]);
+      expect(ifiLimits, [
+        800000.0,
+        1300000.0,
+        2570000.0,
+        5000000.0,
+        10000000.0,
+      ]);
       expect(ifiRates, [0.0, 0.5, 0.7, 1.0, 1.25, 1.5]);
     });
 

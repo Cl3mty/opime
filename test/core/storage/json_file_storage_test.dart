@@ -1,13 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/core/storage/json_file_storage.dart';
+import 'package:opime/core/storage/json_file_storage.dart';
 
 void main() {
   late Directory tempDir;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('freenary_json_storage_');
+    tempDir = await Directory.systemTemp.createTemp('opime_json_storage_');
   });
 
   tearDown(() async {
@@ -15,15 +15,21 @@ void main() {
   });
 
   test('hasVaultFolder reflète la présence d\'un chemin', () {
-    expect(JsonFileStorage(vaultFolderPath: tempDir.path).hasVaultFolder, isTrue);
+    expect(
+      JsonFileStorage(vaultFolderPath: tempDir.path).hasVaultFolder,
+      isTrue,
+    );
     expect(JsonFileStorage().hasVaultFolder, isFalse);
   });
 
-  test('readVault retourne la structure par défaut si vault.json n\'existe pas', () async {
-    final storage = JsonFileStorage(vaultFolderPath: tempDir.path);
-    final data = await storage.readVault();
-    expect(data, {'patrimoine': [], 'investissements': []});
-  });
+  test(
+    'readVault retourne la structure par défaut si vault.json n\'existe pas',
+    () async {
+      final storage = JsonFileStorage(vaultFolderPath: tempDir.path);
+      final data = await storage.readVault();
+      expect(data, {'patrimoine': [], 'investissements': []});
+    },
+  );
 
   test('writeVault puis readVault restitue les mêmes données', () async {
     final storage = JsonFileStorage(vaultFolderPath: tempDir.path);

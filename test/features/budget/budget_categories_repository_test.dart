@@ -1,14 +1,14 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/features/budget/budget_categories_repository.dart';
+import 'package:opime/features/budget/budget_categories_repository.dart';
 
 void main() {
   late Directory tempDir;
   late BudgetCategoriesRepository repo;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('freenary_categories_repo_');
+    tempDir = await Directory.systemTemp.createTemp('opime_categories_repo_');
     repo = BudgetCategoriesRepository(tempDir.path);
   });
 
@@ -16,10 +16,13 @@ void main() {
     if (await tempDir.exists()) await tempDir.delete(recursive: true);
   });
 
-  test('load crée et retourne les catégories par défaut si aucun fichier n\'existe', () async {
-    final categories = await repo.load();
-    expect(categories, BudgetCategoriesRepository.defaults);
-  });
+  test(
+    'load crée et retourne les catégories par défaut si aucun fichier n\'existe',
+    () async {
+      final categories = await repo.load();
+      expect(categories, BudgetCategoriesRepository.defaults);
+    },
+  );
 
   test('save puis load restitue les catégories persistées', () async {
     await repo.save(['A', 'B', 'C']);
@@ -35,10 +38,13 @@ void main() {
     expect(resultDuplicate, ['Logement', 'Transport']);
   });
 
-  test('un contenu de fichier corrompu retombe sur les valeurs par défaut', () async {
-    await repo.save(['Sera écrasé']);
-    final file = tempDir.listSync(recursive: true).whereType<File>().first;
-    await file.writeAsString('{ceci n\'est pas du JSON valide');
-    expect(await repo.load(), BudgetCategoriesRepository.defaults);
-  });
+  test(
+    'un contenu de fichier corrompu retombe sur les valeurs par défaut',
+    () async {
+      await repo.save(['Sera écrasé']);
+      final file = tempDir.listSync(recursive: true).whereType<File>().first;
+      await file.writeAsString('{ceci n\'est pas du JSON valide');
+      expect(await repo.load(), BudgetCategoriesRepository.defaults);
+    },
+  );
 }

@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.freenary.app"
+    namespace = "com.opime.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.freenary.app"
+        applicationId = "com.opime.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

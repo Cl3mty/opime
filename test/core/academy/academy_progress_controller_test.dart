@@ -1,16 +1,20 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/core/academy/academy_progress_controller.dart';
-import 'package:freenary/core/academy/academy_progress_repository.dart';
+import 'package:opime/core/academy/academy_progress_controller.dart';
+import 'package:opime/core/academy/academy_progress_repository.dart';
 
 void main() {
   late Directory tempDir;
   late AcademyProgressController controller;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('freenary_academy_controller_');
-    controller = AcademyProgressController(AcademyProgressRepository(tempDir.path));
+    tempDir = await Directory.systemTemp.createTemp(
+      'opime_academy_controller_',
+    );
+    controller = AcademyProgressController(
+      AcademyProgressRepository(tempDir.path),
+    );
   });
 
   tearDown(() async {
@@ -21,25 +25,33 @@ void main() {
     expect(controller.isCompleted('envelope_pea'), isFalse);
   });
 
-  test('load() sans progression sauvegardée ne marque rien comme acquis', () async {
-    await controller.load();
-    expect(controller.isCompleted('envelope_pea'), isFalse);
-  });
+  test(
+    'load() sans progression sauvegardée ne marque rien comme acquis',
+    () async {
+      await controller.load();
+      expect(controller.isCompleted('envelope_pea'), isFalse);
+    },
+  );
 
-  test('setCompleted(true) marque la notion comme acquise et notifie', () async {
-    var notified = false;
-    controller.addListener(() => notified = true);
+  test(
+    'setCompleted(true) marque la notion comme acquise et notifie',
+    () async {
+      var notified = false;
+      controller.addListener(() => notified = true);
 
-    await controller.setCompleted('envelope_pea', true);
+      await controller.setCompleted('envelope_pea', true);
 
-    expect(controller.isCompleted('envelope_pea'), isTrue);
-    expect(notified, isTrue);
-  });
+      expect(controller.isCompleted('envelope_pea'), isTrue);
+      expect(notified, isTrue);
+    },
+  );
 
   test('setCompleted persiste pour un futur load()', () async {
     await controller.setCompleted('invest_risque', true);
 
-    final reloaded = AcademyProgressController(AcademyProgressRepository(tempDir.path));
+    final reloaded = AcademyProgressController(
+      AcademyProgressRepository(tempDir.path),
+    );
     await reloaded.load();
     expect(reloaded.isCompleted('invest_risque'), isTrue);
   });

@@ -1,6 +1,12 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/privacy/amount_visibility_controller.dart';
+import '../../core/profiles/profile_controller.dart';
+import '../dashboard/onboarding_highlight_controller.dart';
+import '../investments/complete_patrimoine_dialog.dart';
+import '../investments/investments_models.dart' show assetClassForCategoryId;
+import '../investments/patrimoine_refresh_controller.dart';
+import '../liabilities/liabilities_models.dart' show liabilityTypeForCategoryId;
 
 /// Bouton icône avec tooltip, utilisé par les actions rapides de la barre
 /// du haut (recherche/eye/plus), qu'elle soit rendue par [TopBar] (desktop)
@@ -52,61 +58,103 @@ class AmountVisibilityToggleButton extends StatelessWidget {
   }
 }
 
-/// Bouton "+" ouvrant le menu d'ajout rapide (transaction/compte/document/
-/// objectif — toujours désactivés en attendant le module Patrimoine).
+/// Bouton "+" de la TopBar : ouvre le flux "Compléter mon patrimoine", qui
+/// crée soit un actif (classe → compte → investissement → transaction),
+/// soit un passif (type → formulaire de prêt) — voir
+/// `complete_patrimoine_dialog.dart`. Désactivé sur le profil "Lou" (démo) :
+/// les données qu'il créerait ne seraient de toute façon jamais affichées,
+/// le Dashboard de Lou restant figé sur les données d'exemple.
+///
+/// Se met en valeur (échelle et lueur à 105%) tant que
+/// [onboardingHighlight] signale qu'aucune donnée n'existe encore pour le
+/// profil actif — même signal que le conseil de démarrage affiché sur le
+/// Dashboard, voir `dashboard/onboarding_highlight_controller.dart`.
+///
+/// [compact] réduit le bouton à une icône (utilisé dans l'AppBar mobile,
+/// trop étroite pour un libellé) ; sinon un bouton avec libellé, comme
+/// dans la TopBar desktop/tablette.
 class AddMenuButton extends StatelessWidget {
-  const AddMenuButton({super.key});
+  final ProfileController profileController;
+  final PatrimoineRefreshController patrimoineRefreshController;
+  final OnboardingHighlightController onboardingHighlight;
+  final bool compact;
 
-  void _openAddMenu(BuildContext anchorContext) {
-    MenuButton comingSoonItem({required IconData icon, required String label}) {
-      return MenuButton(
-        enabled: false,
-        leading: Icon(icon, size: 16),
-        trailing: shadcn.Text('Bientôt').muted().xSmall(),
-        child: shadcn.Text(label),
-        onPressed: (ctx) {},
-      );
-    }
+  /// Clé de la page actuellement affichée (ex : `'actifs_crypto'`) — quand
+  /// elle correspond à une classe d'actif réelle, le flux démarre
+  /// directement à l'étape "quel compte ?" pour cette classe plutôt que de
+  /// la faire choisir à nouveau.
+  final String? currentPageKey;
 
-    showDropdown(
-      context: anchorContext,
-      anchorAlignment: AlignmentDirectional.bottomEnd,
-      alignment: AlignmentDirectional.topEnd,
-      offset: const Offset(0, 8),
-      builder: (context) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 240, maxWidth: 280),
-          child: DropdownMenu(
-            children: [
-              const MenuLabel(child: shadcn.Text('Ajouter')),
-              comingSoonItem(
-                icon: LucideIcons.arrowRightLeft,
-                label: 'Transaction',
-              ),
-              comingSoonItem(icon: LucideIcons.landmark, label: 'Compte'),
-              comingSoonItem(icon: LucideIcons.fileText, label: 'Document'),
-              comingSoonItem(icon: LucideIcons.target, label: 'Objectif'),
-              const MenuDivider(),
-              MenuLabel(
-                child: shadcn.Text(
-                  'Disponible une fois le module Patrimoine terminé.',
-                ).muted().xSmall(),
-              ),
-            ],
-          ),
-        );
-      },
+  const AddMenuButton({
+    super.key,
+    required this.profileController,
+    required this.patrimoineRefreshController,
+    required this.onboardingHighlight,
+    this.compact = false,
+    this.currentPageKey,
+  });
+
+  bool get _isDemoProfile => profileController.active?.name == 'Lou';
+
+  void _open(BuildContext context) {
+    final pageKey = currentPageKey;
+    showCompletePatrimoineDialog(
+      context,
+      vaultPath: profileController.activeDataPath,
+      onCompleted: patrimoineRefreshController.notifyChanged,
+      initialAssetClass: pageKey == null
+          ? null
+          : assetClassForCategoryId(pageKey),
+      initialLiabilityType: pageKey == null
+          ? null
+          : liabilityTypeForCategoryId(pageKey),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Builder(
-      builder: (btnContext) => TopBarIconButton(
-        icon: LucideIcons.plus,
-        tooltip: 'Ajouter',
-        onPressed: () => _openAddMenu(btnContext),
-      ),
+    final label = _isDemoProfile
+        ? 'Non disponible sur le profil de démonstration'
+        : 'Compléter mon patrimoine';
+    return AnimatedBuilder(
+      animation: onboardingHighlight,
+      builder: (context, child) {
+        final highlighted = !_isDemoProfile && onboardingHighlight.isEmpty;
+        final button = compact
+            ? IconButton.primary(
+                icon: const Icon(LucideIcons.plus),
+                onPressed: _isDemoProfile ? null : () => _open(context),
+              )
+            : PrimaryButton(
+                leading: const Icon(LucideIcons.plus, size: 16),
+                onPressed: _isDemoProfile ? null : () => _open(context),
+                child: const shadcn.Text('Compléter mon patrimoine'),
+              );
+        return Tooltip(
+          // ignore: implicit_call_tearoffs
+          tooltip: TooltipContainer(child: shadcn.Text(label)),
+          child: highlighted
+              ? Transform.scale(
+                  scale: 1.05,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.55),
+                          blurRadius: 16,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: button,
+                  ),
+                )
+              : button,
+        );
+      },
     );
   }
 }

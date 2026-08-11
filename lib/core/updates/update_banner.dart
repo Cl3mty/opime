@@ -33,13 +33,18 @@ class _UpdateBannerState extends State<UpdateBanner> {
   }
 
   Future<void> _check() async {
-    final checker = UpdateChecker(githubOwner: widget.githubOwner, githubRepo: widget.githubRepo);
+    final checker = UpdateChecker(
+      githubOwner: widget.githubOwner,
+      githubRepo: widget.githubRepo,
+    );
     final info = await checker.checkForUpdate();
     if (!mounted || info == null) return;
 
     final prefs = await SharedPreferences.getInstance();
     final dismissedVersion = prefs.getString(_dismissedKey);
-    if (dismissedVersion == info.latestVersion) return; // déjà ignorée pour cette version
+    if (dismissedVersion == info.latestVersion) {
+      return; // déjà ignorée pour cette version
+    }
 
     if (mounted) setState(() => _update = info);
   }
@@ -77,7 +82,9 @@ class _UpdateBannerState extends State<UpdateBanner> {
                   TextSpan(
                     style: DefaultTextStyle.of(context).style,
                     children: [
-                      const TextSpan(text: 'Une nouvelle version de Freenary est disponible ('),
+                      const TextSpan(
+                        text: 'Une nouvelle version d\'Opime est disponible (',
+                      ),
                       TextSpan(
                         text: _update!.latestVersion,
                         style: const TextStyle(fontWeight: FontWeight.bold),

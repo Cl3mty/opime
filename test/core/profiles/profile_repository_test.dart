@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/core/profiles/profile_repository.dart';
+import 'package:opime/core/profiles/profile_repository.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
@@ -9,7 +9,7 @@ void main() {
   late ProfileRepository repo;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('freenary_profile_repo_');
+    tempDir = await Directory.systemTemp.createTemp('opime_profile_repo_');
     repo = ProfileRepository(tempDir.path);
   });
 
@@ -70,16 +70,23 @@ void main() {
     expect(repo.pathFor('xyz'), p.join(tempDir.path, 'profiles', 'xyz'));
   });
 
-  test('migre les données legacy (strategy/budget à la racine) vers le profil master', () async {
-    final legacyStrategy = Directory(p.join(tempDir.path, 'strategy'));
-    await legacyStrategy.create(recursive: true);
-    await File(p.join(legacyStrategy.path, 'note.md')).writeAsString('# Note');
+  test(
+    'migre les données legacy (strategy/budget à la racine) vers le profil master',
+    () async {
+      final legacyStrategy = Directory(p.join(tempDir.path, 'strategy'));
+      await legacyStrategy.create(recursive: true);
+      await File(
+        p.join(legacyStrategy.path, 'note.md'),
+      ).writeAsString('# Note');
 
-    final profiles = await repo.listAll();
-    expect(profiles.single.isMaster, isTrue);
+      final profiles = await repo.listAll();
+      expect(profiles.single.isMaster, isTrue);
 
-    final migratedFile = File(p.join(repo.pathFor(masterProfileId), 'strategy', 'note.md'));
-    expect(await migratedFile.exists(), isTrue);
-    expect(await legacyStrategy.exists(), isFalse);
-  });
+      final migratedFile = File(
+        p.join(repo.pathFor(masterProfileId), 'strategy', 'note.md'),
+      );
+      expect(await migratedFile.exists(), isTrue);
+      expect(await legacyStrategy.exists(), isFalse);
+    },
+  );
 }

@@ -1,10 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/features/budget/budget_tracking_models.dart';
+import 'package:opime/features/budget/budget_tracking_models.dart';
 
 void main() {
   group('TrackingItem', () {
     test('round-trip JSON', () {
-      final item = TrackingItem(id: 'x1', name: 'Loyer', budget: 800, realite: 820, checked: true, category: 'Logement');
+      final item = TrackingItem(
+        id: 'x1',
+        name: 'Loyer',
+        budget: 800,
+        realite: 820,
+        checked: true,
+        category: 'Logement',
+      );
       final restored = TrackingItem.fromJson(item.toJson());
       expect(restored.id, 'x1');
       expect(restored.name, 'Loyer');
@@ -20,7 +27,12 @@ void main() {
     });
 
     test('copyWith met à jour uniquement les champs fournis', () {
-      final item = TrackingItem(id: 'x1', name: 'Loyer', budget: 800, realite: 800);
+      final item = TrackingItem(
+        id: 'x1',
+        name: 'Loyer',
+        budget: 800,
+        realite: 800,
+      );
       final updated = item.copyWith(realite: 850, checked: true);
       expect(updated.id, 'x1');
       expect(updated.name, 'Loyer');
@@ -32,15 +44,15 @@ void main() {
 
   group('BudgetTrackingMonth — totaux', () {
     BudgetTrackingMonth buildSample() => BudgetTrackingMonth(
-          month: 6,
-          year: 2026,
-          revenues: [TrackingItem(name: 'Salaire', budget: 3000, realite: 3100)],
-          factures: [TrackingItem(name: 'Loyer', budget: 800, realite: 800)],
-          depenses: [TrackingItem(name: 'Courses', budget: 400, realite: 450)],
-          investEpargnes: [TrackingItem(name: 'ETF', budget: 500, realite: 500)],
-          projets: [TrackingItem(name: 'Vacances', budget: 200, realite: 0)],
-          dettes: [TrackingItem(name: 'Crédit', budget: 100, realite: 100)],
-        );
+      month: 6,
+      year: 2026,
+      revenues: [TrackingItem(name: 'Salaire', budget: 3000, realite: 3100)],
+      factures: [TrackingItem(name: 'Loyer', budget: 800, realite: 800)],
+      depenses: [TrackingItem(name: 'Courses', budget: 400, realite: 450)],
+      investEpargnes: [TrackingItem(name: 'ETF', budget: 500, realite: 500)],
+      projets: [TrackingItem(name: 'Vacances', budget: 200, realite: 0)],
+      dettes: [TrackingItem(name: 'Crédit', budget: 100, realite: 100)],
+    );
 
     test('totaux budget par section', () {
       final month = buildSample();

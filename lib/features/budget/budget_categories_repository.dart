@@ -6,9 +6,17 @@ class BudgetCategoriesRepository {
   final String vaultPath;
   BudgetCategoriesRepository(this.vaultPath);
 
-  static const defaults = ['Logement', 'Nourriture', 'Abonnements', 'Transport', 'Bourse', 'Épargne'];
+  static const defaults = [
+    'Logement',
+    'Nourriture',
+    'Abonnements',
+    'Transport',
+    'Bourse',
+    'Épargne',
+  ];
 
-  File get _file => File(p.join(vaultPath, 'budget', 'tracking', 'categories.json'));
+  File get _file =>
+      File(p.join(vaultPath, 'budget', 'tracking', 'categories.json'));
 
   Future<List<String>> load() async {
     if (!await _file.exists()) {

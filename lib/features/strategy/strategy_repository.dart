@@ -29,16 +29,16 @@ class StrategyRepository {
     } catch (e, st) {
       // ignore: avoid_print
       print('ERREUR création dossier strategy: $e');
+      // ignore: avoid_print
       print(st);
       rethrow;
     }
   }
 
   String _titleFromMarkdown(String markdown) {
-    final firstLine = markdown.split('\n').firstWhere(
-          (l) => l.trim().isNotEmpty,
-          orElse: () => 'Nouvelle note',
-        );
+    final firstLine = markdown
+        .split('\n')
+        .firstWhere((l) => l.trim().isNotEmpty, orElse: () => 'Nouvelle note');
     return firstLine.replaceFirst(RegExp(r'^#+\s*'), '').trim().isEmpty
         ? 'Nouvelle note'
         : firstLine.replaceFirst(RegExp(r'^#+\s*'), '').trim();
@@ -66,12 +66,14 @@ class StrategyRepository {
       final content = await f.readAsString();
       final stat = await f.stat();
       final id = p.basenameWithoutExtension(f.path);
-      notes.add(StrategyNote(
-        id: id,
-        title: _titleFromMarkdown(content),
-        updatedAt: stat.modified,
-        createdAt: _createdAtFromId(id),
-      ));
+      notes.add(
+        StrategyNote(
+          id: id,
+          title: _titleFromMarkdown(content),
+          updatedAt: stat.modified,
+          createdAt: _createdAtFromId(id),
+        ),
+      );
     }
     // Tri stable : plus récent (par création) en haut, ne bouge pas au clic/édition.
     notes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -95,7 +97,12 @@ class StrategyRepository {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     await writeNote(id, '# Nouvelle note\n');
     final now = DateTime.now();
-    return StrategyNote(id: id, title: 'Nouvelle note', updatedAt: now, createdAt: now);
+    return StrategyNote(
+      id: id,
+      title: 'Nouvelle note',
+      updatedAt: now,
+      createdAt: now,
+    );
   }
 
   Future<void> deleteNote(String id) async {

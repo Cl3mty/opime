@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/core/date_format.dart';
+import 'package:opime/core/date_format.dart';
 
 void main() {
   test('formate une date au format JJ/MM/AAAA', () {

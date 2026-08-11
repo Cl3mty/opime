@@ -27,7 +27,7 @@ import UniformTypeIdentifiers
     // macOS (App Sandbox), il n'existe pas d'option `.withSecurityScope` côté
     // iOS — les options par défaut suffisent pour ce cas d'usage.
     let bookmarksChannel = FlutterMethodChannel(
-      name: "com.freenary/secure_bookmarks",
+      name: "com.opime/secure_bookmarks",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
     bookmarksChannel.setMethodCallHandler { [weak self] (call, result) in

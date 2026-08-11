@@ -3,8 +3,8 @@ enum AcademyLevel { debutant, intermediaire, avance }
 
 extension AcademyLevelLabel on AcademyLevel {
   String get label => switch (this) {
-        AcademyLevel.debutant => 'Débutant',
-        AcademyLevel.intermediaire => 'Intermédiaire',
-        AcademyLevel.avance => 'Avancé',
-      };
+    AcademyLevel.debutant => 'Débutant',
+    AcademyLevel.intermediaire => 'Intermédiaire',
+    AcademyLevel.avance => 'Avancé',
+  };
 }

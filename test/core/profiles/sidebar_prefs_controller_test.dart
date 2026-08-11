@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/core/profiles/profile_controller.dart';
-import 'package:freenary/core/profiles/profile_repository.dart';
-import 'package:freenary/core/profiles/sidebar_prefs_controller.dart';
+import 'package:opime/core/profiles/profile_controller.dart';
+import 'package:opime/core/profiles/profile_repository.dart';
+import 'package:opime/core/profiles/sidebar_prefs_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -15,7 +15,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    tempDir = await Directory.systemTemp.createTemp('freenary_sidebar_prefs_');
+    tempDir = await Directory.systemTemp.createTemp('opime_sidebar_prefs_');
     profileController = ProfileController(ProfileRepository(tempDir.path));
     await profileController.load();
     controller = SidebarPrefsController(profileController);
@@ -46,15 +46,18 @@ void main() {
     expect(controller.hiddenKeysFor(profileId), isEmpty);
   });
 
-  test('les préférences sont persistées sur disque et rechargées par une nouvelle instance', () async {
-    final profileId = profileController.active!.id;
-    await controller.loadFor(profileId);
-    await controller.setHidden(profileId, 'passifs_emprunts', true);
+  test(
+    'les préférences sont persistées sur disque et rechargées par une nouvelle instance',
+    () async {
+      final profileId = profileController.active!.id;
+      await controller.loadFor(profileId);
+      await controller.setHidden(profileId, 'passifs_emprunts', true);
 
-    final reloaded = SidebarPrefsController(profileController);
-    await reloaded.loadFor(profileId);
-    expect(reloaded.hiddenKeysFor(profileId), {'passifs_emprunts'});
-  });
+      final reloaded = SidebarPrefsController(profileController);
+      await reloaded.loadFor(profileId);
+      expect(reloaded.hiddenKeysFor(profileId), {'passifs_emprunts'});
+    },
+  );
 
   test('notifie ses auditeurs lors d\'un changement', () async {
     final profileId = profileController.active!.id;

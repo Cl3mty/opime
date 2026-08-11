@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Freenary is a local-first personal finance app (net worth tracking, budget, financial simulations) built with Flutter. No backend, no database: every account's data is stored as plain JSON and Markdown files inside a `.freenary` folder the user picks on first launch (can live in iCloud Drive, Dropbox, etc). Desktop (macOS) is the primary target; Windows/Linux are supported; mobile builds are not yet configured despite `android/`/`ios/` scaffolding existing.
+Opime (formerly Freenary) is a local-first personal finance app (net worth tracking, budget, financial simulations) built with Flutter. No backend, no database: every account's data is stored as plain JSON and Markdown files inside a `.opime` folder the user picks on first launch (can live in iCloud Drive, Dropbox, etc). Desktop (macOS) is the primary target; Windows/Linux are supported; mobile builds are not yet configured despite `android/`/`ios/` scaffolding existing.
 
 ## Commands
 
@@ -26,7 +26,7 @@ There is no single-test invocation documented because there are no tests in the 
 
 Data lives in a three-level hierarchy on disk, all under a single **vault** folder:
 
-1. **Vault** (`VaultFolderService`, `lib/core/storage/vault_folder_service.dart`) — the user can create/register multiple vaults, each a `.freenary` directory on disk. Vault metadata (id, name, path, and on macOS a security-scoped bookmark) is stored as JSON in `shared_preferences`, with one vault marked "active". Legacy single-vault installs are auto-migrated into this multi-vault format on first read. On macOS, folder access across app restarts goes through a native `MethodChannel('com.freenary/secure_bookmarks')` implemented in `macos/Runner/MainFlutterWindow.swift` (security-scoped bookmarks) — the Dart side always re-resolves the bookmark before trusting a stored path.
+1. **Vault** (`VaultFolderService`, `lib/core/storage/vault_folder_service.dart`) — the user can create/register multiple vaults, each a `.opime` directory on disk (a `.freenary` vault from before the Freenary → Opime rebrand is no longer recognized). Vault metadata (id, name, path, and on macOS a security-scoped bookmark) is stored as JSON in `shared_preferences`, with one vault marked "active". Legacy single-vault installs are auto-migrated into this multi-vault format on first read. On macOS, folder access across app restarts goes through a native `MethodChannel('com.opime/secure_bookmarks')` implemented in `macos/Runner/MainFlutterWindow.swift` (security-scoped bookmarks) — the Dart side always re-resolves the bookmark before trusting a stored path.
 2. **Profile** (`ProfileRepository`, `lib/core/profiles/profile_repository.dart`) — inside a vault, `profiles.json` lists profiles (e.g. "Moi", spouse, kids). Every profile always includes a `master` profile. Each profile's data is isolated under `<vault>/profiles/<profileId>/`. Legacy pre-multi-profile vaults (with top-level `strategy/`/`budget/` folders) are auto-migrated into the master profile's folder.
 3. **Feature data** — each feature owns its own repository that reads/writes JSON (or Markdown, for strategy notes) under the active profile's folder, e.g. `budget/budget_history.json` (`BudgetRepository`), `simulations/<key>.json` (`SimulationStateRepository`), strategy notes as `.md` files (`StrategyRepository`). There is no shared ORM or query layer — every repository is a small hand-rolled class with `_readAll`/`_writeAll`-style methods over one JSON file, using `JsonEncoder.withIndent('  ')` for human-readable output.
 
@@ -34,10 +34,10 @@ Data lives in a three-level hierarchy on disk, all under a single **vault** fold
 
 ### App shell and navigation
 
-- `main.dart`'s `FreenaryApp` owns top-level state: vault-loading, `ProfileController`, `SidebarPrefsController`, `ThemeController`, and builds the `pages` map (`Map<String, WidgetBuilder>`) keyed by navigation key, passed into `AppShell`.
+- `main.dart`'s `OpimeApp` owns top-level state: vault-loading, `ProfileController`, `SidebarPrefsController`, `ThemeController`, and builds the `pages` map (`Map<String, WidgetBuilder>`) keyed by navigation key, passed into `AppShell`.
 - `lib/app/app_shell.dart`'s `AppShell` is a responsive layout: a persistent, collapsible `AppSidebar` beside content above an 800px width breakpoint; a drawer + `AppBar` below it. It looks up the current page from the `pages` map by the selected key.
 - Navigation structure (groups, items, icons) is declared statically in `lib/features/navigation/nav_models.dart` (`NavGroup`/`NavItem`). **Adding a new screen requires updating both this file and the `pages` map in `main.dart`** — they are not derived from each other.
-- Onboarding: if no vault is registered yet, `FreenaryApp` shows `OnboardingScreen` instead of the shell until a folder is picked.
+- Onboarding: if no vault is registered yet, `OpimeApp` shows `OnboardingScreen` instead of the shell until a folder is picked.
 
 ### UI stack
 
@@ -45,7 +45,7 @@ Built on `shadcn_flutter` (component library, `ShadcnApp` root widget, `Scaffold
 
 ### Update checks
 
-`UpdateChecker` (`lib/core/updates/update_checker.dart`) polls the GitHub Tags/Releases API for `Cl3mty/freenary`, compares semver, and picks a platform-appropriate release asset. `UpdateBanner` wraps `AppShell` and shows a dismissible banner when a newer version is available. This hits the network directly (no backend of its own) and fails silently/quietly on error — never blocks the UI.
+`UpdateChecker` (`lib/core/updates/update_checker.dart`) polls the GitHub Tags/Releases API for `Cl3mty/freenary` (repo not yet renamed to match the app), compares semver, and picks a platform-appropriate release asset. `UpdateBanner` wraps `AppShell` and shows a dismissible banner when a newer version is available. This hits the network directly (no backend of its own) and fails silently/quietly on error — never blocks the UI.
 
 ### French UI / domain terms
 

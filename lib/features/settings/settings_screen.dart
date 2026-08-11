@@ -4,17 +4,12 @@ import '../../app/theme_controller.dart';
 import '../../core/storage/vault_folder_service.dart';
 import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
-import '../../core/profiles/profile_controller.dart';
-import '../../core/profiles/sidebar_prefs_controller.dart';
-import 'sidebar_visibility_card.dart';
 
 class SettingsScreen extends StatelessWidget {
   final VaultFolderService vaultFolderService;
   final Future<void> Function(String path) onVaultActivated;
   final VoidCallback onNoVaultSelected;
   final ThemeController themeController;
-  final ProfileController profileController;
-  final SidebarPrefsController sidebarPrefsController;
   final String githubOwner;
   final String githubRepo;
 
@@ -24,8 +19,6 @@ class SettingsScreen extends StatelessWidget {
     required this.onVaultActivated,
     required this.onNoVaultSelected,
     required this.themeController,
-    required this.profileController,
-    required this.sidebarPrefsController,
     required this.githubOwner,
     required this.githubRepo,
   });
@@ -45,11 +38,6 @@ class SettingsScreen extends StatelessWidget {
           _ThemeCard(themeController: themeController),
           const SizedBox(height: 16),
           _VersionCard(githubOwner: githubOwner, githubRepo: githubRepo),
-          const SizedBox(height: 16),
-          SidebarVisibilityCard(
-            profileController: profileController,
-            sidebarPrefsController: sidebarPrefsController,
-          ),
           const SizedBox(height: 16),
           _VaultCard(
             vaultFolderService: vaultFolderService,
@@ -75,7 +63,7 @@ class _VersionCard extends StatefulWidget {
 
 class _VersionCardState extends State<_VersionCard> {
   bool _loading = true;
-  String? _error;
+  bool _hasError = false;
   String _currentVersion = '-';
   String? _latestVersion;
   UpdateInfo? _update;
@@ -89,7 +77,7 @@ class _VersionCardState extends State<_VersionCard> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _error = null;
+      _hasError = false;
     });
     try {
       final checker = UpdateChecker(
@@ -98,11 +86,18 @@ class _VersionCardState extends State<_VersionCard> {
       );
       final result = await checker.checkForUpdateDetailed();
       if (!mounted) return;
+      // L'utilisateur n'a rien à faire de ces détails techniques (code HTTP,
+      // exception réseau...) : l'UI reste sur un message générique, le
+      // détail complet part uniquement dans le terminal pour le diagnostic.
+      if (result.errorMessage != null) {
+        // ignore: avoid_print
+        print('Vérification de mise à jour échouée : ${result.errorMessage}');
+      }
       setState(() {
         _currentVersion = result.currentVersion;
         _latestVersion = result.latestVersion;
         _update = result.update;
-        _error = result.errorMessage;
+        _hasError = result.errorMessage != null;
       });
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -148,9 +143,9 @@ class _VersionCardState extends State<_VersionCard> {
                   const Text('Vérification des releases GitHub...').muted(),
                 ],
               )
-            else if (_error != null)
+            else if (_hasError)
               Text(
-                _error!,
+                'Impossible de vérifier les mises à jour pour le moment.',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.destructive,
                 ),
@@ -338,7 +333,7 @@ class _VaultCardState extends State<_VaultCard> {
     });
     try {
       final vault = await widget.vaultFolderService.pickAndRememberVault(
-        dialogTitle: 'Choisis ou crée un vault Freenary',
+        dialogTitle: 'Choisis ou crée un vault Opime',
       );
       if (vault != null) {
         await widget.onVaultActivated(vault.vaultPath);

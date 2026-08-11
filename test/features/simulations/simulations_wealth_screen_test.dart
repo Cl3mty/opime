@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/features/simulations/simulations_wealth_screen.dart';
+import 'package:opime/features/simulations/simulations_wealth_screen.dart';
 
 void main() {
   group('monthlyRateFromAnnualPct', () {
@@ -17,154 +17,185 @@ void main() {
   });
 
   group('gaussianSample', () {
-    test('moyenne et écart-type empiriques proches des paramètres sur un grand échantillon', () {
-      final rng = Random(42);
-      const mean = 8.0;
-      const stddev = 15.0;
-      const n = 20000;
+    test(
+      'moyenne et écart-type empiriques proches des paramètres sur un grand échantillon',
+      () {
+        final rng = Random(42);
+        const mean = 8.0;
+        const stddev = 15.0;
+        const n = 20000;
 
-      final samples = List.generate(n, (_) => gaussianSample(rng, mean, stddev));
-      final empiricalMean = samples.reduce((a, b) => a + b) / n;
-      final variance = samples.map((v) => (v - empiricalMean) * (v - empiricalMean)).reduce((a, b) => a + b) / n;
-      final empiricalStddev = sqrt(variance);
+        final samples = List.generate(
+          n,
+          (_) => gaussianSample(rng, mean, stddev),
+        );
+        final empiricalMean = samples.reduce((a, b) => a + b) / n;
+        final variance =
+            samples
+                .map((v) => (v - empiricalMean) * (v - empiricalMean))
+                .reduce((a, b) => a + b) /
+            n;
+        final empiricalStddev = sqrt(variance);
 
-      expect(empiricalMean, closeTo(mean, 0.5));
-      expect(empiricalStddev, closeTo(stddev, 0.5));
-    });
+        expect(empiricalMean, closeTo(mean, 0.5));
+        expect(empiricalStddev, closeTo(stddev, 0.5));
+      },
+    );
   });
 
   group('computeWealthProjection (déterministe, intérêts composés)', () {
-    test('sans versement ni rendement, la valeur future égale le patrimoine initial', () {
-      final result = computeWealthProjection(
-        patrimoineActuel: 100000,
-        repartitionInitialeBourse: 50,
-        investissementsMensuels: 0,
-        repartitionInvestBourse: 50,
-        nombreAnnees: 10,
-        rendementBourse: 0,
-        rendementAutre: 0,
-        impositionBourse: 0,
-        impositionAutre: 0,
-        tauxRetrait: 4,
-        tauxInflation: 0,
-      );
+    test(
+      'sans versement ni rendement, la valeur future égale le patrimoine initial',
+      () {
+        final result = computeWealthProjection(
+          patrimoineActuel: 100000,
+          repartitionInitialeBourse: 50,
+          investissementsMensuels: 0,
+          repartitionInvestBourse: 50,
+          nombreAnnees: 10,
+          rendementBourse: 0,
+          rendementAutre: 0,
+          impositionBourse: 0,
+          impositionAutre: 0,
+          tauxRetrait: 4,
+          tauxInflation: 0,
+        );
 
-      expect(result.valeurFuture, closeTo(100000, 0.01));
-      expect(result.plusValue, closeTo(0, 0.01));
-    });
+        expect(result.valeurFuture, closeTo(100000, 0.01));
+        expect(result.plusValue, closeTo(0, 0.01));
+      },
+    );
 
-    test('sans rendement, la valeur future égale patrimoine initial + versements cumulés', () {
-      final result = computeWealthProjection(
-        patrimoineActuel: 50000,
-        repartitionInitialeBourse: 100,
-        investissementsMensuels: 500,
-        repartitionInvestBourse: 100,
-        nombreAnnees: 5,
-        rendementBourse: 0,
-        rendementAutre: 0,
-        impositionBourse: 0,
-        impositionAutre: 0,
-        tauxRetrait: 4,
-        tauxInflation: 0,
-      );
+    test(
+      'sans rendement, la valeur future égale patrimoine initial + versements cumulés',
+      () {
+        final result = computeWealthProjection(
+          patrimoineActuel: 50000,
+          repartitionInitialeBourse: 100,
+          investissementsMensuels: 500,
+          repartitionInvestBourse: 100,
+          nombreAnnees: 5,
+          rendementBourse: 0,
+          rendementAutre: 0,
+          impositionBourse: 0,
+          impositionAutre: 0,
+          tauxRetrait: 4,
+          tauxInflation: 0,
+        );
 
-      expect(result.valeurFuture, closeTo(50000 + 500 * 60, 0.01));
-    });
+        expect(result.valeurFuture, closeTo(50000 + 500 * 60, 0.01));
+      },
+    );
 
-    test('croissance composée cohérente avec un taux annuel de 5% sur 10 ans', () {
-      final result = computeWealthProjection(
-        patrimoineActuel: 100000,
-        repartitionInitialeBourse: 100,
-        investissementsMensuels: 0,
-        repartitionInvestBourse: 100,
-        nombreAnnees: 10,
-        rendementBourse: 5,
-        rendementAutre: 0,
-        impositionBourse: 0,
-        impositionAutre: 0,
-        tauxRetrait: 4,
-        tauxInflation: 0,
-      );
+    test(
+      'croissance composée cohérente avec un taux annuel de 5% sur 10 ans',
+      () {
+        final result = computeWealthProjection(
+          patrimoineActuel: 100000,
+          repartitionInitialeBourse: 100,
+          investissementsMensuels: 0,
+          repartitionInvestBourse: 100,
+          nombreAnnees: 10,
+          rendementBourse: 5,
+          rendementAutre: 0,
+          impositionBourse: 0,
+          impositionAutre: 0,
+          tauxRetrait: 4,
+          tauxInflation: 0,
+        );
 
-      final expected = 100000 * pow(1.05, 10);
-      expect(result.valeurFuture, closeTo(expected, 1));
-    });
+        final expected = 100000 * pow(1.05, 10);
+        expect(result.valeurFuture, closeTo(expected, 1));
+      },
+    );
 
-    test('sans inflation, la valeur "pouvoir d\'achat actuel" égale la valeur nette nominale', () {
-      final result = computeWealthProjection(
-        patrimoineActuel: 100000,
-        repartitionInitialeBourse: 100,
-        investissementsMensuels: 200,
-        repartitionInvestBourse: 100,
-        nombreAnnees: 15,
-        rendementBourse: 6,
-        rendementAutre: 0,
-        impositionBourse: 18.6,
-        impositionAutre: 0,
-        tauxRetrait: 4,
-        tauxInflation: 0,
-      );
+    test(
+      'sans inflation, la valeur "pouvoir d\'achat actuel" égale la valeur nette nominale',
+      () {
+        final result = computeWealthProjection(
+          patrimoineActuel: 100000,
+          repartitionInitialeBourse: 100,
+          investissementsMensuels: 200,
+          repartitionInvestBourse: 100,
+          nombreAnnees: 15,
+          rendementBourse: 6,
+          rendementAutre: 0,
+          impositionBourse: 18.6,
+          impositionAutre: 0,
+          tauxRetrait: 4,
+          tauxInflation: 0,
+        );
 
-      expect(result.valeurNetteReelle, closeTo(result.valeurNette, 0.01));
-      expect(result.revenuMensuelReel, closeTo(result.revenuMensuel, 0.01));
-    });
+        expect(result.valeurNetteReelle, closeTo(result.valeurNette, 0.01));
+        expect(result.revenuMensuelReel, closeTo(result.revenuMensuel, 0.01));
+      },
+    );
 
-    test('avec de l\'inflation, la valeur réelle est actualisée à la baisse (régression : champ auparavant ignoré)', () {
-      final result = computeWealthProjection(
-        patrimoineActuel: 100000,
-        repartitionInitialeBourse: 100,
-        investissementsMensuels: 200,
-        repartitionInvestBourse: 100,
-        nombreAnnees: 20,
-        rendementBourse: 7,
-        rendementAutre: 0,
-        impositionBourse: 18.6,
-        impositionAutre: 0,
-        tauxRetrait: 4,
-        tauxInflation: 3,
-      );
+    test(
+      'avec de l\'inflation, la valeur réelle est actualisée à la baisse (régression : champ auparavant ignoré)',
+      () {
+        final result = computeWealthProjection(
+          patrimoineActuel: 100000,
+          repartitionInitialeBourse: 100,
+          investissementsMensuels: 200,
+          repartitionInvestBourse: 100,
+          nombreAnnees: 20,
+          rendementBourse: 7,
+          rendementAutre: 0,
+          impositionBourse: 18.6,
+          impositionAutre: 0,
+          tauxRetrait: 4,
+          tauxInflation: 3,
+        );
 
-      expect(result.valeurNetteReelle, lessThan(result.valeurNette));
-      final expectedFactor = pow(1.03, 20);
-      expect(result.valeurNetteReelle, closeTo(result.valeurNette / expectedFactor, 0.01));
-    });
+        expect(result.valeurNetteReelle, lessThan(result.valeurNette));
+        final expectedFactor = pow(1.03, 20);
+        expect(
+          result.valeurNetteReelle,
+          closeTo(result.valeurNette / expectedFactor, 0.01),
+        );
+      },
+    );
   });
 
   group('computeMonteCarloProjection', () {
-    test('sans volatilité, converge vers la projection déterministe équivalente', () {
-      final mc = computeMonteCarloProjection(
-        patrimoineActuel: 100000,
-        repartitionInitialeBourse: 100,
-        investissementsMensuels: 300,
-        repartitionInvestBourse: 100,
-        nombreAnnees: 10,
-        rendementBourse: 5,
-        ecartTypeBourse: 0,
-        rendementAutre: 0,
-        ecartTypeAutre: 0,
-        impositionBourse: 0,
-        impositionAutre: 0,
-        tauxRetrait: 4,
-        nombreSimulations: 50,
-      );
+    test(
+      'sans volatilité, converge vers la projection déterministe équivalente',
+      () {
+        final mc = computeMonteCarloProjection(
+          patrimoineActuel: 100000,
+          repartitionInitialeBourse: 100,
+          investissementsMensuels: 300,
+          repartitionInvestBourse: 100,
+          nombreAnnees: 10,
+          rendementBourse: 5,
+          ecartTypeBourse: 0,
+          rendementAutre: 0,
+          ecartTypeAutre: 0,
+          impositionBourse: 0,
+          impositionAutre: 0,
+          tauxRetrait: 4,
+          nombreSimulations: 50,
+        );
 
-      final deterministic = computeWealthProjection(
-        patrimoineActuel: 100000,
-        repartitionInitialeBourse: 100,
-        investissementsMensuels: 300,
-        repartitionInvestBourse: 100,
-        nombreAnnees: 10,
-        rendementBourse: 5,
-        rendementAutre: 0,
-        impositionBourse: 0,
-        impositionAutre: 0,
-        tauxRetrait: 4,
-        tauxInflation: 0,
-      );
+        final deterministic = computeWealthProjection(
+          patrimoineActuel: 100000,
+          repartitionInitialeBourse: 100,
+          investissementsMensuels: 300,
+          repartitionInvestBourse: 100,
+          nombreAnnees: 10,
+          rendementBourse: 5,
+          rendementAutre: 0,
+          impositionBourse: 0,
+          impositionAutre: 0,
+          tauxRetrait: 4,
+          tauxInflation: 0,
+        );
 
-      expect(mc.valeurNetteP10, closeTo(mc.valeurNetteP90, 0.01));
-      expect(mc.valeurFutureMediane, closeTo(deterministic.valeurFuture, 1));
-    });
+        expect(mc.valeurNetteP10, closeTo(mc.valeurNetteP90, 0.01));
+        expect(mc.valeurFutureMediane, closeTo(deterministic.valeurFuture, 1));
+      },
+    );
 
     test('avec volatilité, les percentiles sont correctement ordonnés', () {
       final mc = computeMonteCarloProjection(
@@ -192,28 +223,31 @@ void main() {
       }
     });
 
-    test('la graine par défaut est fixe : deux appels identiques donnent le même résultat', () {
-      MCResult params() => computeMonteCarloProjection(
-            patrimoineActuel: 80000,
-            repartitionInitialeBourse: 70,
-            investissementsMensuels: 250,
-            repartitionInvestBourse: 70,
-            nombreAnnees: 12,
-            rendementBourse: 7,
-            ecartTypeBourse: 12,
-            rendementAutre: 3,
-            ecartTypeAutre: 2,
-            impositionBourse: 18.6,
-            impositionAutre: 31.4,
-            tauxRetrait: 4,
-            nombreSimulations: 100,
-          );
+    test(
+      'la graine par défaut est fixe : deux appels identiques donnent le même résultat',
+      () {
+        MCResult params() => computeMonteCarloProjection(
+          patrimoineActuel: 80000,
+          repartitionInitialeBourse: 70,
+          investissementsMensuels: 250,
+          repartitionInvestBourse: 70,
+          nombreAnnees: 12,
+          rendementBourse: 7,
+          ecartTypeBourse: 12,
+          rendementAutre: 3,
+          ecartTypeAutre: 2,
+          impositionBourse: 18.6,
+          impositionAutre: 31.4,
+          tauxRetrait: 4,
+          nombreSimulations: 100,
+        );
 
-      final first = params();
-      final second = params();
-      expect(first.valeurNetteMediane, second.valeurNetteMediane);
-      expect(first.valeurNetteP10, second.valeurNetteP10);
-      expect(first.valeurNetteP90, second.valeurNetteP90);
-    });
+        final first = params();
+        final second = params();
+        expect(first.valeurNetteMediane, second.valeurNetteMediane);
+        expect(first.valeurNetteP10, second.valeurNetteP10);
+        expect(first.valeurNetteP90, second.valeurNetteP90);
+      },
+    );
   });
 }

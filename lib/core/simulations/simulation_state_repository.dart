@@ -8,7 +8,8 @@ class SimulationStateRepository {
 
   const SimulationStateRepository(this.profileDataPath);
 
-  File _fileFor(String key) => File(p.join(profileDataPath, 'simulations', '$key.json'));
+  File _fileFor(String key) =>
+      File(p.join(profileDataPath, 'simulations', '$key.json'));
 
   Future<Map<String, dynamic>> read(String key) async {
     final file = _fileFor(key);

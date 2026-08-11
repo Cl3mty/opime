@@ -76,7 +76,11 @@ class VaultFolderService {
   static const _activeVaultIdKey = 'active_vault_id';
   static const _pathKey = 'vault_folder_path';
   static const _bookmarkKey = 'vault_folder_bookmark';
-  static const _channel = MethodChannel('com.freenary/secure_bookmarks');
+  static const _channel = MethodChannel('com.opime/secure_bookmarks');
+
+  /// Nom du dossier vault. Un vault `.freenary` créé avant le rebranding
+  /// Freenary → Opime n'est plus reconnu.
+  static const _vaultFolderName = '.opime';
 
   Future<String?> getSavedVaultPath() async {
     final activeVault = await getActiveVault();
@@ -192,10 +196,10 @@ class VaultFolderService {
   /// Sélectionne un nouveau dossier de données.
   ///
   /// - Le dialogue demande normalement le dossier **parent** où sera créé
-  ///   `.freenary`.
+  ///   `.opime` (voir [_vaultFolderName]).
   /// - Protection : si l'utilisateur sélectionne directement un dossier déjà
-  ///   nommé `.freenary` (erreur de manipulation fréquente), on l'utilise
-  ///   tel quel comme vault au lieu de créer `.freenary/.freenary` dedans.
+  ///   nommé `.opime` (erreur de manipulation fréquente), on l'utilise tel
+  ///   quel comme vault au lieu d'en créer un autre dedans.
   /// - Si le vault résultant existe déjà, on le charge tel quel (aucune
   ///   copie). Sinon, si [currentVaultPath] est fourni, on migre les
   ///   données existantes vers le nouvel emplacement.
@@ -245,10 +249,10 @@ class VaultFolderService {
       result = picked;
     }
 
-    final selectedIsAlreadyVault = p.basename(result) == '.freenary';
+    final selectedIsAlreadyVault = p.basename(result) == _vaultFolderName;
     final vaultDir = selectedIsAlreadyVault
         ? Directory(result)
-        : Directory(p.join(result, '.freenary'));
+        : Directory(p.join(result, _vaultFolderName));
     final alreadyExists = await vaultDir.exists();
 
     if (!alreadyExists) {
@@ -370,7 +374,7 @@ class VaultFolderService {
             legacyBookmarkData,
           );
           if (parentPath != null) {
-            legacyPath = p.join(parentPath, '.freenary');
+            legacyPath = p.join(parentPath, _vaultFolderName);
           }
         } catch (_) {}
       }
@@ -410,7 +414,7 @@ class VaultFolderService {
       if (bookmarkTarget == null) return null;
       final resolvedVaultPath = vault.bookmarkTargetsVault
           ? bookmarkTarget
-          : p.join(bookmarkTarget, '.freenary');
+          : p.join(bookmarkTarget, p.basename(vault.vaultPath));
       final resolvedVault = vault.copyWith(vaultPath: resolvedVaultPath);
       if (!p.equals(resolvedVault.vaultPath, vault.vaultPath)) {
         final vaults = await listVaults();
@@ -431,7 +435,7 @@ class VaultFolderService {
     final trimmed = explicitName?.trim();
     if (trimmed != null && trimmed.isNotEmpty) return trimmed;
     final base = p.basename(vaultPath);
-    if (base == '.freenary') {
+    if (base == _vaultFolderName) {
       final parent = p.basename(p.dirname(vaultPath));
       if (parent.isNotEmpty && parent != '.') return parent;
     }

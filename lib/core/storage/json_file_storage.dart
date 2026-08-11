@@ -26,8 +26,6 @@ class JsonFileStorage implements StorageRepository {
   @override
   Future<void> writeVault(Map<String, dynamic> data) async {
     final file = File(_vaultFilePath);
-    await file.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(data),
-    );
+    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
   }
 }

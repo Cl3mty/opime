@@ -20,6 +20,12 @@ class NavGroup {
   const NavGroup({required this.label, required this.items});
 }
 
+/// Sur desktop, le Dashboard permet déjà de naviguer vers chaque catégorie
+/// d'actif/passif (clic sur une ligne des cartes Actifs/Passifs) : les
+/// détailler aussi dans la sidebar serait redondant, donc [patrimoineGroup]
+/// (desktop) ne garde que "Tableau de bord". Sur mobile, sans ces cartes
+/// cliquables, l'onglet Portfolio continue de les exposer via
+/// [patrimoineCategoryItems].
 const patrimoineGroup = NavGroup(
   label: 'Patrimoine',
   items: [
@@ -28,107 +34,69 @@ const patrimoineGroup = NavGroup(
       label: 'Tableau de bord',
       icon: LucideIcons.gauge,
     ),
-    NavItem(
-      key: 'actifs',
-      label: 'Actifs',
-      icon: LucideIcons.circlePlus,
-      children: [
-        NavItem(
-          key: 'actifs_actions_fonds',
-          label: 'Actions & Fonds',
-          icon: LucideIcons.chartLine,
-        ),
-        NavItem(
-          key: 'actifs_private_equity',
-          label: 'Private Equity',
-          icon: LucideIcons.rocket,
-        ),
-        NavItem(
-          key: 'actifs_immobilier',
-          label: 'Immobilier',
-          icon: LucideIcons.house,
-        ),
-        NavItem(
-          key: 'actifs_crypto',
-          label: 'Crypto',
-          icon: LucideIcons.bitcoin,
-        ),
-        NavItem(
-          key: 'actifs_metaux_precieux',
-          label: 'Métaux précieux',
-          icon: LucideIcons.gem,
-        ),
-        NavItem(
-          key: 'actifs_epargne',
-          label: 'Épargne',
-          icon: LucideIcons.piggyBank,
-        ),
-        NavItem(key: 'actifs_autres', label: 'Autres', icon: LucideIcons.boxes),
-      ],
-    ),
-    NavItem(
-      key: 'passifs',
-      label: 'Passifs',
-      icon: LucideIcons.circleMinus,
-      children: [
-        NavItem(
-          key: 'passifs_emprunts',
-          label: 'Emprunts',
-          icon: LucideIcons.handCoins,
-        ),
-        NavItem(
-          key: 'passifs_prets_immobiliers',
-          label: 'Crédits immobiliers',
-          icon: LucideIcons.house,
-        ),
-      ],
-    ),
   ],
 );
+
+const patrimoineCategoryItems = [
+  NavItem(
+    key: 'actifs',
+    label: 'Actifs',
+    icon: LucideIcons.circlePlus,
+    children: [
+      NavItem(
+        key: 'actifs_actions_fonds',
+        label: 'Actions & Fonds',
+        icon: LucideIcons.chartLine,
+      ),
+      NavItem(
+        key: 'actifs_private_equity',
+        label: 'Private Equity',
+        icon: LucideIcons.rocket,
+      ),
+      NavItem(
+        key: 'actifs_immobilier',
+        label: 'Immobilier',
+        icon: LucideIcons.house,
+      ),
+      NavItem(key: 'actifs_crypto', label: 'Crypto', icon: LucideIcons.bitcoin),
+      NavItem(
+        key: 'actifs_metaux_precieux',
+        label: 'Métaux précieux',
+        icon: LucideIcons.gem,
+      ),
+      NavItem(
+        key: 'actifs_epargne',
+        label: 'Épargne',
+        icon: LucideIcons.piggyBank,
+      ),
+      NavItem(key: 'actifs_autres', label: 'Autres', icon: LucideIcons.boxes),
+    ],
+  ),
+  NavItem(
+    key: 'passifs',
+    label: 'Passifs',
+    icon: LucideIcons.circleMinus,
+    children: [
+      NavItem(
+        key: 'passifs_emprunts',
+        label: 'Emprunts',
+        icon: LucideIcons.handCoins,
+      ),
+      NavItem(
+        key: 'passifs_prets_immobiliers',
+        label: 'Crédits immobiliers',
+        icon: LucideIcons.house,
+      ),
+    ],
+  ),
+];
 
 const academieGroup = NavGroup(
   label: 'Académie',
   items: [
     NavItem(
-      key: 'enveloppes',
-      label: 'Enveloppes',
-      icon: LucideIcons.library,
-      children: [
-        NavItem(
-          key: 'envelope_compte_courant',
-          label: 'Compte courant',
-          icon: LucideIcons.landmark,
-        ),
-        NavItem(
-          key: 'envelope_livret_a',
-          label: 'Livret A',
-          icon: LucideIcons.piggyBank,
-        ),
-        NavItem(key: 'envelope_ldds', label: 'LDDS', icon: LucideIcons.sprout),
-        NavItem(key: 'envelope_lep', label: 'LEP', icon: LucideIcons.coins),
-        NavItem(key: 'envelope_pel', label: 'PEL', icon: LucideIcons.house),
-        NavItem(key: 'envelope_cto', label: 'CTO', icon: LucideIcons.briefcase),
-        NavItem(
-          key: 'envelope_pea',
-          label: 'PEA',
-          icon: LucideIcons.trendingUp,
-        ),
-        NavItem(
-          key: 'envelope_assurance_vie',
-          label: 'Assurance-vie',
-          icon: LucideIcons.heartHandshake,
-        ),
-        NavItem(
-          key: 'envelope_pee_peg',
-          label: 'PEE / PEG',
-          icon: LucideIcons.users,
-        ),
-        NavItem(key: 'envelope_per', label: 'PER', icon: LucideIcons.sunset),
-      ],
-    ),
-    NavItem(
       key: 'investissement',
-      label: 'Investissement',
+      label: 'Fondamentaux',
       icon: LucideIcons.university,
       children: [
         NavItem(
@@ -175,6 +143,48 @@ const academieGroup = NavGroup(
       ],
     ),
     NavItem(
+      key: 'enveloppes',
+      label: 'Enveloppes',
+      icon: LucideIcons.library,
+      children: [
+        NavItem(
+          key: 'envelope_compte_courant',
+          label: 'Compte courant',
+          icon: LucideIcons.landmark,
+        ),
+        NavItem(
+          key: 'envelope_livret_a',
+          label: 'Livret A',
+          icon: LucideIcons.piggyBank,
+        ),
+        NavItem(key: 'envelope_ldds', label: 'LDDS', icon: LucideIcons.sprout),
+        NavItem(key: 'envelope_lep', label: 'LEP', icon: LucideIcons.coins),
+        NavItem(key: 'envelope_pel', label: 'PEL', icon: LucideIcons.house),
+        NavItem(key: 'envelope_cto', label: 'CTO', icon: LucideIcons.briefcase),
+        NavItem(
+          key: 'envelope_pea',
+          label: 'PEA',
+          icon: LucideIcons.trendingUp,
+        ),
+        NavItem(
+          key: 'envelope_assurance_vie',
+          label: 'Assurance-vie',
+          icon: LucideIcons.heartHandshake,
+        ),
+        NavItem(
+          key: 'envelope_contrat_capitalisation',
+          label: 'Contrat de capitalisation',
+          icon: LucideIcons.building2,
+        ),
+        NavItem(
+          key: 'envelope_pee_peg',
+          label: 'PEE / PEG',
+          icon: LucideIcons.users,
+        ),
+        NavItem(key: 'envelope_per', label: 'PER', icon: LucideIcons.sunset),
+      ],
+    ),
+    NavItem(
       key: 'formation',
       label: 'Formation',
       icon: LucideIcons.graduationCap,
@@ -204,12 +214,10 @@ const academieGroup = NavGroup(
   ],
 );
 
-/// Items du groupe Patrimoine pour l'onglet "Portfolio" de la navigation
-/// mobile (le tableau de bord a déjà son propre onglet "Home").
-final portfolioTabItems = [
-  for (final item in patrimoineGroup.items)
-    if (item.key != 'dashboard') item,
-];
+/// Items de l'onglet "Portfolio" de la navigation mobile (le tableau de
+/// bord a déjà son propre onglet "Home") : sans les cartes cliquables du
+/// Dashboard desktop, le mobile garde Actifs/Passifs pour y naviguer.
+const portfolioTabItems = patrimoineCategoryItems;
 
 const outilsGroup = NavGroup(
   label: 'Outils',

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freenary/core/money_format.dart';
+import 'package:opime/core/money_format.dart';
 
 void main() {
   group('formatEuros', () {
@@ -35,9 +35,12 @@ void main() {
   });
 
   group('maskAmount', () {
-    test('remplace chaque chiffre par un astérisque en gardant la ponctuation', () {
-      expect(maskAmount('1 234 567 €'), '* *** *** €');
-    });
+    test(
+      'remplace chaque chiffre par un astérisque en gardant la ponctuation',
+      () {
+        expect(maskAmount('1 234 567 €'), '* *** *** €');
+      },
+    );
 
     test('gère le signe négatif', () {
       expect(maskAmount('-1 500 €'), '-* *** €');

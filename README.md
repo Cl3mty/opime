@@ -1,4 +1,4 @@
-# Freenary
+# Opime
 
 A portfolio and investment management app that is:
 
@@ -7,7 +7,7 @@ A portfolio and investment management app that is:
 - 💻 **Multi-platform** — built with Flutter for macOS, Windows, Linux, iOS and Android
 - 🔐 **Yours** — your data lives in a folder *you* choose.
 
-Freenary helps you track your net worth, plan your budget, and simulate long-term financial decisions — without handing your financial data to a third party.
+Opime helps you track your net worth, plan your budget, and simulate long-term financial decisions — without handing your financial data to a third party.
 
 > **Status:** early-stage / actively developed. Desktop (macOS) is the primary target right now; mobile builds are not yet configured. Expect rough edges.
 
@@ -16,7 +16,7 @@ Freenary helps you track your net worth, plan your budget, and simulate long-ter
 ## Features
 
 ### 🔒 Local-first, always
-Every account's data is stored as plain JSON and Markdown files in a `.freenary` folder you pick on first launch. Put it in iCloud Drive, Dropbox, or a local folder — Freenary doesn't know or care, and never phones home.
+Every account's data is stored as plain JSON and Markdown files in a `.opime` folder you pick on first launch. Put it in iCloud Drive, Dropbox, or a local folder — Opime doesn't know or care, and never phones home.
 
 ### 👨‍👩‍👧‍👦 Multiple accounts
 Create a separate account for your spouse, your kids, a parent, or anyone else you help manage finances for. Each account has its own strategy notes, budget, and (soon) assets & liabilities, fully isolated on disk. Switch between accounts in one click from the sidebar.
@@ -36,13 +36,13 @@ Track income, expenses, and monthly investments by category, visualized as an in
 Light, dark, or system theme. Each account can also choose which asset/liability categories appear in their own sidebar.
 
 ### 🔄 Update notifications
-Freenary checks GitHub Releases on launch and shows a one-click download banner when a newer version is available.
+Opime checks GitHub Releases on launch and shows a one-click download banner when a newer version is available.
 
 ---
 
 ## Getting started
 
-Freenary is built with [Flutter](https://flutter.dev). To run it locally:
+Opime is built with [Flutter](https://flutter.dev). To run it locally:
 
 ```bash
 git clone https://github.com/<your-username>/freenary.git
@@ -72,7 +72,7 @@ On first launch, you'll be asked to choose (or create) the folder where your dat
 ## Data & privacy
 
 - All data is stored locally in the folder you select. Nothing is sent anywhere.
-- **Encryption is not implemented yet.** Data is currently stored as plain, human-readable JSON/Markdown files. Treat your `.freenary` folder like any other sensitive personal document (e.g. don't put it in a publicly-shared folder) until at-rest encryption ships.
+- **Encryption is not implemented yet.** Data is currently stored as plain, human-readable JSON/Markdown files. Treat your `.opime` folder like any other sensitive personal document (e.g. don't put it in a publicly-shared folder) until at-rest encryption ships.
 - Deleting an account in the app removes it from the account list but does **not** delete its data folder, so you can recover it manually if needed.
 
 ---

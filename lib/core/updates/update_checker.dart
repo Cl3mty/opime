@@ -29,7 +29,8 @@ class UpdateCheckResult {
   });
 
   bool get hasUpdate => update != null;
-  bool get isUpToDate => update == null && errorMessage == null && latestVersion != null;
+  bool get isUpToDate =>
+      update == null && errorMessage == null && latestVersion != null;
   bool get hasError => errorMessage != null;
 }
 
@@ -55,13 +56,16 @@ class UpdateChecker {
 
     try {
       final tagsResponse = await http.get(
-        Uri.parse('https://api.github.com/repos/$githubOwner/$githubRepo/tags?per_page=100'),
+        Uri.parse(
+          'https://api.github.com/repos/$githubOwner/$githubRepo/tags?per_page=100',
+        ),
         headers: {'Accept': 'application/vnd.github+json'},
       );
       if (tagsResponse.statusCode != 200) {
         return UpdateCheckResult(
           currentVersion: currentVersion,
-          errorMessage: 'GitHub API tags a répondu ${tagsResponse.statusCode}. Vérifie owner/repo et visibilité du dépôt.',
+          errorMessage:
+              'GitHub API tags a répondu ${tagsResponse.statusCode}. Vérifie owner/repo et visibilité du dépôt.',
         );
       }
 
@@ -106,14 +110,19 @@ class UpdateChecker {
       var releaseNotesUrl = 'https://github.com/$githubOwner/$githubRepo/tags';
 
       final releaseByTagResponse = await http.get(
-        Uri.parse('https://api.github.com/repos/$githubOwner/$githubRepo/releases/tags/${Uri.encodeComponent(bestTagName)}'),
+        Uri.parse(
+          'https://api.github.com/repos/$githubOwner/$githubRepo/releases/tags/${Uri.encodeComponent(bestTagName)}',
+        ),
         headers: {'Accept': 'application/vnd.github+json'},
       );
       if (releaseByTagResponse.statusCode == 200) {
-        final releaseJson = jsonDecode(releaseByTagResponse.body) as Map<String, dynamic>;
-        downloadUrl = _pickPlatformAssetDownloadUrl(releaseJson) ??
+        final releaseJson =
+            jsonDecode(releaseByTagResponse.body) as Map<String, dynamic>;
+        downloadUrl =
+            _pickPlatformAssetDownloadUrl(releaseJson) ??
             (releaseJson['html_url'] as String? ?? downloadUrl);
-        releaseNotesUrl = (releaseJson['html_url'] as String? ?? releaseNotesUrl);
+        releaseNotesUrl =
+            (releaseJson['html_url'] as String? ?? releaseNotesUrl);
       }
 
       return UpdateCheckResult(
@@ -181,13 +190,15 @@ class UpdateChecker {
     for (final asset in assets) {
       if (asset is! Map<String, dynamic>) continue;
       final name = (asset['name'] as String? ?? '').toLowerCase();
-      if (Platform.isMacOS && (name.endsWith('.dmg') || name.contains('macos'))) {
+      if (Platform.isMacOS &&
+          (name.endsWith('.dmg') || name.contains('macos'))) {
         return asset['browser_download_url'] as String?;
       }
       if (Platform.isWindows && name.endsWith('.exe')) {
         return asset['browser_download_url'] as String?;
       }
-      if (Platform.isLinux && (name.endsWith('.appimage') || name.endsWith('.deb'))) {
+      if (Platform.isLinux &&
+          (name.endsWith('.appimage') || name.endsWith('.deb'))) {
         return asset['browser_download_url'] as String?;
       }
     }
