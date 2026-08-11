@@ -77,10 +77,7 @@ class OpimeApp extends StatefulWidget {
 
 class _OpimeAppState extends State<OpimeApp> {
   static const _githubOwner = 'Cl3mty';
-  // Le dépôt GitHub utilisé pour la vérification de mise à jour n'a pas
-  // été renommé lors du passage à Opime — laissé tel quel jusqu'à ce que
-  // ce soit le cas.
-  static const _githubRepo = 'freenary';
+  static const _githubRepo = 'opime';
 
   final _themeController = ThemeController();
   final _amountVisibilityController = AmountVisibilityController();

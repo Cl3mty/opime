@@ -45,8 +45,8 @@ Opime checks GitHub Releases on launch and shows a one-click download banner whe
 Opime is built with [Flutter](https://flutter.dev). To run it locally:
 
 ```bash
-git clone https://github.com/<your-username>/freenary.git
-cd freenary
+git clone https://github.com/<your-username>/opime.git
+cd opime
 flutter pub get
 flutter run -d macos   # or -d windows / -d linux
 ```

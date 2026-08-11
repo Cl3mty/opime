@@ -45,7 +45,7 @@ Built on `shadcn_flutter` (component library, `ShadcnApp` root widget, `Scaffold
 
 ### Update checks
 
-`UpdateChecker` (`lib/core/updates/update_checker.dart`) polls the GitHub Tags/Releases API for `Cl3mty/freenary` (repo not yet renamed to match the app), compares semver, and picks a platform-appropriate release asset. `UpdateBanner` wraps `AppShell` and shows a dismissible banner when a newer version is available. This hits the network directly (no backend of its own) and fails silently/quietly on error — never blocks the UI.
+`UpdateChecker` (`lib/core/updates/update_checker.dart`) polls the GitHub Tags/Releases API for `Cl3mty/opime`, compares semver, and picks a platform-appropriate release asset. `UpdateBanner` wraps `AppShell` and shows a dismissible banner when a newer version is available. This hits the network directly (no backend of its own) and fails silently/quietly on error — never blocks the UI.
 
 ### French UI / domain terms
 

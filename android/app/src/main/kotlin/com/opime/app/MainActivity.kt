@@ -1,4 +1,4 @@
-package com.freenary.app
+package com.opime.app
 
 import io.flutter.embedding.android.FlutterActivity
 

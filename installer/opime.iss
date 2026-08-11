@@ -1,10 +1,10 @@
-; Freenary Windows Installer
+; Opime Windows Installer
 ; Generated with Inno Setup
 
-#define MyAppName "Freenary"
+#define MyAppName "Opime"
 #define MyAppVersion "0.6.0"
-#define MyAppPublisher "Freenary"
-#define MyAppExeName "freenary.exe"
+#define MyAppPublisher "Opime"
+#define MyAppExeName "opime.exe"
 
 [Setup]
 
@@ -28,7 +28,7 @@ DisableProgramGroupPage=yes
 
 ; Output
 OutputDir=Output
-OutputBaseFilename=Freenary-Setup-{#MyAppVersion}-ARM64
+OutputBaseFilename=Opime-Setup-{#MyAppVersion}-ARM64
 
 ; Compression
 Compression=lzma2
@@ -40,7 +40,7 @@ WizardStyle=modern
 ; Windows file information
 VersionInfoVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription=Freenary Personal Wealth Manager
+VersionInfoDescription=Opime Personal Wealth Manager
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
 
