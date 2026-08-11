@@ -1,7 +1,10 @@
 import 'dart:math' as math;
+import 'package:path/path.dart' as p;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons, Color;
 import '../dashboard/dashboard_dummy_data.dart';
 import 'investments_models.dart';
+import 'metal_price_client.dart';
+import 'metal_price_repository.dart';
 import 'price_history_repository.dart';
 import 'yahoo_finance_client.dart';
 
@@ -69,10 +72,30 @@ Future<Map<String, List<PricePoint>>> loadAllPriceHistories(
   List<InvestmentAccount> accounts,
 ) async {
   final repo = PriceHistoryRepository(vaultPath);
+  // Les métaux précieux physiques n'ont pas d'historique Yahoo Finance :
+  // leur série est reconstruite depuis les relevés journaliers stockés par
+  // `price_refresh_service.dart` (voir
+  // [MetalPriceRepository.pricePointsFor]) — même clé (l'ISIN, qui porte le
+  // nom de la pièce/lingot) et même repli sur le cours au gramme qu'à la
+  // valorisation. Un ETC or/argent logé dans un CTO, lui, est un titre coté
+  // dont le cours et l'historique passent par Yahoo Finance, comme le fait
+  // déjà le rafraîchissement des cours.
+  final metalRepo = MetalPriceRepository(vaultPath);
   final result = <String, List<PricePoint>>{};
   for (final account in accounts) {
     for (final investment in account.investments) {
-      result[investment.isin] = await repo.load(investment.isin);
+      final effectiveClass = investment.assetClass ?? account.assetClass;
+      if (effectiveClass == AssetClass.metauxPrecieux && !isMetalEtc(account)) {
+        result[investment.isin] = await metalRepo.pricePointsFor(
+          metalKindForInvestment(
+            isin: investment.isin,
+            label: investment.label,
+          ),
+          investment.isin,
+        );
+      } else {
+        result[investment.isin] = await repo.load(investment.isin);
+      }
     }
   }
   return result;
@@ -91,6 +114,7 @@ Future<Map<String, List<PricePoint>>> loadAllPriceHistories(
 List<PatrimoineCategory> buildRealCategories(
   List<InvestmentAccount> accounts,
   Map<String, List<PricePoint>> priceHistories,
+  String vaultPath,
 ) {
   final byClass = <AssetClass, List<(InvestmentAccount, Investment)>>{};
   for (final account in accounts) {
@@ -101,7 +125,7 @@ List<PatrimoineCategory> buildRealCategories(
   }
   return [
     for (final entry in byClass.entries)
-      _buildCategory(entry.key, entry.value, priceHistories),
+      _buildCategory(entry.key, entry.value, priceHistories, vaultPath),
   ];
 }
 
@@ -109,10 +133,12 @@ PatrimoineCategory _buildCategory(
   AssetClass assetClass,
   List<(InvestmentAccount, Investment)> pairs,
   Map<String, List<PricePoint>> priceHistories,
+  String vaultPath,
 ) {
   final meta = _categoryMeta[assetClass]!;
   final leaves = <PatrimoineAccount>[
-    for (final (account, investment) in pairs) _buildLeaf(account, investment),
+    for (final (account, investment) in pairs)
+      _buildLeaf(account, investment, vaultPath),
   ];
   return PatrimoineCategory(
     id: assetClass.categoryId,
@@ -140,6 +166,7 @@ PatrimoineCategory _buildCategory(
 List<PatrimoineCategory> buildRealCategoriesByAccount(
   List<InvestmentAccount> accounts,
   Map<String, List<PricePoint>> priceHistories,
+  String vaultPath,
 ) {
   final byClass = <AssetClass, List<(InvestmentAccount, Investment)>>{};
   for (final account in accounts) {
@@ -150,7 +177,7 @@ List<PatrimoineCategory> buildRealCategoriesByAccount(
   }
   return [
     for (final entry in byClass.entries)
-      _buildCategoryByAccount(entry.key, entry.value, priceHistories),
+      _buildCategoryByAccount(entry.key, entry.value, priceHistories, vaultPath),
   ];
 }
 
@@ -158,6 +185,7 @@ PatrimoineCategory _buildCategoryByAccount(
   AssetClass assetClass,
   List<(InvestmentAccount, Investment)> pairs,
   Map<String, List<PricePoint>> priceHistories,
+  String vaultPath,
 ) {
   final meta = _categoryMeta[assetClass]!;
   final byAccountId = <String, List<(InvestmentAccount, Investment)>>{};
@@ -166,7 +194,7 @@ PatrimoineCategory _buildCategoryByAccount(
   }
   final leaves = <PatrimoineAccount>[
     for (final accountPairs in byAccountId.values)
-      _buildAccountLeaf(accountPairs),
+      _buildAccountLeaf(accountPairs, vaultPath),
   ];
   return PatrimoineCategory(
     id: assetClass.categoryId,
@@ -184,6 +212,7 @@ PatrimoineCategory _buildCategoryByAccount(
 
 PatrimoineAccount _buildAccountLeaf(
   List<(InvestmentAccount, Investment)> pairs,
+  String vaultPath,
 ) {
   final account = pairs.first.$1;
   var valeur = 0.0;
@@ -198,14 +227,35 @@ PatrimoineAccount _buildAccountLeaf(
   }
   return PatrimoineAccount(
     id: account.id,
-    name: account.name,
-    subtitle: account.envelope?.label,
+    // Pour l'épargne, l'identité d'un compte est son type (l'enveloppe
+    // fiscale — Livret A, LDDS...) en première ligne, avec une description
+    // facultative en dessous : le nom de la banque est déjà porté par la
+    // ligne de l'établissement de l'accordéon (voir `_buildAccountAccordions`).
+    // Les autres classes gardent le nom du compte + son enveloppe.
+    name: account.assetClass == AssetClass.epargne
+        ? account.envelope?.label ?? account.name
+        : account.name,
+    subtitle: account.assetClass == AssetClass.epargne
+        ? account.description
+        : account.envelope?.label,
+    // L'établissement du compte réel — la clé de groupement "banque" de
+    // l'accordéon (`category_detail_screen.dart`), et le nom sous lequel le
+    // logo de la banque est importé (`bank_logo_repository.dart`).
+    bankName: account.bankName,
     valeur: valeur,
     plusValueAbs: plusValueAbs,
     plusValuePercent: costBasis == 0 ? 0 : plusValueAbs / costBasis * 100,
     investments: [
       for (final (investmentAccount, investment) in pairs)
-        _buildLeaf(investmentAccount, investment),
+        _buildLeaf(
+          investmentAccount,
+          investment,
+          vaultPath,
+          // Sous-titre du compte porteur inutile ici : ces lignes sont déjà
+          // affichées à l'intérieur du compte (et de la banque pour
+          // l'épargne) — une ligne simple par devise, sans répétition.
+          showAccountSubtitle: false,
+        ),
     ],
     // Reflète l'état du compte réel dans son ensemble, pas seulement ses
     // investissements de cette classe : un compte avec des transactions
@@ -221,9 +271,10 @@ PatrimoineAccount _buildAccountLeaf(
 List<PatrimoineCategory> buildAllRealCategoriesByAccount(
   List<InvestmentAccount> accounts,
   Map<String, List<PricePoint>> priceHistories,
+  String vaultPath,
 ) {
   final populated = {
-    for (final c in buildRealCategoriesByAccount(accounts, priceHistories))
+    for (final c in buildRealCategoriesByAccount(accounts, priceHistories, vaultPath))
       c.id: c,
   };
   return [
@@ -241,9 +292,11 @@ List<PatrimoineCategory> buildAllRealCategoriesByAccount(
 List<PatrimoineCategory> buildAllRealCategories(
   List<InvestmentAccount> accounts,
   Map<String, List<PricePoint>> priceHistories,
+  String vaultPath,
 ) {
   final populated = {
-    for (final c in buildRealCategories(accounts, priceHistories)) c.id: c,
+    for (final c in buildRealCategories(accounts, priceHistories, vaultPath))
+      c.id: c,
   };
   return [
     for (final assetClass in AssetClass.values)
@@ -273,21 +326,96 @@ PatrimoineCategory emptyCategoryFor(String categoryId) {
   );
 }
 
-PatrimoineAccount _buildLeaf(InvestmentAccount account, Investment investment) {
+/// Feuille d'investissement d'une catégorie : une ligne par actif détenu.
+/// [showAccountSubtitle] ajoute en sous-titre le nom du compte porteur —
+/// utile dans la vue "Par actif" (les lignes y sont mélangées entre
+/// comptes), redondant dans l'accordéon d'un compte (les lignes y sont déjà
+/// "à l'intérieur" du compte, voir `_buildAccountLeaf` — l'épargne y garde
+/// une ligne simple pour sa devise, sans rappeler banque/compte).
+PatrimoineAccount _buildLeaf(
+  InvestmentAccount account,
+  Investment investment,
+  String vaultPath, {
+  bool showAccountSubtitle = true,
+}) {
   final valeur = investment.marketValue ?? investment.investedAmount;
   final plusValueAbs = investment.unrealizedGain ?? 0;
   final costBasis = valeur - plusValueAbs;
   return PatrimoineAccount(
     id: investment.id,
     name: investment.label,
-    subtitle: account.name,
+    subtitle: showAccountSubtitle ? account.name : null,
     quantite: investment.quantityHeld == 0 ? null : investment.quantityHeld,
     cours: investment.lastPrice,
     valeur: valeur,
     pru: investment.pru,
+    priceUnavailable: investment.priceUnavailable,
     plusValueAbs: plusValueAbs,
     plusValuePercent: costBasis == 0 ? 0 : plusValueAbs / costBasis * 100,
+    // Métaux précieux : l'avatar affiche la photo du produit (pièce/lingot)
+    // téléchargée localement quand elle existe — sauf ETC logé dans un CTO,
+    // sans produit physique associé, où l'avatar affiche "ETC". Épargne :
+    // l'avatar affiche le code de la devise tenue (EUR, GBP...).
+    avatarImagePath: _metalAvatarImagePath(account, investment, vaultPath),
+    avatarInitials:
+        _currencyAvatarInitials(account, investment) ??
+        _metalAvatarInitials(account, investment),
   );
+}
+
+/// Investissement "Épargne" tenu dans une devise (EUR, USD, GBP... — la
+/// devise est l'identifiant de l'investissement, voir
+/// `identifierOptionsFor`) : l'avatar affiche le code de la devise plutôt
+/// que des initiales dérivées du libellé, pour distinguer au premier coup
+/// d'œil les comptes multi-devises.
+String? _currencyAvatarInitials(
+  InvestmentAccount account,
+  Investment investment,
+) {
+  final effectiveClass = investment.assetClass ?? account.assetClass;
+  if (effectiveClass != AssetClass.epargne) return null;
+  final currency = investment.isin.trim().toUpperCase();
+  return currency.isEmpty ? null : currency;
+}
+
+/// Métal précieux *physique* : chemin absolu de l'image locale du produit,
+/// ou `null` si aucune n'a encore été téléchargée (voir
+/// `price_refresh_service.dart`'s `_ensureMetalImages` et
+/// `metal_image_repository.dart`) ou si l'investissement est un ETC coté
+/// ([account] dans un CTO), qui n'a pas de produit sur le site marchand.
+String? _metalAvatarImagePath(
+  InvestmentAccount account,
+  Investment investment,
+  String vaultPath,
+) {
+  if ((investment.assetClass ?? account.assetClass) !=
+      AssetClass.metauxPrecieux) {
+    return null;
+  }
+  if (isMetalEtc(account)) return null;
+  final fileName = investment.imageFileName;
+  if (fileName == null || fileName.isEmpty) return null;
+  return p.join(
+    vaultPath,
+    'investissements',
+    'metaux',
+    'images',
+    fileName,
+  );
+}
+
+/// Initiales d'avatar affichées à la place de celles dérivées du nom — "ETC"
+/// pour un métal précieux coté détenu dans un CTO (l'image du produit n'a
+/// pas de sens pour un titre financier).
+String? _metalAvatarInitials(
+  InvestmentAccount account,
+  Investment investment,
+) {
+  if ((investment.assetClass ?? account.assetClass) !=
+      AssetClass.metauxPrecieux) {
+    return null;
+  }
+  return isMetalEtc(account) ? 'ETC' : null;
 }
 
 /// Un [DashboardAsset] par investissement valorisé, pour réutiliser
@@ -366,6 +494,18 @@ List<NetWorthPoint> netWorthHistoryFor(
   points.add(
     NetWorthPoint(end, _valuationAt(investments, priceHistories, end)),
   );
+  // Un compte dont la première transaction est aujourd'hui (totalDays == 0)
+  // ne produirait qu'un seul point — le graphique d'évolution exige au
+  // moins deux points (voir `NetWorthChart`) et afficherait sinon "Pas
+  // assez de données sur cette période". On ajoute le point de départ,
+  // au même jour et à la même valeur : la courbe se réduit à une ligne
+  // plate, ce qui reflète honnêtement l'absence d'historique.
+  if (points.length < 2) {
+    points.insert(
+      0,
+      NetWorthPoint(start, _valuationAt(investments, priceHistories, start)),
+    );
+  }
   return points;
 }
 
@@ -405,6 +545,20 @@ double _valuationAt(
     for (final p in history) {
       if (p.date.isAfter(date)) break;
       priceAtDate = p.close;
+    }
+    // Aucun cours à cette date ni avant ? S'il en existe un plus tard (un
+    // produit métal dont le premier relevé quotidien est plus récent que
+    // l'achat, ou un titre acheté avant le début de son historique Yahoo),
+    // on prolonge le plus ancien cours connu vers le passé plutôt que de
+    // retomber sur le coût d'achat : sans ce repli, la courbe sautait d'un
+    // seul coup du montant investi au cours de marché au premier point de
+    // cours, créant une pique verticale trompeuse en bout de graphique (ex :
+    // la classe "Métaux précieux" tant que les relevés n'ont pas accumulé
+    // d'historique). Même convention que `calculateTwr`
+    // (`performance_calculator.dart`), qui valorise déjà la période
+    // antérieure au premier cours au prix de ce premier cours.
+    if (priceAtDate == null && history.isNotEmpty) {
+      priceAtDate = history.first.close;
     }
     total += priceAtDate != null ? quantity * priceAtDate : invested;
   }

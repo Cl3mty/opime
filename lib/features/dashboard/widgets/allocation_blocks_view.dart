@@ -3,22 +3,19 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 /// Une part affichée comme bloc dans [AllocationBlocksView] — assez
 /// générique pour représenter aussi bien une catégorie d'allocation
-/// (avec description, pour la carte Allocation) qu'un compte au sein
-/// d'une catégorie (sans description, pour la Distribution de la page de
-/// détail).
+/// (carte Allocation) qu'un compte au sein d'une catégorie (Distribution
+/// de la page de détail).
 class AllocationSlice {
   final String id;
   final String label;
   final Color color;
   final double percent;
-  final String? description;
 
   const AllocationSlice({
     required this.id,
     required this.label,
     required this.color,
     required this.percent,
-    this.description,
   });
 }
 
@@ -26,8 +23,7 @@ class AllocationSlice {
 /// [CustomPainter] nécessaire ici, les blocs sont des rectangles
 /// axis-aligned) — la plus grosse part occupe un bloc à gauche, les autres
 /// s'empilent dans une colonne à droite. Chaque bloc s'estompe au survol
-/// d'un autre bloc, et affiche sa description en bulle au survol si elle
-/// en a une.
+/// d'un autre bloc, et affiche son titre en bulle au survol.
 class AllocationBlocksView extends StatefulWidget {
   final List<AllocationSlice> slices;
 
@@ -42,8 +38,13 @@ class _AllocationBlocksViewState extends State<AllocationBlocksView> {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...widget.slices]
-      ..sort((a, b) => b.percent.compareTo(a.percent));
+    // Une part à 0 % (catégorie ou compte sans valeur) ne doit pas occuper
+    // de bloc : filtrée ici, la plus grande part restante prend sa place
+    // dans le treemap.
+    final sorted = [
+      for (final slice in widget.slices)
+        if (slice.percent > 0) slice,
+    ]..sort((a, b) => b.percent.compareTo(a.percent));
     if (sorted.isEmpty) return const SizedBox.shrink();
 
     final first = sorted.first;
@@ -137,10 +138,14 @@ class _Block extends StatelessWidget {
         ),
       ),
     );
-    if (slice.description == null) return content;
+    // Toujours un tooltip au survol : le titre et le pourcentage du bloc
+    // survolé doivent s'afficher — comme dans les autres vues d'allocation,
+    // pas de description détaillée.
     return Tooltip(
       tooltip: (context) => TooltipContainer(
-        child: SizedBox(width: 220, child: shadcn.Text(slice.description!)),
+        child: shadcn.Text(
+          '${slice.label} · $percentText %',
+        ).semiBold().small(),
       ),
       child: content,
     );

@@ -134,28 +134,52 @@ class YahooFinanceClient {
       if (results == null || results.isEmpty) return [];
       final result = results.first as Map<String, dynamic>;
 
+      final points = <PricePoint>[];
       final timestamps = (result['timestamp'] as List?)?.cast<num>();
       final quoteList =
           (result['indicators'] as Map<String, dynamic>?)?['quote'] as List?;
       final closes = (quoteList != null && quoteList.isNotEmpty)
           ? (quoteList.first as Map<String, dynamic>)['close'] as List?
           : null;
-      if (timestamps == null || closes == null) return [];
+      if (timestamps != null && closes != null) {
+        for (var i = 0; i < timestamps.length && i < closes.length; i++) {
+          final close = closes[i];
+          if (close == null) continue;
+          final utcDate = DateTime.fromMillisecondsSinceEpoch(
+            timestamps[i].toInt() * 1000,
+            isUtc: true,
+          );
+          points.add(
+            PricePoint(
+              DateTime.utc(utcDate.year, utcDate.month, utcDate.day),
+              (close as num).toDouble(),
+            ),
+          );
+        }
+      }
 
-      final points = <PricePoint>[];
-      for (var i = 0; i < timestamps.length && i < closes.length; i++) {
-        final close = closes[i];
-        if (close == null) continue;
-        final utcDate = DateTime.fromMillisecondsSinceEpoch(
-          timestamps[i].toInt() * 1000,
-          isUtc: true,
-        );
-        points.add(
-          PricePoint(
-            DateTime.utc(utcDate.year, utcDate.month, utcDate.day),
-            (close as num).toDouble(),
-          ),
-        );
+      // Repli pour les fonds/ETC sans historique quotidien : certains (ex :
+      // un ETC or coté à Stuttgart, `FR0013416716.SG`) sont bien résolus
+      // par l'API search mais n'exposent aucun point via l'API chart —
+      // seulement un prix en direct dans `meta.regularMarketPrice`. Sans ce
+      // repli sur ce dernier cours, leur investissement resterait à jamais
+      // "cours introuvable" malgré un prix bien réel sur Yahoo.
+      if (points.isEmpty) {
+        final meta = result['meta'] as Map<String, dynamic>?;
+        final metaTime = (meta?['regularMarketTime'] as num?)?.toInt();
+        final metaPrice = (meta?['regularMarketPrice'] as num?)?.toDouble();
+        if (metaTime != null && metaPrice != null) {
+          final utcDate = DateTime.fromMillisecondsSinceEpoch(
+            metaTime * 1000,
+            isUtc: true,
+          );
+          points.add(
+            PricePoint(
+              DateTime.utc(utcDate.year, utcDate.month, utcDate.day),
+              metaPrice,
+            ),
+          );
+        }
       }
       return points;
     } on SocketException catch (_) {

@@ -5,6 +5,7 @@ import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/profiles/profile_controller.dart';
 import '../dashboard/onboarding_highlight_controller.dart';
 import '../investments/patrimoine_refresh_controller.dart';
+import '../investments/price_sync_status_controller.dart';
 import 'top_bar_actions.dart';
 
 /// Barre persistante au-dessus du contenu de la page en mise en page
@@ -23,6 +24,7 @@ class TopBar extends StatelessWidget {
   final ProfileController profileController;
   final PatrimoineRefreshController patrimoineRefreshController;
   final OnboardingHighlightController onboardingHighlight;
+  final PriceSyncStatusController priceSyncStatus;
   final String currentPageKey;
   final ValueChanged<String> onSelect;
 
@@ -32,6 +34,7 @@ class TopBar extends StatelessWidget {
     required this.profileController,
     required this.patrimoineRefreshController,
     required this.onboardingHighlight,
+    required this.priceSyncStatus,
     required this.currentPageKey,
     required this.onSelect,
   });
@@ -82,6 +85,7 @@ class TopBar extends StatelessWidget {
             profileController: profileController,
             patrimoineRefreshController: patrimoineRefreshController,
             onboardingHighlight: onboardingHighlight,
+            priceSyncStatus: priceSyncStatus,
             currentPageKey: currentPageKey,
           ),
         ],

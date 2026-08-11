@@ -13,7 +13,8 @@ enum _Kind { actifs, passifs }
 /// Carte "Allocation" : répartition du patrimoine par catégorie, avec un
 /// choix Actifs/Passifs et 3 modes d'affichage (blocs, pyramide, anneau) —
 /// mêmes 3 vues que sur les captures Finary fournies. Survoler une
-/// catégorie l'isole (les autres s'estompent) et affiche sa description.
+/// catégorie l'isole (les autres s'estompent) et affiche son nom et son
+/// pourcentage.
 class AllocationCard extends StatefulWidget {
   final List<PatrimoineCategory> actifs;
   final List<PatrimoineCategory> passifs;
@@ -169,7 +170,6 @@ class _AllocationCardState extends State<AllocationCard> {
                 label: c.label,
                 color: c.color,
                 percent: p,
-                description: c.description,
               ),
           ],
         );
@@ -184,7 +184,6 @@ class _AllocationCardState extends State<AllocationCard> {
                 label: c.label,
                 color: c.color,
                 percent: p,
-                description: c.description,
               ),
           ],
           total: total,

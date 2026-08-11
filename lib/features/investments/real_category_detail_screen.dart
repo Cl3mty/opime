@@ -102,10 +102,15 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
       widget.vaultPath,
       accounts,
     );
-    final categories = buildRealCategories(accounts, priceHistories);
+    final categories = buildRealCategories(
+      accounts,
+      priceHistories,
+      widget.vaultPath,
+    );
     final categoriesByAccount = buildRealCategoriesByAccount(
       accounts,
       priceHistories,
+      widget.vaultPath,
     );
     if (!mounted) return;
     PatrimoineCategory? found;
@@ -254,6 +259,11 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
       distributionByAccount: _categoryByAccount,
       onAccountEdit: _openAccountForEdit,
       onAccountDelete: _deleteAccountFromAccordion,
+      // Permet d'importer les logos des banques (avatar cliquable).
+      vaultPath: widget.vaultPath,
+      // Les avatars restent affichés pour toutes les classes d'actif : pour
+      // les métaux précieux, la photo du produit détenu remplace les
+      // initiales (voir `real_patrimoine_adapter.dart`).
     );
   }
 }

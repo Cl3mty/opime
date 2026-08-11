@@ -230,6 +230,7 @@ class _OpimeAppState extends State<OpimeApp> {
           amountVisibilityController: _amountVisibilityController,
           patrimoineRefreshController: _patrimoineRefreshController,
           onboardingHighlightController: _onboardingHighlightController,
+          priceSyncStatusController: _priceSyncStatusController,
           pages: {
             // Les données d'exemple restent réservées au profil "Lou" (démo) :
             // tout autre profil voit son vrai Dashboard, vide au départ, où

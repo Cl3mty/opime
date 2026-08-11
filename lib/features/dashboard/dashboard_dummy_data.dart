@@ -8,6 +8,7 @@ library;
 import 'dart:math' as math;
 import 'package:flutter/widgets.dart' show Color, IconData;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import '../investments/investments_models.dart' show AssetClass;
 
 /// Un point de la courbe de patrimoine net dans le temps.
 class NetWorthPoint {
@@ -150,6 +151,32 @@ class PatrimoineAccount {
   /// ne représente pas un compte (investissement individuel, démo...).
   final bool canDelete;
 
+  /// Chemin absolu d'une image locale affichée à la place des initiales de
+  /// l'avatar — pour les métaux précieux physiques, la photo du produit
+  /// (pièce/lingot) scrapée du site marchand et stockée dans
+  /// `investissements/metaux/images/` (voir `metal_image_repository.dart`).
+  /// `null` (défaut) affiche l'avatar à initiales.
+  final String? avatarImagePath;
+
+  /// Initiales affichées à la place de celles dérivées du nom — "ETC" pour
+  /// un métal précieux coté détenu dans un CTO (pas de produit physique
+  /// associé, donc pas d'image non plus).
+  final String? avatarInitials;
+
+  /// `true` quand un cours a été cherché (Yahoo Finance) et n'a pas été
+  /// trouvé — voir `Investment.priceUnavailable` côté réel, propagé par
+  /// `real_patrimoine_adapter.dart`'s `_buildLeaf`. Le tableau de détail
+  /// affiche alors un avertissement plutôt qu'un simple « — » dans la
+  /// colonne Cours.
+  final bool? priceUnavailable;
+
+  /// Établissement (banque) de ce compte réel — la clé qui regroupe les
+  /// comptes d'une même banque sous un accordéon avec logo sur les pages de
+  /// catégorie (voir `category_detail_screen.dart`'s `_BankAccordionTile`).
+  /// `null` pour les données de démo et pour un compte sans banque
+  /// distincte (son nom tient alors lieu de banque).
+  final String? bankName;
+
   const PatrimoineAccount({
     this.id,
     required this.name,
@@ -162,6 +189,10 @@ class PatrimoineAccount {
     required this.plusValuePercent,
     this.investments = const [],
     this.canDelete = true,
+    this.avatarImagePath,
+    this.avatarInitials,
+    this.priceUnavailable,
+    this.bankName,
   });
 
   String get initials => initialsFor(name);
@@ -204,6 +235,22 @@ class PatrimoineCategory {
     final costBasis = montant - plusValueAbs;
     if (costBasis == 0) return 0;
     return plusValueAbs / costBasis * 100;
+  }
+
+  /// Vrai pour les classes d'actif "unitaires" — une quantité et un cours
+  /// par ligne, où le PRU (Prix de Revient Unitaire, voir
+  /// [PatrimoineAccount.pru]) a un sens : actions & fonds, crypto, private
+  /// equity, métaux précieux et autres. L'immobilier n'a pas de cours de
+  /// marché et l'épargne est tenue en devise sans unité comparable : leur
+  /// tableau de détail n'affiche pas de colonne PRU.
+  bool get showsPruColumn {
+    for (final assetClass in AssetClass.values) {
+      if (assetClass.categoryId == id) {
+        return !const {AssetClass.immobilier, AssetClass.epargne}
+            .contains(assetClass);
+      }
+    }
+    return false;
   }
 }
 

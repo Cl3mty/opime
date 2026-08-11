@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'investments_models.dart';
+import 'metal_mirror_repository.dart';
 
 /// Persiste les comptes de placement réels de l'utilisateur (créés
 /// manuellement, sans API de cours pour l'instant) — même pattern que
@@ -35,6 +36,11 @@ class InvestmentsRepository {
     await _file.writeAsString(
       const JsonEncoder.withIndent('  ').convert(jsonList),
     );
+    // Projette les métaux précieux vers leur dossier miroir daté
+    // (`metaux_precieux/<or|argent>/<date>/`, voir
+    // `metal_mirror_repository.dart`) — à chaque écriture, pour que toute
+    // modification (transaction, document, suppression) soit reflétée.
+    await MetalMirrorRepository(vaultPath).sync(all);
   }
 
   Future<List<InvestmentAccount>> listAll() => _readAll();

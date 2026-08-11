@@ -11,7 +11,7 @@ import 'allocation_hover_tooltip.dart';
 /// minoritaires (crypto, start-up) restent visibles — c'est un visuel
 /// illustratif du niveau de risque, pas un graphique à aire strictement
 /// proportionnelle. Le survol d'une section l'isole (les autres s'estompent)
-/// et affiche sa description.
+/// et affiche son nom et son pourcentage.
 class AllocationPyramidView extends StatefulWidget {
   final List<(PatrimoineCategory, double)> slices;
 

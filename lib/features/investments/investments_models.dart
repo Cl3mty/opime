@@ -152,6 +152,37 @@ List<String>? identifierOptionsFor(
   }
 }
 
+/// À la création d'un investissement, faut-il un champ "libellé" séparé
+/// du champ "identifiant" ? — `false` quand le libellé découle directement
+/// du produit choisi dans la liste déroulante de [identifierOptionsFor] :
+/// c'est le cas des métaux précieux physiques (pièce ou lingot sélectionné,
+/// le libellé est celui du produit, pré-rempli automatiquement) et de
+/// l'épargne (la devise choisie — EUR, USD... — tient lieu de libellé,
+/// pas besoin de le répéter dans un champ séparé). L'immobilier garde
+/// toujours son libellé (nom du bien), comme toutes les autres classes.
+bool requiresLabelFieldFor(
+  AssetClass assetClass, {
+  AccountEnvelope? accountEnvelope,
+}) {
+  if (assetClass == AssetClass.immobilier) return true;
+  if (identifierOptionsFor(assetClass, accountEnvelope: accountEnvelope) !=
+      null) {
+    return false;
+  }
+  return true;
+}
+
+/// Une valeur a-t-elle besoin d'une précision au-delà du centime à la
+/// persistance sur disque ? Les cryptomonnaies (quantités et cours ont un
+/// sens en dessous du centime) et les taux de change d'une épargne en
+/// devise étrangère (1 JPY ≈ 0,006 € — un arrondi à 2 décimales le
+/// fausserait d'un ordre de grandeur) échappent à [round2] ; toutes les
+/// autres classes se satisfont d'une précision au centime. Voir [round2] et
+/// ses appelants (`InvestmentAccount.toJson`, `price_refresh_service`'s
+/// `_resolveInvestmentPrice`).
+bool requiresFullPricePrecision(AssetClass assetClass) =>
+    assetClass == AssetClass.crypto || assetClass == AssetClass.epargne;
+
 /// Une transaction d'achat ou de vente sur un [Investment].
 class Transaction {
   final String id;
@@ -178,8 +209,9 @@ class Transaction {
     unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0,
   );
 
-  /// [round] à `false` pour les cryptomonnaies, dont la quantité/le cours
-  /// ont un sens en dessous du centime — voir [round2] et
+  /// [round] à `false` pour les cryptomonnaies (quantité/le cours en
+  /// dessous du centime) et les épargnes en devise étrangère (taux de
+  /// change — voir [requiresFullPricePrecision]) — voir [round2] et
   /// `InvestmentAccount.toJson`, seul appelant qui connaît la classe
   /// d'actif effective de l'investissement porteur.
   Map<String, dynamic> toJson({bool round = true}) => {
@@ -208,6 +240,25 @@ class Investment {
   final double? lastPrice;
   final DateTime? lastPriceDate;
 
+  /// Nom du fichier local de la photo du produit (pièce/lingot) scrapée du
+  /// catalogue achat-or-et-argent.fr et téléchargée dans
+  /// `investissements/metaux/images/` — voir `metal_image_repository.dart`
+  /// et `price_refresh_service.dart`'s `_ensureMetalImages`. `null` tant
+  /// qu'aucune image n'a été téléchargée (ou pour un ETC coté, voir
+  /// [identifierOptionsFor]) : l'avatar affiche alors des initiales.
+  final String? imageFileName;
+
+  /// `true` quand un cours a été *cherché* sur Yahoo Finance et n'a pas été
+  /// trouvé (identifiant inconnu de Yahoo, actif non coté, pas de données) —
+  /// sans qu'il s'agisse d'une panne réseau, qui, elle, laisse le dernier
+  /// cours connu tel quel (voir `price_refresh_service.dart`'s
+  /// `_resolveInvestmentPrice`). Distinct d'un [lastPrice] simplement absent
+  /// (jamais cherché, ou mise à jour jamais tentée) : ce drapeau permet
+  /// d'afficher clairement "cours introuvable" plutôt que de retomber
+  /// silencieusement sur le montant investi — utile notamment pour un ETC
+  /// or/argent (voir [isMetalEtc]) dont l'ISIN serait mal saisi.
+  final bool? priceUnavailable;
+
   /// Classe d'actif spécifique à cet investissement, différente de celle
   /// du compte qui le porte — `null` dans l'immense majorité des cas
   /// (hérite alors de [InvestmentAccount.assetClass] via
@@ -227,6 +278,8 @@ class Investment {
     this.symbol,
     this.lastPrice,
     this.lastPriceDate,
+    this.imageFileName,
+    this.priceUnavailable,
     this.assetClass,
     this.realEstateType,
     this.documents = const [],
@@ -237,6 +290,8 @@ class Investment {
     String? symbol,
     double? lastPrice,
     DateTime? lastPriceDate,
+    String? imageFileName,
+    bool? priceUnavailable,
     AssetClass? assetClass,
     RealEstateType? realEstateType,
     List<VaultDocument>? documents,
@@ -248,6 +303,8 @@ class Investment {
     symbol: symbol ?? this.symbol,
     lastPrice: lastPrice ?? this.lastPrice,
     lastPriceDate: lastPriceDate ?? this.lastPriceDate,
+    imageFileName: imageFileName ?? this.imageFileName,
+    priceUnavailable: priceUnavailable ?? this.priceUnavailable,
     assetClass: assetClass ?? this.assetClass,
     realEstateType: realEstateType ?? this.realEstateType,
     documents: documents ?? this.documents,
@@ -257,6 +314,12 @@ class Investment {
     0.0,
     (sum, t) => sum + (t.isBuy ? t.quantity : -t.quantity),
   );
+
+  /// Transactions du plus récent au plus ancien, quel que soit l'ordre de
+  /// saisie — c'est l'ordre d'affichage utilisé partout (liste des
+  /// transactions, choix "rattacher à quelle transaction ?"...).
+  List<Transaction> get transactionsByDateDesc =>
+      [...transactions]..sort((a, b) => b.date.compareTo(a.date));
 
   /// Coût net de la position actuellement détenue (achats − ventes).
   double get investedAmount => transactions.fold(
@@ -289,6 +352,8 @@ class Investment {
     lastPriceDate: json['lastPriceDate'] != null
         ? DateTime.parse(json['lastPriceDate'] as String)
         : null,
+    imageFileName: json['imageFileName'] as String?,
+    priceUnavailable: json['priceUnavailable'] as bool?,
     assetClass: json['assetClass'] != null
         ? AssetClass.fromName(json['assetClass'] as String)
         : null,
@@ -298,7 +363,8 @@ class Investment {
         .toList(),
   );
 
-  /// [round] à `false` pour les cryptomonnaies — voir [Transaction.toJson].
+  /// [round] à `false` pour les cryptomonnaies et les épargnes en devise
+  /// étrangère — voir [requiresFullPricePrecision] et [round2].
   Map<String, dynamic> toJson({bool round = true}) => {
     'id': id,
     'isin': isin,
@@ -308,6 +374,8 @@ class Investment {
     if (lastPrice != null) 'lastPrice': round ? round2(lastPrice!) : lastPrice,
     if (lastPriceDate != null)
       'lastPriceDate': lastPriceDate!.toIso8601String(),
+    if (imageFileName != null) 'imageFileName': imageFileName,
+    if (priceUnavailable != null) 'priceUnavailable': priceUnavailable,
     if (assetClass != null) 'assetClass': assetClass!.name,
     if (realEstateType != null) 'realEstateType': realEstateType!.name,
     if (documents.isNotEmpty)
@@ -529,6 +597,19 @@ List<AccountEnvelope> accountEnvelopesFor(AssetClass assetClass) {
   }
 }
 
+/// Enveloppe d'épargne unique par banque — donc réutilisée quand elle est
+/// recréée (voir `_selectEpargneEnvelope` dans
+/// `complete_patrimoine_dialog.dart`) : un produit d'épargne réglementée
+/// (Livret A, LDDS, LEP, PEL) ne peut être ouvert qu'une seule fois par
+/// établissement. L'assurance vie, le contrat de capitalisation et le
+/// compte "autre" peuvent au contraire être ouverts plusieurs fois, y
+/// compris dans une même banque (un contrat par assureur, une poche par
+/// projet...) : un nouveau compte est alors créé à chaque fois.
+bool epargneEnvelopeIsUniquePerBank(AccountEnvelope envelope) =>
+    envelope != AccountEnvelope.assuranceVie &&
+    envelope != AccountEnvelope.contratCapitalisation &&
+    envelope != AccountEnvelope.autre;
+
 /// Un CTO "Actions & Fonds" peut aussi loger un ETC (Exchange-Traded
 /// Commodity) sur métaux précieux : plutôt que d'imposer un compte dédié,
 /// le flux "Compléter mon patrimoine" propose ces comptes-titres existants
@@ -544,6 +625,50 @@ bool accountAcceptsCrossClassInvestment(
       account.envelope == AccountEnvelope.cto;
 }
 
+/// Un métal précieux *coté* plutôt que physique : un ETC (Exchange Traded
+/// Commodity) or/argent est logé dans un CTO ([AccountEnvelope.cto]) comme
+/// n'importe quel titre, et son cours se résout en Bourse sur Yahoo Finance
+/// (voir `price_refresh_service.dart`) — pas via les cours au gramme du
+/// site marchand, réservés aux pièces/lingots physiques (pièce ou lingot
+/// réellement détenu, coffre ou autre, identifié par son nom de produit).
+bool isMetalEtc(InvestmentAccount account) =>
+    account.envelope == AccountEnvelope.cto;
+
+/// Un établissement (banque, broker...) a-t-il un sens pour un compte de
+/// [assetClass] ? — l'identité qui groupe les comptes en accordéons "banque
+/// → comptes" (`category_detail_screen.dart`) et sous laquelle le logo est
+/// importé (`bank_logo_repository.dart`). L'immobilier (bien détenu en
+/// direct), la crypto (portefeuille auto-détenu) et les métaux physiques
+/// (pièce ou lingot en coffre) n'ont pas de banque ; tout le reste
+/// (compte-titres, assurance-vie, épargne...) est bien détenu chez un
+/// établissement. Pour les métaux, l'enveloppe tranche : seule une
+/// détention en CTO ([AccountEnvelope.cto], un ETC coté) est bancaire.
+bool assetClassSupportsBankName(
+  AssetClass assetClass, {
+  AccountEnvelope? envelope,
+}) {
+  switch (assetClass) {
+    case AssetClass.immobilier:
+    case AssetClass.crypto:
+      return false;
+    case AssetClass.metauxPrecieux:
+      return envelope == AccountEnvelope.cto;
+    case AssetClass.actionsEtFonds:
+    case AssetClass.epargne:
+    case AssetClass.privateEquity:
+    case AssetClass.autres:
+      return true;
+  }
+}
+
+/// Comme [assetClassSupportsBankName], pour un [InvestmentAccount] réel —
+/// l'enveloppe du compte tranche pour les métaux précieux.
+bool supportsBankName(InvestmentAccount account) =>
+    assetClassSupportsBankName(
+      account.assetClass,
+      envelope: account.envelope,
+    );
+
 /// Un compte de placement créé par l'utilisateur (PEA, CTO...), contenant
 /// ses investissements identifiés par ISIN.
 class InvestmentAccount {
@@ -551,14 +676,40 @@ class InvestmentAccount {
   final AssetClass assetClass;
   final AccountEnvelope? envelope;
   final String name;
+
+  /// Établissement qui détient le compte (ex : "Boursorama") — la clé de
+  /// groupement des comptes en accordéons "banque → comptes" sur les pages
+  /// de catégorie (voir `category_detail_screen.dart`) et l'identité du
+  /// logo importé par l'utilisateur (voir `bank_logo_repository.dart`).
+  /// `null` (défaut) pour un compte dont le nom tient lieu de banque (une
+  /// épargne créée avant l'introduction du champ, ex : "Livret A"), ou qui
+  /// n'a simplement pas d'établissement renseigné.
+  final String? bankName;
+
+  /// Description facultative saisie par l'utilisateur (ex : "Épargne
+  /// vacances"), affichée en seconde ligne sous le type du compte sur les
+  /// accordéons de catégorie (voir `real_patrimoine_adapter.dart`) — saisie
+  /// à la création d'un compte d'épargne (étape "Quel compte ?", voir
+  /// `complete_patrimoine_dialog.dart`), éditable ensuite.
+  final String? description;
+
   final List<Investment> investments;
   final List<VaultDocument> documents;
+
+  /// Valeur sentinelle privée de [InvestmentAccount.copyWith] : distingue
+  /// "paramètre non fourni" (conserve la valeur existante) de "`null`
+  /// explicite" (efface le champ) — `copyWith` ne pouvant pas exprimer
+  /// l'effacement d'un champ nullable avec le pattern `x ?? this.x`.
+  static const Object _unsetBankName = Object();
+  static const Object _unsetDescription = Object();
 
   InvestmentAccount({
     String? id,
     required this.assetClass,
     this.envelope,
     required this.name,
+    this.bankName,
+    this.description,
     required this.investments,
     this.documents = const [],
   }) : id = id ?? generateInvestmentId('account');
@@ -568,11 +719,19 @@ class InvestmentAccount {
     AccountEnvelope? envelope,
     List<Investment>? investments,
     List<VaultDocument>? documents,
+    Object? bankName = _unsetBankName,
+    Object? description = _unsetDescription,
   }) => InvestmentAccount(
     id: id,
     assetClass: assetClass,
     envelope: envelope ?? this.envelope,
     name: name ?? this.name,
+    bankName: identical(bankName, _unsetBankName)
+        ? this.bankName
+        : bankName as String?,
+    description: identical(description, _unsetDescription)
+        ? this.description
+        : description as String?,
     investments: investments ?? this.investments,
     documents: documents ?? this.documents,
   );
@@ -588,33 +747,47 @@ class InvestmentAccount {
     (sum, i) => sum + (i.marketValue ?? i.investedAmount),
   );
 
-  factory InvestmentAccount.fromJson(Map<String, dynamic> json) =>
-      InvestmentAccount(
-        id: json['id'] as String? ?? generateInvestmentId('account'),
-        assetClass: AssetClass.fromName(json['assetClass'] as String? ?? ''),
-        envelope: json['envelope'] != null
-            ? AccountEnvelope.fromName(json['envelope'] as String)
-            : null,
-        name: json['name'] as String? ?? '',
-        investments: (json['investments'] as List? ?? [])
-            .map((e) => Investment.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        documents: (json['documents'] as List? ?? [])
-            .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+  factory InvestmentAccount.fromJson(Map<String, dynamic> json) {
+    // Champ banque normalisé : une chaîne vide (effacement saisi en tant
+    // que tel) vaut `null`.
+    final rawBankName = json['bankName'] as String?;
+    final bankName = (rawBankName == null || rawBankName.trim().isEmpty)
+        ? null
+        : rawBankName.trim();
+    return InvestmentAccount(
+      id: json['id'] as String? ?? generateInvestmentId('account'),
+      assetClass: AssetClass.fromName(json['assetClass'] as String? ?? ''),
+      envelope: json['envelope'] != null
+          ? AccountEnvelope.fromName(json['envelope'] as String)
+          : null,
+      name: json['name'] as String? ?? '',
+      bankName: bankName,
+      description: json['description'] as String?,
+      investments: (json['investments'] as List? ?? [])
+          .map((e) => Investment.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      documents: (json['documents'] as List? ?? [])
+          .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'assetClass': assetClass.name,
     if (envelope != null) 'envelope': envelope!.name,
     'name': name,
+    // `fromJson` normalise déjà une chaîne vide en `null` : seul le test
+    // de null suffit ici (pas de risque de persister une chaîne vide).
+    if (bankName != null) 'bankName': bankName,
+    if (description != null) 'description': description,
     // Un investissement crypto (le sien ou, à défaut, celui hérité de ce
-    // compte) garde sa précision d'origine — quantité/cours en dessous du
-    // centime — voir [round2].
+    // compte) ou une épargne en devise étrangère gardent leur précision
+    // d'origine — quantité/cours en dessous du centime, taux de change —
+    // voir [requiresFullPricePrecision].
     'investments': investments.map((i) {
       final effectiveClass = i.assetClass ?? assetClass;
-      return i.toJson(round: effectiveClass != AssetClass.crypto);
+      return i.toJson(round: !requiresFullPricePrecision(effectiveClass));
     }).toList(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),

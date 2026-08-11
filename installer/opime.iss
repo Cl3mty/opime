@@ -4,7 +4,7 @@
 #define MyAppName "Opime"
 #define MyAppVersion "0.6.0"
 #define MyAppPublisher "Opime"
-#define MyAppExeName "opime.exe"
+#define MyAppExeName "Opime.exe"
 
 [Setup]
 

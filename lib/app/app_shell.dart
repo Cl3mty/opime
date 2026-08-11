@@ -12,6 +12,7 @@ import '../features/navigation/top_bar.dart';
 import '../features/navigation/top_bar_actions.dart';
 import '../features/dashboard/onboarding_highlight_controller.dart';
 import '../features/investments/patrimoine_refresh_controller.dart';
+import '../features/investments/price_sync_status_controller.dart';
 import 'theme_controller.dart';
 
 const _breakpoint = 800.0;
@@ -53,6 +54,7 @@ class AppShell extends StatefulWidget {
   final AmountVisibilityController amountVisibilityController;
   final PatrimoineRefreshController patrimoineRefreshController;
   final OnboardingHighlightController onboardingHighlightController;
+  final PriceSyncStatusController priceSyncStatusController;
   final Map<String, WidgetBuilder> pages;
 
   const AppShell({
@@ -63,6 +65,7 @@ class AppShell extends StatefulWidget {
     required this.amountVisibilityController,
     required this.patrimoineRefreshController,
     required this.onboardingHighlightController,
+    required this.priceSyncStatusController,
     required this.pages,
   });
 
@@ -240,6 +243,7 @@ class _AppShellState extends State<AppShell> {
                             widget.patrimoineRefreshController,
                         onboardingHighlight:
                             widget.onboardingHighlightController,
+                        priceSyncStatus: widget.priceSyncStatusController,
                         currentPageKey: _selectedKey,
                         onSelect: _select,
                       ),
@@ -273,6 +277,7 @@ class _AppShellState extends State<AppShell> {
               profileController: widget.profileController,
               patrimoineRefreshController: widget.patrimoineRefreshController,
               onboardingHighlight: widget.onboardingHighlightController,
+              priceSyncStatus: widget.priceSyncStatusController,
               compact: true,
               currentPageKey: _selectedKey,
             ),

@@ -1,4 +1,5 @@
 import 'dart:async' show TimeoutException;
+import 'dart:convert';
 import 'dart:io' show SocketException;
 import 'package:http/http.dart' as http;
 
@@ -47,6 +48,47 @@ const kKnownSilverProducts = [
   '5 Francs Semeuse 1959-1969',
 ];
 
+/// Métal précieux côtés par achat-or-et-argent.fr — chaque métal a sa page
+/// catalogue dédiée ([MetalPriceClient]) et son propre fichier de cache
+/// journalier (`metal_price_repository.dart`).
+enum MetalKind {
+  or('or'),
+  argent('argent');
+
+  const MetalKind(this.fileName);
+
+  /// Nom de fichier (sans extension) du cache local de ce métal.
+  final String fileName;
+}
+
+/// Métal d'un texte identifiant un produit physique : les pièces/lingots
+/// d'argent sont explicitement listés dans [kKnownSilverProducts], tout
+/// texte contenant "argent"/"silver" est présumé argent, tout le reste est
+/// or (le cas le plus courant).
+MetalKind metalKindFor(String text) {
+  if (kKnownSilverProducts.contains(text)) return MetalKind.argent;
+  if (kKnownGoldProducts.contains(text)) return MetalKind.or;
+  final lower = text.toLowerCase();
+  return lower.contains('argent') || lower.contains('silver')
+      ? MetalKind.argent
+      : MetalKind.or;
+}
+
+/// Métal d'un investissement "Métaux précieux", à partir de son identifiant
+/// et de son libellé — si l'un des deux est explicitement de l'argent,
+/// c'est de l'argent (même logique que l'ancien `_isSilver` du service de
+/// rafraîchissement des cours).
+MetalKind metalKindForInvestment({
+  required String isin,
+  required String label,
+}) {
+  if (metalKindFor(label) == MetalKind.argent ||
+      metalKindFor(isin) == MetalKind.argent) {
+    return MetalKind.argent;
+  }
+  return MetalKind.or;
+}
+
 /// Cours d'or/argent extrait d'une page achat-or-et-argent.fr : le cours au
 /// gramme (pour un identifiant libre/ancien, voir [pricePerGram]) et le
 /// prix de rachat ("Vous vendez") de chaque pièce/lingot coté
@@ -68,40 +110,114 @@ class MetalPriceSnapshot {
   });
 }
 
-/// Client pour le cours de l'or et de l'argent physiques, extrait de la
-/// page publique achat-or-et-argent.fr — il n'existe pas d'API de cours
-/// pour ces métaux comme pour les actions/cryptos (voir
-/// `YahooFinanceClient`), donc pas de ticker à résoudre : une page dédiée
-/// par métal, dont le cours au gramme apparaît dans un span de classe
-/// `js-cours-gramme-value`, et le tableau détaillé par pièce/lingot dans
-/// des lignes `<tr class="cours-cpr-table-row">` (colonne "Vous vendez",
-/// classe `cours-cpr-action-btn--sell`) — stable sur les deux pages.
+/// Image produit d'une pièce/lingot (face "avers", voir [image1]) et
+/// identifiants du produit, extraits du catalogue `workerApi` de
+/// achat-or-et-argent.fr — voir [MetalPriceClient.fetchProductImages].
+/// Sert à afficher, dans les accordéons de la page "Métaux précieux", la
+/// photo du produit détenu à la place de l'avatar à initiales (voir
+/// `real_patrimoine_adapter.dart` et `metal_image_repository.dart`).
+class MetalProductImage {
+  final String id;
+  final String label;
+  final String imageUrl;
+
+  const MetalProductImage({
+    required this.id,
+    required this.label,
+    required this.imageUrl,
+  });
+
+  /// Décode la réponse JSON du catalogue (voir [MetalPriceClient
+  /// .fetchProductImages]). Retourne `null` si le JSON est illisible ou
+  /// d'une forme inattendue (même philosophie défensive que
+  /// [MetalPriceClient.parseSnapshot]) : l'app retombe alors sur l'avatar à
+  /// initiales, jamais d'erreur affichée.
+  static List<MetalProductImage>? parseCatalog(String jsonBody) {
+    try {
+      final decoded = jsonDecode(jsonBody);
+      if (decoded is! Map) return null;
+      final products = decoded['products'] as List? ?? const [];
+      final result = <MetalProductImage>[];
+      for (final product in products) {
+        if (product is! Map) continue;
+        final label = product['label'] as String?;
+        final id = product['id'];
+        final imageUrl = product['image1'] as String?;
+        if (label == null ||
+            id == null ||
+            imageUrl == null ||
+            imageUrl.isEmpty) {
+          continue;
+        }
+        result.add(
+          MetalProductImage(
+            id: id.toString(),
+            label: label,
+            imageUrl: imageUrl,
+          ),
+        );
+      }
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+/// Client pour le cours de l'or et de l'argent physiques, extrait des pages
+/// publiques achat-or-et-argent.fr — il n'existe pas d'API de cours pour ces
+/// métaux comme pour les actions/cryptos (voir `YahooFinanceClient`), donc
+/// pas de ticker à résoudre : une page catalogue par métal
+/// (`/or/1/` pour l'or, `/argent/2/` pour l'argent), dont les anciennes
+/// pages de cours dédiées (`/or/cours-de-l-or`, cours au gramme dans un span
+/// `js-cours-gramme-value` + tableau `cours-cpr-table-row`) ont disparu du
+/// site.
+///
+/// Sur ces nouvelles pages, deux sources sont utilisées :
+///  * le cours du métal : carte en-tête de la page (attribut `title`,
+///    ex. `Or 122 385.03 €/kg`) — on ne retient que la carte du métal
+///    demandé, en €/kg (converti en €/gramme, l'unité utilisée partout
+///    ailleurs dans l'app) ;
+///  * le prix de rachat de chaque produit : un tableau embarqué en JSON sous
+///    la forme `products: [[{id, name, price, sellPrice}, ...]],` — voir
+///    [MetalPriceSnapshot.productPrices], dont `sellPrice` est la valeur de
+///    revente ("Vous vendez").
 ///
 /// Même philosophie défensive que [YahooFinanceClient] : un échec (réseau,
 /// changement de mise en page du site) retourne simplement `null` plutôt
 /// que de propager une exception, pour ne jamais bloquer l'UI — l'app
 /// retombe alors sur la dernière valorisation connue (ou le prix d'achat).
 class MetalPriceClient {
-  static final _gramValuePattern = RegExp(
-    r'''class="[^"]*\bjs-cours-gramme-value\b[^"]*"[^>]*>\s*([^<]+?)\s*€''',
+  /// Carte en-tête du cours d'un métal : `title="Or 122 385.03 €/kg"` /
+  /// `title="Argent 1 812.498 €/kg"`. Chaque page affiche aussi les cartes
+  /// des autres métaux (onces d'or, platine, palladium...) mais leur titre
+  /// commence par un autre nom ("Once d'or", "Platine"...), ce qui les
+  /// exclut — d'où un motif distinct par métal ([MetalKind]).
+  static final _orHeaderPattern = RegExp(
+    r'\btitle="Or\s+([\d\s.,]+?)\s+€/(kg|g)\b',
   );
-  static final _rowPattern = RegExp(
-    r'<tr\b(?=[^>]*\bcours-cpr-table-row\b)[^>]*>(.*?)</tr>',
+  static final _argentHeaderPattern = RegExp(
+    r'\btitle="Argent\s+([\d\s.,]+?)\s+€/(kg|g)\b',
+  );
+
+  /// Tableau des produits et de leurs prix, embarqué en JSON sur les pages
+  /// catalogue (une seule ligne, format `products: [[{...},...]],`) — le
+  /// prix de rachat demandé est `sellPrice`.
+  static final _productsJsonPattern = RegExp(
+    r'products:\s*(\[\[.*?\]\])\s*,',
     dotAll: true,
   );
-  static final _nameInRowPattern = RegExp(
-    r'<h4\b[^>]*>\s*<a\b[^>]*\btitle="([^"]+)"',
-  );
-  static final _sellPriceInRowPattern = RegExp(
-    r'cours-cpr-action-btn--sell.*?cours-cpr-action-btn__price[^>]*>\s*([^<]+?)\s*€',
-    dotAll: true,
-  );
+
+  /// Endpoint `workerApi` du site, utilisé pour les images produits
+  /// ([fetchProductImages]) — le cours au gramme et les prix de rachat,
+  /// eux, viennent du HTML des pages catalogue ([fetchSnapshot]).
+  static const _workerApiUrl = 'https://www.achat-or-et-argent.fr/workerApi';
 
   Future<MetalPriceSnapshot?> fetchGoldSnapshot({
     void Function()? onNetworkError,
     void Function()? onNetworkSuccess,
-  }) => _fetchSnapshot(
-    'https://www.achat-or-et-argent.fr/or/cours-de-l-or',
+  }) => fetchSnapshot(
+    MetalKind.or,
     onNetworkError: onNetworkError,
     onNetworkSuccess: onNetworkSuccess,
   );
@@ -109,14 +225,32 @@ class MetalPriceClient {
   Future<MetalPriceSnapshot?> fetchSilverSnapshot({
     void Function()? onNetworkError,
     void Function()? onNetworkSuccess,
-  }) => _fetchSnapshot(
-    'https://www.achat-or-et-argent.fr/argent/cours-de-l-argent',
+  }) => fetchSnapshot(
+    MetalKind.argent,
     onNetworkError: onNetworkError,
     onNetworkSuccess: onNetworkSuccess,
   );
 
+  Future<MetalPriceSnapshot?> fetchSnapshot(
+    MetalKind metal, {
+    void Function()? onNetworkError,
+    void Function()? onNetworkSuccess,
+  }) {
+    final url = switch (metal) {
+      MetalKind.or => 'https://www.achat-or-et-argent.fr/or/1/',
+      MetalKind.argent => 'https://www.achat-or-et-argent.fr/argent/2/',
+    };
+    return _fetchSnapshot(
+      url,
+      metal,
+      onNetworkError: onNetworkError,
+      onNetworkSuccess: onNetworkSuccess,
+    );
+  }
+
   Future<MetalPriceSnapshot?> _fetchSnapshot(
-    String url, {
+    String url,
+    MetalKind metal, {
     void Function()? onNetworkError,
     void Function()? onNetworkSuccess,
   }) async {
@@ -134,7 +268,7 @@ class MetalPriceClient {
       onNetworkSuccess?.call();
       if (response.statusCode != 200) return null;
 
-      return parseSnapshot(response.body);
+      return parseSnapshot(response.body, metal);
     } on SocketException catch (_) {
       onNetworkError?.call();
       return null;
@@ -149,23 +283,89 @@ class MetalPriceClient {
     }
   }
 
-  /// Extrait un instantané depuis le HTML des pages de cours. Les classes et
-  /// attributs peuvent être réordonnés par le site ; les expressions sont
-  /// donc volontairement moins rigides que sa mise en page actuelle.
-  static MetalPriceSnapshot? parseSnapshot(String html) {
-    final gramMatch = _gramValuePattern.firstMatch(html);
-    if (gramMatch == null) return null;
-    final pricePerGram = _parseNumber(gramMatch.group(1)!);
-    if (pricePerGram == null) return null;
+  /// Catalogue des images produits (une photo par pièce/lingot) extrait de
+  /// l'endpoint `workerApi` du site (`methode=getProducts`, `type=1` pour
+  /// l'or, `type=2` pour l'argent) — les images ne sont pas embarquées sur
+  /// les pages catalogue utilisées pour les cours (voir [fetchSnapshot]),
+  /// il faut cet appel séparé pour récupérer [MetalProductImage.image1].
+  /// `null` en cas d'échec réseau ou de réponse inattendue — l'app affiche
+  /// alors l'avatar à initiales, sans jamais bloquer ni lever d'erreur.
+  Future<List<MetalProductImage>?> fetchProductImages(
+    MetalKind metal, {
+    void Function()? onNetworkError,
+    void Function()? onNetworkSuccess,
+  }) async {
+    final type = metal == MetalKind.or ? '1' : '2';
+    try {
+      final response = await http.post(
+        Uri.parse(_workerApiUrl),
+        headers: const {
+          'User-Agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+              'AppleWebKit/605.1.15',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'methode=getProducts&type=$type&limit=250',
+      );
+      onNetworkSuccess?.call();
+      if (response.statusCode != 200) return null;
+      return MetalProductImage.parseCatalog(response.body);
+    } on SocketException catch (_) {
+      onNetworkError?.call();
+      return null;
+    } on http.ClientException catch (_) {
+      onNetworkError?.call();
+      return null;
+    } on TimeoutException catch (_) {
+      onNetworkError?.call();
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Extrait un instantané depuis le HTML des pages catalogue. Les classes
+  /// et attributs peuvent être réordonnés par le site ; les expressions
+  /// sont donc volontairement moins rigides que sa mise en page actuelle.
+  static MetalPriceSnapshot? parseSnapshot(String html, MetalKind metal) {
+    final headerPattern = metal == MetalKind.or
+        ? _orHeaderPattern
+        : _argentHeaderPattern;
+    final headerMatch = headerPattern.firstMatch(html);
+    if (headerMatch == null) return null;
+    final rawPrice = _parseNumber(headerMatch.group(1)!);
+    if (rawPrice == null) return null;
+    final pricePerGram = headerMatch.group(2) == 'kg'
+        ? rawPrice / 1000
+        : rawPrice;
 
     final productPrices = <String, double>{};
-    for (final rowMatch in _rowPattern.allMatches(html)) {
-      final row = rowMatch.group(1)!;
-      final nameMatch = _nameInRowPattern.firstMatch(row);
-      final priceMatch = _sellPriceInRowPattern.firstMatch(row);
-      if (nameMatch == null || priceMatch == null) continue;
-      final price = _parseNumber(priceMatch.group(1)!);
-      if (price != null) productPrices[nameMatch.group(1)!] = price;
+    final jsonMatch = _productsJsonPattern.firstMatch(html);
+    if (jsonMatch != null) {
+      try {
+        final decoded = jsonDecode(jsonMatch.group(1)!) as List;
+        final products = decoded.isEmpty
+            ? const <dynamic>[]
+            : decoded.first is List
+            ? decoded.first as List
+            : decoded;
+        for (final product in products) {
+          if (product is! Map) continue;
+          final name = product['name'] as String?;
+          final id = product['id'] as int?;
+          final sellPrice = (product['sellPrice'] as num?)?.toDouble();
+          // Pas encore de marché de revente (produit neuf tout juste sorti,
+          // ou collection limitée) : `sellPrice` vaut 0, on n'en tient pas
+          // compte — la valorisation retombera sur le cours au gramme.
+          if (name == null || sellPrice == null || sellPrice <= 0) continue;
+          productPrices[name] = sellPrice;
+          // Identifiant alternatif, au cas où le nom affiché changerait
+          // entre le moment du choix et celui de la valorisation.
+          if (id != null) productPrices['id:$id'] = sellPrice;
+        }
+      } catch (_) {
+        // JSON illisible : on garde au moins le cours au gramme.
+      }
     }
 
     return MetalPriceSnapshot(

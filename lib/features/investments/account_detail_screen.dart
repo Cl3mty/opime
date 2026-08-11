@@ -30,9 +30,9 @@ class AccountDetailView extends StatefulWidget {
   final ValueChanged<String> onOpenInvestment;
   final VoidCallback onChanged;
 
-  /// Ouvre directement le formulaire d'édition du compte (nom, enveloppe)
-  /// plutôt que sa vue normale — utilisé par le menu "⋮ Modifier le
-  /// compte" de l'accordéon d'une catégorie (voir
+  /// Ouvre directement le formulaire d'édition du compte (nom, banque,
+  /// enveloppe) plutôt que sa vue normale — utilisé par le menu "⋮ Modifier
+  /// le compte" de l'accordéon d'une catégorie (voir
   /// `RealCategoryDetailScreen`'s `_openAccountForEdit`), pour éviter à
   /// l'utilisateur de cliquer une deuxième fois une fois le compte ouvert.
   final bool startInEditMode;
@@ -61,6 +61,8 @@ class _AccountDetailViewState extends State<AccountDetailView> {
 
   bool _editingAccount = false;
   final _editNameController = TextEditingController();
+  final _editBankController = TextEditingController();
+  final _editDescriptionController = TextEditingController();
   AccountEnvelope? _editEnvelope;
 
   @override
@@ -83,6 +85,8 @@ class _AccountDetailViewState extends State<AccountDetailView> {
     _isinController.dispose();
     _labelController.dispose();
     _editNameController.dispose();
+    _editBankController.dispose();
+    _editDescriptionController.dispose();
     super.dispose();
   }
 
@@ -131,6 +135,8 @@ class _AccountDetailViewState extends State<AccountDetailView> {
     setState(() {
       _editingAccount = true;
       _editNameController.text = widget.account.name;
+      _editBankController.text = widget.account.bankName ?? '';
+      _editDescriptionController.text = widget.account.description ?? '';
       _editEnvelope =
           widget.account.envelope ??
           accountEnvelopesFor(widget.account.assetClass).first;
@@ -138,11 +144,24 @@ class _AccountDetailViewState extends State<AccountDetailView> {
   }
 
   Future<void> _commitEditAccount() async {
-    final name = _editNameController.text.trim();
+    // Pour l'épargne, le compte n'a pas de "Nom du compte" éditable : son
+    // identité est le type (enveloppe) + une description facultative. Le
+    // nom suit alors le champ banque, comme à la création (banque et nom
+    // sont identiques pour un compte d'épargne).
+    final isEpargne = widget.account.assetClass == AssetClass.epargne;
+    final bank = _editBankController.text.trim();
+    final name = isEpargne
+        ? (bank.isEmpty ? widget.account.name : bank)
+        : _editNameController.text.trim();
     if (name.isEmpty) return;
+    // Une banque ou une description effacées (champ vidé) valent `null` —
+    // comme à la lecture du disque (`InvestmentAccount.fromJson`).
+    final description = _editDescriptionController.text.trim();
     final updated = widget.account.copyWith(
       name: name,
       envelope: _editEnvelope,
+      bankName: bank.isEmpty ? null : bank,
+      description: description.isEmpty ? null : description,
     );
     await _repo.saveAccount(updated);
     setState(() => _editingAccount = false);
@@ -272,6 +291,18 @@ class _AccountDetailViewState extends State<AccountDetailView> {
             _EditAccountForm(
               assetClass: account.assetClass,
               nameController: _editNameController,
+              // L'épargne n'a pas de "Nom du compte" : son identité est le
+              // type + une description facultative (le nom suit la banque).
+              showNameField: account.assetClass != AssetClass.epargne,
+              bankNameController: _editBankController,
+              // Un compte sans établissement possible (immobilier, crypto,
+              // métaux physiques) n'a pas de champ banque à éditer — voir
+              // `supportsBankName`.
+              showBankField: supportsBankName(account),
+              // La description ne se saisit que pour l'épargne, où elle
+              // s'affiche sous le type du compte dans les accordéons.
+              descriptionController: _editDescriptionController,
+              showDescriptionField: account.assetClass == AssetClass.epargne,
               envelope: _editEnvelope!,
               onEnvelopeChanged: (e) => setState(() => _editEnvelope = e),
               onSave: _commitEditAccount,
@@ -427,7 +458,11 @@ class _InvestmentCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       shadcn.Text(investment.label).medium(),
-                      if (accountAssetClass != AssetClass.immobilier)
+                      // Immobilier : pas d'identifiant à afficher. Épargne :
+                      // l'identifiant est la devise, déjà portée par le
+                      // libellé — pas besoin de la répéter en dessous.
+                      if (accountAssetClass != AssetClass.immobilier &&
+                          accountAssetClass != AssetClass.epargne)
                         shadcn.Text(investment.isin).muted().small(),
                       if (crossClass)
                         Padding(
@@ -526,6 +561,19 @@ class _CreateInvestmentForm extends StatelessWidget {
                   'Nom du bien (ex: Appartement Lyon 6e)',
                 ),
               )
+            else if (!requiresLabelFieldFor(
+              assetClass,
+              accountEnvelope: accountEnvelope,
+            ))
+              // Métaux physiques : le libellé est le produit choisi dans la
+              // liste déroulante (pré-rempli automatiquement), inutile de
+              // demander un libellé séparé.
+              InvestmentIdentifierField(
+                assetClass: assetClass,
+                accountEnvelope: accountEnvelope,
+                isinController: isinController,
+                labelController: labelController,
+              )
             else
               Row(
                 children: [
@@ -572,6 +620,21 @@ class _CreateInvestmentForm extends StatelessWidget {
 class _EditAccountForm extends StatelessWidget {
   final AssetClass assetClass;
   final TextEditingController nameController;
+
+  /// Le champ "Nom du compte" est masqué pour l'épargne, dont l'identité
+  /// est le type (enveloppe) + une description facultative — le nom suit
+  /// alors la banque (voir `_commitEditAccount`).
+  final bool showNameField;
+
+  /// Pré-rempli avec la banque actuelle du compte, effaçable (champ vide →
+  /// `null`) — le champ n'apparaît que si [showBankField].
+  final TextEditingController bankNameController;
+  final bool showBankField;
+
+  /// Pré-rempli avec la description actuelle, effaçable (champ vide →
+  /// `null`) — le champ n'apparaît que si [showDescriptionField] (épargne).
+  final TextEditingController descriptionController;
+  final bool showDescriptionField;
   final AccountEnvelope envelope;
   final ValueChanged<AccountEnvelope> onEnvelopeChanged;
   final VoidCallback onSave;
@@ -580,6 +643,11 @@ class _EditAccountForm extends StatelessWidget {
   const _EditAccountForm({
     required this.assetClass,
     required this.nameController,
+    required this.showNameField,
+    required this.bankNameController,
+    required this.showBankField,
+    required this.descriptionController,
+    required this.showDescriptionField,
     required this.envelope,
     required this.onEnvelopeChanged,
     required this.onSave,
@@ -618,17 +686,41 @@ class _EditAccountForm extends StatelessWidget {
                     ),
                   ),
                 ),
-                SizedBox(
-                  width: 240,
-                  child: TextField(
-                    controller: nameController,
-                    placeholder: const shadcn.Text('Nom du compte'),
-                    autofocus: true,
+                if (showNameField) ...[
+                  SizedBox(
+                    width: 240,
+                    child: TextField(
+                      controller: nameController,
+                      placeholder: const shadcn.Text('Nom du compte'),
+                      autofocus: true,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                ],
+                if (showBankField) ...[
+                  SizedBox(
+                    width: 240,
+                    child: TextField(
+                      controller: bankNameController,
+                      placeholder: const shadcn.Text(
+                        'Banque (ex: Boursorama)',
+                      ),
+                      autofocus: !showNameField,
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
+            if (showDescriptionField) ...[
+              TextField(
+                controller: descriptionController,
+                placeholder: const shadcn.Text(
+                  'Description (facultative, ex: Épargne vacances)',
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 PrimaryButton(

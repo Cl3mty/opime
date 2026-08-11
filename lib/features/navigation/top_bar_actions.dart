@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/privacy/amount_visibility_controller.dart';
@@ -5,7 +6,10 @@ import '../../core/profiles/profile_controller.dart';
 import '../dashboard/onboarding_highlight_controller.dart';
 import '../investments/complete_patrimoine_dialog.dart';
 import '../investments/investments_models.dart' show assetClassForCategoryId;
+import '../investments/investments_repository.dart';
 import '../investments/patrimoine_refresh_controller.dart';
+import '../investments/price_refresh_service.dart';
+import '../investments/price_sync_status_controller.dart';
 import '../liabilities/liabilities_models.dart' show liabilityTypeForCategoryId;
 
 /// Bouton icône avec tooltip, utilisé par les actions rapides de la barre
@@ -77,6 +81,7 @@ class AddMenuButton extends StatelessWidget {
   final ProfileController profileController;
   final PatrimoineRefreshController patrimoineRefreshController;
   final OnboardingHighlightController onboardingHighlight;
+  final PriceSyncStatusController priceSyncStatus;
   final bool compact;
 
   /// Clé de la page actuellement affichée (ex : `'actifs_crypto'`) — quand
@@ -90,6 +95,7 @@ class AddMenuButton extends StatelessWidget {
     required this.profileController,
     required this.patrimoineRefreshController,
     required this.onboardingHighlight,
+    required this.priceSyncStatus,
     this.compact = false,
     this.currentPageKey,
   });
@@ -101,7 +107,17 @@ class AddMenuButton extends StatelessWidget {
     showCompletePatrimoineDialog(
       context,
       vaultPath: profileController.activeDataPath,
-      onCompleted: patrimoineRefreshController.notifyChanged,
+      onCompleted: () {
+        // Rechargement immédiat depuis le cache (données déjà à jour sur
+        // disque), pour que le Dashboard et les pages de catégorie ouvertes
+        // reflètent le nouvel actif sans attendre le réseau.
+        patrimoineRefreshController.notifyChanged();
+        // Puis résolution des cours en arrière-plan : la plus/moins-value
+        // et la performance du nouvel investissement se calculent dès que
+        // son cours est connu, sans attendre la prochaine ouverture du
+        // Dashboard — voir [PatrimoineRefreshController].
+        unawaited(_refreshPricesAfterCompletion());
+      },
       initialAssetClass: pageKey == null
           ? null
           : assetClassForCategoryId(pageKey),
@@ -109,6 +125,25 @@ class AddMenuButton extends StatelessWidget {
           ? null
           : liabilityTypeForCategoryId(pageKey),
     );
+  }
+
+  /// Résout les cours de tous les investissements (voir
+  /// `price_refresh_service.dart`), puis notifie à nouveau le signal de
+  /// rechargement : les éléments visuels impactés par la performance et la
+  /// plus/moins-value se mettent à jour une fois les cours connus. Le flux
+  /// de complétion lui-même est déjà refermé (mutation persistée), ce
+  /// rechargement est donc purement réactif.
+  Future<void> _refreshPricesAfterCompletion() async {
+    final vaultPath = profileController.activeDataPath;
+    final repo = InvestmentsRepository(vaultPath);
+    final accounts = await repo.listAll();
+    await refreshAllPrices(
+      vaultPath: vaultPath,
+      accounts: accounts,
+      repo: repo,
+      priceSyncStatus: priceSyncStatus,
+    );
+    patrimoineRefreshController.notifyChanged();
   }
 
   @override

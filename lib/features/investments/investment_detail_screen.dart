@@ -11,6 +11,8 @@ import 'documents_section.dart';
 import 'investment_identifier_field.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
+import 'metal_price_client.dart';
+import 'metal_price_repository.dart';
 import 'performance_calculator.dart';
 import 'price_history_repository.dart';
 import 'yahoo_finance_client.dart' show PricePoint;
@@ -107,6 +109,26 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   }
 
   Future<void> _loadPriceHistory() async {
+    // Les métaux précieux physiques n'ont pas d'historique Yahoo Finance :
+    // leur série est reconstruite depuis les relevés journaliers stockés par
+    // `price_refresh_service.dart` (voir
+    // [MetalPriceRepository.pricePointsFor]) — nécessaire à la performance
+    // TWR, qui valorise chaque transaction à une date de cours. Un ETC
+    // or/argent logé dans un CTO (voir [isMetalEtc]) est, lui, un titre
+    // coté : son historique se lit comme celui d'une action.
+    if (_effectiveClass == AssetClass.metauxPrecieux &&
+        !isMetalEtc(widget.account)) {
+      final points = await MetalPriceRepository(widget.vaultPath).pricePointsFor(
+        metalKindForInvestment(
+          isin: widget.investment.isin,
+          label: widget.investment.label,
+        ),
+        widget.investment.isin,
+      );
+      if (!mounted) return;
+      setState(() => _priceHistory = points);
+      return;
+    }
     final history = await PriceHistoryRepository(
       widget.vaultPath,
     ).load(widget.investment.isin);
@@ -324,6 +346,8 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       symbol: isinChanged ? null : widget.investment.symbol,
       lastPrice: isinChanged ? null : widget.investment.lastPrice,
       lastPriceDate: isinChanged ? null : widget.investment.lastPriceDate,
+      priceUnavailable:
+          isinChanged ? null : widget.investment.priceUnavailable,
       assetClass: widget.investment.assetClass,
       realEstateType: widget.investment.realEstateType,
       documents: widget.investment.documents,
@@ -558,13 +582,21 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 ),
                 _StatChip(
                   label: 'PRU',
-                  value: displayEuros(investment.pru, widget.hidden),
+                  // Une épargne en devise étrangère est tenue à un taux de
+                  // change (le PRU est le cours de la paire à l'achat), pas
+                  // à un montant : l'afficher avec la précision du taux
+                  // plutôt que formaté en euros arrondis.
+                  value: _effectiveClass == AssetClass.epargne
+                      ? '${investment.pru.toStringAsFixed(4)} €'
+                      : displayEuros(investment.pru, widget.hidden),
                 ),
               ],
               if (hasPrice)
                 _StatChip(
                   label: 'Dernier cours',
-                  value: displayEuros(investment.lastPrice!, widget.hidden),
+                  value: _effectiveClass == AssetClass.epargne
+                      ? '${investment.lastPrice!.toStringAsFixed(4)} €'
+                      : displayEuros(investment.lastPrice!, widget.hidden),
                 ),
             ],
           ),
@@ -624,17 +656,28 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  LucideIcons.info,
+                  investment.priceUnavailable == true
+                      ? LucideIcons.triangleAlert
+                      : LucideIcons.info,
                   size: 14,
-                  color: theme.colorScheme.mutedForeground,
+                  color: investment.priceUnavailable == true
+                      ? const Color(0xFFF59E0B)
+                      : theme.colorScheme.mutedForeground,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: shadcn.Text(
-                    'Cours en temps réel pas encore disponible : la '
-                    'valorisation ci-dessus correspond au montant net '
-                    'investi (prix d\'achat), pas au cours actuel du '
-                    'marché.',
+                    investment.priceUnavailable == true
+                        ? 'Cours introuvable sur Yahoo Finance pour '
+                              '« ${investment.isin} » : identifiant inconnu '
+                              'ou actif non coté. Vérifiez l\'identifiant — '
+                              'la valorisation ci-dessus correspond au '
+                              'montant net investi (prix d\'achat), pas au '
+                              'cours actuel du marché.'
+                        : 'Cours en temps réel pas encore disponible : la '
+                              'valorisation ci-dessus correspond au montant '
+                              'net investi (prix d\'achat), pas au cours '
+                              'actuel du marché.',
                   ).muted().xSmall(),
                 ),
               ],

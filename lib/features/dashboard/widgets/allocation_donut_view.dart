@@ -9,7 +9,7 @@ import 'allocation_hover_tooltip.dart';
 /// centre (comme sur la capture Finary), et une légende compacte à côté
 /// (en dessous si la carte est trop étroite). Le survol d'une section
 /// (déterminé par l'angle du curseur autour du centre) l'isole — les
-/// autres s'estompent — et affiche sa description. Prend les mêmes
+/// autres s'estompent — et affiche son nom et son pourcentage. Prend les mêmes
 /// [AllocationSlice] génériques que [AllocationBlocksView] pour être
 /// réutilisable aussi bien par la carte Allocation (catégories) que par la
 /// Distribution d'une page de détail (comptes/prêts) — voir
@@ -69,7 +69,12 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
 
   @override
   Widget build(BuildContext context) {
-    final hoveredSlice = widget.slices
+    // Une part à 0 % (catégorie ou compte sans valeur) ne dessine rien :
+    // la filtrer évite un point parasite dans l'anneau et une ligne
+    // "0 %" dans la légende, sans changer le total affiché au centre.
+    final slices = widget.slices.where((s) => s.percent > 0).toList();
+
+    final hoveredSlice = slices
         .where((s) => s.id == _hoveredId)
         .firstOrNull;
 
@@ -89,7 +94,7 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
                 CustomPaint(
                   size: size,
                   painter: _DonutPainter(
-                    slices: widget.slices,
+                    slices: slices,
                     hoveredId: _hoveredId,
                   ),
                 ),
@@ -127,7 +132,7 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
         },
       ),
     );
-    final legend = _Legend(slices: widget.slices, hoveredId: _hoveredId);
+    final legend = _Legend(slices: slices, hoveredId: _hoveredId);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -144,7 +149,13 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
           children: [
             Expanded(child: Center(child: ring)),
             const SizedBox(width: 20),
-            legend,
+            // Largeur bornée : un libellé long ne doit pas rogner le donut à
+            // l'excès — au-delà de cette largeur, les libellés sont
+            // tronqués (voir [_Legend]).
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 220),
+              child: legend,
+            ),
           ],
         );
       },
@@ -229,7 +240,16 @@ class _Legend extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  shadcn.Text(slice.label).small(),
+                  // Libellé tronqué quand il est trop long : la largeur de
+                  // la légende est bornée (voir [AllocationDonutView]) pour
+                  // ne pas réduire la taille du donut.
+                  Flexible(
+                    child: shadcn.Text(
+                      slice.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ).small(),
+                  ),
                   const SizedBox(width: 6),
                   shadcn.Text(
                     slice.percent < 1

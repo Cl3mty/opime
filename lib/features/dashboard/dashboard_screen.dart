@@ -122,6 +122,10 @@ class _DemoDashboard extends StatelessWidget {
                     title: 'Actifs',
                     categories: dashboardActifsCategories,
                     hidden: hidden,
+                    // Le PRU reste visible sur les pages de détail de
+                    // chaque classe d'actif, pas ici : la vue agrégée du
+                    // Dashboard montre uniquement montant et évolution.
+                    showPru: false,
                   ),
                   const SizedBox(height: 16),
                   CategoryBreakdownCard(
@@ -242,10 +246,15 @@ class _RealDashboardState extends State<_RealDashboard> {
     widget.onboardingHighlight.setEmpty(isEverythingEmpty);
     setState(() {
       _isEverythingEmpty = isEverythingEmpty;
-      _categories = buildAllRealCategories(accounts, priceHistories);
+      _categories = buildAllRealCategories(
+        accounts,
+        priceHistories,
+        widget.vaultPath,
+      );
       _categoriesByAccount = buildAllRealCategoriesByAccount(
         accounts,
         priceHistories,
+        widget.vaultPath,
       );
       _topAssets = buildRealTopAssets(accounts, priceHistories);
       final grid = sharedDateGrid(accounts);
@@ -340,6 +349,10 @@ class _RealDashboardState extends State<_RealDashboard> {
                 title: 'Actifs',
                 categories: _categoriesByAccount,
                 hidden: hidden,
+                // Le PRU reste visible sur les pages de détail de chaque
+                // classe d'actif, pas ici : la vue agrégée du Dashboard
+                // montre uniquement montant et évolution.
+                showPru: false,
               ),
               const SizedBox(height: 16),
               CategoryBreakdownCard(

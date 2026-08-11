@@ -45,8 +45,9 @@ class PriceHistoryRepository {
         .toList();
   }
 
-  /// [round] à `false` pour les cryptomonnaies, dont le cours a un sens en
-  /// dessous du centime — voir [round2].
+  /// [round] à `false` pour les cryptomonnaies et les épargnes en devise
+  /// étrangère, dont la quantité/le cours/le taux ont un sens en dessous du
+  /// centime — voir [requiresFullPricePrecision] et [round2].
   Future<void> save(
     String isin,
     List<PricePoint> points, {
