@@ -581,7 +581,7 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
       children: [
         Row(
           children: [
-            Expanded(child: shadcn.Text('Budgets').semiBold()),
+            Expanded(child: shadcn.Text('Budgets ventilés').semiBold()),
             IconButton.ghost(
               icon: const Icon(LucideIcons.filePlus),
               onPressed: widget.onNew,

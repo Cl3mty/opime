@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:window_manager/window_manager.dart';
+import 'core/assistant/assistant_config_controller.dart';
 import 'core/privacy/amount_visibility_controller.dart';
 import 'core/storage/vault_folder_service.dart';
 import 'core/profiles/profile_controller.dart';
@@ -9,6 +10,7 @@ import 'core/updates/update_banner.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/account_management_screen.dart';
+import 'features/assistant/assistant_screen.dart';
 import 'app/theme_controller.dart';
 import 'app/app_shell.dart';
 import 'core/platform_info.dart';
@@ -81,6 +83,7 @@ class _OpimeAppState extends State<OpimeApp> {
 
   final _themeController = ThemeController();
   final _amountVisibilityController = AmountVisibilityController();
+  final _assistantConfigController = AssistantConfigController();
   final _patrimoineRefreshController = PatrimoineRefreshController();
   final _priceSyncStatusController = PriceSyncStatusController();
   final _onboardingHighlightController = OnboardingHighlightController();
@@ -102,6 +105,7 @@ class _OpimeAppState extends State<OpimeApp> {
     _themeController.load();
     _themeController.addListener(() => setState(() {}));
     _amountVisibilityController.load();
+    _assistantConfigController.load();
     _loadVault();
   }
 
@@ -231,6 +235,7 @@ class _OpimeAppState extends State<OpimeApp> {
           patrimoineRefreshController: _patrimoineRefreshController,
           onboardingHighlightController: _onboardingHighlightController,
           priceSyncStatusController: _priceSyncStatusController,
+          assistantConfigController: _assistantConfigController,
           pages: {
             // Les données d'exemple restent réservées au profil "Lou" (démo) :
             // tout autre profil voit son vrai Dashboard, vide au départ, où
@@ -334,7 +339,13 @@ class _OpimeAppState extends State<OpimeApp> {
               vaultPath: _profileController!.activeDataPath,
               amountVisibility: _amountVisibilityController,
             ),
-            'assistant': (_) => const Center(child: Text('Assistant')),
+            'assistant': (_) => AssistantScreen(
+              key: ValueKey(
+                'assistant_${_profileController!.activeDataPath}',
+              ),
+              vaultPath: _profileController!.activeDataPath,
+              configController: _assistantConfigController,
+            ),
             'account_management': (_) =>
                 AccountManagementScreen(profileController: _profileController!),
             'settings': (_) => SettingsScreen(
@@ -342,6 +353,7 @@ class _OpimeAppState extends State<OpimeApp> {
               onVaultActivated: _onVaultReady,
               onNoVaultSelected: _resetVault,
               themeController: _themeController,
+              assistantConfigController: _assistantConfigController,
               githubOwner: _githubOwner,
               githubRepo: _githubRepo,
             ),

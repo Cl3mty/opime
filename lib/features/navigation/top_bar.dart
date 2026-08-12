@@ -1,20 +1,18 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
-import '../../core/platform_info.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/profiles/profile_controller.dart';
 import '../dashboard/onboarding_highlight_controller.dart';
 import '../investments/patrimoine_refresh_controller.dart';
 import '../investments/price_sync_status_controller.dart';
+import '../search/global_search_bar.dart';
+import 'nav_models.dart';
 import 'top_bar_actions.dart';
 
 /// Barre persistante au-dessus du contenu de la page en mise en page
-/// "large" (sidebar, desktop ou tablette) : recherche/assistant, bascule
-/// de confidentialité des montants, et ajout rapide.
-///
-/// L'Assistant reste réservé au poste de travail : le champ de recherche
-/// n'apparaît que sur [isDesktopPlatform], même sur tablette où cette
-/// barre est par ailleurs affichée.
+/// "large" (sidebar, desktop ou tablette) : titre de la page courante,
+/// recherche globale, bascule de confidentialité des montants, et ajout
+/// rapide.
 ///
 /// En mode mobile (bottom nav), ces actions sont directement intégrées à
 /// l'AppBar par [AppShell] : pas de barre séparée, pour économiser la
@@ -39,12 +37,6 @@ class TopBar extends StatelessWidget {
     required this.onSelect,
   });
 
-  void _openAssistant(String query) {
-    // Le champ ne fait que rediriger vers la page Assistant pour l'instant :
-    // il n'y a pas encore d'intégration LLM branchée dessus.
-    onSelect('assistant');
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -59,25 +51,18 @@ class TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (isDesktopPlatform)
-            Expanded(
-              child: TextField(
-                placeholder: const shadcn.Text("Demander à l'assistant..."),
-                border: Border.all(color: Colors.transparent),
-                features: [
-                  InputFeature.leading(
-                    Icon(
-                      LucideIcons.sparkles,
-                      size: 16,
-                      color: theme.colorScheme.mutedForeground,
-                    ),
-                  ),
-                ],
-                onSubmitted: _openAssistant,
-              ),
-            )
-          else
-            const Spacer(),
+          // Titre de la page sélectionnée, avant le champ de recherche.
+          shadcn.Text(navLabelForKey(currentPageKey)).medium.small,
+          const SizedBox(width: 16),
+          // Reconstruit l'index de recherche quand le profil actif change :
+          // le patrimoine réel indexé dépend de ProfileController.activeDataPath.
+          Expanded(
+            child: GlobalSearchBar(
+              key: ValueKey(profileController.activeDataPath),
+              vaultPath: profileController.activeDataPath,
+              onSelect: onSelect,
+            ),
+          ),
           const SizedBox(width: 8),
           AmountVisibilityToggleButton(amountVisibility: amountVisibility),
           const SizedBox(width: 4),

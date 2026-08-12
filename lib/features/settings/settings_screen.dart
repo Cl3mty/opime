@@ -1,6 +1,8 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme_controller.dart';
+import '../../core/assistant/assistant_config_controller.dart';
+import '../../core/assistant/ollama_client.dart';
 import '../../core/storage/vault_folder_service.dart';
 import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
@@ -10,6 +12,7 @@ class SettingsScreen extends StatelessWidget {
   final Future<void> Function(String path) onVaultActivated;
   final VoidCallback onNoVaultSelected;
   final ThemeController themeController;
+  final AssistantConfigController assistantConfigController;
   final String githubOwner;
   final String githubRepo;
 
@@ -19,6 +22,7 @@ class SettingsScreen extends StatelessWidget {
     required this.onVaultActivated,
     required this.onNoVaultSelected,
     required this.themeController,
+    required this.assistantConfigController,
     required this.githubOwner,
     required this.githubRepo,
   });
@@ -36,6 +40,8 @@ class SettingsScreen extends StatelessWidget {
           const Text('Réglages').large().medium(),
           const SizedBox(height: 24),
           _ThemeCard(themeController: themeController),
+          const SizedBox(height: 16),
+          _AssistantCard(configController: assistantConfigController),
           const SizedBox(height: 16),
           _VersionCard(githubOwner: githubOwner, githubRepo: githubRepo),
           const SizedBox(height: 16),
@@ -274,6 +280,299 @@ class _ThemeCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _AssistantCard extends StatefulWidget {
+  final AssistantConfigController configController;
+
+  const _AssistantCard({required this.configController});
+
+  @override
+  State<_AssistantCard> createState() => _AssistantCardState();
+}
+
+class _AssistantCardState extends State<_AssistantCard> {
+  final _client = OllamaClient();
+  final _baseUrlController = TextEditingController();
+
+  bool _loadingModels = false;
+  List<String> _models = const [];
+  String? _modelsError;
+
+  @override
+  void initState() {
+    super.initState();
+    _baseUrlController.text = widget.configController.baseUrl;
+    widget.configController.addListener(_onConfigChanged);
+    _loadModelsIfEnabled();
+  }
+
+  @override
+  void dispose() {
+    widget.configController.removeListener(_onConfigChanged);
+    _baseUrlController.dispose();
+    super.dispose();
+  }
+
+  void _onConfigChanged() {
+    // Synchronise le champ d'adresse si une autre source (écran assistant,
+    // restauration...) a changé la base URL sans passer par cette carte.
+    final baseUrl = widget.configController.baseUrl;
+    if (baseUrl != _baseUrlController.text) {
+      _baseUrlController.text = baseUrl;
+    }
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  Future<void> _loadModelsIfEnabled() async {
+    if (!widget.configController.enabled || _loadingModels) return;
+    setState(() {
+      _loadingModels = true;
+      _modelsError = null;
+    });
+    try {
+      final models = await _client.listModels(widget.configController.baseUrl);
+      if (!mounted) return;
+      setState(() => _models = models);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _modelsError = e is OllamaException ? e.message : 'Erreur : $e';
+      });
+    } finally {
+      if (mounted) setState(() => _loadingModels = false);
+    }
+  }
+
+  Future<void> _resetBaseUrl() async {
+    await widget.configController.setBaseUrl(
+      AssistantConfigController.defaultBaseUrl,
+    );
+    await _loadModelsIfEnabled();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.configController,
+      builder: (context, _) {
+        final enabled = widget.configController.enabled;
+        return FrostedCard(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      LucideIcons.bot,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Assistant IA').large().medium(),
+                    ),
+                    Switch(
+                      value: enabled,
+                      onChanged: (value) async {
+                        await widget.configController.setEnabled(value);
+                        // La détection des modèles ne se relance pas à chaque
+                        // frappe dans le champ d'adresse : uniquement ici, à
+                        // la soumission du champ et sur les boutons d'action.
+                        if (value) _loadModelsIfEnabled();
+                      },
+                    ),
+                  ],
+                ),
+                if (enabled) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Dialogue avec un modèle Ollama local (gemma, llama...) : '
+                    'analyses du patrimoine, explications pédagogiques, '
+                    'questions sur tes simulations et ta stratégie. Tout reste '
+                    'sur ta machine — aucune donnée n\'est envoyée en ligne. '
+                    'Ollama doit tourner en arrière-plan (« ollama serve ») et '
+                    'les modèles s\'installent avec « ollama pull <modèle> ».',
+                  ).muted().small(),
+                  const SizedBox(height: 16),
+                  _buildBaseUrlField(),
+                  const SizedBox(height: 12),
+                  _buildModelField(),
+                  const SizedBox(height: 12),
+                  _buildContextCheckbox(),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBaseUrlField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('Adresse du serveur Ollama').medium()),
+            Tooltip(
+              // ignore: implicit_call_tearoffs
+              tooltip: TooltipContainer(
+                child: Text('Rétablir l\'adresse par défaut'),
+              ),
+              child: IconButton.ghost(
+                icon: const Icon(LucideIcons.rotateCcw, size: 16),
+                onPressed: _resetBaseUrl,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _baseUrlController,
+          enabled: !_loadingModels,
+          onChanged: (value) => widget.configController.setBaseUrl(value),
+          onSubmitted: (_) => _loadModelsIfEnabled(),
+          placeholder: const Text('http://localhost:11434'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModelField() {
+    if (_loadingModels) {
+      return Row(
+        children: [
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 10),
+          const Text('Détection des modèles installés...').muted().small(),
+        ],
+      );
+    }
+
+    if (_modelsError != null) {
+      return Row(
+        children: [
+          Icon(
+            LucideIcons.circleAlert,
+            size: 16,
+            color: Theme.of(context).colorScheme.destructive,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(_modelsError!).small().muted(),
+          ),
+          Tooltip(
+            // ignore: implicit_call_tearoffs
+            tooltip: TooltipContainer(child: Text('Réessayer')),
+            child: IconButton.ghost(
+              icon: const Icon(LucideIcons.refreshCw, size: 16),
+              onPressed: _loadModelsIfEnabled,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_models.isEmpty) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Aucun modèle détecté. Installe un modèle puis actualise la '
+              'liste.',
+            ).small().muted(),
+          ),
+          Tooltip(
+            // ignore: implicit_call_tearoffs
+            tooltip: TooltipContainer(child: Text('Actualiser')),
+            child: IconButton.ghost(
+              icon: const Icon(LucideIcons.refreshCw, size: 16),
+              onPressed: _loadModelsIfEnabled,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Modèle utilisé').medium(),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            // Largeur bornée : le sélecteur n'a pas besoin de toute la
+            // largeur de la carte (le nom d'un modèle est court).
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Select<String>(
+                value: widget.configController.model,
+                placeholder: const Text('Choisir un modèle'),
+                popupWidthConstraint: PopoverConstraint.flexible,
+                onChanged: (model) {
+                  if (model != null) {
+                    widget.configController.setModel(model);
+                  }
+                },
+                itemBuilder: (context, model) => Text(model),
+                // ignore: implicit_call_tearoffs
+                popup: SelectPopup.builder(
+                  builder: (context, searchQuery) => SelectItemList(
+                    children: [
+                      for (final model in _models)
+                        if (searchQuery == null ||
+                            model.toLowerCase().contains(searchQuery.toLowerCase()))
+                          SelectItemButton(
+                            value: model,
+                            child: Row(
+                              children: [
+                                const Icon(LucideIcons.brain, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(model)),
+                              ],
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Tooltip(
+              // ignore: implicit_call_tearoffs
+              tooltip: TooltipContainer(child: Text('Actualiser la liste')),
+              child: IconButton.ghost(
+                icon: const Icon(LucideIcons.refreshCw, size: 16),
+                onPressed: _loadModelsIfEnabled,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContextCheckbox() {
+    return Checkbox(
+      state: widget.configController.includePatrimoine
+          ? CheckboxState.checked
+          : CheckboxState.unchecked,
+      onChanged: (state) => widget.configController.setIncludePatrimoine(
+        state == CheckboxState.checked,
+      ),
+      trailing: const Text(
+        'Inclure une synthèse de mon patrimoine dans le contexte du modèle',
+      ).small(),
     );
   }
 }

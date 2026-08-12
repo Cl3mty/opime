@@ -14,6 +14,10 @@ class AppSidebar extends StatelessWidget {
   final ProfileController profileController;
   final SidebarPrefsController sidebarPrefsController;
 
+  /// L'assistant est-il activé dans les Réglages ? Si non, son item est
+  /// retiré du groupe Outils sur desktop.
+  final bool assistantEnabled;
+
   const AppSidebar({
     super.key,
     required this.selectedKey,
@@ -22,6 +26,7 @@ class AppSidebar extends StatelessWidget {
     required this.onToggleCollapse,
     required this.profileController,
     required this.sidebarPrefsController,
+    required this.assistantEnabled,
   });
 
   Widget _profileAvatar(BuildContext context, String initials, double size) {
@@ -190,10 +195,17 @@ class AppSidebar extends StatelessWidget {
             // L'Assistant est réservé au desktop, y compris sur tablette
             // (où la largeur d'écran déclenche par ailleurs cette même
             // sidebar) : toolsTabItems l'exclut déjà pour la navigation
-            // mobile, on le réutilise ici plutôt que dupliquer le filtre.
+            // mobile. Sur desktop, il n'apparaît que si l'assistant est
+            // activé dans les Réglages (assistantEnabled).
             _buildGroup(
               isDesktopPlatform
-                  ? outilsGroup
+                  ? NavGroup(
+                      label: outilsGroup.label,
+                      items: [
+                        for (final item in outilsGroup.items)
+                          if (assistantEnabled || item.key != 'assistant') item,
+                      ],
+                    )
                   : NavGroup(label: outilsGroup.label, items: toolsTabItems),
               hiddenKeys,
             ),

@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import '../core/assistant/assistant_config_controller.dart';
 import '../core/privacy/amount_visibility_controller.dart';
 import '../core/profiles/profile_controller.dart';
 import '../core/ui/app_background.dart';
@@ -55,6 +56,7 @@ class AppShell extends StatefulWidget {
   final PatrimoineRefreshController patrimoineRefreshController;
   final OnboardingHighlightController onboardingHighlightController;
   final PriceSyncStatusController priceSyncStatusController;
+  final AssistantConfigController assistantConfigController;
   final Map<String, WidgetBuilder> pages;
 
   const AppShell({
@@ -66,6 +68,7 @@ class AppShell extends StatefulWidget {
     required this.patrimoineRefreshController,
     required this.onboardingHighlightController,
     required this.priceSyncStatusController,
+    required this.assistantConfigController,
     required this.pages,
   });
 
@@ -77,6 +80,7 @@ class _AppShellState extends State<AppShell> {
   String _selectedKey = 'dashboard';
   bool _collapsed = false;
   int _dashboardEpoch = 0;
+  bool _lastAssistantEnabled = false;
 
   // --- État de la navigation mobile (bottom bar + hub de drill-down) ---
   String _mobileActiveTab = 'home';
@@ -94,6 +98,39 @@ class _AppShellState extends State<AppShell> {
       // un drill-down local (voir NavigationScope.dashboardEpoch) s'en sert
       // pour revenir à sa racine sur un reclic de la sidebar.
       if (key == 'dashboard') _dashboardEpoch++;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _lastAssistantEnabled = widget.assistantConfigController.enabled;
+    widget.assistantConfigController.addListener(_onAssistantConfigChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.assistantConfigController.removeListener(_onAssistantConfigChanged);
+    super.dispose();
+  }
+
+  void _onAssistantConfigChanged() {
+    if (!mounted) return;
+    final enabled = widget.assistantConfigController.enabled;
+    // Seule l'activation conditionne sidebar/TopBar : pas de rebuild du
+    // shell à chaque changement sans rapport (saisie de l'adresse, choix du
+    // modèle...) dans les Réglages.
+    if (enabled == _lastAssistantEnabled && _selectedKey != 'assistant') {
+      return;
+    }
+    setState(() {
+      _lastAssistantEnabled = enabled;
+      // L'assistant désactivé dans les Réglages ne doit plus être
+      // accessible : si c'est justement la page affichée, on revient au
+      // tableau de bord.
+      if (!enabled && _selectedKey == 'assistant') {
+        _selectedKey = 'dashboard';
+      }
     });
   }
 
@@ -219,6 +256,7 @@ class _AppShellState extends State<AppShell> {
           onToggleCollapse: () => setState(() => _collapsed = !_collapsed),
           profileController: widget.profileController,
           sidebarPrefsController: widget.sidebarPrefsController,
+          assistantEnabled: widget.assistantConfigController.enabled,
         ),
       );
       return Scaffold(

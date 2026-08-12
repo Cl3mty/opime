@@ -341,7 +341,7 @@ class _MonthTitleCard extends StatelessWidget {
         ),
         shadcn.Text('$year').muted(),
         const SizedBox(height: 6),
-        shadcn.Text('Budget Dashboard').muted().small(),
+        shadcn.Text('Tableau de suivi').muted().small(),
       ],
     );
   }
