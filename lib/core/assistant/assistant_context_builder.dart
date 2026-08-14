@@ -101,11 +101,16 @@ class AssistantContextBuilder {
             : '${transactions.length} transaction(s) '
                   '(${_formatDate(transactions.map((t) => t.date).reduce((a, b) => a.isBefore(b) ? a : b))} → '
                   '${_formatDate(transactions.map((t) => t.date).reduce((a, b) => a.isAfter(b) ? a : b))})';
+        final lastPrice = investment.lastPrice;
+        final lastPriceText = lastPrice == null
+            ? ''
+            : ', dernier cours '
+                  '${formatEuros(lastPrice * (investment.lastFxRateToEur ?? 1.0))}';
         lines.add(
           '- ${investment.label} (${investment.isin}) — ${effectiveClass.label}'
           ', quantité ${_formatQuantity(investment.quantityHeld)}, '
           'PRU ${formatEuros(investment.pru)}'
-          '${investment.lastPrice != null ? ', dernier cours ${formatEuros(investment.lastPrice!)}' : ''}, '
+          '$lastPriceText, '
           'valeur ${formatEuros(value)}$gainText$mwrText, $txnInfo',
         );
       }

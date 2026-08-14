@@ -2,7 +2,6 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme_controller.dart';
 import '../../core/assistant/assistant_config_controller.dart';
-import '../../core/assistant/ollama_client.dart';
 import '../../core/storage/vault_folder_service.dart';
 import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
@@ -294,19 +293,13 @@ class _AssistantCard extends StatefulWidget {
 }
 
 class _AssistantCardState extends State<_AssistantCard> {
-  final _client = OllamaClient();
   final _baseUrlController = TextEditingController();
-
-  bool _loadingModels = false;
-  List<String> _models = const [];
-  String? _modelsError;
 
   @override
   void initState() {
     super.initState();
     _baseUrlController.text = widget.configController.baseUrl;
     widget.configController.addListener(_onConfigChanged);
-    _loadModelsIfEnabled();
   }
 
   @override
@@ -327,31 +320,10 @@ class _AssistantCardState extends State<_AssistantCard> {
     setState(() {});
   }
 
-  Future<void> _loadModelsIfEnabled() async {
-    if (!widget.configController.enabled || _loadingModels) return;
-    setState(() {
-      _loadingModels = true;
-      _modelsError = null;
-    });
-    try {
-      final models = await _client.listModels(widget.configController.baseUrl);
-      if (!mounted) return;
-      setState(() => _models = models);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _modelsError = e is OllamaException ? e.message : 'Erreur : $e';
-      });
-    } finally {
-      if (mounted) setState(() => _loadingModels = false);
-    }
-  }
-
   Future<void> _resetBaseUrl() async {
     await widget.configController.setBaseUrl(
       AssistantConfigController.defaultBaseUrl,
     );
-    await _loadModelsIfEnabled();
   }
 
   @override
@@ -378,13 +350,8 @@ class _AssistantCardState extends State<_AssistantCard> {
                     ),
                     Switch(
                       value: enabled,
-                      onChanged: (value) async {
-                        await widget.configController.setEnabled(value);
-                        // La détection des modèles ne se relance pas à chaque
-                        // frappe dans le champ d'adresse : uniquement ici, à
-                        // la soumission du champ et sur les boutons d'action.
-                        if (value) _loadModelsIfEnabled();
-                      },
+                      onChanged: (value) =>
+                          widget.configController.setEnabled(value),
                     ),
                   ],
                 ),
@@ -400,8 +367,6 @@ class _AssistantCardState extends State<_AssistantCard> {
                   ).muted().small(),
                   const SizedBox(height: 16),
                   _buildBaseUrlField(),
-                  const SizedBox(height: 12),
-                  _buildModelField(),
                   const SizedBox(height: 12),
                   _buildContextCheckbox(),
                 ],
@@ -435,128 +400,8 @@ class _AssistantCardState extends State<_AssistantCard> {
         const SizedBox(height: 6),
         TextField(
           controller: _baseUrlController,
-          enabled: !_loadingModels,
           onChanged: (value) => widget.configController.setBaseUrl(value),
-          onSubmitted: (_) => _loadModelsIfEnabled(),
           placeholder: const Text('http://localhost:11434'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildModelField() {
-    if (_loadingModels) {
-      return Row(
-        children: [
-          const SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 10),
-          const Text('Détection des modèles installés...').muted().small(),
-        ],
-      );
-    }
-
-    if (_modelsError != null) {
-      return Row(
-        children: [
-          Icon(
-            LucideIcons.circleAlert,
-            size: 16,
-            color: Theme.of(context).colorScheme.destructive,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(_modelsError!).small().muted(),
-          ),
-          Tooltip(
-            // ignore: implicit_call_tearoffs
-            tooltip: TooltipContainer(child: Text('Réessayer')),
-            child: IconButton.ghost(
-              icon: const Icon(LucideIcons.refreshCw, size: 16),
-              onPressed: _loadModelsIfEnabled,
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (_models.isEmpty) {
-      return Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Aucun modèle détecté. Installe un modèle puis actualise la '
-              'liste.',
-            ).small().muted(),
-          ),
-          Tooltip(
-            // ignore: implicit_call_tearoffs
-            tooltip: TooltipContainer(child: Text('Actualiser')),
-            child: IconButton.ghost(
-              icon: const Icon(LucideIcons.refreshCw, size: 16),
-              onPressed: _loadModelsIfEnabled,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Modèle utilisé').medium(),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            // Largeur bornée : le sélecteur n'a pas besoin de toute la
-            // largeur de la carte (le nom d'un modèle est court).
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: Select<String>(
-                value: widget.configController.model,
-                placeholder: const Text('Choisir un modèle'),
-                popupWidthConstraint: PopoverConstraint.flexible,
-                onChanged: (model) {
-                  if (model != null) {
-                    widget.configController.setModel(model);
-                  }
-                },
-                itemBuilder: (context, model) => Text(model),
-                // ignore: implicit_call_tearoffs
-                popup: SelectPopup.builder(
-                  builder: (context, searchQuery) => SelectItemList(
-                    children: [
-                      for (final model in _models)
-                        if (searchQuery == null ||
-                            model.toLowerCase().contains(searchQuery.toLowerCase()))
-                          SelectItemButton(
-                            value: model,
-                            child: Row(
-                              children: [
-                                const Icon(LucideIcons.brain, size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(model)),
-                              ],
-                            ),
-                          ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Tooltip(
-              // ignore: implicit_call_tearoffs
-              tooltip: TooltipContainer(child: Text('Actualiser la liste')),
-              child: IconButton.ghost(
-                icon: const Icon(LucideIcons.refreshCw, size: 16),
-                onPressed: _loadModelsIfEnabled,
-              ),
-            ),
-          ],
         ),
       ],
     );
