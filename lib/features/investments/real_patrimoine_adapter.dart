@@ -171,21 +171,40 @@ List<PatrimoineCategory> buildRealCategoriesByAccount(
   String vaultPath,
 ) {
   final byClass = <AssetClass, List<(InvestmentAccount, Investment)>>{};
+  // Un compte sans aucun investissement (tout juste créé, ou vidé après
+  // suppression de sa dernière position) ne produit aucune paire ci-dessous
+  // — sans ce repli, il resterait invisible de tout accordéon établissement
+  // → comptes et donc inatteignable pour être complété ou supprimé. Il est
+  // rattaché à sa seule classe connue, la sienne (pas de notion de classe
+  // effective possible sans investissement porteur — voir
+  // [accountAcceptsCrossClassInvestment]).
+  final emptyAccountsByClass = <AssetClass, List<InvestmentAccount>>{};
   for (final account in accounts) {
+    if (account.investments.isEmpty) {
+      emptyAccountsByClass.putIfAbsent(account.assetClass, () => []).add(account);
+      continue;
+    }
     for (final investment in account.investments) {
       final effectiveClass = investment.assetClass ?? account.assetClass;
       byClass.putIfAbsent(effectiveClass, () => []).add((account, investment));
     }
   }
   return [
-    for (final entry in byClass.entries)
-      _buildCategoryByAccount(entry.key, entry.value, priceHistories, vaultPath),
+    for (final assetClass in {...byClass.keys, ...emptyAccountsByClass.keys})
+      _buildCategoryByAccount(
+        assetClass,
+        byClass[assetClass] ?? const [],
+        emptyAccountsByClass[assetClass] ?? const [],
+        priceHistories,
+        vaultPath,
+      ),
   ];
 }
 
 PatrimoineCategory _buildCategoryByAccount(
   AssetClass assetClass,
   List<(InvestmentAccount, Investment)> pairs,
+  List<InvestmentAccount> emptyAccounts,
   Map<String, List<PricePoint>> priceHistories,
   String vaultPath,
 ) {
@@ -196,7 +215,9 @@ PatrimoineCategory _buildCategoryByAccount(
   }
   final leaves = <PatrimoineAccount>[
     for (final accountPairs in byAccountId.values)
-      _buildAccountLeaf(accountPairs, vaultPath),
+      _buildAccountLeaf(accountPairs.first.$1, accountPairs, vaultPath),
+    for (final account in emptyAccounts)
+      _buildAccountLeaf(account, const [], vaultPath),
   ];
   return PatrimoineCategory(
     id: assetClass.categoryId,
@@ -213,10 +234,10 @@ PatrimoineCategory _buildCategoryByAccount(
 }
 
 PatrimoineAccount _buildAccountLeaf(
+  InvestmentAccount account,
   List<(InvestmentAccount, Investment)> pairs,
   String vaultPath,
 ) {
-  final account = pairs.first.$1;
   // Seules les positions encore détenues représentent ce que le compte
   // contient *actuellement* — une position entièrement soldée (ex : un
   // titre entièrement revendu, une devise entièrement dépensée) disparaît
@@ -225,9 +246,20 @@ PatrimoineAccount _buildAccountLeaf(
   // `Investment.transactions` directement, indépendamment de cette
   // fonction) — voir aussi [buildRealTopAssets], qui applique déjà le même
   // filtre pour les meilleurs actifs du Dashboard.
+  //
+  // Les positions en devise (cash tenu dans le compte — voir
+  // [isCurrencyInvestment]) sont reléguées après les titres : elles
+  // représentent des liquidités en attente plutôt que des placements, pas
+  // ce que l'utilisateur vient chercher en premier dans la liste. L'ordre
+  // relatif au sein de chaque groupe est conservé (deux boucles plutôt
+  // qu'un tri, qui ne serait pas garanti stable).
   final heldPairs = [
     for (final pair in pairs)
-      if (pair.$2.quantityHeld > 0) pair,
+      if (pair.$2.quantityHeld > 0 && !isCurrencyInvestment(pair.$1, pair.$2))
+        pair,
+    for (final pair in pairs)
+      if (pair.$2.quantityHeld > 0 && isCurrencyInvestment(pair.$1, pair.$2))
+        pair,
   ];
   var valeur = 0.0;
   var plusValueAbs = 0.0;
@@ -393,6 +425,7 @@ PatrimoineAccount _buildLeaf(
     avatarInitials:
         _currencyAvatarInitials(account, investment) ??
         _metalAvatarInitials(account, investment),
+    isCurrency: isCurrencyInvestment(account, investment),
   );
 }
 

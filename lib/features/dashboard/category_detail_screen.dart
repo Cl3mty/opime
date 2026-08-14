@@ -1156,7 +1156,13 @@ class _AccountLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                shadcn.Text(account.name).medium().small(),
+                // Une position en devise (cash tenu dans le compte) se
+                // distingue subtilement des titres — texte atténué plutôt
+                // qu'un badge, cohérent avec le reste de la ligne — voir
+                // [PatrimoineAccount.isCurrency].
+                account.isCurrency
+                    ? shadcn.Text(account.name).muted().small()
+                    : shadcn.Text(account.name).medium().small(),
                 if (account.subtitle != null)
                   shadcn.Text(account.subtitle!).muted().xSmall(),
               ],

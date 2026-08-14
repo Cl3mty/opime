@@ -62,12 +62,21 @@ class IbkrImportPlan {
   IbkrImportPlan({required this.mergedAccount, required this.summary});
 }
 
-/// Id déterministe (hash du contenu brut de la ligne CSV + un suffixe pour
-/// distinguer les deux `Transaction`s générées par une même ligne) : réimporter
-/// la même ligne — même le même relevé exporté une seconde fois — retombe
-/// sur le même id, ce qui permet de la reconnaître comme déjà présente.
-String _deterministicId(String rawLine, String leg) {
-  final digest = md5.convert(utf8.encode('$rawLine|$leg'));
+/// Id déterministe, calculé à partir des champs *significatifs* d'un
+/// mouvement plutôt que du texte brut de sa ligne CSV : les deux formats de
+/// relevé pris en charge par [parseIbkrStatement] (Flex Query, Activity
+/// Statement) ne produisent jamais le même texte de ligne pour un même
+/// mouvement réel (colonnes, séparateurs et précision différents), alors que
+/// leurs champs significatifs (date, identifiant, sens, quantité, prix,
+/// devise) coïncident. Réimporter le même relevé — ou le même mouvement
+/// exporté sous l'autre format — retombe donc sur le même id, reconnu comme
+/// déjà présent. [kind] distingue les différentes `Transaction`s qu'un même
+/// mouvement source peut produire (ex : le titre et sa jambe de cash).
+String _semanticId(String kind, List<Object> parts) {
+  final normalized = parts
+      .map((p) => p is double ? p.toStringAsFixed(6) : p.toString())
+      .join('|');
+  final digest = md5.convert(utf8.encode('$kind|$normalized'));
   return 'ibkr_${digest.toString().substring(0, 20)}';
 }
 
@@ -150,9 +159,23 @@ IbkrImportPlan buildIbkrImportPlan(
     for (final investment in account.investments)
       investment.isin.trim().toUpperCase(): investment,
   };
+  // Certains relevés (Activity Statement) ne portent pas l'ISIN sur leurs
+  // lignes de titre — voir `IbkrTradeRow.isin` et
+  // `ibkr_statement_parser.dart`'s `_parseActivityTradeRow`. Avant de
+  // retomber sur le symbole seul comme identifiant, on tente de le déduire
+  // d'une position déjà connue du compte portant le même symbole (déjà
+  // importée avec son ISIN via un autre relevé, ou corrigée manuellement
+  // depuis la fiche de l'investissement — voir `investment_detail_screen.dart`'s
+  // `_commitEditInvestment`).
+  final symbolToKnownIsin = <String, String>{
+    for (final investment in account.investments)
+      if (investment.symbol != null && investment.symbol!.isNotEmpty)
+        investment.symbol!.trim().toUpperCase(): investment.isin,
+  };
   final fx = _FxLookup(parsed.cashConversions);
   final warnings = [...parsed.warnings];
   final unknownTypeCounts = <String, int>{};
+  final warnedMissingIsinSymbols = <String>{};
 
   var duplicatesSkipped = 0;
   var securityTradesAdded = 0;
@@ -191,10 +214,24 @@ IbkrImportPlan buildIbkrImportPlan(
 
   for (final row in parsed.trades) {
     trackPeriod(row.date);
-    final securityKey = (row.isin.trim().isNotEmpty
-            ? row.isin.trim()
-            : row.symbol.trim())
-        .toUpperCase();
+    // 1) l'ISIN du relevé lui-même, 2) à défaut celui d'une position déjà
+    // connue du compte portant le même symbole (voir [symbolToKnownIsin]),
+    // 3) à défaut le symbole seul — auquel cas on avertit une fois par
+    // symbole, avec le moyen de corriger (fiche de l'investissement).
+    final resolvedIsin = row.isin.trim().isNotEmpty
+        ? row.isin.trim()
+        : symbolToKnownIsin[row.symbol.trim().toUpperCase()];
+    if (resolvedIsin == null &&
+        row.symbol.isNotEmpty &&
+        warnedMissingIsinSymbols.add(row.symbol.trim().toUpperCase())) {
+      warnings.add(
+        'ISIN introuvable pour "${row.symbol}" (absent du relevé et d\'aucune '
+        'position déjà connue de ce compte) : identifié par son seul '
+        'symbole — vous pouvez corriger l\'identifiant depuis le menu '
+        '"Modifier" de cet investissement une fois l\'import terminé.',
+      );
+    }
+    final securityKey = (resolvedIsin ?? row.symbol.trim()).toUpperCase();
     if (securityKey.isEmpty) {
       warnings.add(
         'Ligne de titre sans ISIN ni symbole ignorée (${row.description}).',
@@ -204,7 +241,7 @@ IbkrImportPlan buildIbkrImportPlan(
     findOrCreate(
       securityKey,
       () => Investment(
-        isin: row.isin.trim().isNotEmpty ? row.isin.trim() : row.symbol,
+        isin: resolvedIsin ?? row.symbol,
         label: row.description.isNotEmpty ? row.description : row.symbol,
         transactions: const [],
         symbol: row.symbol.isNotEmpty ? row.symbol : null,
@@ -214,7 +251,14 @@ IbkrImportPlan buildIbkrImportPlan(
     final added = addTransaction(
       securityKey,
       Transaction(
-        id: _deterministicId(row.rawLine, 'security'),
+        id: _semanticId('security', [
+          row.date.toIso8601String(),
+          securityKey,
+          row.isBuy,
+          row.quantity,
+          row.tradePrice,
+          row.currency,
+        ]),
         date: row.date,
         isBuy: row.isBuy,
         quantity: row.quantity,
@@ -234,7 +278,12 @@ IbkrImportPlan buildIbkrImportPlan(
     addTransaction(
       currencyKey,
       Transaction(
-        id: _deterministicId(row.rawLine, 'cash'),
+        id: _semanticId('trade-cash', [
+          row.date.toIso8601String(),
+          securityKey,
+          row.currency,
+          cashImpact,
+        ]),
         date: row.date,
         isBuy: cashImpact >= 0,
         quantity: cashImpact.abs(),
@@ -247,6 +296,25 @@ IbkrImportPlan buildIbkrImportPlan(
 
   for (final row in parsed.cashConversions) {
     trackPeriod(row.date);
+    // La commission (et les taxes, toujours nulles en pratique pour ces
+    // lignes) se déduisent du côté de la paire porté par
+    // [IbkrCashConversionRow.commissionCurrency] — la devise de cotation
+    // pour un relevé Flex Query, la devise de base pour un Activity
+    // Statement (voir sa documentation).
+    final commissionAndTaxes = row.commission + row.taxes;
+    final commissionOnBase =
+        row.commissionCurrency.trim().toUpperCase() ==
+            row.baseCurrency.trim().toUpperCase()
+        ? commissionAndTaxes
+        : 0.0;
+    final commissionOnQuote =
+        row.commissionCurrency.trim().toUpperCase() ==
+            row.quoteCurrency.trim().toUpperCase()
+        ? commissionAndTaxes
+        : 0.0;
+    final baseImpact = row.baseQuantity + commissionOnBase;
+    final quoteImpact = row.proceeds + commissionOnQuote;
+
     final baseKey = row.baseCurrency.trim().toUpperCase();
     findOrCreate(
       baseKey,
@@ -256,10 +324,15 @@ IbkrImportPlan buildIbkrImportPlan(
     final baseAdded = addTransaction(
       baseKey,
       Transaction(
-        id: _deterministicId(row.rawLine, 'base'),
+        id: _semanticId('fx-base', [
+          row.date.toIso8601String(),
+          row.baseCurrency,
+          row.quoteCurrency,
+          baseImpact,
+        ]),
         date: row.date,
-        isBuy: row.baseQuantity > 0,
-        quantity: row.baseQuantity.abs(),
+        isBuy: baseImpact > 0,
+        quantity: baseImpact.abs(),
         unitPrice: 1,
         currency: row.baseCurrency,
         fxRateToEur: baseRate,
@@ -282,10 +355,15 @@ IbkrImportPlan buildIbkrImportPlan(
     addTransaction(
       quoteKey,
       Transaction(
-        id: _deterministicId(row.rawLine, 'quote'),
+        id: _semanticId('fx-quote', [
+          row.date.toIso8601String(),
+          row.baseCurrency,
+          row.quoteCurrency,
+          quoteImpact,
+        ]),
         date: row.date,
-        isBuy: row.quoteCashImpact >= 0,
-        quantity: row.quoteCashImpact.abs(),
+        isBuy: quoteImpact >= 0,
+        quantity: quoteImpact.abs(),
         unitPrice: 1,
         currency: row.quoteCurrency,
         fxRateToEur: quoteRate,
@@ -306,7 +384,13 @@ IbkrImportPlan buildIbkrImportPlan(
     final added = addTransaction(
       currencyKey,
       Transaction(
-        id: _deterministicId(row.rawLine, 'flow'),
+        id: _semanticId('flow', [
+          row.date.toIso8601String(),
+          type.name,
+          row.currency,
+          row.amount,
+          row.symbol,
+        ]),
         date: row.date,
         isBuy: row.amount >= 0,
         quantity: row.amount.abs(),

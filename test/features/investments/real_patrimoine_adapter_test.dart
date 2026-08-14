@@ -220,4 +220,83 @@ void main() {
     // s'ajouter à la valeur affichée du compte.
     expect(leaf.valeur, closeTo(250, 1e-9));
   });
+
+  test(
+      'un compte sans aucun investissement reste visible dans l\'accordéon '
+      '(à l\'utilisateur de décider de le supprimer)', () {
+    final emptyCto = InvestmentAccount(
+      assetClass: AssetClass.actionsEtFonds,
+      envelope: AccountEnvelope.cto,
+      name: 'CTO tout juste créé',
+      bankName: 'Interactive Brokers',
+      investments: const [],
+    );
+    final categories = buildRealCategoriesByAccount(
+      [emptyCto],
+      const <String, List<PricePoint>>{},
+      '/vault',
+    );
+    final actions = categories.singleWhere(
+      (c) => c.id == AssetClass.actionsEtFonds.categoryId,
+    );
+    final leaf = actions.accounts.singleWhere((a) => a.id == emptyCto.id);
+
+    expect(leaf.name, 'CTO tout juste créé');
+    expect(leaf.bankName, 'Interactive Brokers');
+    expect(leaf.investments, isEmpty);
+    expect(leaf.valeur, 0);
+    expect(leaf.canDelete, isTrue);
+  });
+
+  test(
+      'dans l\'accordéon d\'un compte, les positions en devise passent '
+      'après les titres et sont marquées isCurrency', () {
+    Transaction buy(double quantity) => Transaction(
+      date: DateTime(2026, 1, 10),
+      isBuy: true,
+      quantity: quantity,
+      unitPrice: 10,
+    );
+    final cto = InvestmentAccount(
+      assetClass: AssetClass.actionsEtFonds,
+      envelope: AccountEnvelope.cto,
+      name: 'CTO',
+      bankName: 'Interactive Brokers',
+      // Ordre volontairement entremêlé : devise, titre, devise, titre.
+      investments: [
+        Investment(isin: 'USD', label: 'USD', transactions: [buy(100)]),
+        Investment(
+          isin: 'FR0012345678',
+          label: 'TotalEnergies',
+          transactions: [buy(5)],
+        ),
+        Investment(isin: 'EUR', label: 'EUR', transactions: [buy(50)]),
+        Investment(
+          isin: 'US0231351067',
+          label: 'AMAZON.COM INC',
+          transactions: [buy(2)],
+        ),
+      ],
+    );
+    final categories = buildRealCategoriesByAccount(
+      [cto],
+      const <String, List<PricePoint>>{},
+      '/vault',
+    );
+    final actions = categories.singleWhere(
+      (c) => c.id == AssetClass.actionsEtFonds.categoryId,
+    );
+    final leaf = actions.accounts.singleWhere((a) => a.id == cto.id);
+
+    // Les titres gardent leur ordre d'origine, suivis des devises, elles
+    // aussi dans leur ordre d'origine.
+    expect(
+      leaf.investments.map((i) => i.name).toList(),
+      ['TotalEnergies', 'AMAZON.COM INC', 'USD', 'EUR'],
+    );
+    expect(
+      leaf.investments.map((i) => i.isCurrency).toList(),
+      [false, false, true, true],
+    );
+  });
 }

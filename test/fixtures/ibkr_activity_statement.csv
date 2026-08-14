@@ -1,0 +1,251 @@
+﻿Statement,Header,Field Name,Field Value
+Statement,Data,BrokerName,Interactive Brokers Ireland Limited
+Statement,Data,BrokerAddress,
+Statement,Data,Title,Activity Statement
+Statement,Data,Period,"February 13, 2023 - February 13, 2024"
+Statement,Data,WhenGenerated,"2026-08-14, 05:56:53 EDT"
+Account Information,Header,Field Name,Field Value
+Account Information,Data,Name,Baptiste Petiot
+Account Information,Data,Account Alias,Magnificent quality
+Account Information,Data,Account,U11444081
+Account Information,Data,Account Type,Individual
+Account Information,Data,Customer Type,Individual
+Account Information,Data,Account Capabilities,Cash
+Account Information,Data,Base Currency,EUR
+Net Asset Value,Header,Asset Class,Prior Total,Current Long,Current Short,Current Total,Change
+Net Asset Value,Data,Cash ,0,203.486193731,0,203.486193731,203.486193731
+Net Asset Value,Data,Stock,0,3717.8170566,0,3717.8170566,3717.8170566
+Net Asset Value,Data,Dividend Accruals,0,3.0254472,0,3.0254472,3.0254472
+Net Asset Value,Data,Total,0,3924.328697531,0,3924.328697531,3924.328697531
+Net Asset Value,Header,Time Weighted Rate of Return
+Net Asset Value,Data,19.84222894%
+Change in NAV,Header,Field Name,Field Value
+Change in NAV,Data,Starting Value,0
+Change in NAV,Data,Mark-to-Market,728.045468749
+Change in NAV,Data,Deposits & Withdrawals,3200
+Change in NAV,Data,Dividends,43.1616722
+Change in NAV,Data,Withholding Tax,-6.0709054
+Change in NAV,Data,Change in Dividend Accruals,2.915575
+Change in NAV,Data,Commissions,-43.820984973
+Change in NAV,Data,Sales Tax,-0.012
+Change in NAV,Data,Other FX Translations,0.1098722
+Change in NAV,Data,Ending Value,3924.328697531
+Mark-to-Market Performance Summary,Header,Asset Category,Symbol,Prior Quantity,Current Quantity,Prior Price,Current Price,Mark-to-Market P/L Position,Mark-to-Market P/L Transaction,Mark-to-Market P/L Commissions,Mark-to-Market P/L Other,Mark-to-Market P/L Total,Code
+Mark-to-Market Performance Summary,Data,Stocks,AAPL,0,3,--,185.0400,56.5045853,6.21646264,-2.79561,1.1355647,61.06100264,
+Mark-to-Market Performance Summary,Data,Stocks,ABBV,0,0,--,--,24.226101,-7.7309532,-2.806972946,6.9513948,20.639569654,
+Mark-to-Market Performance Summary,Data,Stocks,AMZN,0,2,--,168.6400,135.4987665,-1.5934215,-1.800858675,0,132.104486325,
+Mark-to-Market Performance Summary,Data,Stocks,FRT,0,5,--,101.0500,-19.1024281,0.3319943,-3.726785282,15.5629318,-6.934287282,
+Mark-to-Market Performance Summary,Data,Stocks,GOOG,0,3,--,146.3700,65.0685513,-1.042468671,-2.71246385,0,61.313618779,
+Mark-to-Market Performance Summary,Data,Stocks,KO,0,5,--,59.3500,-1.860884,0.21090861,-2.58800302,3.6207366,-0.61724181,
+Mark-to-Market Performance Summary,Data,Stocks,META,0,1,--,460.1200,265.5734065,0.037756,-0.9439,0,264.6672625,
+Mark-to-Market Performance Summary,Data,Stocks,MSFT,0,3,--,406.3200,208.7687805,-6.7378866,-2.8005,2.7830821,202.013476,
+Mark-to-Market Performance Summary,Data,Stocks,PEP,0,1,--,168.8800,-10.7786087,0.7301496,-0.92424,2.0085408,-8.9641583,
+Mark-to-Market Performance Summary,Data,Stocks,UIMM,0,0,--,--,11.86,0.42,-6,0.649054,6.929054,
+Mark-to-Market Performance Summary,Data,Stocks,XOM,0,0,--,--,-20.5939925,7.79041083,-3.735591199,4.379462,-12.159710869,
+Mark-to-Market Performance Summary,Data,Total,,,,,,715.1642778,-1.367047991,-30.834924973,37.0907668,720.053071636,
+Mark-to-Market Performance Summary,Data,Forex,EUR,0,134.97314,1.0000,1.0000,0,0,0,0,0,
+Mark-to-Market Performance Summary,Data,Forex,USD,0,73.37172967,--,0.93378,4.66976694,9.578472,-12.98606,0,1.26217894,
+Mark-to-Market Performance Summary,Data,Total,,,,,,4.66976694,9.578472,-12.98606,0,1.26217894,
+Mark-to-Market Performance Summary,Data,Total (All Assets),,,,,,719.83404474,8.211424009,-43.820984973,37.0907668,721.315250576,
+Realized & Unrealized Performance Summary,Header,Asset Category,Symbol,Cost Adj.,Realized S/T Profit,Realized S/T Loss,Realized L/T Profit,Realized L/T Loss,Realized Total,Unrealized S/T Profit,Unrealized S/T Loss,Unrealized L/T Profit,Unrealized L/T Loss,Unrealized Total,Total,Code
+Realized & Unrealized Performance Summary,Data,Stocks,AAPL,0,0,0,0,0,0,60.96742998,0,0,0,60.96742998,60.96742998,
+Realized & Unrealized Performance Summary,Data,Stocks,ABBV,0,14.483674554,0,0,0,14.483674554,0,0,0,0,0,14.483674554,
+Realized & Unrealized Performance Summary,Data,Stocks,AMZN,0,0,0,0,0,0,134.552375454,0,0,0,134.552375454,134.552375454,
+Realized & Unrealized Performance Summary,Data,Stocks,FRT,-2.09287224,0,0,0,0,0,2.549966424,-20.962613976,0,0,-18.412647552,-18.412647552,
+Realized & Unrealized Performance Summary,Data,Stocks,GOOG,0,0,0,0,0,0,70.65773193,-7.543728486,0,0,63.114003444,63.114003444,
+Realized & Unrealized Performance Summary,Data,Stocks,KO,0,0,0,0,0,0,0,-3.734214233,0,0,-3.734214233,-3.734214233,
+Realized & Unrealized Performance Summary,Data,Stocks,META,0,0,0,0,0,0,268.1069136,0,0,0,268.1069136,268.1069136,
+Realized & Unrealized Performance Summary,Data,Stocks,MSFT,0,0,0,0,0,0,205.3662354,-3.9592272,0,0,201.4070082,201.4070082,
+Realized & Unrealized Performance Summary,Data,Stocks,PEP,0,0,0,0,0,0,0,-10.8131724,0,0,-10.8131724,-10.8131724,
+Realized & Unrealized Performance Summary,Data,Stocks,UIMM,0,6.28,0,0,0,6.28,0,0,0,0,0,6.28,
+Realized & Unrealized Performance Summary,Data,Stocks,XOM,0,0.061806603,-16.091470803,0,0,-16.029664199,0,0,0,0,0,-16.029664199,
+Realized & Unrealized Performance Summary,Data,Total,,-2.09287224,20.825481157,-16.091470803,0,0,4.734010354,742.200652788,-47.012956295,0,0,695.187696493,699.921706847,
+Realized & Unrealized Performance Summary,Data,Forex,USD,0,12.884556,-19.791554,0,0,-6.906998,0.496571092,0,0,0,0.496571092,-6.410426908,
+Realized & Unrealized Performance Summary,Data,Total,,0,12.884556,-19.791554,0,0,-6.906998,0.496571092,0,0,0,0.496571092,-6.410426908,
+Realized & Unrealized Performance Summary,Data,Total (All Assets),,-2.09287224,33.710037157,-35.883024803,0,0,-2.172987646,742.69722388,-47.012956295,0,0,695.684267584,693.511279939,
+Cash Report,Header,Currency Summary,Currency,Total,Securities,Futures,
+Cash Report,Data,Starting Cash,Base Currency Summary,0,0,0,
+Cash Report,Data,Commissions,Base Currency Summary,-43.820984973,-43.820984973,0,
+Cash Report,Data,Deposits,Base Currency Summary,3200,3200,0,
+Cash Report,Data,Dividends,Base Currency Summary,43.1616722,43.1616722,0,
+Cash Report,Data,Trades (Sales),Base Currency Summary,5823.367502786,5823.367502786,0,
+Cash Report,Data,Trades (Purchase),Base Currency Summary,-8810.145273224,-8810.145273224,0,
+Cash Report,Data,Withholding Tax,Base Currency Summary,-6.0709054,-6.0709054,0,
+Cash Report,Data,Sales Tax,EUR,-0.012,-0.012,0,
+Cash Report,Data,Cash FX Translation Gain/Loss,Base Currency Summary,-2.99381766,-2.99381766,0,
+Cash Report,Data,Ending Cash,Base Currency Summary,203.486193731,203.486193731,0,
+Cash Report,Data,Ending Settled Cash,Base Currency Summary,203.486193731,203.486193731,0,
+Cash Report,Data,Starting Cash,EUR,0,0,0,
+Cash Report,Data,Commissions,EUR,-18.98606,-18.98606,0,
+Cash Report,Data,Deposits,EUR,3200,3200,0,
+Cash Report,Data,Trades (Sales),EUR,1154.4512,1154.4512,0,
+Cash Report,Data,Trades (Purchase),EUR,-4200.48,-4200.48,0,
+Cash Report,Data,Sales Tax,EUR,-0.012,-0.012,0,
+Cash Report,Data,Ending Cash,EUR,134.97314,134.97314,0,
+Cash Report,Data,Ending Settled Cash,EUR,134.97314,134.97314,0,
+Cash Report,Data,Starting Cash,USD,0,0,0,
+Cash Report,Data,Commissions,USD,-26.60454736,-26.60454736,0,
+Cash Report,Data,Dividends,USD,46.78,46.78,0,
+Cash Report,Data,Trades (Sales),USD,4991.7948904,4991.7948904,0,
+Cash Report,Data,Trades (Purchase),USD,-4932.01861336,-4932.01861336,0,
+Cash Report,Data,Withholding Tax,USD,-6.58,-6.58,0,
+Cash Report,Data,Ending Cash,USD,73.37172967,73.37172967,0,
+Cash Report,Data,Ending Settled Cash,USD,73.37172967,73.37172967,0,
+Open Positions,Header,DataDiscriminator,Asset Category,Currency,Symbol,Quantity,Mult,Cost Price,Cost Basis,Close Price,Value,Unrealized P/L,Code
+Open Positions,Data,Summary,Stocks,USD,AAPL,3,1,163.276333333,489.829,185.04,555.12,65.291,
+Open Positions,Data,Summary,Stocks,USD,AMZN,2,1,96.59285,193.1857,168.64,337.28,144.0943,
+Open Positions,Data,Summary,Stocks,USD,FRT,5,1,104.99368,524.9684,101.05,505.25,-19.7184,
+Open Positions,Data,Summary,Stocks,USD,GOOG,3,1,123.840066667,371.5202,146.37,439.11,67.5898,
+Open Positions,Data,Summary,Stocks,USD,KO,5,1,60.149806,300.74903,59.35,296.75,-3.99903,
+Open Positions,Data,Summary,Stocks,USD,META,1,1,173,173,460.12,460.12,287.12,
+Open Positions,Data,Summary,Stocks,USD,MSFT,3,1,334.423333333,1003.27,406.32,1218.96,215.69,
+Open Positions,Data,Summary,Stocks,USD,PEP,1,1,180.46,180.46,168.88,168.88,-11.58,
+Open Positions,Total,,Stocks,USD,,,,,3236.98233,,3981.47,744.48767,
+Open Positions,Total,,Stocks,EUR,,,,,3022.629360107,,3717.8170566,695.187696493,
+Forex Balances,Header,Asset Category,Currency,Description,Quantity,Cost Price,Cost Basis in EUR,Close Price,Value in EUR,Unrealized P/L in EUR,Code
+Forex Balances,Data,Forex,EUR,EUR,134.97314,0,-134.97314,1,134.97314,0,
+Forex Balances,Data,Forex,EUR,USD,73.371729,0.927012118,-68.016481908,0.93378,68.513053,0.496571092,
+Forex Balances,Data,Total,,,,,-202.989621908,,203.486193,0.496571092,
+Trades,Header,DataDiscriminator,Asset Category,Currency,Symbol,Date/Time,Quantity,T. Price,C. Price,Proceeds,Comm/Fee,Basis,Realized P/L,MTM P/L,Code
+Trades,Data,Order,Stocks,EUR,UIMM,"2023-08-10, 09:43:45",1,122.84,122.7,-122.84,-3,125.84,0,-0.14,O
+Trades,Data,Order,Stocks,EUR,UIMM,"2024-02-01, 06:32:23",-1,135.12,134.56,135.12,-3,-125.84,6.28,0.56,C
+Trades,SubTotal,,Stocks,EUR,UIMM,,0,,,12.28,-6,0,6.28,0.42,
+Trades,Total,,Stocks,EUR,,,,,,12.28,-6,0,6.28,0.42,
+Trades,Data,Order,Stocks,USD,AAPL,"2023-02-13, 11:37:26",1,153.099,153.85,-153.099,-1,154.099,0,0.751,O
+Trades,Data,Order,Stocks,USD,AAPL,"2023-03-06, 09:30:02",1,153.77,153.83,-153.77,-1,154.77,0,0.06,O
+Trades,Data,Order,Stocks,USD,AAPL,"2024-02-02, 09:30:01",1,179.96,185.85,-179.96,-1,180.96,0,5.89,O
+Trades,SubTotal,,Stocks,USD,AAPL,,3,,,-486.829,-3,489.829,0,6.701,
+Trades,Data,Order,Stocks,USD,ABBV,"2023-02-24, 09:30:00",1,151.3,152.71,-151.3,-1,152.3,0,1.41,O
+Trades,Data,Order,Stocks,USD,ABBV,"2023-03-06, 09:30:01",1,155.79,155.28,-155.79,-1,156.79,0,-0.51,O
+Trades,Data,Order,Stocks,USD,ABBV,"2024-02-01, 09:35:31",-2,162.92,167.59,325.84,-1.00293872,-309.09,15.747062,-9.34,C
+Trades,SubTotal,,Stocks,USD,ABBV,,0,,,18.75,-3.00293872,0,15.747062,-8.44,
+Trades,Data,Order,Stocks,USD,AMZN,"2023-02-23, 09:30:02",1,96.07,95.82,-96.07,-0.9622,97.0322,0,-0.25,O
+Trades,Data,Order,Stocks,USD,AMZN,"2023-03-06, 09:30:02",1,95.2,93.75,-95.2,-0.9535,96.1535,0,-1.45,O
+Trades,SubTotal,,Stocks,USD,AMZN,,2,,,-191.27,-1.9157,193.1857,0,-1.7,
+Trades,Data,Order,Stocks,USD,FRT,"2023-02-24, 09:30:00",1,106.04,107.02,-106.04,-1,107.04,0,0.98,O
+Trades,Data,Order,Stocks,USD,FRT,"2023-03-02, 09:30:00",2,106.03,106.22,-212.06,-1,213.06,0,0.38,O
+Trades,Data,Order,Stocks,USD,FRT,"2023-03-06, 09:30:00",1,107.63,107.16,-107.63,-1,108.63,0,-0.47,O
+Trades,Data,Order,Stocks,USD,FRT,"2023-07-05, 10:49:18",1,97.54,96.98,-97.54,-0.9754,98.5154,0,-0.56,O
+Trades,SubTotal,,Stocks,USD,FRT,,5,,,-523.27,-3.9754,527.2454,0,0.33,
+Trades,Data,Order,Stocks,USD,GOOG,"2023-02-23, 09:30:02",1,92,91.07,-92,-0.9215,92.9215,0,-0.93,O
+Trades,Data,Order,Stocks,USD,GOOG,"2023-07-05, 10:47:27",1,123.15,122.63,-123.15,-1,124.15,0,-0.52,O
+Trades,Data,Order,Stocks,USD,GOOG,"2024-01-26, 09:41:27",1,153.4487,153.79,-153.4487,-1,154.4487,0,0.3413,O
+Trades,SubTotal,,Stocks,USD,GOOG,,3,,,-368.5987,-2.9215,371.5202,0,-1.1087,
+Trades,Data,Order,Stocks,USD,KO,"2023-02-24, 09:30:01",2,59.68,59.84,-119.36,-1,120.36,0,0.32,O
+Trades,Data,Order,Stocks,USD,KO,"2023-07-07, 15:28:28",1,60,59.76,-60,-0.6,60.6,0,-0.24,O
+Trades,Data,Order,Stocks,USD,KO,"2024-01-26, 09:47:57",1,59.315,59.37,-59.315,-0.59315,59.90815,0,0.055,O
+Trades,Data,Order,Stocks,USD,KO,"2024-01-26, 09:49:23",1,59.288,59.37,-59.288,-0.59288,59.88088,0,0.082,O
+Trades,SubTotal,,Stocks,USD,KO,,5,,,-297.963,-2.78603,300.74903,0,0.217,
+Trades,Data,Order,Stocks,USD,META,"2023-02-23, 09:30:02",1,172,172.04,-172,-1,173,0,0.04,O
+Trades,SubTotal,,Stocks,USD,META,,1,,,-172,-1,173,0,0.04,
+Trades,Data,Order,Stocks,USD,MSFT,"2023-02-24, 09:30:02",1,250,249.22,-250,-1,251,0,-0.78,O
+Trades,Data,Order,Stocks,USD,MSFT,"2023-07-05, 10:51:00",1,340.71,338.15,-340.71,-1,341.71,0,-2.56,O
+Trades,Data,Order,Stocks,USD,MSFT,"2024-02-05, 09:30:03",1,409.56,405.65,-409.56,-1,410.56,0,-3.91,O
+Trades,SubTotal,,Stocks,USD,MSFT,,3,,,-1000.27,-3,1003.27,0,-7.25,
+Trades,Data,Order,Stocks,USD,PEP,"2023-08-27, 20:00:15",1,179.46,180.25,-179.46,-1,180.46,0,0.79,O
+Trades,SubTotal,,Stocks,USD,PEP,,1,,,-179.46,-1,180.46,0,0.79,
+Trades,Data,Order,Stocks,USD,XOM,"2023-02-24, 09:33:35",1,109.37,110.75,-109.37,-1,110.37,0,1.38,O
+Trades,Data,Order,Stocks,USD,XOM,"2023-03-06, 09:32:37",1,112.04,113.81,-112.04,-1,113.04,0,1.77,O
+Trades,Data,Order,Stocks,USD,XOM,"2024-01-26, 09:43:30",1,101.959,103,-101.959,-1,102.959,0,1.041,O
+Trades,Data,Order,Stocks,USD,XOM,"2024-02-02, 09:32:30",-3,103.36,101.97,310.08,-1.00297864,-326.369,-17.291978,4.17,C
+Trades,SubTotal,,Stocks,USD,XOM,,0,,,-13.289,-4.00297864,0,-17.291978,8.361,
+Trades,Total,,Stocks,USD,,,,,,-3214.1997,-26.60454736,3239.25933,-1.544916,-2.0597,
+Trades,Total,,Stocks,EUR,,,,,,-3008.636242191,-24.834924973,3031.925177518,-1.54598839,-1.787047991,
+Trades,Header,DataDiscriminator,Asset Category,Currency,Symbol,Date/Time,Quantity,T. Price,,Proceeds,Comm in EUR,,,MTM in EUR,Code
+Trades,Data,Order,Forex,USD,EUR.USD,"2023-02-13, 11:36:38",-190,1.0712,,203.528,-1.87312,,,-0.222352,
+Trades,Data,Order,Forex,USD,EUR.USD,"2023-02-23, 07:16:27","-3,006",1.0605,,3187.863,-1.88588,,,3.023886,
+Trades,Data,Order,Forex,USD,EUR.USD,"2023-03-01, 02:21:23","1,015",1.06115,,-1077.06725,-1.89104,,,5.454096,
+Trades,Data,Order,Forex,USD,EUR.USD,"2023-07-05, 10:49:52",-340,1.0867,,369.478,-1.8383,,,0.411166,
+Trades,Data,Order,Forex,USD,EUR.USD,"2023-07-05, 10:57:13",-30,1.08705,,32.6115,-1.8383,,,0.045953,
+Trades,Data,Order,Forex,USD,EUR.USD,"2023-07-11, 20:00:33",1.0551,1.10095,,-1.161612345,0,,,0.011531,
+Trades,Data,Order,Forex,USD,EUR.USD,"2023-07-19, 20:15:22",3.2761,1.12025,,-3.670051025,0,,,-0.021441,
+Trades,Data,Order,Forex,USD,EUR.USD,"2023-07-30, 17:15:00",-426.64,1.10161,,469.9908904,-1.8155,,,0.741516,
+Trades,Data,Order,Forex,USD,EUR.USD,"2024-01-26, 09:44:42",-85,1.0871,,92.4035,-1.84392,,,0.134117,
+Trades,SubTotal,,Forex,USD,EUR.USD,,-3058.3088,,,3273.97597703,-12.98606,,,9.578472,
+Trades,Total,,Forex,USD,,,,,,3273.97597703,-12.98606,,,9.578472,
+Trades,Total,,Forex,EUR,,,,,,3067.887271744,-12.98606,,,9.578472,
+Deposits & Withdrawals,Header,Currency,Settle Date,Description,Amount
+Deposits & Withdrawals,Data,EUR,2023-02-13,Electronic Fund Transfer,200
+Deposits & Withdrawals,Data,EUR,2023-02-23,Electronic Fund Transfer,3000
+Deposits & Withdrawals,Data,Total,,,3200
+Fees,Header,Subtitle,Currency,Date,Description,Amount
+Fees,Data,Other Fees,EUR,2023-03-02,F******64:US Consolidated Snapshot for Feb 2023,-0.06
+Fees,Data,Other Fees,EUR,2023-03-02,F******64:US Consolidated Snapshot for Feb 2023,0.06
+Fees,Data,Total,,,,0
+Fees,Notes,"Market data is provided by Global Financial Information Services (GmbH). Your local broker collects amounts owed for fees and tax for such data on behalf of Global Financial Information Services (GmbH). Note, you are responsible for any applicable taxes relating to the provision of these services."
+Dividends,Header,Currency,Date,Description,Amount
+Dividends,Data,USD,2023-04-03,KO(US1912161007) Cash Dividend USD 0.46 per Share (Ordinary Dividend),0.92
+Dividends,Data,USD,2023-04-17,FRT(US3137451015) Cash Dividend USD 1.08 per Share (Ordinary Dividend),4.32
+Dividends,Data,USD,2023-05-15,ABBV(US00287Y1091) Cash Dividend USD 1.48 per Share (Ordinary Dividend),2.96
+Dividends,Data,USD,2023-05-18,AAPL(US0378331005) Cash Dividend USD 0.24 per Share (Ordinary Dividend),0.48
+Dividends,Data,USD,2023-06-08,MSFT(US5949181045) Cash Dividend USD 0.68 per Share (Ordinary Dividend),0.68
+Dividends,Data,USD,2023-06-09,XOM(US30231G1022) Cash Dividend USD 0.91 per Share (Ordinary Dividend),1.82
+Dividends,Data,USD,2023-07-03,KO(US1912161007) Cash Dividend USD 0.46 per Share (Ordinary Dividend),0.92
+Dividends,Data,USD,2023-07-17,FRT(US3137451015) Cash Dividend USD 1.08 per Share (Ordinary Dividend),4.32
+Dividends,Data,USD,2023-08-15,ABBV(US00287Y1091) Cash Dividend USD 1.48 per Share (Ordinary Dividend),2.96
+Dividends,Data,USD,2023-08-17,AAPL(US0378331005) Cash Dividend USD 0.24 per Share (Ordinary Dividend),0.48
+Dividends,Data,USD,2023-09-11,XOM(US30231G1022) Cash Dividend USD 0.91 per Share (Ordinary Dividend),1.82
+Dividends,Data,USD,2023-09-14,MSFT(US5949181045) Cash Dividend USD 0.68 per Share (Ordinary Dividend),1.36
+Dividends,Data,USD,2023-09-29,PEP(US7134481081) Cash Dividend USD 1.265 per Share (Ordinary Dividend),1.27
+Dividends,Data,USD,2023-10-02,KO(US1912161007) Cash Dividend USD 0.46 per Share (Ordinary Dividend),1.38
+Dividends,Data,USD,2023-10-16,FRT(US3137451015) Cash Dividend USD 1.09 per Share (Ordinary Dividend),5.45
+Dividends,Data,USD,2023-11-15,ABBV(US00287Y1091) Cash Dividend USD 1.48 per Share (Ordinary Dividend),2.96
+Dividends,Data,USD,2023-11-16,AAPL(US0378331005) Cash Dividend USD 0.24 per Share (Ordinary Dividend),0.48
+Dividends,Data,USD,2023-12-11,XOM(US30231G1022) Cash Dividend USD 0.95 per Share (Ordinary Dividend),1.9
+Dividends,Data,USD,2023-12-14,MSFT(US5949181045) Cash Dividend USD 0.75 per Share (Ordinary Dividend),1.5
+Dividends,Data,USD,2023-12-15,KO(US1912161007) Cash Dividend USD 0.46 per Share (Ordinary Dividend),1.38
+Dividends,Data,USD,2024-01-05,PEP(US7134481081) Cash Dividend USD 1.265 per Share (Ordinary Dividend),1.27
+Dividends,Data,USD,2024-01-16,FRT(US3137451015) Cash Dividend USD 1.09 per Share (Ordinary Dividend),5.45
+Dividends,Data,USD,2024-02-07,UIMM(LU0629459743) Cash Dividend USD 0.7037 per Share (Mixed Income),0.7
+Dividends,Data,Total,,,46.78
+Dividends,Data,Total in EUR,,,43.1616722
+Withholding Tax,Header,Currency,Date,Description,Amount,Code
+Withholding Tax,Data,USD,2023-04-03,KO(US1912161007) Cash Dividend USD 0.46 per Share - US Tax,-0.14,
+Withholding Tax,Data,USD,2023-04-17,FRT(US3137451015) Cash Dividend USD 1.08 per Share - US Tax,-0.65,
+Withholding Tax,Data,USD,2023-04-17,FRT(US3137451015) Cash Dividend USD 1.08 per Share - US Tax,0.65,
+Withholding Tax,Data,USD,2023-04-17,FRT(US3137451015) Cash Dividend USD 1.08 per Share - US Tax,-0.55,
+Withholding Tax,Data,USD,2023-05-15,ABBV(US00287Y1091) Cash Dividend USD 1.48 per Share - US Tax,-0.44,
+Withholding Tax,Data,USD,2023-05-18,AAPL(US0378331005) Cash Dividend USD 0.24 per Share - US Tax,-0.07,
+Withholding Tax,Data,USD,2023-06-08,MSFT(US5949181045) Cash Dividend USD 0.68 per Share - US Tax,-0.1,
+Withholding Tax,Data,USD,2023-06-09,XOM(US30231G1022) Cash Dividend USD 0.91 per Share - US Tax,-0.27,
+Withholding Tax,Data,USD,2023-07-03,KO(US1912161007) Cash Dividend USD 0.46 per Share - US Tax,-0.14,
+Withholding Tax,Data,USD,2023-07-17,FRT(US3137451015) Cash Dividend USD 1.08 per Share - US Tax,-0.65,
+Withholding Tax,Data,USD,2023-07-17,FRT(US3137451015) Cash Dividend USD 1.08 per Share - US Tax,0.65,
+Withholding Tax,Data,USD,2023-07-17,FRT(US3137451015) Cash Dividend USD 1.08 per Share - US Tax,-0.55,
+Withholding Tax,Data,USD,2023-08-15,ABBV(US00287Y1091) Cash Dividend USD 1.48 per Share - US Tax,-0.44,
+Withholding Tax,Data,USD,2023-08-17,AAPL(US0378331005) Cash Dividend USD 0.24 per Share - US Tax,-0.07,
+Withholding Tax,Data,USD,2023-09-11,XOM(US30231G1022) Cash Dividend USD 0.91 per Share - US Tax,-0.27,
+Withholding Tax,Data,USD,2023-09-14,MSFT(US5949181045) Cash Dividend USD 0.68 per Share - US Tax,-0.2,
+Withholding Tax,Data,USD,2023-09-29,PEP(US7134481081) Cash Dividend USD 1.265 per Share - US Tax,-0.19,
+Withholding Tax,Data,USD,2023-10-02,KO(US1912161007) Cash Dividend USD 0.46 per Share - US Tax,-0.21,
+Withholding Tax,Data,USD,2023-10-16,FRT(US3137451015) Cash Dividend USD 1.09 per Share - US Tax,-0.82,
+Withholding Tax,Data,USD,2023-10-16,FRT(US3137451015) Cash Dividend USD 1.09 per Share - US Tax,0.82,
+Withholding Tax,Data,USD,2023-10-16,FRT(US3137451015) Cash Dividend USD 1.09 per Share - US Tax,-0.69,
+Withholding Tax,Data,USD,2023-11-15,ABBV(US00287Y1091) Cash Dividend USD 1.48 per Share - US Tax,-0.44,
+Withholding Tax,Data,USD,2023-11-16,AAPL(US0378331005) Cash Dividend USD 0.24 per Share - US Tax,-0.07,
+Withholding Tax,Data,USD,2023-12-11,XOM(US30231G1022) Cash Dividend USD 0.95 per Share - US Tax,-0.29,
+Withholding Tax,Data,USD,2023-12-14,MSFT(US5949181045) Cash Dividend USD 0.75 per Share - US Tax,-0.23,
+Withholding Tax,Data,USD,2023-12-15,KO(US1912161007) Cash Dividend USD 0.46 per Share - US Tax,-0.21,
+Withholding Tax,Data,USD,2024-01-05,PEP(US7134481081) Cash Dividend USD 1.265 per Share - US Tax,-0.19,
+Withholding Tax,Data,USD,2024-01-16,FRT(US3137451015) Cash Dividend USD 1.09 per Share - US Tax,-0.82,
+Withholding Tax,Data,Total,,,-6.58,
+Withholding Tax,Data,Total in EUR,,,-6.0709054,
+Change in Dividend Accruals,Header,Asset Category,Currency,Symbol,Date,Ex Date,Pay Date,Quantity,Tax,Fee,Gross Rate,Gross Amount,Net Amount,Code
+Change in Dividend Accruals,Data,Starting Dividend Accruals in EUR,,,,,,,,,,,0,
+Change in Dividend Accruals,Data,Stocks,USD,AAPL,2023-05-11,2023-05-12,2023-05-18,2,0.07,0,0.24,0.48,0.41,Po
+Change in Dividend Accruals,Data,Stocks,USD,AAPL,2023-05-18,2023-05-12,2023-05-18,2,-0.07,0,0.24,-0.48,-0.41,Re
+Change in Dividend Accruals,Data,Ending Dividend Accruals in EUR,,,,,,,,,,,3.0254472,
+Financial Instrument Information,Header,Asset Category,Symbol,Description,Conid,Security ID,Underlying,Listing Exch,Multiplier,Type,Code
+Financial Instrument Information,Data,Stocks,AAPL,APPLE INC,265598,US0378331005,,NASDAQ,1,COMMON,
+Financial Instrument Information,Data,Stocks,ABBV,ABBVIE INC,118089500,US00287Y1091,,NYSE,1,COMMON,
+Financial Instrument Information,Data,Stocks,AMZN,AMAZON.COM INC,3691937,US0231351067,,NASDAQ,1,COMMON,
+Financial Instrument Information,Data,Stocks,FRT,FEDERAL REALTY INVS TRUST,535271307,US3137451015,,NYSE,1,REIT,
+Financial Instrument Information,Data,Stocks,GOOG,ALPHABET INC-CL C,208813720,US02079K1079,,NASDAQ,1,COMMON,
+Financial Instrument Information,Data,Stocks,KO,COCA-COLA CO/THE,8894,US1912161007,,NYSE,1,COMMON,
+Financial Instrument Information,Data,Stocks,META,META PLATFORMS INC-CLASS A,107113386,US30303M1027,,NASDAQ,1,COMMON,
+Financial Instrument Information,Data,Stocks,MSFT,MICROSOFT CORP,272093,US5949181045,,NASDAQ,1,COMMON,
+Financial Instrument Information,Data,Stocks,PEP,PEPSICO INC,11017,US7134481081,,NASDAQ,1,COMMON,
+Financial Instrument Information,Data,Stocks,UIMM,UBS ETF MSCI WORLD SRI,93785221,LU0629459743,,IBIS,1,ETF,
+Financial Instrument Information,Data,Stocks,XOM,EXXON MOBIL CORP,13977,US30231G1022,,NYSE,1,COMMON,
+Notes/Legal Notes,Header,Type,Note
+Notes/Legal Notes,Data,Notes,"Quantities preceded by a ""-"" sign indicate sell transactions. Other transactions are purchases. "

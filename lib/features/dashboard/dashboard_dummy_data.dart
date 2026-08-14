@@ -179,6 +179,14 @@ class PatrimoineAccount {
   /// distincte (son nom tient alors lieu de banque).
   final String? bankName;
 
+  /// `true` quand cette ligne représente une position en devise (épargne,
+  /// ou devise tenue dans un compte-titres — voir `isCurrencyInvestment`
+  /// dans `investments_models.dart`) plutôt qu'un titre coté. Sert à
+  /// afficher ces lignes en dernier et à les distinguer visuellement des
+  /// titres dans l'accordéon d'un compte (voir `_AccountLine` dans
+  /// `category_detail_screen.dart`). `false` pour les données de démo.
+  final bool isCurrency;
+
   const PatrimoineAccount({
     this.id,
     required this.name,
@@ -193,6 +201,7 @@ class PatrimoineAccount {
     this.canDelete = true,
     this.avatarImagePath,
     this.avatarInitials,
+    this.isCurrency = false,
     this.priceUnavailable,
     this.bankName,
   });
