@@ -1,7 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/ui/frosted_card.dart';
-import '../dashboard_dummy_data.dart';
+import '../patrimoine_models.dart';
 import 'allocation_blocks_view.dart';
 import 'allocation_donut_view.dart';
 import 'allocation_pyramid_view.dart';

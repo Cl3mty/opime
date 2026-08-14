@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
-import '../dashboard_dummy_data.dart';
+import '../patrimoine_models.dart';
 import 'allocation_hover_tooltip.dart';
 
 /// Vue "pyramide" de l'Allocation : les catégories sont regroupées par

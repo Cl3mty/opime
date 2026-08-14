@@ -211,10 +211,18 @@ Future<Investment?> _resolveInvestmentPrice({
     }
   }
 
+  // Date la plus ancienne à couvrir par l'historique de cours — la
+  // transaction la plus ancienne de l'investissement, pour qu'une
+  // estimation de performance sur toute sa durée de détention (voir
+  // `real_patrimoine_adapter.dart`'s `_valuationAt`) dispose de vrais
+  // cours plutôt que d'un repli sur le montant investi faute d'historique.
+  final neededSince = _earliestTransactionDate(investment);
+
   final priceRepo = PriceHistoryRepository(vaultPath, client: yahoo);
   final result = await priceRepo.syncIfNeeded(
     investment.isin,
     symbol,
+    neededSince: neededSince,
     round: !fullPrecision,
     onNetworkError: onNetworkError,
     onNetworkSuccess: onNetworkSuccess,
@@ -249,6 +257,10 @@ Future<Investment?> _resolveInvestmentPrice({
     final fxResult = await priceRepo.syncIfNeeded(
       pair,
       pair,
+      // Même besoin de recul que le cours du titre lui-même : convertir sa
+      // valorisation à une date ancienne suppose un taux de change connu à
+      // cette même date.
+      neededSince: neededSince,
       round: false,
       onNetworkError: onNetworkError,
       onNetworkSuccess: onNetworkSuccess,
@@ -340,6 +352,18 @@ bool _pricedToday(Investment investment) {
   return lastFetch.year == today.year &&
       lastFetch.month == today.month &&
       lastFetch.day == today.day;
+}
+
+/// Date de la transaction la plus ancienne de [investment] — `null` sans
+/// transaction (investissement tout juste créé, avant tout achat), auquel
+/// cas [PriceHistoryRepository.syncIfNeeded] ne cherche pas à couvrir plus
+/// que la journée courante.
+DateTime? _earliestTransactionDate(Investment investment) {
+  DateTime? earliest;
+  for (final t in investment.transactions) {
+    if (earliest == null || t.date.isBefore(earliest)) earliest = t.date;
+  }
+  return earliest;
 }
 
 /// Or/argent physique : pas de ticker, un prix par pièce/lingot extrait du

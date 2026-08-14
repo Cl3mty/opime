@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons, Color;
-import '../dashboard/dashboard_dummy_data.dart';
+import '../dashboard/patrimoine_models.dart';
 import 'liabilities_models.dart';
 
-/// Adapte les passifs réels vers les mêmes types que les données de démo
-/// (`dashboard/dashboard_dummy_data.dart`) pour réutiliser telles quelles
-/// les cartes du Dashboard — même principe que
+/// Adapte les passifs réels vers le modèle générique du Dashboard
+/// (`dashboard/patrimoine_models.dart`) pour réutiliser telles quelles ses
+/// cartes — même principe que
 /// `features/investments/real_patrimoine_adapter.dart` côté actifs.
 const _categoryMeta = {
   LiabilityType.pretImmobilier: (
@@ -64,7 +64,6 @@ PatrimoineCategory emptyPassifCategoryFor(String categoryId) {
     tier: meta.$3,
     description: meta.$4,
     accounts: const [],
-    history: const [],
   );
 }
 
@@ -81,16 +80,14 @@ PatrimoineCategory _buildCategory(
     tier: meta.$3,
     description: meta.$4,
     accounts: [for (final liability in liabilities) _buildLeaf(liability)],
-    history: remainingBalanceHistoryFor(liabilities),
   );
 }
 
 /// Un passif compte comme "PatrimoineAccount" à part entière : [valeur] est
 /// le capital restant dû, [plusValueAbs]/[plusValuePercent] le montant déjà
-/// remboursé — négatif (donc affiché en rouge), même convention que les
-/// données de démo pour ces mêmes catégories (une baisse de la dette est
+/// remboursé — négatif (donc affiché en rouge) : une baisse de la dette est
 /// visuellement traitée comme la baisse de n'importe quelle "valeur", sans
-/// distinction de signe métier entre actif et passif).
+/// distinction de signe métier entre actif et passif.
 PatrimoineAccount _buildLeaf(Liability liability) {
   final remaining = liability.remainingBalance;
   final repaid = remaining - liability.montantEmprunte;
@@ -175,10 +172,10 @@ Map<String, List<NetWorthPoint>> perLiabilityHistoryOnGrid(
 }
 
 /// Comme [remainingBalanceHistoryFor], mais évalué aux dates de [grid]
-/// (voir `real_patrimoine_adapter.dart`'s `sharedDateGrid`) plutôt que sur
-/// une grille propre aux dates de prêt — pour le mode "Patrimoine brut" du
-/// graphique Patrimoine complet (brut = net + dettes), où le capital
-/// restant dû doit partager les mêmes abscisses que les classes d'actif.
+/// (voir `real_patrimoine_adapter.dart`'s `evenDateGrid`) plutôt que sur
+/// une grille propre aux dates de prêt — pour la carte "Patrimoine net" du
+/// Dashboard, où le capital restant dû doit partager les mêmes abscisses,
+/// bornées par la période sélectionnée, que le côté actifs.
 List<NetWorthPoint> totalBalanceOnGrid(
   List<Liability> liabilities,
   List<DateTime> grid,
@@ -186,6 +183,22 @@ List<NetWorthPoint> totalBalanceOnGrid(
   return [
     for (final date in grid) NetWorthPoint(date, _balanceAt(liabilities, date)),
   ];
+}
+
+/// Première date de départ de prêt, tous [liabilities] confondus — `null`
+/// sans aucun passif. Même rôle que
+/// `real_patrimoine_adapter.dart`'s `earliestTransactionDateAcrossAccounts`
+/// côté actifs : sert à ancrer la borne "Tout" de la carte "Patrimoine net"
+/// du Dashboard sur la donnée la plus ancienne, actifs et passifs confondus.
+DateTime? earliestLiabilityStart(List<Liability> liabilities) {
+  DateTime? earliest;
+  for (final liability in liabilities) {
+    if (earliest == null || liability.dateDebut.isBefore(earliest)) {
+      earliest = liability.dateDebut;
+    }
+  }
+  if (earliest == null) return null;
+  return DateTime.utc(earliest.year, earliest.month, earliest.day);
 }
 
 double _balanceAt(List<Liability> liabilities, DateTime date) {

@@ -1,7 +1,8 @@
 import 'dart:async' show unawaited;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
-import '../investments/investments_models.dart' show AssetClass;
+import '../investments/investments_models.dart'
+    show AssetClass, InvestmentAccount;
 import '../investments/investments_repository.dart';
 import '../investments/patrimoine_refresh_controller.dart';
 import '../investments/price_refresh_service.dart';
@@ -10,21 +11,20 @@ import '../investments/real_patrimoine_adapter.dart';
 import '../investments/real_patrimoine_card.dart';
 import '../liabilities/liabilities_repository.dart';
 import '../liabilities/real_passifs_adapter.dart';
-import 'dashboard_dummy_data.dart';
 import 'onboarding_highlight_controller.dart';
+import 'patrimoine_models.dart';
 import 'widgets/allocation_card.dart';
 import 'widgets/category_breakdown_card.dart';
 import 'widgets/dashboard_onboarding_view.dart';
-import 'widgets/patrimoine_card.dart';
 import 'widgets/top_assets_row.dart';
+import '../investments/yahoo_finance_client.dart' show PricePoint;
+import '../liabilities/liabilities_models.dart' show Liability;
 
 /// Tableau de bord : patrimoine (graphique + évolution), allocation, et
-/// meilleurs actifs — même structure visuelle pour tout le monde. Le
-/// profil "Lou" ([isDemoProfile]) voit des données d'exemple
-/// ([dashboardSampleData]) ; tout autre profil voit ses propres comptes de
-/// placement réels (`features/investments/`), toujours pour l'intégralité
-/// des classes d'actifs (même vides). La création se fait exclusivement
-/// via le flux "Compléter mon patrimoine" de la TopBar — voir
+/// meilleurs actifs, à partir des comptes de placement réels
+/// (`features/investments/`), toujours pour l'intégralité des classes
+/// d'actifs (même vides). La création se fait exclusivement via le flux
+/// "Compléter mon patrimoine" de la TopBar — voir
 /// [PatrimoineRefreshController] pour le signal de rechargement associé.
 ///
 /// C'est aussi ici, à l'ouverture, que les cours de tous les investissements
@@ -34,7 +34,6 @@ import 'widgets/top_assets_row.dart';
 /// performance affichées soient déjà à jour dès l'arrivée sur le Dashboard.
 class DashboardScreen extends StatelessWidget {
   final String vaultPath;
-  final bool isDemoProfile;
   final AmountVisibilityController amountVisibility;
   final PatrimoineRefreshController refreshSignal;
   final PriceSyncStatusController priceSyncStatus;
@@ -43,7 +42,6 @@ class DashboardScreen extends StatelessWidget {
   const DashboardScreen({
     super.key,
     required this.vaultPath,
-    required this.isDemoProfile,
     required this.amountVisibility,
     required this.refreshSignal,
     required this.priceSyncStatus,
@@ -52,94 +50,12 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (isDemoProfile) {
-      return _DemoDashboard(amountVisibility: amountVisibility);
-    }
     return _RealDashboard(
       vaultPath: vaultPath,
       amountVisibility: amountVisibility,
       refreshSignal: refreshSignal,
       priceSyncStatus: priceSyncStatus,
       onboardingHighlight: onboardingHighlight,
-    );
-  }
-}
-
-class _DemoDashboard extends StatelessWidget {
-  final AmountVisibilityController amountVisibility;
-
-  const _DemoDashboard({required this.amountVisibility});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: amountVisibility,
-      builder: (context, _) {
-        final hidden = amountVisibility.hidden;
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final narrow = constraints.maxWidth < 800;
-              final patrimoineCard = PatrimoineCard(
-                data: dashboardSampleData,
-                hidden: hidden,
-              );
-              final allocationCard = AllocationCard(
-                actifs: dashboardActifsCategories,
-                passifs: dashboardPassifsCategories,
-                hidden: hidden,
-              );
-
-              final topRow = narrow
-                  ? Column(
-                      children: [
-                        SizedBox(height: 460, child: patrimoineCard),
-                        const SizedBox(height: 16),
-                        SizedBox(height: 320, child: allocationCard),
-                      ],
-                    )
-                  : SizedBox(
-                      height: 460,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(flex: 2, child: patrimoineCard),
-                          const SizedBox(width: 16),
-                          Expanded(child: allocationCard),
-                        ],
-                      ),
-                    );
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  topRow,
-                  const SizedBox(height: 24),
-                  TopAssetsRow(assets: dashboardSampleData.topAssets),
-                  const SizedBox(height: 24),
-                  CategoryBreakdownCard(
-                    title: 'Actifs',
-                    categories: dashboardActifsCategories,
-                    hidden: hidden,
-                    // Le PRU reste visible sur les pages de détail de
-                    // chaque classe d'actif, pas ici : la vue agrégée du
-                    // Dashboard montre uniquement montant et évolution.
-                    showPru: false,
-                  ),
-                  const SizedBox(height: 16),
-                  CategoryBreakdownCard(
-                    title: 'Passifs',
-                    categories: dashboardPassifsCategories,
-                    hidden: hidden,
-                    showPru: false,
-                  ),
-                ],
-              );
-            },
-          ),
-        );
-      },
     );
   }
 }
@@ -171,9 +87,18 @@ class _RealDashboardState extends State<_RealDashboard> {
   List<PatrimoineCategory> _categoriesByAccount = [];
   List<PatrimoineCategory> _passifCategories = [];
   List<DashboardAsset> _topAssets = [];
-  Map<String, List<NetWorthPoint>> _actifsHistoryById = {};
-  List<NetWorthPoint> _totalPassifHistory = [];
   bool _isEverythingEmpty = false;
+
+  // Données brutes retenues (pas seulement les `PatrimoineCategory` qui en
+  // découlent) pour que les closures ci-dessous puissent recalculer
+  // l'historique "Patrimoine net" à la demande, borné à la période
+  // sélectionnée dans `RealPatrimoineCard` — sans relire le disque à
+  // chaque changement d'onglet (voir [_actifsHistoryFor]/
+  // [_totalPassifHistoryFor], purement en mémoire).
+  List<InvestmentAccount> _accounts = [];
+  Map<String, List<PricePoint>> _priceHistories = {};
+  List<Liability> _liabilities = [];
+  DateTime? _earliest;
 
   @override
   void initState() {
@@ -204,8 +129,8 @@ class _RealDashboardState extends State<_RealDashboard> {
   @override
   void dispose() {
     widget.refreshSignal.removeListener(_loadFromDisk);
-    // Repart de zéro pour le prochain profil affiché (ex : Lou, sur lequel
-    // ce signal ne doit jamais rester actif par erreur) — voir
+    // Repart de zéro pour le prochain profil affiché (ce signal ne doit
+    // jamais rester actif par erreur pour un autre profil) — voir
     // [OnboardingHighlightController]. Différé via microtask : appeler
     // notifyListeners() en plein dispose() (l'arbre de widgets est
     // verrouillé pendant le démontage) fait planter tout listener qui
@@ -246,6 +171,13 @@ class _RealDashboardState extends State<_RealDashboard> {
     widget.onboardingHighlight.setEmpty(isEverythingEmpty);
     setState(() {
       _isEverythingEmpty = isEverythingEmpty;
+      _accounts = accounts;
+      _priceHistories = priceHistories;
+      _liabilities = liabilities;
+      _earliest = _earliestOf(
+        earliestTransactionDateAcrossAccounts(accounts),
+        earliestLiabilityStart(liabilities),
+      );
       _categories = buildAllRealCategories(
         accounts,
         priceHistories,
@@ -257,18 +189,52 @@ class _RealDashboardState extends State<_RealDashboard> {
         widget.vaultPath,
       );
       _topAssets = buildRealTopAssets(accounts, priceHistories);
-      final grid = sharedDateGrid(accounts);
-      _actifsHistoryById = {
-        for (final assetClass in AssetClass.values)
-          assetClass.categoryId: categoryHistoryOnGrid(
-            investmentsForEffectiveClass(accounts, assetClass),
-            priceHistories,
-            grid,
-          ),
-      };
-      _totalPassifHistory = totalBalanceOnGrid(liabilities, grid);
       _passifCategories = buildAllRealPassifCategories(liabilities);
     });
+  }
+
+  static DateTime? _earliestOf(DateTime? a, DateTime? b) {
+    if (a == null) return b;
+    if (b == null) return a;
+    return a.isBefore(b) ? a : b;
+  }
+
+  /// Historique "Patrimoine net"/"Patrimoine brut" par classe d'actif pour
+  /// une période donnée — voir `RealPatrimoineCard.actifsHistoryFor`.
+  /// Recalculé à la demande à partir des données déjà en mémoire (aucune
+  /// E/S), à chaque changement d'onglet de période.
+  Map<String, List<NetWorthPoint>> _actifsHistoryFor(DashboardPeriod period) {
+    final today = DateTime.utc(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+    final earliest = _earliest ?? today;
+    final start = period.startFor(today: today, earliest: earliest);
+    final grid = evenDateGrid(start, today);
+    return {
+      for (final assetClass in AssetClass.values)
+        assetClass.categoryId: categoryHistoryOnGrid(
+          investmentsForEffectiveClass(_accounts, assetClass),
+          _priceHistories,
+          grid,
+        ),
+    };
+  }
+
+  /// Comme [_actifsHistoryFor], côté passifs — même grille (même [_earliest],
+  /// même période) pour que la soustraction actifs − passifs de
+  /// `buildPatrimoineChartData` reste alignée terme à terme.
+  List<NetWorthPoint> _totalPassifHistoryFor(DashboardPeriod period) {
+    final today = DateTime.utc(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+    final earliest = _earliest ?? today;
+    final start = period.startFor(today: today, earliest: earliest);
+    final grid = evenDateGrid(start, today);
+    return totalBalanceOnGrid(_liabilities, grid);
   }
 
   /// Résout/synchronise le cours de tous les investissements du vault (voir
@@ -309,8 +275,8 @@ class _RealDashboardState extends State<_RealDashboard> {
                   final narrow = constraints.maxWidth < 800;
                   final patrimoineCard = RealPatrimoineCard(
                     actifs: _categories,
-                    actifsHistoryById: _actifsHistoryById,
-                    totalPassifHistory: _totalPassifHistory,
+                    actifsHistoryFor: _actifsHistoryFor,
+                    totalPassifHistoryFor: _totalPassifHistoryFor,
                     hidden: hidden,
                   );
                   final allocationCard = AllocationCard(

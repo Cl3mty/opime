@@ -1,19 +1,18 @@
 import 'dart:math' as math;
 import 'package:path/path.dart' as p;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons, Color;
-import '../dashboard/dashboard_dummy_data.dart';
+import '../dashboard/patrimoine_models.dart';
 import 'investments_models.dart';
 import 'metal_price_client.dart';
 import 'metal_price_repository.dart';
 import 'price_history_repository.dart';
 import 'yahoo_finance_client.dart';
 
-/// Adapte les comptes de placement réels (`InvestmentAccount`) vers les
-/// mêmes types que les données de démo (`dashboard/dashboard_dummy_data.dart`)
-/// pour réutiliser telles quelles les cartes du Dashboard (`PatrimoineCard`
-/// simplifiée, `AllocationCard`, `TopAssetsRow`, `CategoryBreakdownCard`,
-/// `CategoryDetailScreen`) plutôt que d'en écrire des équivalents dédiés
-/// aux données réelles.
+/// Adapte les comptes de placement réels (`InvestmentAccount`) vers le
+/// modèle générique du Dashboard (`dashboard/patrimoine_models.dart`) pour
+/// réutiliser telles quelles ses cartes (`AllocationCard`, `TopAssetsRow`,
+/// `CategoryBreakdownCard`, `CategoryDetailScreen`) plutôt que d'en écrire
+/// des équivalents dédiés aux données réelles.
 const _categoryMeta = {
   AssetClass.immobilier: (
     LucideIcons.house,
@@ -150,9 +149,6 @@ PatrimoineCategory _buildCategory(
     tier: meta.$3,
     description: meta.$4,
     accounts: leaves,
-    history: netWorthHistoryFor([
-      for (final (_, investment) in pairs) investment,
-    ], priceHistories),
   );
 }
 
@@ -227,9 +223,6 @@ PatrimoineCategory _buildCategoryByAccount(
     tier: meta.$3,
     description: meta.$4,
     accounts: leaves,
-    history: netWorthHistoryFor([
-      for (final (_, investment) in pairs) investment,
-    ], priceHistories),
   );
 }
 
@@ -383,7 +376,6 @@ PatrimoineCategory emptyCategoryFor(String categoryId) {
     tier: meta.$3,
     description: meta.$4,
     accounts: const [],
-    history: const [],
   );
 }
 
@@ -493,12 +485,56 @@ double? _lastPriceToEur(Investment investment) {
   return lastPrice * (investment.lastFxRateToEur ?? 1.0);
 }
 
+/// Cours le plus proche à ou avant [date] dans [history] (triée par date
+/// croissante) — prolonge le plus ancien cours connu vers le passé plutôt
+/// que de renvoyer `null` quand [date] précède le premier point (un
+/// produit dont l'historique Yahoo commence après l'achat, par exemple),
+/// pour éviter une pique verticale trompeuse en début de courbe. `null`
+/// seulement si [history] est vide.
+double? _priceAt(List<PricePoint> history, DateTime date) {
+  double? priceAtDate;
+  for (final p in history) {
+    if (p.date.isAfter(date)) break;
+    priceAtDate = p.close;
+  }
+  if (priceAtDate == null && history.isNotEmpty) {
+    priceAtDate = history.first.close;
+  }
+  return priceAtDate;
+}
+
+/// Rendement réel sur [period], dérivé du cours à son début et à
+/// aujourd'hui (voir [_priceAt]) — `null` sans historique suffisant (moins
+/// de deux points, ou aucun cours positif exploitable).
+double? _priceReturnForPeriod(
+  List<PricePoint> history,
+  DashboardPeriod period,
+) {
+  if (history.length < 2) return null;
+  final today = DateTime.utc(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+  );
+  final firstDate = history.first.date;
+  final earliest = DateTime.utc(
+    firstDate.year,
+    firstDate.month,
+    firstDate.day,
+  );
+  final start = period.startFor(today: today, earliest: earliest);
+  final priceStart = _priceAt(history, start);
+  final priceEnd = _priceAt(history, today);
+  if (priceStart == null || priceStart <= 0 || priceEnd == null) return null;
+  return (priceEnd - priceStart) / priceStart * 100;
+}
+
 /// Un [DashboardAsset] par investissement valorisé, pour réutiliser
-/// [TopAssetsRow] tel quel. [DashboardAsset.changePercent] est ici la
-/// plus-value latente réelle (pas de retour réel par période — la
-/// période choisie dans [TopAssetsRow] continue d'appliquer la même
-/// formule synthétique d'échelle qu'en démo, appliquée cette fois à un
-/// vrai chiffre de base plutôt qu'à un chiffre d'exemple).
+/// [TopAssetsRow] tel quel — [DashboardAsset.changePercentForPeriod] donne
+/// un rendement réel par cours, le même calcul pour les 6 périodes (y
+/// compris "Tout", qui n'utilise donc plus la plus-value latente comme
+/// autrefois : cohérent avec les 5 autres onglets plutôt qu'une mesure
+/// différente pour un seul d'entre eux).
 List<DashboardAsset> buildRealTopAssets(
   List<InvestmentAccount> accounts,
   Map<String, List<PricePoint>> priceHistories,
@@ -507,11 +543,6 @@ List<DashboardAsset> buildRealTopAssets(
   for (final account in accounts) {
     for (final investment in account.investments) {
       if (investment.quantityHeld <= 0) continue;
-      final invested = investment.investedAmount;
-      final gain = investment.unrealizedGain;
-      final changePercent = (gain == null || invested == 0)
-          ? 0.0
-          : gain / invested * 100;
       final history = priceHistories[investment.isin] ?? const [];
       final sparkline = history.length >= 2
           ? [
@@ -529,8 +560,9 @@ List<DashboardAsset> buildRealTopAssets(
         DashboardAsset(
           name: investment.label,
           ticker: investment.isin,
-          changePercent: changePercent,
           sparkline: sparkline,
+          changePercentForPeriod: (period) =>
+              _priceReturnForPeriod(history, period),
         ),
       );
     }
@@ -538,49 +570,63 @@ List<DashboardAsset> buildRealTopAssets(
   return assets;
 }
 
-/// Reconstruit un historique de patrimoine (somme, jour par jour, de
-/// `quantité détenue × cours à cette date`) depuis les transactions et
-/// l'historique de cours en cache de [investments] — de la première
-/// transaction à aujourd'hui. Sans cours connu à une date donnée, retombe
-/// sur le montant investi jusqu'à cette date (même repli que partout
-/// ailleurs sans cours). Retourne une liste vide si [investments] n'a
-/// aucune transaction.
-List<NetWorthPoint> netWorthHistoryFor(
-  List<Investment> investments,
-  Map<String, List<PricePoint>> priceHistories,
-) {
+/// Première date de transaction, tous [investments] confondus — `null` sans
+/// aucune transaction. Sert de repli pour la borne de départ de la période
+/// "Tout" (voir `DashboardPeriod.all`), jamais remontée plus tôt qu'elle.
+DateTime? earliestTransactionDate(List<Investment> investments) {
   DateTime? earliest;
   for (final investment in investments) {
     for (final t in investment.transactions) {
       if (earliest == null || t.date.isBefore(earliest)) earliest = t.date;
     }
   }
-  if (earliest == null) return [];
+  if (earliest == null) return null;
+  return DateTime.utc(earliest.year, earliest.month, earliest.day);
+}
 
-  final start = DateTime.utc(earliest.year, earliest.month, earliest.day);
-  final now = DateTime.now();
-  final end = DateTime.utc(now.year, now.month, now.day);
+/// ~30 dates régulièrement espacées entre [start] et [end] inclus, toujours
+/// terminées par [end] — grille partagée par le côté actif
+/// ([netWorthHistoryFor]) et passif (`real_passifs_adapter.dart`) du
+/// Dashboard, pour qu'une même période sélectionnée produise le même
+/// domaine de dates des deux côtés (nécessaire pour soustraire terme à
+/// terme dans `buildPatrimoineChartData`).
+List<DateTime> evenDateGrid(DateTime start, DateTime end) {
+  if (!end.isAfter(start)) return [start, end];
   final totalDays = end.difference(start).inDays;
-
-  // ~30 points répartis sur toute la période (même densité que l'historique
-  // de démo), avec toujours un dernier point à aujourd'hui.
   final stepDays = math.max(1, (totalDays / 30).ceil());
-  final points = <NetWorthPoint>[];
-  for (var offset = 0; offset < totalDays; offset += stepDays) {
-    final date = start.add(Duration(days: offset));
-    points.add(
+  final dates = <DateTime>[
+    for (var offset = 0; offset < totalDays; offset += stepDays)
+      start.add(Duration(days: offset)),
+  ];
+  dates.add(end);
+  return dates;
+}
+
+/// Reconstruit un historique de patrimoine (somme, jour par jour, de
+/// `quantité détenue × cours à cette date`) depuis les transactions et
+/// l'historique de cours en cache de [investments], entre [start] et [end]
+/// (voir [evenDateGrid]) — bornes calculées par l'appelant à partir de la
+/// période sélectionnée (voir `DashboardPeriod.startFor`), pas dérivées ici
+/// de la première transaction : la même fonction sert aussi bien "1M" que
+/// "Tout" sans jamais générer une grille sur l'historique complet puis la
+/// trancher a posteriori (ancien bug de correspondance période ↔ durée).
+List<NetWorthPoint> netWorthHistoryFor(
+  List<Investment> investments,
+  Map<String, List<PricePoint>> priceHistories, {
+  required DateTime start,
+  required DateTime end,
+}) {
+  final points = [
+    for (final date in evenDateGrid(start, end))
       NetWorthPoint(date, _valuationAt(investments, priceHistories, date)),
-    );
-  }
-  points.add(
-    NetWorthPoint(end, _valuationAt(investments, priceHistories, end)),
-  );
-  // Un compte dont la première transaction est aujourd'hui (totalDays == 0)
-  // ne produirait qu'un seul point — le graphique d'évolution exige au
-  // moins deux points (voir `NetWorthChart`) et afficherait sinon "Pas
-  // assez de données sur cette période". On ajoute le point de départ,
-  // au même jour et à la même valeur : la courbe se réduit à une ligne
-  // plate, ce qui reflète honnêtement l'absence d'historique.
+  ];
+  // Une période qui ne contient qu'un seul jour (`start == end`, ex. "1J"
+  // sur un compte créé aujourd'hui) ne produirait qu'un seul point — le
+  // graphique d'évolution exige au moins deux points (voir `NetWorthChart`)
+  // et afficherait sinon "Pas assez de données sur cette période". On
+  // ajoute le point de départ, au même jour et à la même valeur : la
+  // courbe se réduit à une ligne plate, ce qui reflète honnêtement
+  // l'absence d'historique sur cette période.
   if (points.length < 2) {
     points.insert(
       0,
@@ -621,59 +667,38 @@ double _valuationAt(
     }
     if (quantity == 0) continue;
 
-    final history = priceHistories[investment.isin] ?? const [];
-    double? priceAtDate;
-    for (final p in history) {
-      if (p.date.isAfter(date)) break;
-      priceAtDate = p.close;
-    }
-    // Aucun cours à cette date ni avant ? S'il en existe un plus tard (un
-    // produit métal dont le premier relevé quotidien est plus récent que
-    // l'achat, ou un titre acheté avant le début de son historique Yahoo),
-    // on prolonge le plus ancien cours connu vers le passé plutôt que de
-    // retomber sur le coût d'achat : sans ce repli, la courbe sautait d'un
-    // seul coup du montant investi au cours de marché au premier point de
-    // cours, créant une pique verticale trompeuse en bout de graphique (ex :
-    // la classe "Métaux précieux" tant que les relevés n'ont pas accumulé
-    // d'historique). Même convention que `calculateTwr`
+    // [_priceAt] prolonge le plus ancien cours connu vers le passé plutôt
+    // que de renvoyer `null` avant le premier point (un produit métal dont
+    // le premier relevé quotidien est plus récent que l'achat, ou un titre
+    // acheté avant le début de son historique Yahoo) : sans ce repli, la
+    // courbe sautait d'un seul coup du montant investi au cours de marché
+    // au premier point de cours, créant une pique verticale trompeuse en
+    // bout de graphique. Même convention que `calculateTwr`
     // (`performance_calculator.dart`), qui valorise déjà la période
     // antérieure au premier cours au prix de ce premier cours.
-    if (priceAtDate == null && history.isNotEmpty) {
-      priceAtDate = history.first.close;
-    }
+    final history = priceHistories[investment.isin] ?? const [];
+    final priceAtDate = _priceAt(history, date);
     total += priceAtDate != null ? quantity * priceAtDate : invested;
   }
   return total;
 }
 
-/// Grille de dates commune à toutes les classes d'actif, depuis la toute
-/// première transaction (tous comptes confondus) jusqu'à aujourd'hui —
-/// contrairement à [netWorthHistoryFor], dont la grille est propre à
-/// chaque sous-ensemble d'investissements passé en argument. Nécessaire
-/// pour empiler plusieurs classes sur les mêmes abscisses dans le
-/// graphique "Patrimoine complet" (voir [categoryHistoryOnGrid]).
-List<DateTime> sharedDateGrid(List<InvestmentAccount> accounts) {
+/// Première date de transaction, tous [accounts] confondus — `null` sans
+/// aucun investissement. Même rôle que [earliestTransactionDate], mais à
+/// l'échelle de tous les comptes (le Dashboard doit borner sa période
+/// "Tout" sur la donnée la plus ancienne toutes classes confondues, pas
+/// classe par classe) plutôt que d'une seule liste d'investissements déjà
+/// filtrée par classe.
+DateTime? earliestTransactionDateAcrossAccounts(
+  List<InvestmentAccount> accounts,
+) {
   DateTime? earliest;
   for (final account in accounts) {
-    for (final investment in account.investments) {
-      for (final t in investment.transactions) {
-        if (earliest == null || t.date.isBefore(earliest)) earliest = t.date;
-      }
-    }
+    final candidate = earliestTransactionDate(account.investments);
+    if (candidate == null) continue;
+    if (earliest == null || candidate.isBefore(earliest)) earliest = candidate;
   }
-  if (earliest == null) return [];
-
-  final start = DateTime.utc(earliest.year, earliest.month, earliest.day);
-  final now = DateTime.now();
-  final end = DateTime.utc(now.year, now.month, now.day);
-  final totalDays = end.difference(start).inDays;
-  final stepDays = math.max(1, (totalDays / 30).ceil());
-  final dates = <DateTime>[
-    for (var offset = 0; offset < totalDays; offset += stepDays)
-      start.add(Duration(days: offset)),
-  ];
-  dates.add(end);
-  return dates;
+  return earliest;
 }
 
 /// Investissements dont la classe effective (voir [buildRealCategories])
@@ -693,9 +718,9 @@ List<Investment> investmentsForEffectiveClass(
 }
 
 /// Comme [netWorthHistoryFor], mais évalué aux dates de [grid] (voir
-/// [sharedDateGrid]) plutôt que sur une grille propre à [investments] —
-/// pour que plusieurs classes d'actif partagent les mêmes abscisses et
-/// puissent être empilées dans le graphique "Patrimoine complet".
+/// [evenDateGrid]) plutôt que sur une grille propre à [investments] — pour
+/// que plusieurs classes d'actif partagent les mêmes abscisses et puissent
+/// être empilées dans le graphique "Patrimoine complet".
 List<NetWorthPoint> categoryHistoryOnGrid(
   List<Investment> investments,
   Map<String, List<PricePoint>> priceHistories,

@@ -3,7 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../../navigation/navigation_scope.dart';
-import '../dashboard_dummy_data.dart';
+import '../patrimoine_models.dart';
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);

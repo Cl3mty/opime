@@ -3,16 +3,15 @@ import 'dart:ui' as ui;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
-import '../dashboard_dummy_data.dart';
+import '../patrimoine_models.dart';
 import 'net_worth_chart.dart';
 
-/// Une couche sélectionnable/empilable dans la carte "Patrimoine" (démo ou
-/// réelle) : un point coloré en légende, une bande empilée du même nom
-/// dans le graphique. Type générique partagé par [PatrimoineCard] (démo,
-/// `dashboard_dummy_data.dart`'s `AssetFilter`) et `RealPatrimoineCard`
+/// Une couche sélectionnable/empilable dans la carte "Patrimoine" : un
+/// point coloré en légende, une bande empilée du même nom dans le
+/// graphique — utilisé par `RealPatrimoineCard`
 /// (`features/investments/real_patrimoine_card.dart`, classes d'actif
 /// réelles) pour réutiliser les mêmes contrôles et le même graphique sans
-/// coupler ce fichier à l'un ou l'autre modèle de données.
+/// coupler ce fichier au module Investissements.
 class ChartLayer {
   final String id;
   final String label;
@@ -34,10 +33,8 @@ class ChartLayer {
 
 enum PatrimoineKind { net, brut }
 
-enum PatrimoineValueMode { valeur, performance }
-
 /// Titre "Patrimoine net"/"Patrimoine brut" avec bascule et infobulle sur
-/// TWR/MWR — partagé entre données de démo et réelles.
+/// TWR/MWR.
 class PatrimoineTitleRow extends StatelessWidget {
   final PatrimoineKind kind;
   final ValueChanged<PatrimoineKind> onChanged;
@@ -210,37 +207,6 @@ class CategoryMultiSelect extends StatelessWidget {
   }
 }
 
-class ValueModeToggle extends StatelessWidget {
-  final PatrimoineValueMode mode;
-  final ValueChanged<PatrimoineValueMode> onChanged;
-
-  const ValueModeToggle({
-    super.key,
-    required this.mode,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ButtonGroup(
-      children: [
-        SelectedButton(
-          value: mode == PatrimoineValueMode.valeur,
-          selectedStyle: const ButtonStyle.primary(),
-          onChanged: (_) => onChanged(PatrimoineValueMode.valeur),
-          child: shadcn.Text('Valeur').small(),
-        ),
-        SelectedButton(
-          value: mode == PatrimoineValueMode.performance,
-          selectedStyle: const ButtonStyle.primary(),
-          onChanged: (_) => onChanged(PatrimoineValueMode.performance),
-          child: shadcn.Text('Performance').small(),
-        ),
-      ],
-    );
-  }
-}
-
 class EmptySelectionAmount extends StatelessWidget {
   const EmptySelectionAmount({super.key});
 
@@ -252,20 +218,68 @@ class EmptySelectionAmount extends StatelessWidget {
   }
 }
 
-/// Rebase une série sur sa valeur de départ, exprimée en variation en %
-/// depuis le premier point — pour le mode Performance.
-List<NetWorthPoint> rebaseToPercent(List<NetWorthPoint> points) {
-  if (points.isEmpty) return points;
-  final base = points.first.value;
-  if (base == 0) return points;
-  return [
-    for (final p in points)
-      NetWorthPoint(p.date, (p.value - base) / base * 100),
-  ];
+/// Plus-value en % entre le premier et le dernier point d'une période —
+/// `null` s'il n'y a pas assez de points ou si le point de départ est
+/// négatif ou nul : diviser par une valeur de départ non positive
+/// produirait un pourcentage sans signification, même quand la variation
+/// absolue (`last.value - first.value`) est parfaitement lisible et
+/// positive (ex : un patrimoine net qui repart d'une valeur négative en
+/// tout début d'historique — un prêt souscrit avant que les actifs
+/// n'existent encore). Voir [PeriodChangeRow], qui affiche ce pourcentage
+/// sans jamais s'en servir pour la couleur/icône de tendance (dérivées de
+/// la variation absolue, toujours définie).
+double? changePercentFor(List<NetWorthPoint> points) {
+  if (points.length < 2) return null;
+  final first = points.first.value;
+  if (first <= 0) return null;
+  return (points.last.value - first) / first * 100;
 }
 
-/// Couleur de la courbe "Patrimoine net" (dorée) — partagée par la carte
-/// Patrimoine de démo et la carte des données réelles.
+/// Ligne "+1 234 € (+4,56 %)" affichée sous le montant total — évolution
+/// absolue puis relative sur la période sélectionnée (les onglets de
+/// [PeriodTabs]). Le texte omet la parenthèse quand [changePercent] est
+/// `null` (voir [changePercentFor]) plutôt que d'afficher un pourcentage
+/// trompeur. [color]/[icon] restent au choix de l'appelant — toujours
+/// dérivés du signe de [absoluteChange], jamais de [changePercent] — pour
+/// rester cohérents avec les constantes `_green`/`_red` déjà définies
+/// localement dans chaque carte.
+class PeriodChangeRow extends StatelessWidget {
+  final double absoluteChange;
+  final double? changePercent;
+  final bool hidden;
+  final Color color;
+  final IconData icon;
+
+  const PeriodChangeRow({
+    super.key,
+    required this.absoluteChange,
+    required this.changePercent,
+    required this.hidden,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = changePercent;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        shadcn.Text(
+          percent == null
+              ? displayEuros(absoluteChange, hidden)
+              : '${displayEuros(absoluteChange, hidden)} '
+                    '(${displayPercent(percent)})',
+          style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        ).small(),
+      ],
+    );
+  }
+}
+
+/// Couleur de la courbe "Patrimoine net" (dorée).
 const netWorthColor = Color(0xFFF59E0B);
 
 /// Données prêtes à l'emploi pour [StackedNetWorthChart] (mode Valeur),
@@ -286,14 +300,13 @@ class PatrimoineChartData {
   });
 }
 
-/// Règle métier commune aux cartes Patrimoine (démo et réelle) pour le
-/// mode Valeur :
+/// Règle métier commune aux cartes Patrimoine pour le mode Valeur :
 ///  - **Patrimoine net** : une seule courbe dorée "Patrimoine net" qui vaut
 ///    à chaque instant la somme des actifs moins la somme des passifs. La
 ///    sélection multi-classes n'a pas d'effet dans ce mode — toutes les
 ///    classes sont toujours incluses. Une courbe nette prédéfinie peut être
-///    fournie via [netSeriesOverride] (cas de la carte démo, dont la série
-///    nette est un historique prédéfini plutôt qu'une soustraction).
+///    fournie via [netSeriesOverride] plutôt que d'être dérivée par
+///    soustraction, si l'appelant en dispose déjà.
 ///  - **Patrimoine brut** : uniquement les actifs sélectionnés, empilés
 ///    dans leurs couleurs respectives — les passifs n'apparaissent jamais.
 ///

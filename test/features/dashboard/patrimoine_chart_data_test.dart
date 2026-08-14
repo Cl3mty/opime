@@ -1,6 +1,6 @@
 import 'dart:ui' show Color;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:opime/features/dashboard/dashboard_dummy_data.dart';
+import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/dashboard/widgets/patrimoine_chart_widgets.dart';
 
 /// Trois classes d'actif avec des séries de trois points alignées, utilisées
@@ -192,5 +192,27 @@ void main() {
       [for (final p in _series().first) p.date],
     );
     expect([for (final p in data.totalPoints) p.date], data.dates);
+  });
+
+  group('changePercentFor', () {
+    test('null sans au moins deux points', () {
+      expect(changePercentFor(const []), isNull);
+      expect(changePercentFor([_p(0, 100)]), isNull);
+    });
+
+    test(
+        'null quand le premier point est négatif ou nul — même si la '
+        'variation absolue est positive (régression : un patrimoine net qui '
+        'repart d\'une valeur négative affichait un pourcentage sans '
+        'rapport avec le sens réel de l\'évolution)', () {
+      expect(changePercentFor([_p(0, -500), _p(1, 2000)]), isNull);
+      expect(changePercentFor([_p(0, 0), _p(1, 2000)]), isNull);
+    });
+
+    test('pourcentage correct quand le premier point est strictement positif',
+        () {
+      expect(changePercentFor([_p(0, 100), _p(1, 120)]), closeTo(20, 1e-9));
+      expect(changePercentFor([_p(0, 100), _p(1, 80)]), closeTo(-20, 1e-9));
+    });
   });
 }

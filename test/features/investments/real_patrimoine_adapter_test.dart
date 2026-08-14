@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/real_patrimoine_adapter.dart';
 import 'package:opime/features/investments/yahoo_finance_client.dart';
@@ -298,5 +299,113 @@ void main() {
       leaf.investments.map((i) => i.isCurrency).toList(),
       [false, false, true, true],
     );
+  });
+
+  test(
+      'netWorthHistoryFor est bornée à [start, end] plutôt que sur '
+      'l\'historique complet (régression : "1M" sur un vieux compte '
+      'montrait quasiment tout l\'historique, pas un mois réel)', () {
+    final investment = Investment(
+      isin: 'FR0012345678',
+      label: 'TotalEnergies',
+      transactions: [
+        Transaction(
+          date: DateTime.utc(2024, 1, 1),
+          isBuy: true,
+          quantity: 10,
+          unitPrice: 50,
+        ),
+      ],
+    );
+    // "1M" avant le 14/08/2026, sur un compte ouvert bien plus tôt.
+    final start = DateTime.utc(2026, 7, 15);
+    final end = DateTime.utc(2026, 8, 14);
+    final points = netWorthHistoryFor(
+      [investment],
+      const {},
+      start: start,
+      end: end,
+    );
+
+    expect(points, isNotEmpty);
+    for (final p in points) {
+      expect(
+        p.date.isBefore(start) || p.date.isAfter(end),
+        isFalse,
+        reason: 'point hors période : ${p.date}',
+      );
+    }
+    expect(points.last.date, end);
+  });
+
+  test(
+      'buildRealTopAssets : changePercentForPeriod calcule un rendement '
+      'réel par cours (régression : l\'ancienne formule était une '
+      'ondulation synthétique dérivée de la plus-value latente, pas un '
+      'vrai calcul par période)', () {
+    final priceHistory = [
+      PricePoint(DateTime.utc(2025, 1, 1), 100),
+      PricePoint(DateTime.utc(2025, 2, 1), 120),
+    ];
+    final account = InvestmentAccount(
+      assetClass: AssetClass.actionsEtFonds,
+      envelope: AccountEnvelope.cto,
+      name: 'CTO',
+      investments: [
+        Investment(
+          isin: 'FR0012345678',
+          label: 'TotalEnergies',
+          transactions: [
+            Transaction(
+              date: DateTime.utc(2025, 1, 1),
+              isBuy: true,
+              quantity: 5,
+              unitPrice: 90,
+            ),
+          ],
+        ),
+      ],
+    );
+    final asset = buildRealTopAssets(
+      [account],
+      {'FR0012345678': priceHistory},
+    ).single;
+
+    // "Tout" : cours du premier point connu (100) au dernier (120) = +20 %.
+    expect(
+      asset.changePercentForPeriod(DashboardPeriod.all),
+      closeTo(20, 1e-6),
+    );
+  });
+
+  test(
+      'buildRealTopAssets : changePercentForPeriod est null sans '
+      'historique de cours suffisant, sans planter le tri de '
+      '"Mes meilleurs actifs"', () {
+    final account = InvestmentAccount(
+      assetClass: AssetClass.actionsEtFonds,
+      envelope: AccountEnvelope.cto,
+      name: 'CTO',
+      investments: [
+        Investment(
+          isin: 'FR0012345678',
+          label: 'TotalEnergies',
+          transactions: [
+            Transaction(
+              date: DateTime.utc(2025, 1, 1),
+              isBuy: true,
+              quantity: 5,
+              unitPrice: 90,
+            ),
+          ],
+        ),
+      ],
+    );
+    final asset = buildRealTopAssets(
+      [account],
+      const <String, List<PricePoint>>{},
+    ).single;
+
+    expect(asset.changePercentForPeriod(DashboardPeriod.all), isNull);
   });
 }

@@ -1,8 +1,8 @@
 import 'dart:typed_data';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
+import '../../core/ui/copyable_identifier.dart';
 import '../../core/ui/frosted_card.dart';
 import 'account_detail_screen.dart' show BackHeader;
 import 'confirm_delete_dialog.dart';
@@ -567,21 +567,6 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
         : value.toString();
   }
 
-  Future<void> _copyIsin(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: widget.investment.isin));
-    if (!context.mounted) return;
-    showToast(
-      context: context,
-      location: ToastLocation.bottomRight,
-      builder: (context, overlay) => SurfaceCard(
-        child: Basic(
-          title: shadcn.Text(_isRealIsin ? 'ISIN copié' : 'Identifiant copié'),
-          subtitle: shadcn.Text(widget.investment.isin),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final investment = widget.investment;
@@ -639,15 +624,20 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             )
           else ...[
             if (!_isImmobilier && !_isCurrency) ...[
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
                 children: [
-                  shadcn.Text(investment.isin).muted().small(),
-                  const SizedBox(width: 4),
-                  IconButton.ghost(
-                    icon: const Icon(LucideIcons.copy, size: 14),
-                    onPressed: () => _copyIsin(context),
+                  CopyableIdentifier(
+                    value: investment.isin,
+                    toastTitle: _isRealIsin ? 'ISIN copié' : 'Identifiant copié',
                   ),
+                  if (investment.symbol != null &&
+                      investment.symbol!.isNotEmpty)
+                    CopyableIdentifier(
+                      value: investment.symbol!,
+                      toastTitle: 'Ticker copié',
+                    ),
                 ],
               ),
               const SizedBox(height: 4),

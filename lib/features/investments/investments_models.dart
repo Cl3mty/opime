@@ -15,10 +15,10 @@ String generateInvestmentId(String prefix) {
 }
 
 /// Classe d'actif choisie à la création d'un compte — mêmes 7 catégories
-/// que celles du Dashboard de démo (`dashboard/dashboard_dummy_data.dart`,
-/// `PatrimoineCategory`) et de la sidebar (`actifs_*` dans
-/// `nav_models.dart`), pour que les comptes réels puissent un jour
-/// alimenter les mêmes vues (Allocation, répartition Actifs/Passifs...)
+/// que celles du modèle générique du Dashboard
+/// (`dashboard/patrimoine_models.dart`, `PatrimoineCategory`) et de la
+/// sidebar (`actifs_*` dans `nav_models.dart`), pour que les comptes réels
+/// alimentent les mêmes vues (Allocation, répartition Actifs/Passifs...)
 /// via [categoryId].
 enum AssetClass {
   immobilier,
@@ -49,7 +49,7 @@ enum AssetClass {
   }
 
   /// Identifiant de catégorie correspondant (`actifs_*` de
-  /// `nav_models.dart`/`dashboard_dummy_data.dart`), pour relier plus tard
+  /// `nav_models.dart`/`patrimoine_models.dart`), pour relier plus tard
   /// les comptes réels aux mêmes vues que les données de démo.
   String get categoryId {
     switch (this) {

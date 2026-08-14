@@ -1,7 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../dashboard/category_detail_screen.dart';
-import '../dashboard/dashboard_dummy_data.dart';
+import '../dashboard/patrimoine_models.dart';
 import '../investments/patrimoine_refresh_controller.dart';
 import 'liabilities_models.dart';
 import 'liabilities_repository.dart';
@@ -13,13 +13,18 @@ import 'real_passifs_adapter.dart'
         perLiabilityHistoryOnGrid;
 
 /// Charge les passifs réels puis affiche [CategoryDetailScreen] pour le
-/// type [categoryId] ('passifs_prets_immobiliers'/'passifs_emprunts') —
-/// équivalent réel de ces entrées du Dashboard de démo. La création d'un
-/// passif se fait exclusivement via le flux "Compléter mon patrimoine" de
-/// la TopBar (voir `investments/complete_patrimoine_dialog.dart`), pas
-/// depuis cette page. Cliquer sur une ligne ouvre en local (pas de
+/// type [categoryId] ('passifs_prets_immobiliers'/'passifs_emprunts'). La
+/// création d'un passif se fait exclusivement via le flux "Compléter mon
+/// patrimoine" de la TopBar (voir `investments/complete_patrimoine_dialog.dart`),
+/// pas depuis cette page. Cliquer sur une ligne ouvre en local (pas de
 /// `Navigator.push`) le détail du passif : édition, suppression,
 /// documents.
+///
+/// Le graphique par onglets de période de [CategoryDetailScreen] reste
+/// volontairement non borné par période ici (voir
+/// [_historyByLiabilityId]/[perLiabilityHistoryOnGrid]) : il projette
+/// toujours jusqu'au remboursement final de chaque prêt, cohérent avec la
+/// vue détaillée d'un passif ([LiabilityDetailView]) qui fait de même.
 class RealPassifDetailScreen extends StatefulWidget {
   final String vaultPath;
   final String categoryId;
@@ -149,7 +154,9 @@ class _RealPassifDetailScreenState extends State<RealPassifDetailScreen> {
       category: category,
       amountVisibility: widget.amountVisibility,
       onAccountTap: _openLiability,
-      historyByLineId: _historyByLiabilityId,
+      // Toujours la même projection complète, quelle que soit la période
+      // sélectionnée dans l'onglet — voir la doc de classe ci-dessus.
+      historyByLineIdForPeriod: (_) => _historyByLiabilityId,
       showAvatar: false,
       accountsCardTitle: 'Passifs',
     );

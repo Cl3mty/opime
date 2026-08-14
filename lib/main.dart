@@ -17,14 +17,14 @@ import 'app/app_shell.dart';
 import 'core/platform_info.dart';
 import 'core/ui/load_error_view.dart';
 import 'core/ui/mobile_orientation.dart';
-import 'features/dashboard/category_detail_screen.dart';
-import 'features/dashboard/dashboard_dummy_data.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/dashboard/onboarding_highlight_controller.dart';
+import 'features/investments/investments_models.dart' show AssetClass;
 import 'features/investments/patrimoine_refresh_controller.dart';
 import 'features/investments/price_sync_banner.dart';
 import 'features/investments/price_sync_status_controller.dart';
 import 'features/investments/real_category_detail_screen.dart';
+import 'features/liabilities/liabilities_models.dart' show LiabilityType;
 import 'features/liabilities/real_passif_detail_screen.dart';
 import 'features/strategy/strategy_screen.dart';
 import 'package:flutter_quill/flutter_quill.dart'
@@ -292,50 +292,34 @@ class _OpimeAppState extends State<OpimeApp> {
           assistantConfigController: _assistantConfigController,
           assistantChatController: _assistantChatController!,
           pages: {
-            // Les données d'exemple restent réservées au profil "Lou" (démo) :
-            // tout autre profil voit son vrai Dashboard, vide au départ, où
-            // il crée ses propres comptes de placement.
             'dashboard': (_) => DashboardScreen(
               key: ValueKey(_profileController!.activeDataPath),
               vaultPath: _profileController!.activeDataPath,
-              isDemoProfile: _profileController!.active?.name == 'Lou',
               amountVisibility: _amountVisibilityController,
               refreshSignal: _patrimoineRefreshController,
               priceSyncStatus: _priceSyncStatusController,
               onboardingHighlight: _onboardingHighlightController,
             ),
-            for (final category in dashboardActifsCategories)
-              category.id: (_) => _profileController!.active?.name == 'Lou'
-                  ? CategoryDetailScreen(
-                      category: category,
-                      amountVisibility: _amountVisibilityController,
-                    )
-                  : RealCategoryDetailScreen(
-                      key: ValueKey(
-                        '${_profileController!.activeDataPath}_${category.id}',
-                      ),
-                      vaultPath: _profileController!.activeDataPath,
-                      categoryId: category.id,
-                      amountVisibility: _amountVisibilityController,
-                      patrimoineRefreshController: _patrimoineRefreshController,
-                    ),
-            for (final category in dashboardPassifsCategories)
-              category.id: (_) => _profileController!.active?.name == 'Lou'
-                  ? CategoryDetailScreen(
-                      category: category,
-                      amountVisibility: _amountVisibilityController,
-                      showAvatar: false,
-                      accountsCardTitle: 'Passifs',
-                    )
-                  : RealPassifDetailScreen(
-                      key: ValueKey(
-                        '${_profileController!.activeDataPath}_${category.id}',
-                      ),
-                      vaultPath: _profileController!.activeDataPath,
-                      categoryId: category.id,
-                      amountVisibility: _amountVisibilityController,
-                      patrimoineRefreshController: _patrimoineRefreshController,
-                    ),
+            for (final assetClass in AssetClass.values)
+              assetClass.categoryId: (_) => RealCategoryDetailScreen(
+                key: ValueKey(
+                  '${_profileController!.activeDataPath}_${assetClass.categoryId}',
+                ),
+                vaultPath: _profileController!.activeDataPath,
+                categoryId: assetClass.categoryId,
+                amountVisibility: _amountVisibilityController,
+                patrimoineRefreshController: _patrimoineRefreshController,
+              ),
+            for (final liabilityType in LiabilityType.values)
+              liabilityType.categoryId: (_) => RealPassifDetailScreen(
+                key: ValueKey(
+                  '${_profileController!.activeDataPath}_${liabilityType.categoryId}',
+                ),
+                vaultPath: _profileController!.activeDataPath,
+                categoryId: liabilityType.categoryId,
+                amountVisibility: _amountVisibilityController,
+                patrimoineRefreshController: _patrimoineRefreshController,
+              ),
             for (final envelope in envelopes)
               envelope.id: (_) => EnvelopeSheetScreen(
                 key: ValueKey(

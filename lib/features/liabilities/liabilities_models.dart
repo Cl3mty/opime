@@ -4,7 +4,7 @@ import '../investments/investments_models.dart'
 import '../simulations/loan_calculator.dart';
 
 /// Type de passif — mêmes deux catégories que le Dashboard de démo
-/// (`dashboard_dummy_data.dart`, ids `passifs_prets_immobiliers` /
+/// (`patrimoine_models.dart`, ids `passifs_prets_immobiliers` /
 /// `passifs_emprunts`), pour que les passifs réels remplacent directement
 /// les données d'exemple dans les mêmes cartes.
 enum LiabilityType {

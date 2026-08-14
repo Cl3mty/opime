@@ -9,12 +9,12 @@ import '../investments/bank_logo_avatar.dart';
 import '../investments/bank_logo_repository.dart';
 import '../investments/investments_models.dart';
 import '../navigation/navigation_scope.dart';
-import 'dashboard_dummy_data.dart';
+import 'patrimoine_models.dart';
 import 'widgets/allocation_blocks_view.dart';
 import 'widgets/allocation_donut_view.dart';
 import 'widgets/net_worth_chart.dart';
 import 'widgets/patrimoine_chart_widgets.dart'
-    show ChartLayer, CategoryMultiSelect;
+    show ChartLayer, CategoryMultiSelect, PeriodChangeRow, changePercentFor;
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
@@ -29,10 +29,10 @@ class CategoryDetailScreen extends StatefulWidget {
   final PatrimoineCategory category;
   final AmountVisibilityController amountVisibility;
 
-  /// Appelé quand une ligne du tableau des comptes est cliquée (hors
-  /// données de démo, où il reste `null` — les lignes ne sont alors pas
-  /// cliquables) : permet à l'appelant (voir `RealCategoryDetailScreen`)
-  /// d'ouvrir la vue de détail du compte/investissement réel correspondant.
+  /// Appelé quand une ligne du tableau des comptes est cliquée (`null` sur
+  /// un écran sans drill-down, où les lignes ne sont alors pas cliquables) :
+  /// permet à l'appelant (voir `RealCategoryDetailScreen`) d'ouvrir la vue
+  /// de détail du compte/investissement réel correspondant.
   final ValueChanged<PatrimoineAccount>? onAccountTap;
 
   /// Contenu ajouté en bas de page, après le tableau des comptes — utilisé
@@ -42,22 +42,28 @@ class CategoryDetailScreen extends StatefulWidget {
   final Widget? trailingSection;
 
   /// Regroupement par compte (une ligne par compte, montants sommés) de la
-  /// même catégorie que [category] — `null` (données de démo, Passifs)
-  /// masque le switch "Par compte / Par actif" de la Distribution et
-  /// n'affiche que [category.accounts] tel quel. Quand renseigné,
-  /// [category.accounts] est utilisé comme vue "Par actif" (une ligne par
-  /// investissement, ex : Google/Meta/Nvidia) et ce paramètre comme vue
-  /// "Par compte" (ex : CTO/AV/PER/PEA) — voir `real_patrimoine_adapter.dart`.
+  /// même catégorie que [category] — `null` masque le switch "Par compte /
+  /// Par actif" de la Distribution et n'affiche que [category.accounts] tel
+  /// quel. Quand renseigné, [category.accounts] est utilisé comme vue "Par
+  /// actif" (une ligne par investissement, ex : Google/Meta/Nvidia) et ce
+  /// paramètre comme vue "Par compte" (ex : CTO/AV/PER/PEA) — voir
+  /// `real_patrimoine_adapter.dart`.
   final List<PatrimoineAccount>? distributionByAccount;
 
   /// Historique individuel de chaque ligne de [category.accounts] (clé :
-  /// [PatrimoineAccount.id]), toutes sur une même grille de dates — `null`
-  /// (comportement par défaut) affiche simplement [category.history] sans
-  /// sélecteur. Quand renseigné (passifs réels, voir
-  /// `real_passifs_adapter.dart`'s `perLiabilityHistoryOnGrid`), un
-  /// [CategoryMultiSelect] permet de choisir un/plusieurs/tous les prêts
+  /// [PatrimoineAccount.id]) pour une période donnée, toutes sur une même
+  /// grille de dates — `null` (comportement par défaut) utilise
+  /// [historyForPeriod] à la place, sans sélecteur. Quand renseigné (passifs
+  /// réels, voir `real_passifs_adapter.dart`'s `perLiabilityHistoryOnGrid`),
+  /// un [CategoryMultiSelect] permet de choisir un/plusieurs/tous les prêts
   /// dont la somme forme la courbe affichée.
-  final Map<String, List<NetWorthPoint>>? historyByLineId;
+  final Map<String, List<NetWorthPoint>> Function(DashboardPeriod)?
+  historyByLineIdForPeriod;
+
+  /// Historique de la catégorie entière pour une période donnée — utilisé
+  /// quand [historyByLineIdForPeriod] est `null`. `null` (les deux à la
+  /// fois) affiche une courbe vide.
+  final List<NetWorthPoint> Function(DashboardPeriod)? historyForPeriod;
 
   /// `false` masque l'avatar (initiales) devant chaque ligne du tableau des
   /// comptes et des investissements de l'accordéon — un prêt n'a pas
@@ -73,15 +79,14 @@ class CategoryDetailScreen extends StatefulWidget {
   /// Menu "⋮" (Modifier/Supprimer) affiché au bout de chaque ligne de
   /// *compte* de l'accordéon (voir `_AccountAccordionTile`, uniquement
   /// quand [distributionByAccount] est renseigné) — `null` masque le menu
-  /// entièrement (données de démo, où il n'y a pas de compte réel à
-  /// éditer). "Supprimer" reste désactivé si [PatrimoineAccount.canDelete]
-  /// vaut `false`.
+  /// entièrement. "Supprimer" reste désactivé si
+  /// [PatrimoineAccount.canDelete] vaut `false`.
   final ValueChanged<PatrimoineAccount>? onAccountEdit;
   final Future<void> Function(PatrimoineAccount)? onAccountDelete;
 
   /// Chemin du vault — permet d'importer/remplacer les logos de banques
   /// (l'avatar d'une banque est cliquable, voir `BankLogoAvatar`). `null`
-  /// (données de démo, où il n'y a pas de vault) rend l'avatar non cliquable.
+  /// rend l'avatar non cliquable.
   final String? vaultPath;
 
   const CategoryDetailScreen({
@@ -91,7 +96,8 @@ class CategoryDetailScreen extends StatefulWidget {
     this.onAccountTap,
     this.trailingSection,
     this.distributionByAccount,
-    this.historyByLineId,
+    this.historyByLineIdForPeriod,
+    this.historyForPeriod,
     this.showAvatar = true,
     this.accountsCardTitle = 'Actifs',
     this.onAccountEdit,
@@ -110,8 +116,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
       if (a.id != null) a.id!,
   };
 
-  /// Repository des logos de banques — `null` sans vault (données de démo),
-  /// où aucun logo ne peut être importé.
+  /// Repository des logos de banques — `null` sans [CategoryDetailScreen.vaultPath]
+  /// renseigné, auquel cas aucun logo ne peut être importé.
   BankLogoRepository? get _logoRepo {
     final vaultPath = widget.vaultPath;
     return vaultPath == null ? null : BankLogoRepository(vaultPath);
@@ -172,14 +178,19 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
       builder: (context, _) {
         final hidden = widget.amountVisibility.hidden;
         final category = widget.category;
-        final days = dashboardPeriods[_periodIndex].$2;
-        final historyByLineId = widget.historyByLineId;
-        final history = historyByLineId == null
-            ? category.history
-            : _combinedHistory(historyByLineId, _selectedLineIds);
-        final points = dashboardSampleData.sliceForDays(history, days);
-        final changePercent = dashboardSampleData.changePercentFor(points);
-        final positive = changePercent >= 0;
+        final period = DashboardPeriod.values[_periodIndex];
+        final historyByLineIdForPeriod = widget.historyByLineIdForPeriod;
+        final points = historyByLineIdForPeriod == null
+            ? widget.historyForPeriod?.call(period) ?? const <NetWorthPoint>[]
+            : _combinedHistory(
+                historyByLineIdForPeriod(period),
+                _selectedLineIds,
+              );
+        final changePercent = changePercentFor(points);
+        final absoluteChange = points.length < 2
+            ? 0.0
+            : points.last.value - points.first.value;
+        final positive = absoluteChange >= 0;
         final color = positive ? _green : _red;
 
         final performanceCard = FrostedCard(
@@ -189,7 +200,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (historyByLineId != null)
+                if (historyByLineIdForPeriod != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Align(
@@ -214,29 +225,18 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                   displayEuros(points.isEmpty ? 0 : points.last.value, hidden),
                 ).x2Large().bold(),
                 const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      positive
-                          ? LucideIcons.trendingUp
-                          : LucideIcons.trendingDown,
-                      size: 14,
-                      color: color,
-                    ),
-                    const SizedBox(width: 4),
-                    shadcn.Text(
-                      displayPercent(changePercent),
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ).small(),
-                  ],
+                PeriodChangeRow(
+                  absoluteChange: absoluteChange,
+                  changePercent: changePercent,
+                  hidden: hidden,
+                  color: color,
+                  icon: positive
+                      ? LucideIcons.trendingUp
+                      : LucideIcons.trendingDown,
                 ),
                 const SizedBox(height: 12),
                 PeriodTabs(
-                  labels: [for (final p in dashboardPeriods) p.$1],
+                  labels: [for (final p in DashboardPeriod.values) p.label],
                   index: _periodIndex,
                   onChanged: (i) => setState(() => _periodIndex = i),
                 ),
@@ -383,8 +383,8 @@ const _toggleIconSize = 16.0 * 0.95;
 /// ([AllocationBlocksView]) ou en anneau ([AllocationDonutView], mêmes 2
 /// vues que la carte Allocation du Dashboard), soit par compte
 /// (CTO/AV/PER/PEA...) soit par actif individuel (Google/Meta/Nvidia...)
-/// quand [byAccount] est fourni — sans lui (données de démo, Passifs),
-/// toujours [category.accounts] sans switch de mode visible.
+/// quand [byAccount] est fourni — sans lui (Passifs), toujours
+/// [category.accounts] sans switch de mode visible.
 class _DistributionCard extends StatefulWidget {
   final PatrimoineCategory category;
   final List<PatrimoineAccount>? byAccount;
@@ -602,12 +602,11 @@ class _DistributionCardState extends State<_DistributionCard> {
 }
 
 /// Tableau "Actifs" de la page de détail d'une classe. Quand [byAccount]
-/// est fourni (profils réels), c'est un accordéon à deux niveaux : une
-/// ligne par compte (montants sommés), dépliable pour révéler les
-/// investissements individuels qui le composent
-/// ([PatrimoineAccount.investments], voir `real_patrimoine_adapter.dart`).
-/// Sans lui (données de démo, Passifs), reste la liste plate de
-/// [PatrimoineCategory.accounts] d'origine.
+/// est fourni, c'est un accordéon à deux niveaux : une ligne par compte
+/// (montants sommés), dépliable pour révéler les investissements
+/// individuels qui le composent ([PatrimoineAccount.investments], voir
+/// `real_patrimoine_adapter.dart`). Sans lui (Passifs), reste la liste
+/// plate de [PatrimoineCategory.accounts] d'origine.
 class _AccountsCard extends StatefulWidget {
   final PatrimoineCategory category;
   final List<PatrimoineAccount>? byAccount;
@@ -1276,8 +1275,7 @@ class _AccountLine extends StatelessWidget {
 /// menu (`account_detail_screen.dart`), exposée ici sans dépendre du
 /// module Investissements (voir [CategoryDetailScreen.onAccountEdit]/
 /// [CategoryDetailScreen.onAccountDelete]). Ne s'affiche que si au moins
-/// une des deux actions est fournie — les données de démo n'en fournissent
-/// aucune, pas de compte réel à éditer.
+/// une des deux actions est fournie.
 class _AccountActionsMenu extends StatelessWidget {
   final PatrimoineAccount account;
   final ValueChanged<PatrimoineAccount>? onEdit;

@@ -65,9 +65,7 @@ class AmountVisibilityToggleButton extends StatelessWidget {
 /// Bouton "+" de la TopBar : ouvre le flux "Compléter mon patrimoine", qui
 /// crée soit un actif (classe → compte → investissement → transaction),
 /// soit un passif (type → formulaire de prêt) — voir
-/// `complete_patrimoine_dialog.dart`. Désactivé sur le profil "Lou" (démo) :
-/// les données qu'il créerait ne seraient de toute façon jamais affichées,
-/// le Dashboard de Lou restant figé sur les données d'exemple.
+/// `complete_patrimoine_dialog.dart`.
 ///
 /// Se met en valeur (échelle et lueur à 105%) tant que
 /// [onboardingHighlight] signale qu'aucune donnée n'existe encore pour le
@@ -99,8 +97,6 @@ class AddMenuButton extends StatelessWidget {
     this.compact = false,
     this.currentPageKey,
   });
-
-  bool get _isDemoProfile => profileController.active?.name == 'Lou';
 
   void _open(BuildContext context) {
     final pageKey = currentPageKey;
@@ -148,26 +144,25 @@ class AddMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = _isDemoProfile
-        ? 'Non disponible sur le profil de démonstration'
-        : 'Compléter mon patrimoine';
     return AnimatedBuilder(
       animation: onboardingHighlight,
       builder: (context, child) {
-        final highlighted = !_isDemoProfile && onboardingHighlight.isEmpty;
+        final highlighted = onboardingHighlight.isEmpty;
         final button = compact
             ? IconButton.primary(
                 icon: const Icon(LucideIcons.plus),
-                onPressed: _isDemoProfile ? null : () => _open(context),
+                onPressed: () => _open(context),
               )
             : PrimaryButton(
                 leading: const Icon(LucideIcons.plus, size: 16),
-                onPressed: _isDemoProfile ? null : () => _open(context),
+                onPressed: () => _open(context),
                 child: const shadcn.Text('Compléter mon patrimoine'),
               );
         return Tooltip(
           // ignore: implicit_call_tearoffs
-          tooltip: TooltipContainer(child: shadcn.Text(label)),
+          tooltip: TooltipContainer(
+            child: const shadcn.Text('Compléter mon patrimoine'),
+          ),
           child: highlighted
               ? Transform.scale(
                   scale: 1.05,

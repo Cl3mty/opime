@@ -2,18 +2,19 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
-import '../dashboard_dummy_data.dart';
+import '../patrimoine_models.dart';
 
 /// Largeur réservée à gauche du graphique pour les repères de montant sur
 /// l'axe des ordonnées — partagée avec le graphique empilé de
-/// [PatrimoineCard] (dans `patrimoine_card.dart`) pour un alignement visuel
-/// cohérent entre les deux types de graphiques.
+/// `RealPatrimoineCard` (`StackedNetWorthChart`, dans
+/// `patrimoine_chart_widgets.dart`) pour un alignement visuel cohérent
+/// entre les deux types de graphiques.
 const chartLeftAxisWidth = 46.0;
 
 /// Graphique mono-courbe (aire + ligne) avec tooltip au survol, réutilisé
-/// par [PatrimoineCard] (mode Performance) et par la page de détail d'une
-/// catégorie. Pas de dépendance de charts : [CustomPainter] fait main,
-/// suit le pattern déjà en place dans les simulations.
+/// par la page de détail d'une catégorie et la vue détaillée d'un passif.
+/// Pas de dépendance de charts : [CustomPainter] fait main, suit le pattern
+/// déjà en place dans les simulations.
 class NetWorthChart extends StatefulWidget {
   final List<NetWorthPoint> points;
   final String Function(double value) formatValue;
@@ -299,7 +300,8 @@ class _NetWorthChartPainter extends CustomPainter {
 }
 
 /// Rangée d'onglets de période (1J/7J/1M/YTD/1A/Tout), réutilisée par
-/// [PatrimoineCard], la page de détail catégorie et "Mes meilleurs actifs".
+/// `RealPatrimoineCard`, la page de détail catégorie et "Mes meilleurs
+/// actifs".
 class PeriodTabs extends StatelessWidget {
   final List<String> labels;
   final int index;
@@ -344,20 +346,14 @@ class PeriodTabs extends StatelessWidget {
   }
 }
 
-/// Période standard (label, jours) réutilisée par [PatrimoineCard], la
-/// page de détail catégorie et "Mes meilleurs actifs".
-const dashboardPeriods = [
-  ('1J', 1),
-  ('7J', 7),
-  ('1M', 30),
-  ('YTD', 220),
-  ('1A', 365),
-  ('Tout', 100000),
-];
+// [DashboardPeriod] vit dans `patrimoine_models.dart` (déjà importé plus
+// haut) plutôt qu'ici : c'est une notion de domaine (bornes de dates),
+// réutilisée par les adaptateurs (`real_patrimoine_adapter.dart`), pas
+// seulement par les widgets de ce fichier.
 
 // ---------------------------------------------------------------------------
 // Helpers de dessin partagés (aussi utilisés par le graphique empilé de
-// PatrimoineCard, dans patrimoine_card.dart).
+// RealPatrimoineCard, dans patrimoine_chart_widgets.dart).
 // ---------------------------------------------------------------------------
 
 void drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {

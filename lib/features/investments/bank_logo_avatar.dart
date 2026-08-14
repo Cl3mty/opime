@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
-import '../dashboard/dashboard_dummy_data.dart' show initialsFor;
+import '../dashboard/patrimoine_models.dart' show initialsFor;
 
 /// Avatar d'une banque : le logo importé par l'utilisateur quand il existe
 /// (voir `bank_logo_repository.dart`), sinon les initiales du nom. Quand

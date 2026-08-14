@@ -1,7 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../dashboard/category_detail_screen.dart';
-import '../dashboard/dashboard_dummy_data.dart';
+import '../dashboard/patrimoine_models.dart';
 import 'account_detail_screen.dart';
 import 'confirm_delete_dialog.dart';
 import 'investment_detail_screen.dart';
@@ -9,12 +9,12 @@ import 'investments_models.dart';
 import 'investments_repository.dart';
 import 'patrimoine_refresh_controller.dart';
 import 'real_patrimoine_adapter.dart';
+import 'yahoo_finance_client.dart' show PricePoint;
 
 /// Charge les comptes réels puis affiche [CategoryDetailScreen] pour la
 /// classe d'actif [categoryId] ('actifs_immobilier', 'actifs_crypto'...) —
-/// équivalent réel des entrées `actifs_*` du Dashboard de démo, ouvertes
-/// depuis `CategoryBreakdownCard`/`AllocationCard` via `NavigationScope`.
-/// Sans compte pour cette classe, affiche l'état vide de
+/// ouvert depuis `CategoryBreakdownCard`/`AllocationCard` via
+/// `NavigationScope`. Sans compte pour cette classe, affiche l'état vide de
 /// [CategoryDetailScreen] plutôt que rien.
 ///
 /// Cliquer sur une ligne du tableau ouvre en local (pas de `Navigator.push`,
@@ -47,6 +47,7 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
   late InvestmentsRepository _repo;
   bool _loading = true;
   List<InvestmentAccount> _accounts = [];
+  Map<String, List<PricePoint>> _priceHistories = {};
   PatrimoineCategory? _category;
   List<PatrimoineAccount>? _categoryByAccount;
 
@@ -129,9 +130,33 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
     }
     setState(() {
       _accounts = accounts;
+      _priceHistories = priceHistories;
       _category = found ?? emptyCategoryFor(widget.categoryId);
       _categoryByAccount = foundByAccount?.accounts;
     });
+  }
+
+  /// Historique de la catégorie pour une période donnée — voir
+  /// [CategoryDetailScreen.historyForPeriod]. Calculé à la demande à partir
+  /// des comptes/cours déjà en mémoire (aucune E/S), pas mis en cache : la
+  /// période change rarement assez pour que ça coûte quelque chose.
+  List<NetWorthPoint> _historyForPeriod(DashboardPeriod period) {
+    final assetClass = assetClassForCategoryId(widget.categoryId);
+    if (assetClass == null) return const [];
+    final investments = investmentsForEffectiveClass(_accounts, assetClass);
+    final today = DateTime.utc(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+    final earliest = earliestTransactionDate(investments) ?? today;
+    final start = period.startFor(today: today, earliest: earliest);
+    return netWorthHistoryFor(
+      investments,
+      _priceHistories,
+      start: start,
+      end: today,
+    );
   }
 
   /// Prévient le Dashboard (et toute autre page ouverte) qu'il doit lui
@@ -271,6 +296,7 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
       amountVisibility: widget.amountVisibility,
       onAccountTap: _openInvestment,
       distributionByAccount: _categoryByAccount,
+      historyForPeriod: _historyForPeriod,
       onAccountEdit: _openAccountForEdit,
       onAccountDelete: _deleteAccountFromAccordion,
       // Permet d'importer les logos des banques (avatar cliquable).

@@ -2,8 +2,8 @@ import 'dart:math' as math;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/ui/frosted_card.dart';
-import '../dashboard_dummy_data.dart';
-import 'net_worth_chart.dart' show PeriodTabs, dashboardPeriods;
+import '../patrimoine_models.dart';
+import 'net_worth_chart.dart' show PeriodTabs;
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
@@ -37,13 +37,18 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
 
   @override
   Widget build(BuildContext context) {
-    final days = dashboardPeriods[_periodIndex].$2;
+    final period = DashboardPeriod.values[_periodIndex];
+    // Rendements nuls (pas d'historique de cours couvrant le début de la
+    // période) relégués en fin de liste plutôt que de perturber le tri.
     final sorted = [...widget.assets]
-      ..sort(
-        (a, b) => b
-            .changePercentForDays(days)
-            .compareTo(a.changePercentForDays(days)),
-      );
+      ..sort((a, b) {
+        final aPercent = a.changePercentForPeriod(period);
+        final bPercent = b.changePercentForPeriod(period);
+        if (aPercent == null && bPercent == null) return 0;
+        if (aPercent == null) return 1;
+        if (bPercent == null) return -1;
+        return bPercent.compareTo(aPercent);
+      });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,7 +58,7 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
             const shadcn.Text('Mes meilleurs actifs').large().medium(),
             const Spacer(),
             PeriodTabs(
-              labels: [for (final p in dashboardPeriods) p.$1],
+              labels: [for (final p in DashboardPeriod.values) p.label],
               index: _periodIndex,
               onChanged: (i) => setState(() => _periodIndex = i),
             ),
@@ -70,7 +75,7 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
               width: 200,
               child: _AssetCard(
                 asset: sorted[i],
-                changePercent: sorted[i].changePercentForDays(days),
+                changePercent: sorted[i].changePercentForPeriod(period),
                 avatarColor: _avatarPalette[i % _avatarPalette.length],
               ),
             ),
@@ -83,7 +88,7 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
 
 class _AssetCard extends StatelessWidget {
   final DashboardAsset asset;
-  final double changePercent;
+  final double? changePercent;
   final Color avatarColor;
 
   const _AssetCard({
@@ -94,8 +99,11 @@ class _AssetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final positive = changePercent >= 0;
-    final color = positive ? _green : _red;
+    final percent = changePercent;
+    final positive = percent != null && percent >= 0;
+    final color = percent == null
+        ? const Color(0xFF94A3B8)
+        : (positive ? _green : _red);
 
     return FrostedCard(
       child: Padding(
@@ -133,7 +141,9 @@ class _AssetCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 shadcn.Text(
-                  '${positive ? '+' : ''}${changePercent.toStringAsFixed(2)} %',
+                  percent == null
+                      ? '—'
+                      : '${positive ? '+' : ''}${percent.toStringAsFixed(2)} %',
                   style: TextStyle(color: color, fontWeight: FontWeight.w600),
                 ).small(),
                 const Spacer(),

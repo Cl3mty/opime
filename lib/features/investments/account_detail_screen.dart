@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/date_format.dart';
+import '../../core/ui/copyable_identifier.dart';
 import '../../core/ui/frosted_card.dart';
 import 'confirm_delete_dialog.dart';
 import 'document_storage.dart';
@@ -549,7 +550,22 @@ class _InvestmentCard extends StatelessWidget {
                       // déjà porté par le libellé — pas besoin de le répéter.
                       if (accountAssetClass != AssetClass.immobilier &&
                           !investment.isCurrency)
-                        shadcn.Text(investment.isin).muted().small(),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 2,
+                          children: [
+                            CopyableIdentifier(
+                              value: investment.isin,
+                              toastTitle: 'Identifiant copié',
+                            ),
+                            if (investment.symbol != null &&
+                                investment.symbol!.isNotEmpty)
+                              CopyableIdentifier(
+                                value: investment.symbol!,
+                                toastTitle: 'Ticker copié',
+                              ),
+                          ],
+                        ),
                       if (crossClass)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
