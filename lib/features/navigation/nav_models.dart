@@ -282,6 +282,33 @@ final toolsTabItems = [
     if (item.key != 'assistant') item,
 ];
 
+/// Parcours (breadcrumb) de la page sélectionnée, affiché dans la TopBar :
+/// pour un sous-item (ex : « Transmission » sous « Simulation »), la liste
+/// des libellés du parent vers la page (`['Simulation', 'Transmission']`) ;
+/// pour une page de premier niveau, un unique libellé. Les catégories du
+/// dashboard (`actifs_*`/`passifs_*`), navigables sur desktop depuis les
+/// cartes du Tableau de bord, sont rattachées à « Actifs »/« Passifs »
+/// comme sur l'onglet mobile — même si la sidebar desktop ne les expose pas.
+List<String> navBreadcrumbForKey(String key) {
+  final navItems = [
+    ...patrimoineGroup.items,
+    ...academieGroup.items,
+    ...outilsGroup.items,
+    ...patrimoineCategoryItems,
+  ];
+  for (final item in navItems) {
+    if (item.key == key) return [item.label];
+    for (final child in item.children) {
+      if (child.key == key) return [item.label, child.label];
+    }
+  }
+  return switch (key) {
+    'account_management' => ['Comptes'],
+    'settings' => ['Réglages'],
+    _ => [''],
+  };
+}
+
 /// Libellé de la page sélectionnée, affiché en titre dans la TopBar
 /// desktop. Pour un sous-item (ex : « Ventilation » sous « Budget »), c'est
 /// le libellé de l'item parent de la sidebar qui est renvoyé — le titre

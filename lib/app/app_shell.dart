@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import '../core/assistant/assistant_chat_controller.dart';
 import '../core/assistant/assistant_config_controller.dart';
 import '../core/privacy/amount_visibility_controller.dart';
 import '../core/profiles/profile_controller.dart';
@@ -57,6 +58,7 @@ class AppShell extends StatefulWidget {
   final OnboardingHighlightController onboardingHighlightController;
   final PriceSyncStatusController priceSyncStatusController;
   final AssistantConfigController assistantConfigController;
+  final AssistantChatController assistantChatController;
   final Map<String, WidgetBuilder> pages;
 
   const AppShell({
@@ -69,6 +71,7 @@ class AppShell extends StatefulWidget {
     required this.onboardingHighlightController,
     required this.priceSyncStatusController,
     required this.assistantConfigController,
+    required this.assistantChatController,
     required this.pages,
   });
 
@@ -99,6 +102,16 @@ class _AppShellState extends State<AppShell> {
       // pour revenir à sa racine sur un reclic de la sidebar.
       if (key == 'dashboard') _dashboardEpoch++;
     });
+    _onAssistantVisibilityChanged();
+  }
+
+  /// Synchronise le controller de chat avec la visibilité de la page
+  /// Assistant : ouverte, les réponses qui s'y terminent ne comptent pas
+  /// comme « non lues » (et le compteur repart à zéro).
+  void _onAssistantVisibilityChanged() {
+    final chat = widget.assistantChatController;
+    chat.assistantVisible = _selectedKey == 'assistant';
+    if (chat.assistantVisible) chat.markAllRead();
   }
 
   @override
@@ -106,12 +119,58 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     _lastAssistantEnabled = widget.assistantConfigController.enabled;
     widget.assistantConfigController.addListener(_onAssistantConfigChanged);
+    widget.assistantChatController.unreadResponses
+        .addListener(_onAssistantUnreadChanged);
+    _onAssistantVisibilityChanged();
+  }
+
+  @override
+  void didUpdateWidget(covariant AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.assistantChatController != widget.assistantChatController) {
+      oldWidget.assistantChatController.unreadResponses
+          .removeListener(_onAssistantUnreadChanged);
+      widget.assistantChatController.unreadResponses
+          .addListener(_onAssistantUnreadChanged);
+      _onAssistantVisibilityChanged();
+    }
   }
 
   @override
   void dispose() {
     widget.assistantConfigController.removeListener(_onAssistantConfigChanged);
+    widget.assistantChatController.unreadResponses
+        .removeListener(_onAssistantUnreadChanged);
     super.dispose();
+  }
+
+  /// Signal de fin d'une réponse générée hors de la page Assistant : un
+  /// toast propose de revenir au chat (le badge de la sidebar reste, lui,
+  /// jusqu'à l'ouverture de la page).
+  void _onAssistantUnreadChanged() {
+    if (!mounted) return;
+    final unread = widget.assistantChatController.unreadResponses.value;
+    if (unread == 0 || _selectedKey == 'assistant') return;
+    showToast(
+      context: context,
+      location: ToastLocation.bottomRight,
+      builder: (context, overlay) => SurfaceCard(
+        child: Basic(
+          leading: const Icon(LucideIcons.bot, size: 18),
+          title: const Text('Réponse de l\'assistant prête'),
+          subtitle: Text(
+            unread > 1 ? '$unread réponses en attente' : 'Une réponse est prête',
+          ),
+          trailing: PrimaryButton(
+            onPressed: () {
+              overlay.close();
+              _select('assistant');
+            },
+            child: const Text('Voir'),
+          ),
+        ),
+      ),
+    );
   }
 
   void _onAssistantConfigChanged() {
@@ -119,7 +178,7 @@ class _AppShellState extends State<AppShell> {
     final enabled = widget.assistantConfigController.enabled;
     // Seule l'activation conditionne sidebar/TopBar : pas de rebuild du
     // shell à chaque changement sans rapport (saisie de l'adresse, choix du
-    // modèle...) dans les Réglages.
+    // modèle dans l'écran assistant...).
     if (enabled == _lastAssistantEnabled && _selectedKey != 'assistant') {
       return;
     }
@@ -257,6 +316,7 @@ class _AppShellState extends State<AppShell> {
           profileController: widget.profileController,
           sidebarPrefsController: widget.sidebarPrefsController,
           assistantEnabled: widget.assistantConfigController.enabled,
+          assistantUnread: widget.assistantChatController.unreadResponses,
         ),
       );
       return Scaffold(

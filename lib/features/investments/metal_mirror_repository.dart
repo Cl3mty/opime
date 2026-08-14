@@ -190,6 +190,13 @@ class MetalMirrorRepository {
     'type': entry.transaction.isBuy ? 'achat' : 'vente',
     'quantite': round2(entry.transaction.quantity),
     'prixUnitaire': round2(entry.transaction.unitPrice),
+    // Devise de cotation et taux de change (1 devise = X €) d'une
+    // transaction saisie hors euros (ex : une pièce US achetée en USD) —
+    // voir `Transaction.currency`/`Transaction.fxRateToEur`.
+    if (entry.transaction.currency != 'EUR')
+      'devise': entry.transaction.currency,
+    if (entry.transaction.currency != 'EUR')
+      'tauxEur': entry.transaction.fxRateToEur,
     'montant': round2(entry.transaction.amount),
     'investissement': entry.investment.label,
     'compte': entry.account.name,

@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:window_manager/window_manager.dart';
+import 'core/assistant/assistant_chat_controller.dart';
 import 'core/assistant/assistant_config_controller.dart';
 import 'core/privacy/amount_visibility_controller.dart';
 import 'core/storage/vault_folder_service.dart';
@@ -95,8 +96,57 @@ class _OpimeAppState extends State<OpimeApp> {
   SidebarPrefsController? _sidebarPrefsController;
   Object? _profilesLoadError;
 
+  /// Conversation avec l'assistant : vit ici (et non dans l'écran) pour
+  /// que les réponses continuent en arrière-plan quand on navigue ailleurs.
+  /// Recréé quand le contexte change (vault ou profil actif), ce qui coupe
+  /// proprement les requêtes en cours — d'où le toast d'interruption.
+  AssistantChatController? _assistantChatController;
+
+  /// Clé de contexte du controller courant : `vaultPath|profileId`. Quand
+  /// elle change, la conversation est remise à zéro (données d'un autre
+  /// profil = autre conversation).
+  String? _assistantChatScope;
+
   void _handleProfileControllerChanged() {
+    _recreateAssistantChat();
     if (mounted) setState(() {});
+  }
+
+  /// (Re)crée le controller de chat quand le vault ou le profil actif a
+  /// changé. L'ancien est disposé (requêtes annulées) et, si une réponse
+  /// était en cours, un toast prévient l'utilisateur qu'elle a été coupée.
+  void _recreateAssistantChat() {
+    final profile = _profileController;
+    if (profile == null || profile.active == null) return;
+    final scope = '$_vaultPath|${profile.active!.id}';
+    if (scope == _assistantChatScope) return;
+
+    final old = _assistantChatController;
+    final wasBusy = old?.busy ?? false;
+    old?.dispose();
+    _assistantChatScope = scope;
+    _assistantChatController = AssistantChatController(
+      config: _assistantConfigController,
+      activeDataPath: () => profile.activeDataPath,
+    );
+    if (wasBusy && mounted) {
+      // Le changement de contexte (vault/profil) coupe les réponses en
+      // cours : on le signale plutôt que de laisser l'utilisateur croire
+      // qu'elles arrivent encore.
+      showToast(
+        context: context,
+        location: ToastLocation.bottomRight,
+        builder: (context, overlay) => SurfaceCard(
+          child: Basic(
+            leading: const Icon(LucideIcons.circlePause, size: 18),
+            title: const Text('Réponse interrompue'),
+            subtitle: const Text(
+              'Le profil ou le vault a changé pendant la génération.',
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -155,6 +205,7 @@ class _OpimeAppState extends State<OpimeApp> {
       _profileController = controller;
       _sidebarPrefsController = sidebarPrefs;
     });
+    _recreateAssistantChat();
   }
 
   void _retryInitProfiles() {
@@ -169,6 +220,9 @@ class _OpimeAppState extends State<OpimeApp> {
   void _resetVault() {
     _profileController?.removeListener(_handleProfileControllerChanged);
     _profileController?.dispose();
+    _assistantChatController?.dispose();
+    _assistantChatController = null;
+    _assistantChatScope = null;
     setState(() {
       _vaultPath = null;
       _profileController = null;
@@ -236,6 +290,7 @@ class _OpimeAppState extends State<OpimeApp> {
           onboardingHighlightController: _onboardingHighlightController,
           priceSyncStatusController: _priceSyncStatusController,
           assistantConfigController: _assistantConfigController,
+          assistantChatController: _assistantChatController!,
           pages: {
             // Les données d'exemple restent réservées au profil "Lou" (démo) :
             // tout autre profil voit son vrai Dashboard, vide au départ, où
@@ -343,8 +398,8 @@ class _OpimeAppState extends State<OpimeApp> {
               key: ValueKey(
                 'assistant_${_profileController!.activeDataPath}',
               ),
-              vaultPath: _profileController!.activeDataPath,
               configController: _assistantConfigController,
+              chatController: _assistantChatController!,
             ),
             'account_management': (_) =>
                 AccountManagementScreen(profileController: _profileController!),

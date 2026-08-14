@@ -293,7 +293,7 @@ class _NumberFieldState extends State<_NumberField> {
                   decimal: true,
                 ),
                 onChanged: (text) {
-                  final parsed = double.tryParse(text.replaceAll(',', '.'));
+                  final parsed = parseDecimal(text);
                   if (parsed != null) widget.onChanged(parsed);
                 },
                 onSubmitted: (_) => _controller.text = _textFor(widget.value),

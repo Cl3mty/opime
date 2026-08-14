@@ -53,3 +53,13 @@ String displayPercent(double value) {
 /// la quantité/le cours ont un sens en dessous du centime — voir les
 /// appelants (`investments_models.dart`, `liabilities_models.dart`).
 double round2(double value) => (value * 100).round() / 100;
+
+/// Parse un nombre saisi par l'utilisateur en acceptant le point comme la
+/// virgule comme séparateur décimal (« 1,5 » == « 1.5 »), après
+/// suppression des espaces de tête/de fin. `null` si [text] est `null` ou
+/// n'est pas un nombre valide. Point d'entrée unique de toutes les saisies
+/// numériques de l'app (montants, quantités, taux...).
+double? parseDecimal(String? text) {
+  if (text == null) return null;
+  return double.tryParse(text.trim().replaceAll(',', '.'));
+}

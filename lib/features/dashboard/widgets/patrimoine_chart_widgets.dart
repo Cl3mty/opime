@@ -83,12 +83,9 @@ class PatrimoineTitleRow extends StatelessWidget {
             child: SizedBox(
               width: 260,
               child: shadcn.Text(
-                'Deux méthodes existent pour calculer un rendement : le '
-                'TWR (Time-Weighted Return) neutralise l\'effet des apports '
-                'et retraits pour isoler la performance des placements, '
-                'tandis que le MWR / XIRR (Money-Weighted Return) reflète '
-                'le rendement réel perçu, en tenant compte du montant et '
-                'du moment de chaque apport ou retrait.',
+                'Rendement calculé en tenant compte du montant et de la '
+                'date de chaque versement (méthode MWR) : il reflète le '
+                'rendement réellement perçu.',
               ),
             ),
           ),

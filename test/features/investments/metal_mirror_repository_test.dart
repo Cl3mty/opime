@@ -99,6 +99,55 @@ void main() {
     expect(File(p.join(dayDir.path, 'scellé.pdf')).existsSync(), isTrue);
   });
 
+  test('une transaction saisie en devise étrangère projette devise et taux',
+      () async {
+    final vault = tempDir.path;
+    final repo = MetalMirrorRepository(vault);
+
+    final account = InvestmentAccount(
+      assetClass: AssetClass.metauxPrecieux,
+      envelope: AccountEnvelope.coffrePersonnel,
+      name: 'Coffre maison',
+      investments: [
+        Investment(
+          id: 'inv_5',
+          isin: 'Pièce US',
+          label: 'Pièce US',
+          transactions: [
+            Transaction(
+              id: 'txn_5',
+              date: DateTime(2026, 8, 11),
+              isBuy: true,
+              quantity: 1,
+              unitPrice: 250,
+              currency: 'USD',
+              fxRateToEur: 0.92,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await repo.sync([account]);
+
+    final txnJson = await readTransactionJson(
+      File(
+        p.join(
+          vault,
+          'investissements',
+          'metaux_precieux',
+          'or',
+          '2026-08-11',
+          'transaction.json',
+        ),
+      ),
+    );
+    expect(txnJson['devise'], 'USD');
+    expect(txnJson['tauxEur'], 0.92);
+    // Montant toujours en euros : 1 × 250 $ × 0,92 = 230 €.
+    expect(txnJson['montant'], 230.0);
+  });
+
   test('range une pièce d\'argent sous le dossier argent', () async {
     final vault = tempDir.path;
     final repo = MetalMirrorRepository(vault);

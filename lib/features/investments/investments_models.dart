@@ -183,6 +183,63 @@ bool requiresLabelFieldFor(
 bool requiresFullPricePrecision(AssetClass assetClass) =>
     assetClass == AssetClass.crypto || assetClass == AssetClass.epargne;
 
+/// Formate une quantité d'actifs pour l'affichage : les pièces et lingots
+/// de métaux précieux se comptent en unités entières (« 2 » et non
+/// « 2,00 »), les autres quantités (parts d'ETF, unités de crypto, grammes
+/// d'une épargne devise...) gardent deux décimales.
+String formatQuantity(double quantity, AssetClass assetClass) {
+  if (assetClass == AssetClass.metauxPrecieux) {
+    return quantity.toStringAsFixed(0);
+  }
+  return quantity.toStringAsFixed(2);
+}
+
+/// Nature d'une [Transaction] au-delà du simple achat/vente d'un titre —
+/// utile pour les mouvements de cash importés d'un relevé de courtier
+/// (dividende, retenue à la source, frais, dépôt/retrait, conversion de
+/// devise) qui s'enregistrent comme des achats/ventes d'une position-devise
+/// (voir [isCurrencyInvestment]) mais ne doivent pas s'afficher comme un
+/// simple "Achat"/"Vente" de titre. `null` sur [Transaction.type] — un achat
+/// ou une vente de titre saisi manuellement, ou une transaction historique
+/// antérieure à l'introduction de ce champ — garde l'affichage "Achat"/
+/// "Vente" habituel, voir [Transaction.displayLabel].
+enum TransactionType {
+  dividend,
+  withholdingTax,
+  fee,
+  deposit,
+  withdrawal,
+  fxConversion,
+  other;
+
+  String get label {
+    switch (this) {
+      case TransactionType.dividend:
+        return 'Dividende';
+      case TransactionType.withholdingTax:
+        return 'Retenue à la source';
+      case TransactionType.fee:
+        return 'Frais';
+      case TransactionType.deposit:
+        return 'Dépôt';
+      case TransactionType.withdrawal:
+        return 'Retrait';
+      case TransactionType.fxConversion:
+        return 'Conversion de devise';
+      case TransactionType.other:
+        return 'Autre';
+    }
+  }
+
+  static TransactionType? fromName(String? name) {
+    if (name == null) return null;
+    for (final type in TransactionType.values) {
+      if (type.name == name) return type;
+    }
+    return null;
+  }
+}
+
 /// Une transaction d'achat ou de vente sur un [Investment].
 class Transaction {
   final String id;
@@ -191,15 +248,56 @@ class Transaction {
   final double quantity;
   final double unitPrice;
 
+  /// Nature du mouvement quand ce n'est pas un simple achat/vente de titre
+  /// (dividende, frais...) — voir [TransactionType]. `null` pour un achat/
+  /// vente classique.
+  final TransactionType? type;
+
+  /// Précision facultative sur l'origine du mouvement (ex : "Dividende
+  /// AAPL", ou le libellé brut d'un relevé importé dont le type n'est pas
+  /// reconnu) — affichée en complément de [displayLabel], jamais utilisée
+  /// dans les calculs.
+  final String? note;
+
+  /// Devise dans laquelle [unitPrice] est exprimé (EUR par défaut — voir
+  /// [kKnownCurrencies]). Une action cotée en monnaie étrangère (ex : META
+  /// à New York) peut être saisie dans sa devise de cotation (USD) plutôt
+  /// que convertie mentalement en euros : le prix d'achat réel est alors
+  /// conservé tel quel et seul [amount] (en euros) alimente les
+  /// agrégations du patrimoine.
+  final String currency;
+
+  /// Taux de change appliqué : valeur de 1 unité de [currency] en euros
+  /// (ex : 1 USD ≈ 0,92 €). Vaut toujours 1 pour une transaction en euros.
+  /// Résolu automatiquement depuis Yahoo Finance (paire `<devise>EUR=X`)
+  /// avec repli sur la saisie manuelle — voir
+  /// `TransactionPriceCurrencyController`.
+  final double fxRateToEur;
+
   Transaction({
     String? id,
     required this.date,
     required this.isBuy,
     required this.quantity,
     required this.unitPrice,
+    this.currency = 'EUR',
+    this.fxRateToEur = 1.0,
+    this.type,
+    this.note,
   }) : id = id ?? generateInvestmentId('txn');
 
-  double get amount => quantity * unitPrice;
+  /// Montant de la transaction en euros (la devise de compte) : quantité ×
+  /// prix unitaire × taux de change. C'est ce montant que retiennent toutes
+  /// les agrégations ([Investment.investedAmount], la performance, le
+  /// miroir métaux...).
+  double get amount => quantity * unitPrice * fxRateToEur;
+
+  /// Montant brut dans la devise de cotation [currency], sans conversion.
+  double get amountInCurrency => quantity * unitPrice;
+
+  /// Libellé affiché pour cette transaction — celui de [type] s'il est
+  /// renseigné (dividende, frais...), sinon le "Achat"/"Vente" habituel.
+  String get displayLabel => type?.label ?? (isBuy ? 'Achat' : 'Vente');
 
   factory Transaction.fromJson(Map<String, dynamic> json) => Transaction(
     id: json['id'] as String? ?? generateInvestmentId('txn'),
@@ -207,19 +305,32 @@ class Transaction {
     isBuy: json['isBuy'] as bool? ?? true,
     quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
     unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0,
+    // Transactions historiques sans devise : l'euro, avec un taux de change
+    // unitaire — le JSON reste rétro-compatible.
+    currency: json['currency'] as String? ?? 'EUR',
+    fxRateToEur: (json['fxRateToEur'] as num?)?.toDouble() ?? 1.0,
+    type: TransactionType.fromName(json['type'] as String?),
+    note: json['note'] as String?,
   );
 
   /// [round] à `false` pour les cryptomonnaies (quantité/le cours en
   /// dessous du centime) et les épargnes en devise étrangère (taux de
   /// change — voir [requiresFullPricePrecision]) — voir [round2] et
   /// `InvestmentAccount.toJson`, seul appelant qui connaît la classe
-  /// d'actif effective de l'investissement porteur.
+  /// d'actif effective de l'investissement porteur. Le taux de change, lui,
+  /// est toujours écrit en pleine précision (un taux JPY ≈ 0,006 € ne
+  /// survivrait pas à [round2]).
   Map<String, dynamic> toJson({bool round = true}) => {
     'id': id,
     'date': date.toIso8601String(),
     'isBuy': isBuy,
     'quantity': round ? round2(quantity) : quantity,
     'unitPrice': round ? round2(unitPrice) : unitPrice,
+    // Seule une transaction hors euros porte sa devise et son taux.
+    if (currency != 'EUR') 'currency': currency,
+    if (type != null) 'type': type!.name,
+    if (note != null) 'note': note,
+    if (currency != 'EUR') 'fxRateToEur': fxRateToEur,
   };
 }
 
@@ -239,6 +350,19 @@ class Investment {
   final String? symbol;
   final double? lastPrice;
   final DateTime? lastPriceDate;
+
+  /// Devise dans laquelle [lastPrice] est coté sur le marché — `null` (et
+  /// donc l'euro) tant qu'aucun cours n'a été récupéré. Résolue depuis les
+  /// métadonnées de Yahoo Finance (`meta.currency`) au rafraîchissement des
+  /// cours (voir `price_refresh_service.dart`) : le cours brut d'une action
+  /// US (META...) est en dollars, pas en euros.
+  final String? quoteCurrency;
+
+  /// Taux de change (1 [quoteCurrency] = X €) appliqué à [lastPrice] pour
+  /// la valorisation en euros — `null` tant que la devise de cotation est
+  /// l'euro ou que le taux n'a pas été résolu (voir
+  /// `price_refresh_service.dart`'s `_resolveInvestmentPrice`).
+  final double? lastFxRateToEur;
 
   /// Nom du fichier local de la photo du produit (pièce/lingot) scrapée du
   /// catalogue achat-or-et-argent.fr et téléchargée dans
@@ -278,6 +402,8 @@ class Investment {
     this.symbol,
     this.lastPrice,
     this.lastPriceDate,
+    this.quoteCurrency,
+    this.lastFxRateToEur,
     this.imageFileName,
     this.priceUnavailable,
     this.assetClass,
@@ -290,6 +416,8 @@ class Investment {
     String? symbol,
     double? lastPrice,
     DateTime? lastPriceDate,
+    String? quoteCurrency,
+    double? lastFxRateToEur,
     String? imageFileName,
     bool? priceUnavailable,
     AssetClass? assetClass,
@@ -303,6 +431,8 @@ class Investment {
     symbol: symbol ?? this.symbol,
     lastPrice: lastPrice ?? this.lastPrice,
     lastPriceDate: lastPriceDate ?? this.lastPriceDate,
+    quoteCurrency: quoteCurrency ?? this.quoteCurrency,
+    lastFxRateToEur: lastFxRateToEur ?? this.lastFxRateToEur,
     imageFileName: imageFileName ?? this.imageFileName,
     priceUnavailable: priceUnavailable ?? this.priceUnavailable,
     assetClass: assetClass ?? this.assetClass,
@@ -314,6 +444,17 @@ class Investment {
     0.0,
     (sum, t) => sum + (t.isBuy ? t.quantity : -t.quantity),
   );
+
+  /// `true` si l'identifiant est un code de devise connu (EUR, USD, GBP... —
+  /// voir [kKnownCurrencies]) : la position est tenue à un taux de change
+  /// plutôt qu'à un cours de titre. C'est le cas de toute épargne (dont
+  /// l'identifiant EST la devise tenue, voir `identifierOptionsFor`) et d'une
+  /// devise créée dans un compte-titres via l'étape "Investissement et/ou
+  /// devises" du flux de complétion — un compte qui peut donc contenir des
+  /// titres ET des devises côte à côte. Voir aussi [isCurrencyInvestment],
+  /// qui couvre en plus l'épargne dont l'identifiant serait hors liste.
+  bool get isCurrency =>
+      kKnownCurrencies.contains(isin.trim().toUpperCase());
 
   /// Transactions du plus récent au plus ancien, quel que soit l'ordre de
   /// saisie — c'est l'ordre d'affichage utilisé partout (liste des
@@ -330,10 +471,14 @@ class Investment {
   /// Prix de Revient Unitaire : coût moyen par unité actuellement détenue.
   double get pru => quantityHeld == 0 ? 0 : investedAmount / quantityHeld;
 
-  /// Valorisation au dernier cours connu, ou `null` si aucun cours n'a
-  /// encore été récupéré.
-  double? get marketValue =>
-      lastPrice == null ? null : quantityHeld * lastPrice!;
+  /// Valorisation au dernier cours connu, convertie en euros — `null` si
+  /// aucun cours n'a encore été récupéré. Un titre coté en devise étrangère
+  /// (ex : META en USD) est valorisé au taux de change enregistré
+  /// ([lastFxRateToEur]).
+  double? get marketValue {
+    if (lastPrice == null) return null;
+    return quantityHeld * lastPrice! * (lastFxRateToEur ?? 1.0);
+  }
 
   /// Plus/moins-value latente par rapport au coût d'achat, ou `null` sans
   /// cours connu.
@@ -352,6 +497,8 @@ class Investment {
     lastPriceDate: json['lastPriceDate'] != null
         ? DateTime.parse(json['lastPriceDate'] as String)
         : null,
+    quoteCurrency: json['quoteCurrency'] as String?,
+    lastFxRateToEur: (json['lastFxRateToEur'] as num?)?.toDouble(),
     imageFileName: json['imageFileName'] as String?,
     priceUnavailable: json['priceUnavailable'] as bool?,
     assetClass: json['assetClass'] != null
@@ -374,6 +521,10 @@ class Investment {
     if (lastPrice != null) 'lastPrice': round ? round2(lastPrice!) : lastPrice,
     if (lastPriceDate != null)
       'lastPriceDate': lastPriceDate!.toIso8601String(),
+    // La devise de cotation et le taux de change ne s'écrivent qu'une fois
+    // connus, et le taux toujours en pleine précision (0,006 € pour 1 JPY).
+    if (quoteCurrency != null) 'quoteCurrency': quoteCurrency,
+    if (lastFxRateToEur != null) 'lastFxRateToEur': lastFxRateToEur,
     if (imageFileName != null) 'imageFileName': imageFileName,
     if (priceUnavailable != null) 'priceUnavailable': priceUnavailable,
     if (assetClass != null) 'assetClass': assetClass!.name,
@@ -548,6 +699,14 @@ List<AccountEnvelope> accountEnvelopesFor(AssetClass assetClass) {
         AccountEnvelope.peg,
         AccountEnvelope.pee,
         AccountEnvelope.per,
+        // L'assurance vie et le contrat de capitalisation détiennent des
+        // fonds/ETF/actions comme un compte-titres : beaucoup les gèrent
+        // avec leur bourse, en plus de leur volet épargne (voir la liste
+        // de la classe épargne). Créés ici, ces comptes héritent du flux
+        // compte-titres (ISIN + libellé, plusieurs contrats par
+        // établissement — voir `accountEnvelopeIsUniquePerEstablishment`).
+        AccountEnvelope.assuranceVie,
+        AccountEnvelope.contratCapitalisation,
         AccountEnvelope.autre,
       ];
     case AssetClass.epargne:
@@ -597,8 +756,21 @@ List<AccountEnvelope> accountEnvelopesFor(AssetClass assetClass) {
   }
 }
 
+/// Un investissement est-il une position en devise (tenue à un taux de
+/// change, pas à un cours de titre) ? — toujours vrai pour une épargne (dont
+/// l'identifiant est le code de la devise tenue, voir `identifierOptionsFor`,
+/// même si ce code manquait dans [kKnownCurrencies]), et vrai pour toute
+/// autre détention identifiée par un code de devise connu (ex : des dollars
+/// tenus en cash dans un CTO, créés via l'étape "Investissement et/ou
+/// devises" du flux de complétion). Voir aussi [Investment.isCurrency].
+bool isCurrencyInvestment(InvestmentAccount account, Investment investment) {
+  final effectiveClass = investment.assetClass ?? account.assetClass;
+  if (effectiveClass == AssetClass.epargne) return true;
+  return kKnownCurrencies.contains(investment.isin.trim().toUpperCase());
+}
+
 /// Enveloppe d'épargne unique par banque — donc réutilisée quand elle est
-/// recréée (voir `_selectEpargneEnvelope` dans
+/// recréée (voir `_selectAccountEnvelope` dans
 /// `complete_patrimoine_dialog.dart`) : un produit d'épargne réglementée
 /// (Livret A, LDDS, LEP, PEL) ne peut être ouvert qu'une seule fois par
 /// établissement. L'assurance vie, le contrat de capitalisation et le
@@ -609,6 +781,33 @@ bool epargneEnvelopeIsUniquePerBank(AccountEnvelope envelope) =>
     envelope != AccountEnvelope.assuranceVie &&
     envelope != AccountEnvelope.contratCapitalisation &&
     envelope != AccountEnvelope.autre;
+
+/// L'enveloppe d'un compte de [assetClass] est-elle unique par
+/// établissement — donc réutilisée quand elle est recréée au même
+/// établissement (voir `_selectAccountEnvelope`) ? L'épargne réglementée
+/// (Livret A, LDDS, LEP, PEL) et le PEA / PEA-PME (un seul par personne en
+/// France) ne peuvent être ouverts qu'une seule fois par établissement. Tout
+/// le reste (CTO, assurance vie, contrat de capitalisation, épargne
+/// entreprise, club deal, art...) peut être ouvert plusieurs fois, y compris
+/// dans une même banque : un nouveau compte est alors créé à chaque fois.
+bool accountEnvelopeIsUniquePerEstablishment(
+  AssetClass assetClass,
+  AccountEnvelope envelope,
+) {
+  switch (assetClass) {
+    case AssetClass.epargne:
+      return epargneEnvelopeIsUniquePerBank(envelope);
+    case AssetClass.actionsEtFonds:
+      return envelope == AccountEnvelope.pea ||
+          envelope == AccountEnvelope.peaPme;
+    case AssetClass.privateEquity:
+    case AssetClass.autres:
+    case AssetClass.immobilier:
+    case AssetClass.crypto:
+    case AssetClass.metauxPrecieux:
+      return false;
+  }
+}
 
 /// Un CTO "Actions & Fonds" peut aussi loger un ETC (Exchange-Traded
 /// Commodity) sur métaux précieux : plutôt que d'imposer un compte dédié,
@@ -633,6 +832,43 @@ bool accountAcceptsCrossClassInvestment(
 /// réellement détenu, coffre ou autre, identifié par son nom de produit).
 bool isMetalEtc(InvestmentAccount account) =>
     account.envelope == AccountEnvelope.cto;
+
+/// Classes d'actif dont chaque compte est détenu chez un établissement
+/// financier (banque, broker, assureur, plateforme...) : le flux de
+/// complétion ("Compléter mon patrimoine", `complete_patrimoine_dialog.dart`)
+/// y commence par l'étape "Quel établissement ?" puis "Quel compte ?"
+/// (l'enveloppe fiscale), comme pour l'épargne — plutôt que par le formulaire
+/// de compte avec champ banque libre des autres classes. "Autres" est inclus
+/// (comptes ouverts chez un établissement : produits non classés, droits...),
+/// au même titre que `assetClassSupportsBankName`. L'immobilier, la crypto,
+/// les métaux précieux n'y passent pas : l'établissement n'y concerne qu'une
+/// partie des enveloppes (les métaux en CTO — un ETC), et le choix de
+/// l'enveloppe précède alors l'éventuel établissement (étape compte classique,
+/// champ banque conditionnel).
+bool assetClassRequiresEstablishmentStep(AssetClass assetClass) {
+  switch (assetClass) {
+    case AssetClass.epargne:
+    case AssetClass.actionsEtFonds:
+    case AssetClass.privateEquity:
+    case AssetClass.autres:
+      return true;
+    case AssetClass.immobilier:
+    case AssetClass.crypto:
+    case AssetClass.metauxPrecieux:
+      return false;
+  }
+}
+
+/// Une date d'ouverture a-t-elle un sens pour un compte de [assetClass] ? —
+/// les comptes d'investissement détenus chez un établissement (épargne,
+/// compte-titres, PEA, assurance vie, private equity, "autres") s'ouvrent à
+/// une date précise, à saisir à la création/édition (voir
+/// `complete_patrimoine_dialog.dart` et `account_detail_screen.dart`). La
+/// crypto (portefeuille auto-détenu), les métaux physiques (pièce ou lingot
+/// en coffre) et le compte technique de l'immobilier n'ont pas de date
+/// d'ouverture.
+bool accountHasOpeningDate(AssetClass assetClass) =>
+    assetClassRequiresEstablishmentStep(assetClass);
 
 /// Un établissement (banque, broker...) a-t-il un sens pour un compte de
 /// [assetClass] ? — l'identité qui groupe les comptes en accordéons "banque
@@ -693,6 +929,12 @@ class InvestmentAccount {
   /// `complete_patrimoine_dialog.dart`), éditable ensuite.
   final String? description;
 
+  /// Date d'ouverture du compte (ex : ouverture du Livret A en 2021) —
+  /// pertinente pour les comptes d'investissement détenus chez un
+  /// établissement (voir [accountHasOpeningDate]), affichée dans le détail
+  /// du compte. `null` si inconnue / non pertinente.
+  final DateTime? openingDate;
+
   final List<Investment> investments;
   final List<VaultDocument> documents;
 
@@ -702,6 +944,7 @@ class InvestmentAccount {
   /// l'effacement d'un champ nullable avec le pattern `x ?? this.x`.
   static const Object _unsetBankName = Object();
   static const Object _unsetDescription = Object();
+  static const Object _unsetOpeningDate = Object();
 
   InvestmentAccount({
     String? id,
@@ -710,6 +953,7 @@ class InvestmentAccount {
     required this.name,
     this.bankName,
     this.description,
+    this.openingDate,
     required this.investments,
     this.documents = const [],
   }) : id = id ?? generateInvestmentId('account');
@@ -721,6 +965,7 @@ class InvestmentAccount {
     List<VaultDocument>? documents,
     Object? bankName = _unsetBankName,
     Object? description = _unsetDescription,
+    Object? openingDate = _unsetOpeningDate,
   }) => InvestmentAccount(
     id: id,
     assetClass: assetClass,
@@ -732,6 +977,9 @@ class InvestmentAccount {
     description: identical(description, _unsetDescription)
         ? this.description
         : description as String?,
+    openingDate: identical(openingDate, _unsetOpeningDate)
+        ? this.openingDate
+        : openingDate as DateTime?,
     investments: investments ?? this.investments,
     documents: documents ?? this.documents,
   );
@@ -763,6 +1011,9 @@ class InvestmentAccount {
       name: json['name'] as String? ?? '',
       bankName: bankName,
       description: json['description'] as String?,
+      openingDate: json['openingDate'] != null
+          ? DateTime.parse(json['openingDate'] as String)
+          : null,
       investments: (json['investments'] as List? ?? [])
           .map((e) => Investment.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -781,13 +1032,22 @@ class InvestmentAccount {
     // de null suffit ici (pas de risque de persister une chaîne vide).
     if (bankName != null) 'bankName': bankName,
     if (description != null) 'description': description,
+    // Promotion d'un champ public impossible dans l'élément d'un
+    // collection-if : le `!` est explicite, comme `envelope!.name`.
+    if (openingDate != null) 'openingDate': openingDate!.toIso8601String(),
     // Un investissement crypto (le sien ou, à défaut, celui hérité de ce
-    // compte) ou une épargne en devise étrangère gardent leur précision
-    // d'origine — quantité/cours en dessous du centime, taux de change —
-    // voir [requiresFullPricePrecision].
+    // compte), une épargne en devise étrangère ou toute autre position en
+    // devise (ex : des dollars tenus dans un CTO — voir
+    // `isCurrencyInvestment`) gardent leur précision d'origine — quantité/
+    // cours en dessous du centime, taux de change — voir
+    // [requiresFullPricePrecision].
     'investments': investments.map((i) {
       final effectiveClass = i.assetClass ?? assetClass;
-      return i.toJson(round: !requiresFullPricePrecision(effectiveClass));
+      return i.toJson(
+        round:
+            !(requiresFullPricePrecision(effectiveClass) ||
+              isCurrencyInvestment(this, i)),
+      );
     }).toList(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),

@@ -773,7 +773,7 @@ class _RevenuesCard extends StatelessWidget {
                       textAlign: TextAlign.end,
                       keyboardType: TextInputType.number,
                       onChanged: (value) {
-                        final amount = double.tryParse(value) ?? 0;
+                        final amount = parseDecimal(value) ?? 0;
                         onChanged([
                           for (var j = 0; j < revenues.length; j++)
                             if (j == i)
@@ -881,7 +881,7 @@ class _CategoriesCard extends StatelessWidget {
                               textAlign: TextAlign.end,
                               keyboardType: TextInputType.number,
                               onChanged: (value) {
-                                final amount = double.tryParse(value) ?? 0;
+                                final amount = parseDecimal(value) ?? 0;
                                 final updated = [...categories];
                                 updated[catIdx] = updated[catIdx].copyWith(
                                   items: [

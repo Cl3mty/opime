@@ -6,6 +6,7 @@ import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
 import 'account_detail_screen.dart' show BackHeader;
 import 'confirm_delete_dialog.dart';
+import 'currency_format.dart';
 import 'document_storage.dart';
 import 'documents_section.dart';
 import 'investment_identifier_field.dart';
@@ -15,6 +16,7 @@ import 'metal_price_client.dart';
 import 'metal_price_repository.dart';
 import 'performance_calculator.dart';
 import 'price_history_repository.dart';
+import 'transaction_price_currency.dart';
 import 'yahoo_finance_client.dart' show PricePoint;
 
 const _green = Color(0xFF22C55E);
@@ -71,6 +73,11 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
 
+  /// Devise et taux de change du formulaire de transaction courant (voir
+  /// `transaction_price_currency.dart`) : à l'euro par défaut, résolus puis
+  /// convertis au moment du commit (`_commitCreateTransaction`/`_commitEditTransaction`).
+  late final TransactionPriceCurrencyController _priceCurrencyController;
+
   bool _editingInvestment = false;
   final _editIsinController = TextEditingController();
   final _editLabelController = TextEditingController();
@@ -79,6 +86,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   void initState() {
     super.initState();
     _repo = InvestmentsRepository(widget.vaultPath);
+    _priceCurrencyController = TransactionPriceCurrencyController(
+      vaultPath: widget.vaultPath,
+    );
     // Date par défaut sans heure, comme les dates saisies au datepicker —
     // voir `_onOrBeforeDay` dans real_patrimoine_adapter.
     _newDate = DateTime(
@@ -97,12 +107,19 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       _repo = InvestmentsRepository(widget.vaultPath);
       _loadPriceHistory();
     }
+    if (oldWidget.vaultPath != widget.vaultPath) {
+      _priceCurrencyController.dispose();
+      _priceCurrencyController = TransactionPriceCurrencyController(
+        vaultPath: widget.vaultPath,
+      );
+    }
   }
 
   @override
   void dispose() {
     _quantityController.dispose();
     _priceController.dispose();
+    _priceCurrencyController.dispose();
     _editIsinController.dispose();
     _editLabelController.dispose();
     super.dispose();
@@ -146,10 +163,12 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   /// Seules les actions, fonds et parts de private equity sont identifiés
   /// par un vrai code ISIN — les autres classes utilisent [Investment.isin]
   /// comme identifiant libre (ticker crypto, "Or physique", adresse d'un
-  /// bien immobilier...), donc ne doivent pas être présentées comme tel.
+  /// bien immobilier, code de devise tenue...), donc ne doivent pas être
+  /// présentées comme tel.
   bool get _isRealIsin =>
-      _effectiveClass == AssetClass.actionsEtFonds ||
-      _effectiveClass == AssetClass.privateEquity;
+      !_isCurrency &&
+      (_effectiveClass == AssetClass.actionsEtFonds ||
+          _effectiveClass == AssetClass.privateEquity);
 
   bool get _isImmobilier => _effectiveClass == AssetClass.immobilier;
 
@@ -162,39 +181,93 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       _effectiveClass == AssetClass.metauxPrecieux ||
       _effectiveClass == AssetClass.autres;
 
-  /// Une épargne tenue en euros (l'immense majorité des cas français —
-  /// Livret A, LDDS, LEP, PEL...) n'a pas de taux de change à saisir : un
-  /// versement de 1000 € est juste... 1000 €. Le champ "Cours de la paire
-  /// de devise" ne devient pertinent que pour une épargne tenue dans une
-  /// autre devise (voir [kKnownCurrencies] côté sélection).
-  bool get _isEurEpargne =>
-      _effectiveClass == AssetClass.epargne &&
-      widget.investment.isin.toUpperCase() == 'EUR';
+  /// Une position en devise tenue en euros (l'immense majorité des cas
+  /// français — Livret A, LDDS, LEP, PEL...) n'a pas de taux de change à
+  /// saisir : un versement de 1000 € est juste... 1000 €. Le champ "Cours
+  /// de la paire de devise" ne devient pertinent que pour une position en
+  /// devise tenue dans une autre devise (voir [kKnownCurrencies] côté
+  /// sélection).
+  bool get _isEurCurrency =>
+      _isCurrency && widget.investment.isin.trim().toUpperCase() == 'EUR';
+
+  /// L'investissement courant est-il tenu en devise (épargne, ou devise
+  /// créée dans un compte-titres via le flux de complétion — un compte peut
+  /// loger des titres ET des devises côte à côte) ? — mêmes règles que
+  /// `isCurrencyInvestment` au niveau du modèle.
+  bool get _isCurrency => isCurrencyInvestment(widget.account, widget.investment);
 
   String get _quantityFieldLabel {
     if (_isImmobilier) return 'Montant total (€)';
-    if (_effectiveClass != AssetClass.epargne) return 'Quantité';
-    return _isEurEpargne
-        ? 'Montant (€)'
-        : 'Montant (${widget.investment.isin})';
+    if (_isCurrency) {
+      return _isEurCurrency
+          ? 'Montant (€)'
+          : 'Montant (${widget.investment.isin})';
+    }
+    return 'Quantité';
   }
 
-  String get _priceFieldLabel => _effectiveClass == AssetClass.epargne
+  String get _priceFieldLabel => _isCurrency
       ? 'Cours de la paire de devise'
-      : 'Prix unitaire (€)';
+      : 'Prix unitaire';
+
+  /// Le sélecteur de devise s'affiche sur le champ prix dès qu'il est
+  /// pertinent : hors immobilier (pas de prix unitaire), et hors position
+  /// en devise — dont le "prix" est déjà le taux de change en euros, sans
+  /// devise à choisir (voir `_isCurrency`).
+  bool get _showCurrencySelector =>
+      !_isEurCurrency && !_isImmobilier && !_isCurrency;
+
+  /// Devise effective de la transaction en cours de saisie : toujours
+  /// l'euro pour une position en devise (le cours saisi est déjà un taux en
+  /// euros), sinon la devise choisie sur le formulaire.
+  String get _txnCurrency =>
+      _isCurrency ? 'EUR' : _priceCurrencyController.currency;
+
+  /// Taux de change à appliquer à la transaction en cours de saisie — 1
+  /// pour une transaction en euros, le taux résolu/saisi sinon (peut être
+  /// `null` : devise étrangère dont aucun taux n'est encore disponible, le
+  /// commit est alors impossible).
+  double? get _txnFxRateToEur => _txnCurrency == 'EUR'
+      ? 1.0
+      : _priceCurrencyController.resolvedRate;
+
+  /// Libellé du champ "Dernier cours" quand le titre est coté en devise
+  /// étrangère : le cours brut dans sa devise de cotation + son équivalent
+  /// en euros au taux enregistré (voir `Investment.quoteCurrency`).
+  String get _lastPriceDisplay {
+    final price = widget.investment.lastPrice!;
+    if (_isCurrency) return '${price.toStringAsFixed(4)} €';
+    final quoteCurrency = widget.investment.quoteCurrency;
+    if (quoteCurrency != null && quoteCurrency.toUpperCase() != 'EUR') {
+      final display =
+          '${price.toStringAsFixed(2)} ${currencySymbol(quoteCurrency)} · ≈ '
+          '${formatEuros(price * (widget.investment.lastFxRateToEur ?? 1.0))}';
+      return widget.hidden ? maskAmount(display) : display;
+    }
+    return displayEuros(price, widget.hidden);
+  }
 
   Future<void> _commitCreateTransaction() async {
     final date = _newDate;
     if (date == null) return;
     final quantity = _isImmobilier
         ? 1.0
-        : double.tryParse(_quantityController.text.trim());
+        : parseDecimal(_quantityController.text);
     final price = _isImmobilier
-        ? double.tryParse(_quantityController.text.trim())
-        : _isEurEpargne
+        ? parseDecimal(_quantityController.text)
+        : _isEurCurrency
         ? 1.0
-        : double.tryParse(_priceController.text.trim());
-    if (quantity == null || quantity <= 0 || price == null || price <= 0) {
+        : parseDecimal(_priceController.text);
+    final currency = _txnCurrency;
+    final fxRateToEur = _txnFxRateToEur;
+    // Devise étrangère sans taux de change (auto et manuel indisponibles) :
+    // impossible de convertir en euros, on ne sauvegarde pas.
+    if (quantity == null ||
+        quantity <= 0 ||
+        price == null ||
+        price <= 0 ||
+        fxRateToEur == null ||
+        fxRateToEur <= 0) {
       return;
     }
     final updatedInvestment = widget.investment.copyWith(
@@ -205,6 +278,8 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
           isBuy: _newIsBuy,
           quantity: quantity,
           unitPrice: price,
+          currency: currency,
+          fxRateToEur: fxRateToEur,
         ),
       ],
     );
@@ -234,11 +309,15 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
           ? ''
           : _formatNumber(transaction.unitPrice);
     });
+    // Devise et taux enregistrés sur la transaction (historiquement exacts)
+    // repris tels quels pour l'édition.
+    _priceCurrencyController.loadFrom(transaction);
   }
 
   void _cancelEdit() {
     _quantityController.clear();
     _priceController.clear();
+    _priceCurrencyController.reset();
     setState(() => _editingTransactionId = null);
   }
 
@@ -247,18 +326,22 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     final date = _newDate;
     final quantity = _isImmobilier
         ? 1.0
-        : double.tryParse(_quantityController.text.trim());
+        : parseDecimal(_quantityController.text);
     final price = _isImmobilier
-        ? double.tryParse(_quantityController.text.trim())
-        : _isEurEpargne
+        ? parseDecimal(_quantityController.text)
+        : _isEurCurrency
         ? 1.0
-        : double.tryParse(_priceController.text.trim());
+        : parseDecimal(_priceController.text);
+    final currency = _txnCurrency;
+    final fxRateToEur = _txnFxRateToEur;
     if (id == null ||
         date == null ||
         quantity == null ||
         quantity <= 0 ||
         price == null ||
-        price <= 0) {
+        price <= 0 ||
+        fxRateToEur == null ||
+        fxRateToEur <= 0) {
       return;
     }
     final updatedTransaction = Transaction(
@@ -267,6 +350,8 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       isBuy: _newIsBuy,
       quantity: quantity,
       unitPrice: price,
+      currency: currency,
+      fxRateToEur: fxRateToEur,
     );
     final updatedInvestment = widget.investment.copyWith(
       transactions: [
@@ -346,6 +431,11 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       symbol: isinChanged ? null : widget.investment.symbol,
       lastPrice: isinChanged ? null : widget.investment.lastPrice,
       lastPriceDate: isinChanged ? null : widget.investment.lastPriceDate,
+      // La devise de cotation et son taux, résolus pour l'ancien
+      // identifiant, sont tout aussi invalides une fois celui-ci changé.
+      quoteCurrency: isinChanged ? null : widget.investment.quoteCurrency,
+      lastFxRateToEur:
+          isinChanged ? null : widget.investment.lastFxRateToEur,
       priceUnavailable:
           isinChanged ? null : widget.investment.priceUnavailable,
       assetClass: widget.investment.assetClass,
@@ -548,7 +638,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               onCancel: () => setState(() => _editingInvestment = false),
             )
           else ...[
-            if (!_isImmobilier) ...[
+            if (!_isImmobilier && !_isCurrency) ...[
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -578,15 +668,16 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               if (!_isImmobilier) ...[
                 _StatChip(
                   label: 'Quantité détenue',
-                  value: investment.quantityHeld.toStringAsFixed(2),
+                  value: formatQuantity(investment.quantityHeld, _effectiveClass),
                 ),
                 _StatChip(
                   label: 'PRU',
-                  // Une épargne en devise étrangère est tenue à un taux de
-                  // change (le PRU est le cours de la paire à l'achat), pas
-                  // à un montant : l'afficher avec la précision du taux
-                  // plutôt que formaté en euros arrondis.
-                  value: _effectiveClass == AssetClass.epargne
+                  // Une position en devise (épargne ou devise d'un compte-
+                  // titres) est tenue à un taux de change (le PRU est le
+                  // cours de la paire à l'achat), pas à un montant :
+                  // l'afficher avec la précision du taux plutôt que formaté
+                  // en euros arrondis.
+                  value: _isCurrency
                       ? '${investment.pru.toStringAsFixed(4)} €'
                       : displayEuros(investment.pru, widget.hidden),
                 ),
@@ -594,9 +685,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               if (hasPrice)
                 _StatChip(
                   label: 'Dernier cours',
-                  value: _effectiveClass == AssetClass.epargne
-                      ? '${investment.lastPrice!.toStringAsFixed(4)} €'
-                      : displayEuros(investment.lastPrice!, widget.hidden),
+                  value: _lastPriceDisplay,
                 ),
             ],
           ),
@@ -694,7 +783,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 priceController: _priceController,
                 quantityLabel: _quantityFieldLabel,
                 priceLabel: _priceFieldLabel,
-                showPriceField: !_isEurEpargne && !_isImmobilier,
+                showPriceField: !_isEurCurrency && !_isImmobilier,
+                showCurrencySelector: _showCurrencySelector,
+                priceCurrencyController: _priceCurrencyController,
                 onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
                 onDateChanged: (d) => setState(() => _newDate = d),
                 onCreate: _commitEditTransaction,
@@ -712,6 +803,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                             if (d.transactionId == txn.id) d,
                         ],
                         fixedTransactionId: txn.id,
+                        quantityAssetClass: widget.investment.assetClass,
                         onAdd: _addDocument,
                         onDelete: _deleteDocument,
                       )
@@ -721,6 +813,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               _TransactionRow(
                 transaction: txn,
                 hidden: widget.hidden,
+                assetClass: _effectiveClass,
                 onEdit: () => _startEdit(txn),
                 onDelete: () => _deleteTransaction(txn),
                 displayTotalOnly: _isImmobilier,
@@ -750,7 +843,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               priceController: _priceController,
               quantityLabel: _quantityFieldLabel,
               priceLabel: _priceFieldLabel,
-              showPriceField: !_isEurEpargne && !_isImmobilier,
+              showPriceField: !_isEurCurrency && !_isImmobilier,
+              showCurrencySelector: _showCurrencySelector,
+              priceCurrencyController: _priceCurrencyController,
               onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
               onDateChanged: (d) => setState(() => _newDate = d),
               onCreate: _commitCreateTransaction,
@@ -770,6 +865,8 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 );
                 _quantityController.clear();
                 _priceController.clear();
+                // Nouvelle transaction : devise et taux remis à l'euro.
+                _priceCurrencyController.reset();
                 _creating = true;
               }),
             ),
@@ -893,6 +990,10 @@ class _TransactionRow extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  /// Classe d'actif effective de l'investissement porteur : sert à formater
+  /// la quantité (entière pour les pièces/lingots de métaux précieux).
+  final AssetClass assetClass;
+
   /// Documents rattachés à cette transaction (pièces justificatives des
   /// métaux précieux et "autres") — affiche un bouton de consultation
   /// quand la liste est non vide.
@@ -906,6 +1007,7 @@ class _TransactionRow extends StatelessWidget {
     required this.transaction,
     required this.hidden,
     this.displayTotalOnly = false,
+    required this.assetClass,
     required this.onEdit,
     required this.onDelete,
     this.documents = const [],
@@ -953,7 +1055,7 @@ class _TransactionRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: shadcn.Text(
-                transaction.isBuy ? 'Achat' : 'Vente',
+                transaction.displayLabel,
                 style: TextStyle(color: color, fontWeight: FontWeight.w600),
               ).xSmall(),
             ),
@@ -961,8 +1063,14 @@ class _TransactionRow extends StatelessWidget {
             Expanded(child: shadcn.Text(_formatDate(transaction.date)).small()),
             if (!displayTotalOnly) ...[
               shadcn.Text(
-                '${transaction.quantity.toStringAsFixed(2)} × '
-                '${displayEuros(transaction.unitPrice, hidden)}',
+                '${formatQuantity(transaction.quantity, assetClass)} × '
+                '${transaction.currency == 'EUR'
+                    ? displayEuros(transaction.unitPrice, hidden)
+                    : formatPriceInCurrency(
+                        transaction.unitPrice,
+                        transaction.currency,
+                        hidden: hidden,
+                      )}',
               ).muted().xSmall(),
               const SizedBox(width: 12),
             ],
@@ -1047,19 +1155,29 @@ class _CreateTransactionForm extends StatelessWidget {
   final String submitLabel;
 
   /// Libellé du champ [quantityController] — "Quantité" par défaut,
-  /// `Montant (€)`/`Montant (<devise>)` pour une épargne (voir
+  /// `Montant (€)`/`Montant (<devise>)` pour une position en devise (voir
   /// `InvestmentDetailView`'s `_quantityFieldLabel`).
   final String quantityLabel;
 
-  /// Libellé du champ [priceController] — "Prix unitaire (€)" par défaut,
-  /// "Cours de la paire de devise" pour une épargne (voir
+  /// Libellé du champ [priceController] — "Prix unitaire" par défaut,
+  /// "Cours de la paire de devise" pour une position en devise (voir
   /// `InvestmentDetailView`'s `_priceFieldLabel`).
   final String priceLabel;
 
-  /// `false` masque entièrement le champ [priceController] — une épargne
-  /// tenue en euros n'a pas de taux de change à saisir (voir
-  /// `InvestmentDetailView`'s `_isEurEpargne`).
+  /// `false` masque entièrement le champ [priceController] — une position
+  /// en devise tenue en euros n'a pas de taux de change à saisir (voir
+  /// `InvestmentDetailView`'s `_isEurCurrency`).
   final bool showPriceField;
+
+  /// `true` affiche le sélecteur de devise à côté du champ prix (voir
+  /// `InvestmentDetailView`'s `_showCurrencySelector`) — faux pour une
+  /// position en devise, dont le "prix" est déjà le taux en euros.
+  final bool showCurrencySelector;
+
+  /// Contrôleur devise/taux du formulaire (voir
+  /// `transaction_price_currency.dart`) — utilisé quand [showCurrencySelector]
+  /// pour résoudre le taux et afficher la zone de rappel/conversion.
+  final TransactionPriceCurrencyController? priceCurrencyController;
 
   /// Section "Documents" scopée à cette transaction (voir
   /// `DocumentsSection`'s `fixedTransactionId`) — `null` pour une
@@ -1074,8 +1192,10 @@ class _CreateTransactionForm extends StatelessWidget {
     required this.priceController,
     this.submitLabel = 'Ajouter la transaction',
     this.quantityLabel = 'Quantité',
-    this.priceLabel = 'Prix unitaire (€)',
+    this.priceLabel = 'Prix unitaire',
     this.showPriceField = true,
+    this.showCurrencySelector = false,
+    this.priceCurrencyController,
     required this.onIsBuyChanged,
     required this.onDateChanged,
     required this.onCreate,
@@ -1142,9 +1262,22 @@ class _CreateTransactionForm extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (showCurrencySelector &&
+                      priceCurrencyController != null) ...[
+                    const SizedBox(width: 8),
+                    TransactionPriceCurrencySelect(
+                      controller: priceCurrencyController!,
+                    ),
+                  ],
                 ],
               ],
             ),
+            if (showCurrencySelector && priceCurrencyController != null)
+              TransactionFxRateArea(
+                controller: priceCurrencyController!,
+                quantityController: quantityController,
+                priceController: priceController,
+              ),
             if (documentsSection != null) ...[
               const SizedBox(height: 16),
               documentsSection!,

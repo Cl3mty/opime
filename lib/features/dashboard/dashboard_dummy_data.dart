@@ -102,7 +102,9 @@ const dashboardAssetFilters = [
   AssetFilter(
     id: 'crypto',
     label: 'Crypto',
-    color: Color(0xFFFBBF24),
+    // Orange, distinct du jaune des métaux précieux (voir
+    // `real_patrimoine_adapter.dart`).
+    color: Color(0xFFF97316),
     weight: 0.007,
   ),
 ];
@@ -560,7 +562,7 @@ final dashboardActifsCategories = [
     id: 'actifs_crypto',
     label: 'Crypto',
     icon: LucideIcons.bitcoin,
-    color: const Color(0xFFFBBF24),
+    color: const Color(0xFFF97316),
     tier: AllocationTier.opportuniste,
     description: 'Cryptomonnaies détenues sur wallet froid ou plateforme.',
     accounts: const [

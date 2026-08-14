@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/platform_info.dart';
@@ -18,6 +19,12 @@ class AppSidebar extends StatelessWidget {
   /// retiré du groupe Outils sur desktop.
   final bool assistantEnabled;
 
+  /// Nombre de réponses de l'assistant générées pendant qu'on était ailleurs
+  /// (« non lues »), affiché en badge sur l'item Assistant. `ValueListenable`
+  /// pour ne re-rendre la sidebar que quand le compteur bouge (une fois par
+  /// réponse, pas à chaque token du streaming).
+  final ValueListenable<int>? assistantUnread;
+
   const AppSidebar({
     super.key,
     required this.selectedKey,
@@ -27,6 +34,7 @@ class AppSidebar extends StatelessWidget {
     required this.profileController,
     required this.sidebarPrefsController,
     required this.assistantEnabled,
+    this.assistantUnread,
   });
 
   Widget _profileAvatar(BuildContext context, String initials, double size) {
@@ -67,31 +75,76 @@ class AppSidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildItem(NavItem item) {
+  Widget _buildItem(BuildContext context, NavItem item) {
+    final theme = Theme.of(context);
+    final label = shadcn.Text(item.label);
+    // Badge « réponses non lues » sur l'item Assistant : une pastille
+    // numérique dans la version étendue, une simple pastille pleine dans la
+    // version réduite (le libellé n'y est pas affiché, l'icône non plus si
+    // on ne l'habillait pas).
+    final unread =
+        item.key == 'assistant' ? (assistantUnread?.value ?? 0) : 0;
+    final icon = unread > 0
+        ? Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(item.icon),
+              Positioned(
+                right: -7,
+                top: -6,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          )
+        : Icon(item.icon);
+
     return _withTooltip(
       item.label,
       NavigationItem(
-        label: shadcn.Text(item.label),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: label),
+            if (unread > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: shadcn.Text('$unread').small,
+              ),
+            ],
+          ],
+        ),
         selectedStyle: const ButtonStyle.primaryIcon(),
         selected: selectedKey == item.key,
         onChanged: (isSelected) {
           if (isSelected) onSelect(item.key);
         },
-        child: Icon(item.icon),
+        child: icon,
       ),
     );
   }
 
-  Widget _buildGroup(NavGroup group, Set<String> hiddenKeys) {
+  Widget _buildGroup(BuildContext context, NavGroup group, Set<String> hiddenKeys) {
     return NavigationGroup(
       labelAlignment: Alignment.centerLeft,
       label: shadcn.Text(group.label).semiBold.muted.xSmall,
       children: [
         for (final item in group.items)
           if (item.children.isEmpty)
-            _buildItem(item)
+            _buildItem(context, item)
           else
-            _buildParentWithFilteredChildren(item, hiddenKeys),
+            _buildParentWithFilteredChildren(context, item, hiddenKeys),
       ],
     );
   }
@@ -99,6 +152,7 @@ class AppSidebar extends StatelessWidget {
   /// Filtre les sous-items (postes Actifs/Passifs) selon les préférences du
   /// compte actif. Si tout est masqué, le parent disparaît aussi.
   Widget _buildParentWithFilteredChildren(
+    BuildContext context,
     NavItem item,
     Set<String> hiddenKeys,
   ) {
@@ -112,7 +166,7 @@ class AppSidebar extends StatelessWidget {
       NavigationCollapsible(
         leading: Icon(item.icon),
         label: shadcn.Text(item.label),
-        children: [for (final child in visibleChildren) _buildItem(child)],
+        children: [for (final child in visibleChildren) _buildItem(context, child)],
       ),
     );
   }
@@ -121,7 +175,11 @@ class AppSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AnimatedBuilder(
-      animation: Listenable.merge([profileController, sidebarPrefsController]),
+      animation: Listenable.merge([
+        profileController,
+        sidebarPrefsController,
+        if (assistantUnread != null) assistantUnread,
+      ]),
       builder: (context, _) {
         final active = profileController.active;
         final hiddenKeys = active != null
@@ -188,9 +246,9 @@ class AppSidebar extends StatelessWidget {
             ),
           ],
           children: [
-            _buildGroup(patrimoineGroup, hiddenKeys),
+            _buildGroup(context, patrimoineGroup, hiddenKeys),
             const NavigationDivider(),
-            _buildGroup(academieGroup, hiddenKeys),
+            _buildGroup(context, academieGroup, hiddenKeys),
             const NavigationDivider(),
             // L'Assistant est réservé au desktop, y compris sur tablette
             // (où la largeur d'écran déclenche par ailleurs cette même
@@ -198,6 +256,7 @@ class AppSidebar extends StatelessWidget {
             // mobile. Sur desktop, il n'apparaît que si l'assistant est
             // activé dans les Réglages (assistantEnabled).
             _buildGroup(
+              context,
               isDesktopPlatform
                   ? NavGroup(
                       label: outilsGroup.label,

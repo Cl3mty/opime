@@ -998,10 +998,7 @@ class _CategoryCard extends StatelessWidget {
                                           if (i.id == item.id)
                                             i.copyWith(
                                               budget:
-                                                  double.tryParse(
-                                                    v.replaceAll(',', '.'),
-                                                  ) ??
-                                                  0,
+                                                  parseDecimal(v) ?? 0,
                                             )
                                           else
                                             i,
@@ -1034,10 +1031,7 @@ class _CategoryCard extends StatelessWidget {
                                           if (i.id == item.id)
                                             i.copyWith(
                                               realite:
-                                                  double.tryParse(
-                                                    v.replaceAll(',', '.'),
-                                                  ) ??
-                                                  0,
+                                                  parseDecimal(v) ?? 0,
                                             )
                                           else
                                             i,

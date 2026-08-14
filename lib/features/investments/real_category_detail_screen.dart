@@ -217,6 +217,19 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
     return null;
   }
 
+  /// Établissements (banques, brokers...) déjà présents dans le vault, pour
+  /// la liste déroulante du formulaire d'édition d'un compte
+  /// (`_EditAccountForm` d'`account_detail_screen.dart`) — on ne peut
+  /// changer de banque qu'en en sélectionnant une existante.
+  List<String> get _bankNames {
+    final names = <String>{};
+    for (final account in _accounts) {
+      final bankName = account.bankName;
+      if (bankName != null && bankName.isNotEmpty) names.add(bankName);
+    }
+    return names.toList()..sort();
+  }
+
   @override
   Widget build(BuildContext context) {
     final category = _category;
@@ -243,6 +256,7 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
         vaultPath: widget.vaultPath,
         account: account,
         hidden: hidden,
+        bankNames: _bankNames,
         startInEditMode: _openAccountInEditMode,
         onBack: () => setState(() {
           _selectedAccountId = null;

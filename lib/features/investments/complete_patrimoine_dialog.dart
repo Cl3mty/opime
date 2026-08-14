@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
 import '../liabilities/liabilities_models.dart';
 import '../liabilities/liabilities_repository.dart';
@@ -9,19 +10,24 @@ import '../liabilities/liability_form_fields.dart';
 import '../simulations/loan_calculator.dart' show DeferType, LoanType;
 import 'bank_logo_avatar.dart';
 import 'bank_logo_repository.dart';
+import 'confirm_delete_dialog.dart';
+import 'currency_data.dart' show kKnownCurrencies;
 import 'investment_identifier_field.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
 import 'real_patrimoine_adapter.dart' show emptyCategoryFor;
+import 'transaction_price_currency.dart';
 
 enum _Step {
   kind,
   assetClass,
   account,
-  // Sous-flux de l'épargne : la banque est choisie avant le type de compte
-  // (l'enveloppe fiscale), lui-même avant la devise — voir `_selectAssetClass`.
-  epargneBank,
-  epargneEnvelope,
+  // Sous-flux des classes détenues chez un établissement financier
+  // (épargne, actions & fonds, private equity, autres) : l'établissement est
+  // choisi avant le type de compte (l'enveloppe fiscale), lui-même avant
+  // l'investissement et/ou la devise — voir `_selectAssetClass`.
+  establishment,
+  accountEnvelope,
   investment,
   transaction,
   liabilityType,
@@ -103,26 +109,40 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   final _accountNameController = TextEditingController();
 
   /// Établissement (banque) saisi à la création d'un compte — optionnel
-  /// pour les autres classes d'actif (voir [InvestmentAccount.bankName]),
-  /// pré-rempli par la banque pour l'épargne via le sous-flux dédié.
+  /// pour les classes sans établissement (voir [InvestmentAccount.bankName]),
+  /// pré-rempli par l'établissement pour les classes à établissement via le
+  /// sous-flux dédié.
   final _accountBankController = TextEditingController();
 
-  /// Nom de la banque saisi à l'étape "Quelle banque ?" de l'épargne : le
-  /// compte (nom + enveloppe fiscale) n'est créé qu'à l'étape suivante,
-  /// une fois l'enveloppe choisie — voir `_selectEpargneEnvelope`.
-  String? _pendingBankName;
+  /// Nom de l'établissement (banque, broker...) saisi à l'étape "Quel
+  /// établissement ?" des classes à établissement : le compte (nom +
+  /// enveloppe fiscale) n'est créé qu'à l'étape suivante, une fois
+  /// l'enveloppe choisie — voir `_selectAccountEnvelope`. Il reste renseigné
+  /// tant que le compte n'est pas validé, pour pouvoir revenir en arrière.
+  String? _pendingEstablishmentName;
 
-  /// Description facultative du compte d'épargne, saisie à l'étape
-  /// "Quel compte ?" (ex : "Épargne vacances") — affichée en seconde ligne
-  /// sous le type du compte dans les accordéons (voir
+  /// Description facultative du compte (ex : "Épargne vacances", "Mon PEA
+  /// long terme"), saisie à l'étape "Quel compte ?" — affichée en seconde
+  /// ligne sous le type du compte dans les accordéons (voir
   /// `real_patrimoine_adapter.dart`).
-  final _epargneDescriptionController = TextEditingController();
+  final _accountDescriptionController = TextEditingController();
 
-  /// Logos des banques d'épargne déjà importés (nom de banque → chemin
-  /// absolu), pour l'avatar cliquable de l'étape "Quelle banque ?".
+  /// Date d'ouverture du compte (voir [InvestmentAccount.openingDate]),
+  /// saisie à l'étape "Quel compte ?" des classes à établissement puis
+  /// appliquée au compte créé (ou réutilisé s'il n'en a pas) dans
+  /// `_selectAccountEnvelope` — `null` si l'utilisateur n'en renseigne pas.
+  DateTime? _accountOpeningDate;
+
+  /// Logos des établissements déjà importés (nom d'établissement → chemin
+  /// absolu), pour l'avatar cliquable de l'étape "Quel établissement ?".
   Map<String, String> _bankLogos = {};
 
   bool _creatingInvestment = false;
+
+  /// À la création d'un investissement dans un compte-titres (Actions &
+  /// Fonds), l'utilisateur choisit de créer une position en *devise* (USD,
+  /// GBP...) plutôt qu'un titre (ISIN) — voir `_InvestmentStep`.
+  bool _creatingDevise = false;
   RealEstateType _realEstateType = RealEstateType.residencePrincipale;
   final _isinController = TextEditingController();
   final _labelController = TextEditingController();
@@ -131,6 +151,11 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   DateTime? _txnDate;
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
+
+  /// Devise et taux de change de la transaction en cours de saisie (voir
+  /// `transaction_price_currency.dart`) — à l'euro par défaut, résolus puis
+  /// convertis au moment du commit (`_commitCreateTransaction`).
+  late final TransactionPriceCurrencyController _priceCurrencyController;
 
   LiabilityType? _liabilityType;
   final _liabNameController = TextEditingController();
@@ -153,15 +178,18 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     // des historiques (voir `_onOrBeforeDay` dans real_patrimoine_adapter).
     _txnDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     _liabDateDebut = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    _priceCurrencyController = TransactionPriceCurrencyController(
+      vaultPath: widget.vaultPath,
+    );
     final initialAssetClass = widget.initialAssetClass;
     final initialLiabilityType = widget.initialLiabilityType;
     if (initialAssetClass != null) {
       _assetClass = initialAssetClass;
       _envelope = accountEnvelopesFor(initialAssetClass).first;
-      // Épargne : le flux démarre par la banque, pas par le compte — voir
-      // `_selectAssetClass`.
-      _step = initialAssetClass == AssetClass.epargne
-          ? _Step.epargneBank
+      // Classes à établissement : le flux démarre par l'établissement, pas
+      // par le compte — voir `_selectAssetClass`.
+      _step = assetClassRequiresEstablishmentStep(initialAssetClass)
+          ? _Step.establishment
           : _Step.account;
     } else if (initialLiabilityType != null) {
       _liabilityType = initialLiabilityType;
@@ -174,11 +202,12 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   void dispose() {
     _accountNameController.dispose();
     _accountBankController.dispose();
-    _epargneDescriptionController.dispose();
+    _accountDescriptionController.dispose();
     _isinController.dispose();
     _labelController.dispose();
     _quantityController.dispose();
     _priceController.dispose();
+    _priceCurrencyController.dispose();
     _liabNameController.dispose();
     _liabPrixController.dispose();
     _liabApportController.dispose();
@@ -202,18 +231,22 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     await _loadBankLogos();
   }
 
-  /// Lit les logos déjà importés des banques d'épargne (voir
-  /// `BankLogoRepository`) pour les afficher sur l'étape "Quelle banque ?".
+  /// Lit les logos déjà importés des établissements (voir
+  /// `BankLogoRepository`) pour les afficher sur l'étape "Quel
+  /// établissement ?" — ceux des classes à établissement, toutes classes
+  /// confondues (une même banque/broker peut abriter des comptes d'épargne
+  /// ET des comptes-titres).
   Future<void> _loadBankLogos() async {
     final repo = BankLogoRepository(widget.vaultPath);
-    final banks = {
+    final establishments = {
       for (final a in _accounts)
-        if (a.assetClass == AssetClass.epargne) a.bankName ?? a.name,
+        if (assetClassRequiresEstablishmentStep(a.assetClass))
+          a.bankName ?? a.name,
     };
     final logos = <String, String>{};
-    for (final bank in banks) {
-      final path = await repo.logoPathFor(bank);
-      if (path != null) logos[bank] = path;
+    for (final establishment in establishments) {
+      final path = await repo.logoPathFor(establishment);
+      if (path != null) logos[establishment] = path;
     }
     if (!mounted) return;
     setState(() => _bankLogos = logos);
@@ -255,16 +288,23 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     return null;
   }
 
-  /// Même logique que `InvestmentDetailView`'s `_isEurEpargne` : une
-  /// épargne tenue en euros n'a pas de taux de change à saisir pour sa
-  /// première transaction non plus.
-  bool get _isEurEpargne {
+  /// L'investissement courant est-il tenu en devise (épargne, ou devise
+  /// créée dans un compte-titres via l'étape "Investissement et/ou
+  /// devises") ? — mêmes règles que `isCurrencyInvestment` à l'affichage.
+  bool get _investmentIsCurrency {
     final investment = _investment;
     final account = _account;
     if (investment == null || account == null) return false;
-    final effectiveClass = investment.assetClass ?? account.assetClass;
-    return effectiveClass == AssetClass.epargne &&
-        investment.isin.toUpperCase() == 'EUR';
+    return isCurrencyInvestment(account, investment);
+  }
+
+  /// Même logique que `InvestmentDetailView`'s `_isEurCurrency` : une
+  /// épargne — ou une devise — tenue en euros n'a pas de taux de change à
+  /// saisir pour sa première transaction non plus.
+  bool get _isEurCurrency {
+    final investment = _investment;
+    if (investment == null || !_investmentIsCurrency) return false;
+    return investment.isin.trim().toUpperCase() == 'EUR';
   }
 
   String get _quantityFieldLabel {
@@ -273,19 +313,28 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     if (investment == null || account == null) return 'Quantité';
     final effectiveClass = investment.assetClass ?? account.assetClass;
     if (effectiveClass == AssetClass.immobilier) return 'Montant total (€)';
-    if (effectiveClass != AssetClass.epargne) return 'Quantité';
-    return _isEurEpargne ? 'Montant (€)' : 'Montant (${investment.isin})';
+    if (_investmentIsCurrency) {
+      return _isEurCurrency ? 'Montant (€)' : 'Montant (${investment.isin})';
+    }
+    return 'Quantité';
   }
 
   String get _priceFieldLabel {
     final investment = _investment;
     final account = _account;
-    if (investment == null || account == null) return 'Prix unitaire (€)';
-    final effectiveClass = investment.assetClass ?? account.assetClass;
-    return effectiveClass == AssetClass.epargne
-        ? 'Cours de la paire de devise'
-        : 'Prix unitaire (€)';
+    if (investment == null || account == null) return 'Prix unitaire';
+    if (_investmentIsCurrency) return 'Cours de la paire de devise';
+    return 'Prix unitaire';
   }
+
+  /// Le sélecteur de devise s'affiche sur le champ prix dès qu'il est
+  /// pertinent : hors immobilier (pas de prix unitaire), et hors position
+  /// en devise — dont le "prix" est déjà le taux de change en euros (voir
+  /// `_investmentIsCurrency`).
+  bool get _showCurrencySelector =>
+      !_isEurCurrency &&
+      _assetClass != AssetClass.immobilier &&
+      !_investmentIsCurrency;
 
   void _selectAssetClass(AssetClass assetClass) {
     if (assetClass == AssetClass.immobilier) {
@@ -295,11 +344,13 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     setState(() {
       _assetClass = assetClass;
       _envelope = accountEnvelopesFor(assetClass).first;
-      // L'épargne suit un sous-flux dédié : quelle banque → quel compte
-      // (enveloppe) → quelle devise → quelle transaction — plutôt que le
-      // compte puis l'investissement des autres classes.
-      _step = assetClass == AssetClass.epargne
-          ? _Step.epargneBank
+      _pendingEstablishmentName = null;
+      // Les classes détenues chez un établissement suivent un sous-flux
+      // dédié : quel établissement → quel compte (enveloppe) → quel
+      // investissement et/ou quelle devise → quelle transaction — plutôt
+      // que le compte puis l'investissement des autres classes.
+      _step = assetClassRequiresEstablishmentStep(assetClass)
+          ? _Step.establishment
           : _Step.account;
     });
   }
@@ -339,7 +390,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       name: name,
       // L'établissement reste vide pour les classes sans banque (cryptos,
       // immobilier...), il est pré-rempli pour l'épargne — voir
-      // `_selectEpargneEnvelope`.
+      // `_selectAccountEnvelope`.
       bankName: _accountBankController.text.trim().isEmpty
           ? null
           : _accountBankController.text.trim(),
@@ -363,75 +414,122 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     });
   }
 
-  /// "Quelle banque ?" de l'épargne : une banque existante est choisie, on
-  /// enchaîne sur "Quel compte ?" (l'enveloppe fiscale) comme pour une
-  /// nouvelle banque — une même banque peut abriter plusieurs comptes
-  /// (Livret A + LDDS + PEL...), et le compte existant portant l'enveloppe
-  /// retenue est alors réutilisé (voir `_selectEpargneEnvelope`). La suite
-  /// du flux est identique aux autres classes : devise, puis transactions.
-  void _selectEpargneBank(String bankName) {
+  /// "Quel établissement ?" des classes à établissement : un établissement
+  /// existant est choisi, on enchaîne sur "Quel compte ?" (l'enveloppe
+  /// fiscale) comme pour un nouvel établissement — un même établissement
+  /// peut abriter plusieurs comptes (PEA + CTO chez le même broker, Livret A
+  /// + LDDS à la même banque...), et le compte existant portant l'enveloppe
+  /// retenue est alors réutilisé (voir `_selectAccountEnvelope`). La suite
+  /// du flux est identique aux autres classes : investissement et/ou devise,
+  /// puis transactions.
+  void _selectEstablishment(String establishmentName) {
     setState(() {
-      _pendingBankName = bankName;
-      _step = _Step.epargneEnvelope;
+      _pendingEstablishmentName = establishmentName;
+      _step = _Step.accountEnvelope;
     });
   }
 
-  /// "Quelle banque ?" de l'épargne, création : seul le nom de la banque
-  /// est saisi ici. Le compte (nom + enveloppe fiscale) n'est pas encore
-  /// créé — l'enveloppe se choisit à l'étape suivante "Quel compte ?"
-  /// (contrairement aux autres classes, où nom et enveloppe sont saisis
-  /// d'un bloc à l'étape compte).
-  void _commitCreateEpargneBank() {
+  /// "Quel établissement ?", création : seul le nom de l'établissement est
+  /// saisi ici. Le compte (nom + enveloppe fiscale) n'est pas encore créé —
+  /// l'enveloppe se choisit à l'étape suivante "Quel compte ?"
+  /// (contrairement aux classes sans établissement, où nom et enveloppe sont
+  /// saisis d'un bloc à l'étape compte).
+  void _commitCreateEstablishment() {
     final name = _accountNameController.text.trim();
     if (name.isEmpty) return;
     setState(() {
-      _pendingBankName = name;
+      _pendingEstablishmentName = name;
       _creatingAccount = false;
-      _step = _Step.epargneEnvelope;
+      _step = _Step.accountEnvelope;
     });
   }
 
-  /// "Quel compte ?" de l'épargne : choisir l'enveloppe fiscale (Livret A,
-  /// LEP, PEL...) pour la banque retenue à l'étape précédente. Le compte
-  /// existant portant cette banque et cette enveloppe est réutilisé s'il
-  /// existe et que l'enveloppe est unique par banque (`epargneEnvelopeIsUniquePerBank`),
-  /// sinon il est créé — banque et enveloppe définissent ensemble un compte,
-  /// et une même banque peut abriter plusieurs comptes de types différents.
-  /// L'assurance vie, le contrat de capitalisation et le compte "autre"
-  /// sont ouvrables plusieurs fois (même dans une même banque) : un nouveau
-  /// compte est créé à chaque sélection, distingué par sa description.
-  Future<void> _selectEpargneEnvelope(AccountEnvelope envelope) async {
-    final name = _pendingBankName;
-    if (name == null) return;
+  /// Suppression d'un compte sans transaction, demandée depuis le picker de
+  /// l'étape "Quel établissement ?" (voir `_EstablishmentStep`) — un
+  /// historique de transactions ne se perd jamais : le compte doit être
+  /// entièrement vide, même garde-fou que le détail du compte. Les logos
+  /// sont rechargés ensuite : un établissement vidé de ses comptes
+  /// disparaît de la liste.
+  Future<void> _deleteEmptyAccount(InvestmentAccount account) async {
+    if (account.investments.any((i) => i.transactions.isNotEmpty)) return;
+    await _repo.deleteAccount(account.id);
+    if (!mounted) return;
+    setState(() {
+      _accounts = [
+        for (final a in _accounts)
+          if (a.id != account.id) a,
+      ];
+      // Le compte supprimé était peut-être le compte courant du flux : un
+      // retour en arrière depuis l'étape investissement ne doit pas le
+      // faire pointer vers un compte fantôme.
+      if (_accountId == account.id) _accountId = null;
+    });
+    await _loadBankLogos();
+  }
+
+  /// "Quel compte ?" des classes à établissement : choisir l'enveloppe (PEA,
+  /// CTO, Livret A...) pour l'établissement retenu à l'étape précédente. Le
+  /// compte existant portant cet établissement et cette enveloppe est
+  /// réutilisé s'il existe et que l'enveloppe est unique par établissement
+  /// (`accountEnvelopeIsUniquePerEstablishment`), sinon il est créé —
+  /// établissement et enveloppe définissent ensemble un compte, et un même
+  /// établissement peut abriter plusieurs comptes (plusieurs CTO, plusieurs
+  /// contrats d'assurance vie...). Ceux-ci restent sélectionnables
+  /// directement sur l'étape (voir `_AccountEnvelopeStep`'s existingAccounts)
+  /// pour y ajouter un investissement sans en créer un nouveau.
+  Future<void> _selectAccountEnvelope(AccountEnvelope envelope) async {
+    final name = _pendingEstablishmentName;
+    final assetClass = _assetClass;
+    if (name == null || assetClass == null) return;
     // Description facultative saisie sur l'étape. Elle s'applique au compte
     // créé comme au compte existant réutilisé (on peut ainsi la renseigner
     // dès la création, sans passer par la modification) ; un champ vide
     // laisse le compte existant inchangé.
-    final description = _epargneDescriptionController.text.trim();
+    final description = _accountDescriptionController.text.trim();
+    final openingDate = _accountOpeningDate;
     InvestmentAccount? matching;
+    // Même clé d'établissement que la liste de l'étape précédente
+    // (`bankName ?? name`, voir `_EstablishmentStep`) : pour un compte sans
+    // établissement renseigné (créé avant l'introduction du champ), c'est
+    // son nom qui tient lieu d'établissement — pas son libellé d'enveloppe.
     for (final account in _accounts) {
-      if (account.assetClass == AssetClass.epargne &&
+      if (account.assetClass == assetClass &&
           account.envelope == envelope &&
-          account.name == name &&
-          epargneEnvelopeIsUniquePerBank(envelope)) {
+          (account.bankName ?? account.name) == name &&
+          accountEnvelopeIsUniquePerEstablishment(assetClass, envelope)) {
         matching = account;
         break;
       }
     }
     InvestmentAccount account;
     if (matching != null) {
-      account = description.isNotEmpty && matching.description != description
+      // La description saisie s'applique au compte existant réutilisé
+      // (voir commentaire en tête de méthode) ; la date d'ouverture
+      // seulement si le compte n'en a pas déjà une — on ne surcharge pas
+      // une date existante par mégarde.
+      var updated = description.isNotEmpty && matching.description != description
           ? matching.copyWith(description: description)
           : matching;
+      if (openingDate != null && updated.openingDate == null) {
+        updated = updated.copyWith(openingDate: openingDate);
+      }
+      account = updated;
       if (!identical(account, matching)) await _repo.saveAccount(account);
     } else {
       account = InvestmentAccount(
-        assetClass: AssetClass.epargne,
+        assetClass: assetClass,
         envelope: envelope,
-        name: name,
-        // La banque retenue à l'étape précédente est portée par le compte.
+        // L'épargne est identifiée par son établissement (le nom du compte
+        // suit la banque) ; les autres classes à établissement par leur
+        // type — le libellé de l'enveloppe (PEA, CTO...), les comptes du
+        // même établissement se distinguant alors par leur description
+        // facultative (voir `_buildAccountLeaf` dans
+        // `real_patrimoine_adapter.dart`).
+        name: assetClass == AssetClass.epargne ? name : envelope.label,
+        // L'établissement retenu à l'étape précédente est porté par le compte.
         bankName: name,
         description: description.isEmpty ? null : description,
+        openingDate: openingDate,
         investments: const [],
       );
       await _repo.saveAccount(account);
@@ -450,8 +548,12 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       }
       // La description ne doit pas resservir pour un autre compte créé au
       // cours de la même session.
-      _epargneDescriptionController.clear();
-      _pendingBankName = null;
+      _accountDescriptionController.clear();
+      // De même pour la date d'ouverture.
+      _accountOpeningDate = null;
+      // `_pendingEstablishmentName` est conservé : il sert au libellé de
+      // l'étape "Quel compte ?" si l'utilisateur revient en arrière depuis
+      // l'étape investissement.
       _step = _Step.investment;
     });
   }
@@ -460,13 +562,17 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     final account = _account;
     final assetClass = _assetClass;
     final rawIsin = _isinController.text.trim();
+    // Une devise (USD, GBP...) est sélectionnée dans une liste de codes déjà
+    // en majuscules : pas de transformation — la même passe que pour les
+    // classes à options (crypto, épargne, métaux).
     final isin =
-        assetClass != null &&
-            identifierOptionsFor(
+        _creatingDevise ||
+            (assetClass != null &&
+                identifierOptionsFor(
                   assetClass,
                   accountEnvelope: account?.envelope,
                 ) !=
-                null
+                    null)
         ? rawIsin
         : rawIsin.toUpperCase();
     final label = _labelController.text.trim();
@@ -503,8 +609,11 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       ];
       _investmentId = investment.id;
       _creatingInvestment = false;
+      _creatingDevise = false;
       _step = _Step.transaction;
     });
+    // Nouvelle transaction : devise et taux remis à l'euro.
+    _priceCurrencyController.reset();
   }
 
   void _selectInvestment(String id) {
@@ -512,6 +621,8 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       _investmentId = id;
       _step = _Step.transaction;
     });
+    // Nouvelle transaction : devise et taux remis à l'euro.
+    _priceCurrencyController.reset();
   }
 
   Future<void> _commitCreateTransaction() async {
@@ -521,19 +632,33 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     final isImmobilier = _assetClass == AssetClass.immobilier;
     final quantity = isImmobilier
         ? 1.0
-        : double.tryParse(_quantityController.text.trim());
+        : parseDecimal(_quantityController.text);
     final price = isImmobilier
-        ? double.tryParse(_quantityController.text.trim())
-        : _isEurEpargne
+        ? parseDecimal(_quantityController.text)
+        : _isEurCurrency
         ? 1.0
-        : double.tryParse(_priceController.text.trim());
+        : parseDecimal(_priceController.text);
+    // La devise d'une position tenue en devise est toujours l'euro : son
+    // "cours" saisi est déjà le taux de change de la paire. Sinon, c'est la
+    // devise choisie sur le sélecteur du formulaire (voir
+    // `_priceCurrencyController`).
+    final currency = _investmentIsCurrency
+        ? 'EUR'
+        : _priceCurrencyController.currency;
+    final fxRateToEur = currency == 'EUR'
+        ? 1.0
+        : _priceCurrencyController.resolvedRate;
+    // Devise étrangère sans taux de change (auto et manuel indisponibles) :
+    // impossible de convertir en euros, on ne sauvegarde pas.
     if (account == null ||
         investment == null ||
         date == null ||
         quantity == null ||
         quantity <= 0 ||
         price == null ||
-        price <= 0) {
+        price <= 0 ||
+        fxRateToEur == null ||
+        fxRateToEur <= 0) {
       return;
     }
     final updatedInvestment = investment.copyWith(
@@ -544,6 +669,8 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           isBuy: _newIsBuy,
           quantity: quantity,
           unitPrice: price,
+          currency: currency,
+          fxRateToEur: fxRateToEur,
         ),
       ],
     );
@@ -567,11 +694,11 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   Future<void> _commitCreateLiability() async {
     final type = _liabilityType;
     final name = _liabNameController.text.trim();
-    final prix = double.tryParse(_liabPrixController.text.trim());
-    final apport = double.tryParse(_liabApportController.text.trim()) ?? 0;
-    final taux = double.tryParse(_liabTauxController.text.trim());
-    final assuranceMensuelle = double.tryParse(
-      _liabAssuranceMensuelleController.text.trim(),
+    final prix = parseDecimal(_liabPrixController.text);
+    final apport = parseDecimal(_liabApportController.text) ?? 0;
+    final taux = parseDecimal(_liabTauxController.text);
+    final assuranceMensuelle = parseDecimal(
+      _liabAssuranceMensuelleController.text,
     );
     final nbrEcheances = int.tryParse(_liabNbrEcheancesController.text.trim());
     final dureeDiffere =
@@ -647,9 +774,17 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
 
   bool get _isEpargneFlow => _assetClass == AssetClass.epargne;
 
-  /// Nombre d'étapes du flux actif courant : 6 pour l'épargne (la banque et
-  /// le compte s'y choisissent en deux étapes avant la devise), 5 sinon.
-  int get _totalSteps => _isEpargneFlow ? 6 : 5;
+  /// Sous-flux des classes détenues chez un établissement financier
+  /// (épargne, actions & fonds, private equity, autres) : l'établissement et
+  /// le compte (l'enveloppe) s'y choisissent en deux étapes avant
+  /// l'investissement.
+  bool get _isEstablishmentFlow =>
+      _assetClass != null && assetClassRequiresEstablishmentStep(_assetClass!);
+
+  /// Nombre d'étapes du flux actif courant : 6 pour les classes à
+  /// établissement (l'établissement et le compte s'y choisissent en deux
+  /// étapes avant l'investissement), 5 sinon.
+  int get _totalSteps => _isEstablishmentFlow ? 6 : 5;
 
   Widget _buildStep() {
     switch (_step) {
@@ -664,44 +799,71 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           onSelect: _selectAssetClass,
           onBack: () => setState(() => _step = _Step.kind),
         );
-      case _Step.epargneBank:
-        // Une banque peut abriter plusieurs comptes (un par enveloppe
-        // fiscale, ex : Livret A + LDDS) : on regroupe par établissement
-        // pour ne proposer chaque banque qu'une seule fois — le choix du
-        // compte (l'enveloppe) se fait à l'étape suivante.
-        final epargneBanks = <String, List<InvestmentAccount>>{};
+      case _Step.establishment:
+        // Un même établissement peut abriter plusieurs comptes (PEA + CTO
+        // chez le même broker, Livret A + LDDS à la même banque...) : on
+        // regroupe par établissement — toutes classes à établissement
+        // confondues — pour ne proposer chacun qu'une seule fois ; le choix
+        // du compte (l'enveloppe) se fait à l'étape suivante.
+        final establishments = <String, List<InvestmentAccount>>{};
         for (final account in _accounts) {
-          if (account.assetClass != _assetClass) continue;
+          if (!assetClassRequiresEstablishmentStep(account.assetClass)) {
+            continue;
+          }
           final key = account.bankName ?? account.name;
-          epargneBanks.putIfAbsent(key, () => []).add(account);
+          establishments.putIfAbsent(key, () => []).add(account);
         }
-        return _EpargneBankStep(
+        return _EstablishmentStep(
           stepLabel: 'Étape 3 sur $_totalSteps · ${_assetClass!.label}',
-          banks: epargneBanks,
+          establishments: establishments,
           creating: _creatingAccount,
           nameController: _accountNameController,
           onBack: () => setState(() {
             _step = _Step.assetClass;
             _assetClass = null;
             _envelope = null;
+            _pendingEstablishmentName = null;
           }),
-          onSelectBank: _selectEpargneBank,
+          onSelectEstablishment: _selectEstablishment,
           onStartCreate: () => setState(() => _creatingAccount = true),
           onCancelCreate: () => setState(() => _creatingAccount = false),
-          onCreate: _commitCreateEpargneBank,
+          onCreate: _commitCreateEstablishment,
           bankLogos: _bankLogos,
           onImportLogo: _importBankLogo,
+          onDeleteAccount: _deleteEmptyAccount,
         );
-      case _Step.epargneEnvelope:
-        return _EpargneEnvelopeStep(
-          stepLabel: 'Étape 4 sur $_totalSteps · $_pendingBankName',
-          bankName: _pendingBankName!,
-          descriptionController: _epargneDescriptionController,
+      case _Step.accountEnvelope:
+        final establishment = _pendingEstablishmentName!;
+        // Les comptes existants de l'établissement pour cette classe sont
+        // proposés avant les tuiles d'enveloppe, pour y ajouter un
+        // investissement sans en créer un nouveau (surtout utile quand
+        // l'enveloppe est ouvrable plusieurs fois — plusieurs CTO chez le
+        // même broker). L'épargne garde son écran historique : seule les
+        // tuiles, la réutilisation passant par la logique d'enveloppe
+        // unique (`accountEnvelopeIsUniquePerEstablishment`).
+        final existingAccounts = _assetClass == AssetClass.epargne
+            ? const <InvestmentAccount>[]
+            : [
+                for (final account in _accounts)
+                  if (account.assetClass == _assetClass &&
+                      (account.bankName ?? account.name) == establishment)
+                    account,
+              ];
+        return _AccountEnvelopeStep(
+          stepLabel: 'Étape 4 sur $_totalSteps · $establishment',
+          establishmentName: establishment,
+          assetClass: _assetClass!,
+          existingAccounts: existingAccounts,
+          descriptionController: _accountDescriptionController,
+          openingDate: _accountOpeningDate,
+          onOpeningDateChanged: (date) =>
+              setState(() => _accountOpeningDate = date),
           onBack: () => setState(() {
-            _step = _Step.epargneBank;
-            _pendingBankName = null;
+            _step = _Step.establishment;
+            _pendingEstablishmentName = null;
           }),
-          onSelect: _selectEpargneEnvelope,
+          onSelect: _selectAccountEnvelope,
+          onSelectExisting: _selectAccount,
         );
       case _Step.account:
         return _AccountStep(
@@ -733,19 +895,35 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       case _Step.investment:
         // Pour l'épargne, cette étape choisit la devise dans laquelle
         // l'investissement est tenu (voir `identifierOptionsFor`), pas un
-        // titre — le libellé de l'étape le dit explicitement.
+        // titre — le libellé de l'étape le dit explicitement. Pour un
+        // compte-titres (Actions & Fonds), elle permet de créer un
+        // investissement (ISIN) OU une devise (EUR, USD...) — voir
+        // `_InvestmentStep`'s bascule Investissement / Devise.
+        final account = _account!;
+        final assetClass = _assetClass!;
+        final allowsDevises = assetClass == AssetClass.actionsEtFonds;
         return _InvestmentStep(
           stepLabel:
-              'Étape ${_isEpargneFlow ? 5 : 4} sur $_totalSteps · ${_account!.name}',
-          title: _isEpargneFlow ? 'Quelle devise ?' : 'Quel investissement ?',
+              'Étape ${_isEstablishmentFlow ? 5 : 4} sur $_totalSteps · '
+              '${account.name}',
+          title: _isEpargneFlow
+              ? 'Quelle devise ?'
+              : allowsDevises
+              ? 'Quel investissement ou devise ?'
+              : 'Quel investissement ?',
           addLabel: _isEpargneFlow
               ? 'Nouvelle devise'
+              : allowsDevises
+              ? 'Nouvel investissement ou devise'
               : 'Nouvel investissement',
-          createLabel: _isEpargneFlow
+          createLabel: _creatingDevise
               ? 'Créer la devise'
               : 'Créer l\'investissement',
-          account: _account!,
-          assetClass: _assetClass!,
+          allowsDevises: allowsDevises,
+          creatingDevise: _creatingDevise,
+          onDeviseModeChanged: (v) => setState(() => _creatingDevise = v),
+          account: account,
+          assetClass: assetClass,
           creating: _creatingInvestment,
           isinController: _isinController,
           labelController: _labelController,
@@ -755,13 +933,17 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           onBack: () => setState(() {
             _step = _assetClass == AssetClass.immobilier
                 ? _Step.assetClass
-                : _isEpargneFlow
-                ? _Step.epargneBank
+                : _isEstablishmentFlow
+                ? _Step.accountEnvelope
                 : _Step.account;
             _accountId = null;
+            _creatingDevise = false;
           }),
           onSelectInvestment: _selectInvestment,
-          onStartCreate: () => setState(() => _creatingInvestment = true),
+          onStartCreate: () => setState(() {
+            _creatingInvestment = true;
+            _creatingDevise = false;
+          }),
           onCancelCreate: () => setState(() => _creatingInvestment = false),
           onCreate: _commitCreateInvestment,
         );
@@ -776,7 +958,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           quantityLabel: _quantityFieldLabel,
           priceLabel: _priceFieldLabel,
           showPriceField:
-              !_isEurEpargne && _assetClass != AssetClass.immobilier,
+              !_isEurCurrency && _assetClass != AssetClass.immobilier,
+          showCurrencySelector: _showCurrencySelector,
+          priceCurrencyController: _priceCurrencyController,
           onBack: () => setState(() {
             _step = _Step.investment;
             _investmentId = null;
@@ -942,7 +1126,7 @@ class _AccountStep extends StatelessWidget {
   final VoidCallback onCreate;
 
   /// Pré-rempli par la banque pour l'épargne (voir
-  /// `_selectEpargneEnvelope`), le champ "Banque" est sinon proposé à la
+  /// `_selectAccountEnvelope`), le champ "Banque" est sinon proposé à la
   /// création pour toute classe détenue chez un établissement (compte-
   /// titres, assurance-vie...) — voir `assetClassSupportsBankName`. Il
   /// reste masqué pour l'immobilier, la crypto et les métaux physiques.
@@ -1046,47 +1230,169 @@ class _AccountStep extends StatelessWidget {
   }
 }
 
-/// Première étape du sous-flux épargne : quelle banque détient le compte ?
-/// On choisit une banque existante (regroupée par établissement, une ligne
-/// par banque même si elle abrite déjà plusieurs comptes) ou on en saisit
-/// une nouvelle — seul le nom, le type de compte (l'enveloppe) se choisit à
-/// l'étape suivante. L'avatar de chaque banque (logo importé ou initiales)
-/// est cliquable pour importer/remplacer son logo.
-class _EpargneBankStep extends StatelessWidget {
+/// Première étape du sous-flux des classes à établissement (épargne,
+/// actions & fonds, private equity, autres) : quel établissement financier
+/// détient le compte ? On choisit un établissement existant (banque, broker,
+/// assureur, plateforme... — regroupé par nom, une ligne par établissement
+/// même s'il abrite déjà plusieurs comptes, éventuellement de classes
+/// différentes) ou on en saisit un nouveau — seul le nom, le type de compte
+/// (l'enveloppe) se choisit à l'étape suivante. L'avatar de chaque
+/// établissement (logo importé ou initiales) est cliquable pour
+/// importer/remplacer son logo.
+class _EstablishmentStep extends StatelessWidget {
   final String stepLabel;
 
-  /// Banques d'épargne existantes, regroupées par nom d'établissement
-  /// (nom de banque → ses comptes, enveloppes différentes).
-  final Map<String, List<InvestmentAccount>> banks;
+  /// Établissements existants, regroupés par nom d'établissement (nom →
+  /// ses comptes, enveloppes éventuellement différentes, toutes classes à
+  /// établissement confondues).
+  final Map<String, List<InvestmentAccount>> establishments;
   final bool creating;
   final TextEditingController nameController;
   final VoidCallback onBack;
 
-  /// Appelé avec le nom de la banque choisie — l'enveloppe (le compte) se
-  /// choisit à l'étape suivante.
-  final ValueChanged<String> onSelectBank;
+  /// Appelé avec le nom de l'établissement choisi — l'enveloppe (le compte)
+  /// se choisit à l'étape suivante.
+  final ValueChanged<String> onSelectEstablishment;
   final VoidCallback onStartCreate;
   final VoidCallback onCancelCreate;
   final VoidCallback onCreate;
 
-  /// Logos déjà importés, indexés par nom de banque (voir
+  /// Logos déjà importés, indexés par nom d'établissement (voir
   /// `BankLogoRepository`).
   final Map<String, String> bankLogos;
   final ValueChanged<String> onImportLogo;
 
-  const _EpargneBankStep({
+  /// Appelé après confirmation pour supprimer un compte sans transaction
+  /// (voir le picker `_showDeleteAccountsDialog`). Le compte reste listé
+  /// tant qu'il porte une transaction — même garde-fou que la suppression
+  /// depuis le détail du compte (`account_detail_screen.dart`).
+  final Future<void> Function(InvestmentAccount account)? onDeleteAccount;
+
+  const _EstablishmentStep({
     required this.stepLabel,
-    required this.banks,
+    required this.establishments,
     required this.creating,
     required this.nameController,
     required this.onBack,
-    required this.onSelectBank,
+    required this.onSelectEstablishment,
     required this.onStartCreate,
     required this.onCancelCreate,
     required this.onCreate,
     required this.bankLogos,
     required this.onImportLogo,
+    this.onDeleteAccount,
   });
+
+  /// Un compte est supprimable quand aucune de ses transactions n'existe
+  /// (un historique ne se perd jamais silencieusement) — même règle que
+  /// partout ailleurs (détail du compte, accordéon des catégories).
+  static bool _isDeletable(InvestmentAccount account) =>
+      account.investments.every((i) => i.transactions.isEmpty);
+
+  /// La corbeille d'un établissement n'apparaît que s'il abrite au moins un
+  /// compte sans transaction — supprimer n'aurait sinon rien à proposer.
+  bool _hasDeletableAccounts(List<InvestmentAccount> accounts) =>
+      accounts.any(_isDeletable);
+
+  /// Ouvre un picker listant les comptes de l'établissement : chaque compte
+  /// sans transaction propose sa suppression (confirmée), les autres sont
+  /// signalés comme intouchables. C'est le seul endroit du flux qui expose
+  /// la suppression d'un compte vide — un compte vidé de ses transactions
+  /// resterait sinon affiché sans pouvoir être retiré.
+  void _showDeleteAccountsDialog(
+    BuildContext context,
+    String establishment,
+    List<InvestmentAccount> accounts,
+  ) {
+    final onDelete = onDeleteAccount;
+    if (onDelete == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: FrostedCard(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  shadcn.Text('Supprimer un compte').large().semiBold(),
+                  const SizedBox(height: 4),
+                  shadcn.Text(
+                    'Comptes de $establishment — seuls ceux sans transaction '
+                    'sont supprimables.',
+                  ).muted().small(),
+                  const SizedBox(height: 16),
+                  for (final account in accounts) ...[
+                    Row(
+                      children: [
+                        Icon(
+                          LucideIcons.wallet,
+                          size: 16,
+                          color: Theme.of(dialogContext).colorScheme.mutedForeground,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Le libellé d'enveloppe (Livret A, PEA,
+                              // CTO...) identifie le compte — le nom réel
+                              // répéterait l'établissement pour l'épargne.
+                              shadcn.Text(
+                                account.envelope?.label ?? account.name,
+                              ).medium().small(),
+                              if (account.description != null)
+                                shadcn.Text(account.description!)
+                                    .muted()
+                                    .xSmall(),
+                            ],
+                          ),
+                        ),
+                        if (_isDeletable(account))
+                          DestructiveButton(
+                            onPressed: () async {
+                              Navigator.of(dialogContext).pop();
+                              final confirmed = await confirmDelete(
+                                context,
+                                title: 'Supprimer « '
+                                    '${account.envelope?.label ?? account.name} » ?',
+                                message: 'Ce compte et ses investissements '
+                                    '(sans transaction) seront '
+                                    'définitivement supprimés.',
+                              );
+                              if (confirmed) await onDelete(account);
+                            },
+                            child: const shadcn.Text('Supprimer'),
+                          )
+                        else
+                          shadcn.Text('contient des transactions')
+                              .muted()
+                              .xSmall(),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlineButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: const shadcn.Text('Fermer'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1096,24 +1402,31 @@ class _EpargneBankStep extends StatelessWidget {
       children: [
         _DialogHeader(
           step: stepLabel,
-          title: 'Quelle banque ?',
+          title: 'Quel établissement ?',
           onBack: onBack,
         ),
         const SizedBox(height: 16),
-        for (final entry in banks.entries) ...[
+        for (final entry in establishments.entries) ...[
           _OptionTile(
             leading: BankLogoAvatar(
               bankName: entry.key,
               logoPath: bankLogos[entry.key],
               size: 28,
-              // Cliquer l'avatar importe/remplace le logo de la banque.
+              // Cliquer l'avatar importe/remplace le logo de l'établissement.
               onTap: () => onImportLogo(entry.key),
             ),
             label: entry.key,
-            sublabel: entry.value.length == 1
-                ? entry.value.single.envelope?.label
-                : '${entry.value.length} comptes',
-            onTap: () => onSelectBank(entry.key),
+            // Pas de sous-titre : les comptes de l'établissement (leurs
+            // enveloppes) se choisissent à l'étape suivante — les lister ici
+            // n'ajoute que de la confusion.
+            trailing: _hasDeletableAccounts(entry.value)
+                ? IconButton.ghost(
+                    icon: const Icon(LucideIcons.trash2, size: 16),
+                    onPressed: () =>
+                        _showDeleteAccountsDialog(context, entry.key, entry.value),
+                  )
+                : null,
+            onTap: () => onSelectEstablishment(entry.key),
           ),
           const SizedBox(height: 8),
         ],
@@ -1123,7 +1436,7 @@ class _EpargneBankStep extends StatelessWidget {
               TextField(
                 controller: nameController,
                 placeholder: const shadcn.Text(
-                  'Nom de la banque (ex: Banque Populaire)',
+                  'Nom de l\'établissement (ex: Boursorama)',
                 ),
                 autofocus: true,
               ),
@@ -1133,34 +1446,63 @@ class _EpargneBankStep extends StatelessWidget {
             createLabel: 'Continuer',
           )
         else
-          _AddOptionButton(label: 'Nouvelle banque', onTap: onStartCreate),
+          _AddOptionButton(label: 'Nouvel établissement', onTap: onStartCreate),
       ],
     );
   }
 }
 
-/// Deuxième étape du sous-flux épargne : quel type de compte (l'enveloppe
-/// fiscale — Livret A, LEP, PEL...) pour la banque retenue à l'étape
-/// précédente ? Une description facultative (ex : "Épargne vacances") peut
-/// être saisie au-dessus — elle s'applique au compte créé. Choisir une
-/// enveloppe crée (ou réutilise) le compte "banque + enveloppe" puis mène
-/// à la devise — voir `_selectEpargneEnvelope`.
-class _EpargneEnvelopeStep extends StatelessWidget {
+/// Deuxième étape du sous-flux des classes à établissement : quel type de
+/// compte (l'enveloppe fiscale — PEA, CTO, Livret A...) pour l'établissement
+/// retenu à l'étape précédente ? Une description facultative (ex : "Mon PEA
+/// long terme") peut être saisie au-dessus — elle s'applique au compte créé.
+/// Les comptes existants de l'établissement pour cette classe sont proposés
+/// en premier (un CTO déjà ouvert, réutilisable pour y loger un nouvel
+/// investissement), puis une tuile par enveloppe : en choisir une crée (ou
+/// réutilise, si l'enveloppe est unique par établissement — voir
+/// `accountEnvelopeIsUniquePerEstablishment`) le compte "établissement +
+/// enveloppe" puis mène à l'investissement — voir `_selectAccountEnvelope`.
+class _AccountEnvelopeStep extends StatelessWidget {
   final String stepLabel;
-  final String bankName;
+  final String establishmentName;
+
+  /// Classe d'actif du compte à créer — détermine les enveloppes proposées
+  /// (voir `accountEnvelopesFor`).
+  final AssetClass assetClass;
+
+  /// Comptes existants de l'établissement pour [assetClass], sélectionnables
+  /// tels quels pour y ajouter un investissement sans en créer un nouveau.
+  /// Toujours vide pour l'épargne, dont la réutilisation passe par la
+  /// logique d'enveloppe unique.
+  final List<InvestmentAccount> existingAccounts;
   final VoidCallback onBack;
   final ValueChanged<AccountEnvelope> onSelect;
+
+  /// Appelé avec l'id d'un compte existant choisi.
+  final ValueChanged<String> onSelectExisting;
 
   /// Saisie de la description facultative du compte (voir
   /// `InvestmentAccount.description`).
   final TextEditingController descriptionController;
 
-  const _EpargneEnvelopeStep({
+  /// Date d'ouverture du compte sélectionnée par l'utilisateur (voir
+  /// `InvestmentAccount.openingDate`), `null` tant qu'aucune n'est choisie —
+  /// l'étape ne sert qu'aux classes à établissement, pour lesquelles la date
+  /// a un sens (voir `accountHasOpeningDate`).
+  final DateTime? openingDate;
+  final ValueChanged<DateTime?> onOpeningDateChanged;
+
+  const _AccountEnvelopeStep({
     required this.stepLabel,
-    required this.bankName,
+    required this.establishmentName,
+    required this.assetClass,
+    required this.existingAccounts,
     required this.descriptionController,
+    required this.openingDate,
+    required this.onOpeningDateChanged,
     required this.onBack,
     required this.onSelect,
+    required this.onSelectExisting,
   });
 
   @override
@@ -1181,12 +1523,38 @@ class _EpargneEnvelopeStep extends StatelessWidget {
             'Description (facultative, ex: Épargne vacances)',
           ),
         ),
-        const SizedBox(height: 12),
-        for (final envelope in accountEnvelopesFor(AssetClass.epargne)) ...[
+        const SizedBox(height: 8),
+        DatePicker(
+          value: openingDate,
+          onChanged: (date) => onOpeningDateChanged(date == null
+              ? null
+              // Jour calendaire sans heure, comme `_txnDate` et
+              // `_liabDateDebut` (voir `initState`).
+              : DateTime(date.year, date.month, date.day)),
+          placeholder: const shadcn.Text('Date d\'ouverture (facultative)'),
+        ),
+        if (existingAccounts.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          shadcn.Text('Comptes existants').medium(),
+          const SizedBox(height: 8),
+          for (final account in existingAccounts) ...[
+            _OptionTile(
+              leading: const Icon(LucideIcons.wallet, size: 18),
+              label: account.name,
+              sublabel: account.description ?? account.envelope?.label,
+              onTap: () => onSelectExisting(account.id),
+            ),
+            const SizedBox(height: 8),
+          ],
+          shadcn.Text('Nouveau compte').medium(),
+          const SizedBox(height: 8),
+        ] else
+          const SizedBox(height: 12),
+        for (final envelope in accountEnvelopesFor(assetClass)) ...[
           _OptionTile(
             leading: const Icon(LucideIcons.wallet, size: 18),
             label: envelope.label,
-            sublabel: bankName,
+            sublabel: establishmentName,
             onTap: () => onSelect(envelope),
           ),
           const SizedBox(height: 8),
@@ -1204,6 +1572,17 @@ class _InvestmentStep extends StatelessWidget {
   final InvestmentAccount account;
   final AssetClass assetClass;
   final bool creating;
+
+  /// Un compte-titres (Actions & Fonds) peut loger des titres ET des
+  /// devises (USD, GBP... en cash) : la création y propose une bascule
+  /// "Investissement / Devise" (voir [creatingDevise]).
+  final bool allowsDevises;
+
+  /// Mode "Devise" de la bascule — l'identifiant se choisit alors dans la
+  /// liste des codes de devise connus plutôt qu'en ISIN libre.
+  final bool creatingDevise;
+  final ValueChanged<bool>? onDeviseModeChanged;
+
   final TextEditingController isinController;
   final TextEditingController labelController;
   final RealEstateType realEstateType;
@@ -1222,6 +1601,9 @@ class _InvestmentStep extends StatelessWidget {
     required this.account,
     required this.assetClass,
     required this.creating,
+    this.allowsDevises = false,
+    this.creatingDevise = false,
+    this.onDeviseModeChanged,
     required this.isinController,
     required this.labelController,
     required this.realEstateType,
@@ -1249,12 +1631,11 @@ class _InvestmentStep extends StatelessWidget {
           _OptionTile(
             leading: const Icon(LucideIcons.chartCandlestick, size: 18),
             label: investment.label,
-            // Immobilier : pas d'identifiant. Épargne : l'identifiant est
-            // la devise, déjà portée par le libellé — pas besoin de la
-            // répéter en dessous.
-            sublabel:
-                (assetClass == AssetClass.immobilier ||
-                        assetClass == AssetClass.epargne)
+            // Immobilier : pas d'identifiant. Épargne et toute autre
+            // position en devise : l'identifiant est la devise, déjà portée
+            // par le libellé — pas besoin de la répéter en dessous.
+            sublabel: (assetClass == AssetClass.immobilier ||
+                    investment.isCurrency)
                 ? null
                 : investment.isin,
             onTap: () => onSelectInvestment(investment.id),
@@ -1264,6 +1645,27 @@ class _InvestmentStep extends StatelessWidget {
         if (creating)
           _InlineCreateForm(
             fields: [
+              if (allowsDevises) ...[
+                // Bascule "Investissement / Devise" : un compte-titres peut
+                // loger les deux (une action OU des dollars tenus en cash).
+                ButtonGroup(
+                  children: [
+                    SelectedButton(
+                      value: !creatingDevise,
+                      selectedStyle: const ButtonStyle.primary(),
+                      onChanged: (_) => onDeviseModeChanged?.call(false),
+                      child: const shadcn.Text('Investissement'),
+                    ),
+                    SelectedButton(
+                      value: creatingDevise,
+                      selectedStyle: const ButtonStyle.primary(),
+                      onChanged: (_) => onDeviseModeChanged?.call(true),
+                      child: const shadcn.Text('Devise'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
               if (assetClass == AssetClass.immobilier) ...[
                 Select<RealEstateType>(
                   value: realEstateType,
@@ -1289,6 +1691,17 @@ class _InvestmentStep extends StatelessWidget {
                   placeholder: const shadcn.Text(
                     'Nom du bien (ex: Appartement Lyon 6e)',
                   ),
+                ),
+              ] else if (creatingDevise) ...[
+                // Une devise se choisit dans la liste des codes connus
+                // (EUR, USD, GBP...) plutôt qu'en ISIN libre — même liste
+                // que l'épargne (le libellé se pré-remplit du code choisi).
+                InvestmentIdentifierField(
+                  assetClass: assetClass,
+                  accountEnvelope: account.envelope,
+                  isinController: isinController,
+                  labelController: labelController,
+                  options: kKnownCurrencies,
                 ),
               ] else ...[
                 InvestmentIdentifierField(
@@ -1335,6 +1748,17 @@ class _TransactionStep extends StatelessWidget {
   final String quantityLabel;
   final String priceLabel;
   final bool showPriceField;
+
+  /// `true` affiche le sélecteur de devise à côté du champ prix (voir
+  /// `_CompletePatrimoineDialogState`'s `_showCurrencySelector`) — faux pour
+  /// une position en devise, dont le "prix" est déjà le taux en euros.
+  final bool showCurrencySelector;
+
+  /// Contrôleur devise/taux du formulaire (voir
+  /// `transaction_price_currency.dart`) — utilisé quand [showCurrencySelector]
+  /// pour résoudre le taux et afficher la zone de rappel/conversion.
+  final TransactionPriceCurrencyController? priceCurrencyController;
+
   final VoidCallback onBack;
   final ValueChanged<bool> onIsBuyChanged;
   final ValueChanged<DateTime?> onDateChanged;
@@ -1349,8 +1773,10 @@ class _TransactionStep extends StatelessWidget {
     required this.quantityController,
     required this.priceController,
     this.quantityLabel = 'Quantité',
-    this.priceLabel = 'Prix unitaire (€)',
+    this.priceLabel = 'Prix unitaire',
     this.showPriceField = true,
+    this.showCurrencySelector = false,
+    this.priceCurrencyController,
     required this.onBack,
     required this.onIsBuyChanged,
     required this.onDateChanged,
@@ -1421,9 +1847,21 @@ class _TransactionStep extends StatelessWidget {
                   ),
                 ),
               ),
+              if (showCurrencySelector && priceCurrencyController != null) ...[
+                const SizedBox(width: 8),
+                TransactionPriceCurrencySelect(
+                  controller: priceCurrencyController!,
+                ),
+              ],
             ],
           ],
         ),
+        if (showCurrencySelector && priceCurrencyController != null)
+          TransactionFxRateArea(
+            controller: priceCurrencyController!,
+            quantityController: quantityController,
+            priceController: priceController,
+          ),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -1557,12 +1995,17 @@ class _OptionTile extends StatelessWidget {
   final Widget leading;
   final String label;
   final String? sublabel;
+
+  /// Widget affiché avant la chevron (action secondaire de la tuile, ex : un
+  /// bouton supprimer) — `null` pour les tuiles sans action dédiée.
+  final Widget? trailing;
   final VoidCallback onTap;
 
   const _OptionTile({
     required this.leading,
     required this.label,
     this.sublabel,
+    this.trailing,
     required this.onTap,
   });
 
@@ -1594,6 +2037,10 @@ class _OptionTile extends StatelessWidget {
                   ],
                 ),
               ),
+              if (trailing != null) ...[
+                trailing!,
+                const SizedBox(width: 4),
+              ],
               Icon(
                 LucideIcons.chevronRight,
                 size: 16,

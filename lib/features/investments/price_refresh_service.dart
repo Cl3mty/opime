@@ -144,13 +144,21 @@ Future<Investment?> _resolveInvestmentPrice({
 }) async {
   final effectiveClass = investment.assetClass ?? account.assetClass;
 
-  // L'épargne n'a pas de cours de marché comme un titre : tenue en euros,
-  // elle est valorisée au pair (1 EUR = 1 EUR) et aucune résolution n'est
-  // tentée. Une épargne tenue en devise étrangère (GBP, USD...) est en
-  // revanche valorisée en euros au taux de change courant — la paire
-  // `CODE-EUR` de Yahoo Finance est construite directement plus bas plutôt
-  // que cherchée comme un ticker d'action (la recherche matchait par erreur
-  // des devises sans rapport).
+  // Une position en devise — épargne tenue en USD, ou dollars créés dans un
+  // compte-titres via le flux de complétion (voir `Investment.isCurrency`) —
+  // n'a pas de cours de marché comme un titre : tenue en euros, elle est
+  // valorisée au pair (1 EUR = 1 EUR) et aucune résolution n'est tentée.
+  // Tenue en devise étrangère (GBP, USD...), elle est valorisée en euros au
+  // taux de change courant — la paire `CODE-EUR` de Yahoo Finance est
+  // construite directement plus bas plutôt que cherchée comme un ticker
+  // d'action (la recherche matchait par erreur des devises sans rapport).
+  final isCurrency = investment.isCurrency;
+  // Une devise n'est jamais "introuvable" chez Yahoo : un échec de la paire
+  // de change (hors panne réseau) laisse simplement le dernier cours connu.
+  final expectsMarketPrice = !isCurrency && _expectsMarketPrice(effectiveClass);
+  // Le taux de change (1 JPY ≈ 0,006 €) et le cours d'une devise ont besoin
+  // d'une précision au-delà du centime, même logés dans un compte-titres.
+  final fullPrecision = isCurrency || requiresFullPricePrecision(effectiveClass);
 
   // Une panne réseau n'est pas un "cours introuvable" : on ne marque alors
   // pas [Investment.priceUnavailable], et on retombe sur le dernier cours
@@ -166,11 +174,11 @@ Future<Investment?> _resolveInvestmentPrice({
   final yahoo = YahooFinanceClient();
   var symbol = investment.symbol;
   if (symbol == null) {
-    if (effectiveClass == AssetClass.epargne) {
-      // Épargne en devise étrangère : le symbole est la paire de devises
+    if (isCurrency) {
+      // Position en devise étrangère : le symbole est la paire de devises
       // elle-même (`GBP` + `EUR` → "GBPEUR=X"), qui donne en euro la valeur
-      // d'une unité — pas de recherche de ticker. L'épargne en euros, elle,
-      // reste au pair : rien à résoudre.
+      // d'une unité — pas de recherche de ticker. Une position en euros,
+      // elle, reste au pair : rien à résoudre.
       final currency = investment.isin.trim().toUpperCase();
       if (currency.isEmpty || currency == 'EUR') return null;
       symbol = '${currency}EUR=X';
@@ -198,7 +206,7 @@ Future<Investment?> _resolveInvestmentPrice({
     if (symbol == null) {
       // Identifiant inconnu de Yahoo (ou panne réseau, distinguée plus
       // haut) : pas de cours possible.
-      if (networkError || !_expectsMarketPrice(effectiveClass)) return null;
+      if (networkError || !expectsMarketPrice) return null;
       return investment.copyWith(priceUnavailable: true);
     }
   }
@@ -207,20 +215,55 @@ Future<Investment?> _resolveInvestmentPrice({
   final result = await priceRepo.syncIfNeeded(
     investment.isin,
     symbol,
-    round: !requiresFullPricePrecision(effectiveClass),
+    round: !fullPrecision,
     onNetworkError: onNetworkError,
     onNetworkSuccess: onNetworkSuccess,
   );
   if (result.points.isEmpty) {
-    if (networkError || !_expectsMarketPrice(effectiveClass)) return null;
+    if (networkError || !expectsMarketPrice) return null;
     return investment.copyWith(priceUnavailable: true);
   }
 
   final latest = result.points.reduce((a, b) => a.date.isAfter(b.date) ? a : b);
+
+  // Devise de cotation du titre, résolue depuis les métadonnées de l'API
+  // chart (`meta.currency`) puis mise en cache sur l'investissement : un
+  // titre coté en monnaie étrangère (ex : META en USD) a un cours brut en
+  // devise, qu'il faut convertir en euros pour valoriser la position. Une
+  // position en devise (elle est déjà un taux de change en euros) n'a pas
+  // de devise de cotation à retenir.
+  String? quoteCurrency = investment.quoteCurrency;
+  if (quoteCurrency == null && result.currency != null && !isCurrency) {
+    quoteCurrency = result.currency;
+  }
+
+  // Taux de change vers l'euro (1 [quoteCurrency] = X €) pour la devise de
+  // cotation, synchronisé via la paire `<devise>EUR=X` de Yahoo Finance —
+  // mise en cache localement comme n'importe quel historique de cours (le
+  // pseudo-ISIN est la paire elle-même), en pleine précision (1 JPY ≈
+  // 0,006 € ne survivrait pas à l'arrondi au centime). Une devise de
+  // cotation en euros n'appelle aucun taux.
+  double? fxRateToEur = investment.lastFxRateToEur;
+  if (quoteCurrency != null && quoteCurrency.toUpperCase() != 'EUR') {
+    final pair = '${quoteCurrency.toUpperCase()}EUR=X';
+    final fxResult = await priceRepo.syncIfNeeded(
+      pair,
+      pair,
+      round: false,
+      onNetworkError: onNetworkError,
+      onNetworkSuccess: onNetworkSuccess,
+    );
+    if (fxResult.points.isNotEmpty) {
+      fxRateToEur = fxResult.points.last.close;
+    }
+  }
+
   return investment.copyWith(
     symbol: symbol,
     lastPrice: latest.close,
     lastPriceDate: latest.date,
+    quoteCurrency: quoteCurrency,
+    lastFxRateToEur: fxRateToEur,
     // Un cours vient d'être trouvé : le drapeau "introuvable" est levé.
     priceUnavailable: false,
   );

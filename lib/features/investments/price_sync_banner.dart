@@ -54,10 +54,17 @@ class _PriceSyncBannerState extends State<PriceSyncBanner> {
     final theme = Theme.of(context);
     // Même correctif que `FrostedCard` : un aplat de couleur à alpha fixe
     // se voit beaucoup moins sur un fond clair que sur un fond sombre — le
-    // bandeau devenait quasi invisible en thème clair avec une seule
-    // valeur d'opacité pour les deux.
-    final isDark = theme.colorScheme.background.computeLuminance() < 0.5;
-    final tintAlpha = isDark ? 0.12 : 0.16;
+    // bandeau devenait quasi invisible en thème clair avec une seule valeur
+    // d'opacité pour les deux. En sombre, la teinte doit être plus marquée
+    // pour rester lisible sur un fond déjà très sombre.
+    final isDark = theme.brightness == Brightness.dark;
+    final tintAlpha = isDark ? 0.18 : 0.16;
+    // Texte à fort contraste : en thème clair le rouge `destructive`
+    // (foncé) ressort sur la teinte très pâle ; en thème sombre c'est le
+    // premier plan clair qui se détache du fond rouge sombre.
+    final textColor = isDark
+        ? theme.colorScheme.foreground
+        : theme.colorScheme.destructive;
 
     return Column(
       children: [
@@ -77,6 +84,7 @@ class _PriceSyncBannerState extends State<PriceSyncBanner> {
                 child: shadcn.Text(
                   'Impossible de mettre à jour les cours et les '
                   'performances : vérifie ta connexion internet.',
+                  style: TextStyle(color: textColor),
                 ).small(),
               ),
             ],

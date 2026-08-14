@@ -106,7 +106,13 @@ class YahooFinanceClient {
   /// Historique quotidien des cours de clôture. Si [since] est fourni, ne
   /// demande que la période depuis cette date (avec un jour de marge, pour
   /// couvrir le dernier point déjà en cache) ; sinon récupère 5 ans.
-  Future<List<PricePoint>> fetchDailyHistory(
+  ///
+  /// Retourne aussi la devise de cotation de l'actif (`meta.currency` de
+  /// l'API chart — `USD` pour META, `EUR` pour un titre français, ...) :
+  /// c'est elle qui permet de savoir si le cours brut doit être converti en
+  /// euros pour valoriser la position (voir `price_refresh_service.dart`).
+  /// `null` si l'API n'expose pas ce champ.
+  Future<({List<PricePoint> points, String? currency})> fetchDailyHistory(
     String symbol, {
     DateTime? since,
     void Function()? onNetworkError,
@@ -126,13 +132,20 @@ class YahooFinanceClient {
             );
       final response = await http.get(uri);
       onNetworkSuccess?.call();
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) {
+        return (points: const <PricePoint>[], currency: null);
+      }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final results =
           (json['chart'] as Map<String, dynamic>?)?['result'] as List?;
-      if (results == null || results.isEmpty) return [];
+      if (results == null || results.isEmpty) {
+        return (points: const <PricePoint>[], currency: null);
+      }
       final result = results.first as Map<String, dynamic>;
+
+      final meta = result['meta'] as Map<String, dynamic>?;
+      final currency = meta?['currency'] as String?;
 
       final points = <PricePoint>[];
       final timestamps = (result['timestamp'] as List?)?.cast<num>();
@@ -165,7 +178,6 @@ class YahooFinanceClient {
       // repli sur ce dernier cours, leur investissement resterait à jamais
       // "cours introuvable" malgré un prix bien réel sur Yahoo.
       if (points.isEmpty) {
-        final meta = result['meta'] as Map<String, dynamic>?;
         final metaTime = (meta?['regularMarketTime'] as num?)?.toInt();
         final metaPrice = (meta?['regularMarketPrice'] as num?)?.toDouble();
         if (metaTime != null && metaPrice != null) {
@@ -181,18 +193,18 @@ class YahooFinanceClient {
           );
         }
       }
-      return points;
+      return (points: points, currency: currency);
     } on SocketException catch (_) {
       onNetworkError?.call();
-      return [];
+      return (points: const <PricePoint>[], currency: null);
     } on http.ClientException catch (_) {
       onNetworkError?.call();
-      return [];
+      return (points: const <PricePoint>[], currency: null);
     } on TimeoutException catch (_) {
       onNetworkError?.call();
-      return [];
+      return (points: const <PricePoint>[], currency: null);
     } catch (_) {
-      return [];
+      return (points: const <PricePoint>[], currency: null);
     }
   }
 

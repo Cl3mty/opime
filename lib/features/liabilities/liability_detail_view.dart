@@ -118,11 +118,11 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
 
   Future<void> _commitEdit() async {
     final name = _nameController.text.trim();
-    final prix = double.tryParse(_prixController.text.trim());
-    final apport = double.tryParse(_apportController.text.trim()) ?? 0;
-    final taux = double.tryParse(_tauxController.text.trim());
-    final assuranceMensuelle = double.tryParse(
-      _assuranceMensuelleController.text.trim(),
+    final prix = parseDecimal(_prixController.text);
+    final apport = parseDecimal(_apportController.text) ?? 0;
+    final taux = parseDecimal(_tauxController.text);
+    final assuranceMensuelle = parseDecimal(
+      _assuranceMensuelleController.text,
     );
     final nbrEcheances = int.tryParse(_nbrEcheancesController.text.trim());
     final dureeDiffere = int.tryParse(_dureeDiffereController.text.trim()) ?? 0;

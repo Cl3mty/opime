@@ -19,20 +19,29 @@ class InvestmentIdentifierField extends StatelessWidget {
   /// déroulante de pièces/lingots physiques, voir [identifierOptionsFor].
   final AccountEnvelope? accountEnvelope;
 
+  /// Options de la liste déroulante, en remplacement de celles dérivées de
+  /// [identifierOptionsFor] quand [assetClass] n'en propose pas — ex : une
+  /// devise (EUR, USD...) à créer dans un compte-titres, qui emprunte la
+  /// liste de l'épargne (voir [kKnownCurrencies]) sans changer de classe.
+  final List<String>? options;
+
   const InvestmentIdentifierField({
     super.key,
     required this.assetClass,
     required this.isinController,
     required this.labelController,
     this.accountEnvelope,
+    this.options,
   });
 
   @override
   Widget build(BuildContext context) {
-    final options = identifierOptionsFor(
-      assetClass,
-      accountEnvelope: accountEnvelope,
-    );
+    final options =
+        this.options ??
+        identifierOptionsFor(
+          assetClass,
+          accountEnvelope: accountEnvelope,
+        );
     if (options == null) {
       return TextField(
         controller: isinController,

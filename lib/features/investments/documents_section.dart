@@ -7,20 +7,31 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
 import 'confirm_delete_dialog.dart';
+import 'currency_format.dart';
 import 'document_storage.dart';
 import 'investments_models.dart';
 
 /// Libellé compact d'une transaction pour le choix "rattacher à quelle
 /// transaction ?" et pour le tag affiché sur un document déjà rattaché.
-String _transactionLabel(Transaction transaction) {
+/// [quantityAssetClass] sert à formater la quantité (entière pour les
+/// pièces/lingots de métaux précieux).
+String _transactionLabel(
+  Transaction transaction,
+  AssetClass? quantityAssetClass,
+) {
   final date = transaction.date;
   final formattedDate =
       '${date.day.toString().padLeft(2, '0')}/'
       '${date.month.toString().padLeft(2, '0')}/${date.year}';
-  final kind = transaction.isBuy ? 'Achat' : 'Vente';
+  final kind = transaction.displayLabel;
+  // Prix unitaire dans sa devise de cotation (USD pour une action US...)
+  // plutôt qu'en euros quand la transaction a été saisie hors euros.
+  final price = transaction.currency == 'EUR'
+      ? displayEuros(transaction.unitPrice, false)
+      : formatPriceInCurrency(transaction.unitPrice, transaction.currency);
   return '$kind du $formattedDate • '
-      '${transaction.quantity.toStringAsFixed(2)} × '
-      '${displayEuros(transaction.unitPrice, false)}';
+      '${quantityAssetClass != null ? formatQuantity(transaction.quantity, quantityAssetClass) : transaction.quantity.toStringAsFixed(2)} × '
+      '$price';
 }
 
 /// Section "Documents" réutilisée à l'identique sur la page d'un compte,
@@ -54,12 +65,18 @@ class DocumentsSection extends StatelessWidget {
   onAdd;
   final ValueChanged<VaultDocument> onDelete;
 
+  /// Classe d'actif de l'élément auquel on rattache des documents : sert à
+  /// formater la quantité des transactions listées (entière pour les métaux
+  /// précieux). `null` (passif) : formatage par défaut.
+  final AssetClass? quantityAssetClass;
+
   const DocumentsSection({
     super.key,
     required this.vaultPath,
     required this.documents,
     this.transactions,
     this.fixedTransactionId,
+    this.quantityAssetClass,
     required this.onAdd,
     required this.onDelete,
   });
@@ -160,7 +177,10 @@ class DocumentsSection extends StatelessWidget {
                                 vertical: 10,
                               ),
                               child: shadcn.Text(
-                                _transactionLabel(transaction),
+                                _transactionLabel(
+                                  transaction,
+                                  quantityAssetClass,
+                                ),
                               ).small(),
                             ),
                           ),
@@ -202,7 +222,7 @@ class DocumentsSection extends StatelessWidget {
     if (transactionId == null) return null;
     for (final transaction in transactions ?? const []) {
       if (transaction.id == transactionId) {
-        return _transactionLabel(transaction);
+        return _transactionLabel(transaction, quantityAssetClass);
       }
     }
     return null;

@@ -7,8 +7,14 @@ import 'yahoo_finance_client.dart';
 /// Résultat de [PriceHistoryRepository.syncIfNeeded] : [points] est
 /// toujours le meilleur historique disponible, [upToDate] indique si une
 /// tentative de récupération était nécessaire et a réussi (`false` si
-/// elle a échoué — hors ligne, API indisponible...).
-typedef SyncResult = ({List<PricePoint> points, bool upToDate});
+/// elle a échoué — hors ligne, API indisponible...), et [currency] est la
+/// devise de cotation de l'actif (`meta.currency` de l'API Yahoo) —
+/// `null` quand le cache était déjà à jour et n'a pas été rafraîchi.
+typedef SyncResult = ({
+  List<PricePoint> points,
+  bool upToDate,
+  String? currency,
+});
 
 /// Cache local de l'historique de cours par ISIN — même convention que
 /// [InvestmentsRepository] (`investments_repository.dart`) : un fichier
@@ -87,7 +93,7 @@ class PriceHistoryRepository {
         : cached.map((p) => p.date).reduce((a, b) => a.isAfter(b) ? a : b);
 
     if (lastCachedDate != null && !lastCachedDate.isBefore(today)) {
-      return (points: cached, upToDate: true);
+      return (points: cached, upToDate: true, currency: null);
     }
 
     final fetched = await _client.fetchDailyHistory(
@@ -96,16 +102,18 @@ class PriceHistoryRepository {
       onNetworkError: onNetworkError,
       onNetworkSuccess: onNetworkSuccess,
     );
-    if (fetched.isEmpty) return (points: cached, upToDate: false);
+    if (fetched.points.isEmpty) {
+      return (points: cached, upToDate: false, currency: null);
+    }
 
     final merged = <DateTime, PricePoint>{
       for (final point in cached) point.date: point,
-      for (final point in fetched) point.date: point,
+      for (final point in fetched.points) point.date: point,
     };
     final result = merged.values.toList()
       ..sort((a, b) => a.date.compareTo(b.date));
     await save(isin, result, round: round);
-    return (points: result, upToDate: true);
+    return (points: result, upToDate: true, currency: fetched.currency);
   }
 
   DateTime _dateOnly(DateTime date) =>

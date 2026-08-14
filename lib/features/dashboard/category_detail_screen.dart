@@ -662,6 +662,7 @@ class _AccountsCardState extends State<_AccountsCard> {
     bool showPru,
   ) {
     final theme = Theme.of(context);
+    final quantityAssetClass = assetClassForCategoryId(widget.category.id);
     final groups = <String, List<PatrimoineAccount>>{};
     for (final account in byAccount) {
       final key = account.bankName ?? account.name;
@@ -678,6 +679,7 @@ class _AccountsCardState extends State<_AccountsCard> {
             hidden: widget.hidden,
             showAvatar: widget.showAvatar,
             showPru: showPru,
+            quantityAssetClass: quantityAssetClass,
             expanded: _expandedIds.contains(account.id ?? account.name),
             onToggleExpand: () => _toggleExpanded(account.id ?? account.name),
             onInvestmentTap: widget.onAccountTap,
@@ -700,6 +702,7 @@ class _AccountsCardState extends State<_AccountsCard> {
             hidden: widget.hidden,
             showAvatar: false,
             showPru: showPru,
+            quantityAssetClass: quantityAssetClass,
             expanded: _expandedIds.contains(account.id ?? account.name),
             onToggleExpand: () => _toggleExpanded(account.id ?? account.name),
             onInvestmentTap: widget.onAccountTap,
@@ -759,6 +762,9 @@ class _AccountsCardState extends State<_AccountsCard> {
                   hidden: widget.hidden,
                   showAvatar: widget.showAvatar,
                   showPru: showPru,
+                  quantityAssetClass: assetClassForCategoryId(
+                    widget.category.id,
+                  ),
                   onTap: widget.onAccountTap == null
                       ? null
                       : () => widget.onAccountTap!(account),
@@ -793,6 +799,10 @@ class _AccountAccordionTile extends StatelessWidget {
   /// l'accordéon.
   final bool showPru;
 
+  /// Classe d'actif de la catégorie affichée, propagée aux lignes pour
+  /// formater la quantité (entière pour les métaux précieux).
+  final AssetClass? quantityAssetClass;
+
   const _AccountAccordionTile({
     required this.account,
     required this.hidden,
@@ -803,6 +813,7 @@ class _AccountAccordionTile extends StatelessWidget {
     this.onDelete,
     this.showAvatar = true,
     this.showPru = false,
+    this.quantityAssetClass,
   });
 
   @override
@@ -821,6 +832,7 @@ class _AccountAccordionTile extends StatelessWidget {
               account: account,
               hidden: hidden,
               showPru: showPru,
+              quantityAssetClass: quantityAssetClass,
               leading: hasChildren
                   ? SizedBox(
                       width: 28,
@@ -860,6 +872,7 @@ class _AccountAccordionTile extends StatelessWidget {
                             hidden: hidden,
                             showAvatar: showAvatar,
                             showPru: showPru,
+                            quantityAssetClass: quantityAssetClass,
                             onTap: onInvestmentTap == null
                                 ? null
                                 : () => onInvestmentTap!(investment),
@@ -1107,6 +1120,11 @@ class _AccountLine extends StatelessWidget {
   /// le cours — cf. [PatrimoineCategory.showsPruColumn].
   final bool showPru;
 
+  /// Classe d'actif de la catégorie affichée : sert à formater la quantité
+  /// (entière pour les pièces/lingots de métaux précieux). `null` pour une
+  /// catégorie sans classe d'actif (passifs) : formatage par défaut.
+  final AssetClass? quantityAssetClass;
+
   const _AccountLine({
     required this.account,
     required this.hidden,
@@ -1115,6 +1133,7 @@ class _AccountLine extends StatelessWidget {
     this.leading,
     this.showAvatar = true,
     this.showPru = false,
+    this.quantityAssetClass,
   });
 
   @override
@@ -1149,7 +1168,9 @@ class _AccountLine extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: shadcn.Text(
                 account.quantite != null
-                    ? account.quantite!.toStringAsFixed(2)
+                    ? quantityAssetClass != null
+                        ? formatQuantity(account.quantite!, quantityAssetClass!)
+                        : account.quantite!.toStringAsFixed(2)
                     : '—',
               ).small(),
             ),

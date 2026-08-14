@@ -2,10 +2,12 @@ import 'dart:typed_data';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
+import '../../core/date_format.dart';
 import '../../core/ui/frosted_card.dart';
 import 'confirm_delete_dialog.dart';
 import 'document_storage.dart';
 import 'documents_section.dart';
+import 'ibkr/ibkr_import_dialog.dart';
 import 'investment_identifier_field.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
@@ -30,6 +32,13 @@ class AccountDetailView extends StatefulWidget {
   final ValueChanged<String> onOpenInvestment;
   final VoidCallback onChanged;
 
+  /// Noms des établissements (banques, brokers...) déjà créés dans le vault,
+  /// pour la liste déroulante du formulaire d'édition : on change de banque
+  /// en la sélectionnant, on n'en tape pas une nouvelle à la volée (la
+  /// création d'un établissement passe par le flux "Compléter mon
+  /// patrimoine"). Voir `_EditAccountForm`.
+  final List<String> bankNames;
+
   /// Ouvre directement le formulaire d'édition du compte (nom, banque,
   /// enveloppe) plutôt que sa vue normale — utilisé par le menu "⋮ Modifier
   /// le compte" de l'accordéon d'une catégorie (voir
@@ -42,6 +51,7 @@ class AccountDetailView extends StatefulWidget {
     required this.vaultPath,
     required this.account,
     required this.hidden,
+    required this.bankNames,
     required this.onBack,
     required this.onOpenInvestment,
     required this.onChanged,
@@ -61,9 +71,18 @@ class _AccountDetailViewState extends State<AccountDetailView> {
 
   bool _editingAccount = false;
   final _editNameController = TextEditingController();
-  final _editBankController = TextEditingController();
   final _editDescriptionController = TextEditingController();
+
+  /// Établissement (banque, broker...) en cours d'édition, `null` si aucun
+  /// n'est sélectionné. Contrairement au nom (saisi librement), on change de
+  /// banque via une liste déroulante de `bankNames`.
+  String? _editBankName;
   AccountEnvelope? _editEnvelope;
+
+  /// Date d'ouverture en cours d'édition (voir
+  /// `InvestmentAccount.openingDate`), `null` tant que le formulaire n'a
+  /// pas été validé ou si l'utilisateur l'efface.
+  DateTime? _editOpeningDate;
 
   @override
   void initState() {
@@ -85,7 +104,6 @@ class _AccountDetailViewState extends State<AccountDetailView> {
     _isinController.dispose();
     _labelController.dispose();
     _editNameController.dispose();
-    _editBankController.dispose();
     _editDescriptionController.dispose();
     super.dispose();
   }
@@ -135,8 +153,9 @@ class _AccountDetailViewState extends State<AccountDetailView> {
     setState(() {
       _editingAccount = true;
       _editNameController.text = widget.account.name;
-      _editBankController.text = widget.account.bankName ?? '';
+      _editBankName = widget.account.bankName;
       _editDescriptionController.text = widget.account.description ?? '';
+      _editOpeningDate = widget.account.openingDate;
       _editEnvelope =
           widget.account.envelope ??
           accountEnvelopesFor(widget.account.assetClass).first;
@@ -144,15 +163,11 @@ class _AccountDetailViewState extends State<AccountDetailView> {
   }
 
   Future<void> _commitEditAccount() async {
-    // Pour l'épargne, le compte n'a pas de "Nom du compte" éditable : son
-    // identité est le type (enveloppe) + une description facultative. Le
-    // nom suit alors le champ banque, comme à la création (banque et nom
-    // sont identiques pour un compte d'épargne).
-    final isEpargne = widget.account.assetClass == AssetClass.epargne;
-    final bank = _editBankController.text.trim();
-    final name = isEpargne
-        ? (bank.isEmpty ? widget.account.name : bank)
-        : _editNameController.text.trim();
+    // Seuls les comptes dont la classe d'actif gère un établissement
+    // (épargne, PEA, CTO...) portent une banque — les autres (immobilier,
+    // crypto, métaux) gardent `bankName` à `null`.
+    final canHaveBank = supportsBankName(widget.account);
+    final name = _commitEditAccountName();
     if (name.isEmpty) return;
     // Une banque ou une description effacées (champ vidé) valent `null` —
     // comme à la lecture du disque (`InvestmentAccount.fromJson`).
@@ -160,12 +175,40 @@ class _AccountDetailViewState extends State<AccountDetailView> {
     final updated = widget.account.copyWith(
       name: name,
       envelope: _editEnvelope,
-      bankName: bank.isEmpty ? null : bank,
+      bankName: canHaveBank ? _editBankName : null,
       description: description.isEmpty ? null : description,
+      // La date d'ouverture est effaçable via le formulaire : on la
+      // remplace telle quelle, `null` inclus.
+      openingDate: _editOpeningDate,
     );
     await _repo.saveAccount(updated);
     setState(() => _editingAccount = false);
     widget.onChanged();
+  }
+
+  /// Le nom d'un compte découle de son identité dans le formulaire d'édition,
+  /// il n'est pas saisi librement :
+  ///
+  /// * épargne — le nom suit la banque sélectionnée (banque et nom sont
+  ///   identiques pour un compte d'épargne, comme à la création) ;
+  /// * enveloppe avec établissement (assurance-vie, PEA, comptes-titres...) —
+  ///   le nom est le type de compte (l'enveloppe), mis à jour si on en
+  ///   change, conservé sinon pour ne pas renommer un compte existant ;
+  /// * enveloppe sans établissement (crypto, métaux précieux, immobilier) —
+  ///   le nom reste saisi librement.
+  String _commitEditAccountName() {
+    final isEpargne = widget.account.assetClass == AssetClass.epargne;
+    if (isEpargne) return _editBankName ?? widget.account.name;
+    final requiresEstablishment =
+        assetClassRequiresEstablishmentStep(widget.account.assetClass);
+    if (requiresEstablishment) {
+      // Nom = type de compte : on ne le renomme que si le type a changé.
+      final envelopeChanged = _editEnvelope != widget.account.envelope;
+      return envelopeChanged
+          ? (_editEnvelope?.label ?? widget.account.name)
+          : widget.account.name;
+    }
+    return _editNameController.text.trim();
   }
 
   /// Un compte avec des transactions ne peut pas être supprimé directement
@@ -219,6 +262,18 @@ class _AccountDetailViewState extends State<AccountDetailView> {
     widget.onChanged();
   }
 
+  /// "Importer un relevé (IBKR)" du menu "⋮" — voir `ibkr_import_dialog.dart`.
+  /// Réservé aux comptes Actions & Fonds (CTO, PEA...), seuls concernés par
+  /// les titres/dividendes d'un relevé de courtier.
+  Future<void> _importIbkrStatement() async {
+    await showIbkrImportDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      account: widget.account,
+      onImported: widget.onChanged,
+    );
+  }
+
   void _openAccountMenu(BuildContext anchorContext) {
     showDropdown(
       context: anchorContext,
@@ -243,6 +298,12 @@ class _AccountDetailViewState extends State<AccountDetailView> {
               child: const shadcn.Text('Supprimer le compte'),
               onPressed: (_) => _deleteAccount(),
             ),
+            if (widget.account.assetClass == AssetClass.actionsEtFonds)
+              MenuButton(
+                leading: const Icon(LucideIcons.upload, size: 14),
+                child: const shadcn.Text('Importer un relevé (IBKR)'),
+                onPressed: (_) => _importIbkrStatement(),
+              ),
           ],
         ),
       ),
@@ -290,19 +351,36 @@ class _AccountDetailViewState extends State<AccountDetailView> {
           if (_editingAccount)
             _EditAccountForm(
               assetClass: account.assetClass,
+              // Le nom d'un compte n'est pas saisi librement : il découle du
+              // type de compte (enveloppe) ou de la banque pour l'épargne —
+              // voir `_commitEditAccountName`. Seules les enveloppes sans
+              // établissement (immobilier, crypto, métaux) gardent un champ
+              // de saisie.
               nameController: _editNameController,
-              // L'épargne n'a pas de "Nom du compte" : son identité est le
-              // type + une description facultative (le nom suit la banque).
-              showNameField: account.assetClass != AssetClass.epargne,
-              bankNameController: _editBankController,
+              showNameField:
+                  !assetClassRequiresEstablishmentStep(account.assetClass),
+              // On change de banque via une liste déroulante des
+              // établissements déjà créés dans le vault — la création d'un
+              // établissement passe par le flux "Compléter mon patrimoine".
+              bankNames: widget.bankNames,
+              bankName: _editBankName,
+              onBankNameChanged: (v) => setState(() => _editBankName = v),
               // Un compte sans établissement possible (immobilier, crypto,
               // métaux physiques) n'a pas de champ banque à éditer — voir
               // `supportsBankName`.
               showBankField: supportsBankName(account),
-              // La description ne se saisit que pour l'épargne, où elle
-              // s'affiche sous le type du compte dans les accordéons.
               descriptionController: _editDescriptionController,
-              showDescriptionField: account.assetClass == AssetClass.epargne,
+              // La date d'ouverture ne concerne que les comptes
+              // d'investissement (épargne, compte-titres...) — voir
+              // `accountHasOpeningDate`.
+              openingDate: _editOpeningDate,
+              showOpeningDateField: accountHasOpeningDate(account.assetClass),
+              onOpeningDateChanged: (date) => setState(
+                () => _editOpeningDate = date == null
+                    ? null
+                    // Jour calendaire sans heure, comme à la création.
+                    : DateTime(date.year, date.month, date.day),
+              ),
               envelope: _editEnvelope!,
               onEnvelopeChanged: (e) => setState(() => _editEnvelope = e),
               onSave: _commitEditAccount,
@@ -314,6 +392,12 @@ class _AccountDetailViewState extends State<AccountDetailView> {
                   ? '${account.assetClass.label} · ${account.envelope!.label}'
                   : account.assetClass.label,
             ).muted().small(),
+            if (account.openingDate != null) ...[
+              const SizedBox(height: 2),
+              shadcn.Text(
+                'Ouvert le ${formatDateDdMmYyyy(account.openingDate!)}',
+              ).muted().xSmall(),
+            ],
             const SizedBox(height: 4),
             shadcn.Text(
               displayEuros(account.totalMarketValue, widget.hidden),
@@ -388,6 +472,7 @@ class _AccountDetailViewState extends State<AccountDetailView> {
             DocumentsSection(
               vaultPath: widget.vaultPath,
               documents: account.documents,
+              quantityAssetClass: account.assetClass,
               onAdd: _addDocument,
               onDelete: _deleteDocument,
             ),
@@ -458,11 +543,12 @@ class _InvestmentCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       shadcn.Text(investment.label).medium(),
-                      // Immobilier : pas d'identifiant à afficher. Épargne :
-                      // l'identifiant est la devise, déjà portée par le
-                      // libellé — pas besoin de la répéter en dessous.
+                      // Immobilier : pas d'identifiant à afficher. Position
+                      // en devise (épargne, ou devise logée dans un compte-
+                      // titres) : l'identifiant est le code de la devise,
+                      // déjà porté par le libellé — pas besoin de le répéter.
                       if (accountAssetClass != AssetClass.immobilier &&
-                          accountAssetClass != AssetClass.epargne)
+                          !investment.isCurrency)
                         shadcn.Text(investment.isin).muted().small(),
                       if (crossClass)
                         Padding(
@@ -482,7 +568,14 @@ class _InvestmentCard extends StatelessWidget {
                     shadcn.Text(displayEuros(value, hidden)).semiBold(),
                     if (accountAssetClass != AssetClass.immobilier)
                       shadcn.Text(
-                        '${investment.quantityHeld.toStringAsFixed(2)} unités',
+                        // Une position en devise (épargne, ou devise logée
+                        // dans un compte-titres) se compte dans sa propre
+                        // monnaie, pas en "unités".
+                        investment.isCurrency
+                            ? '${formatQuantity(investment.quantityHeld, accountAssetClass)} '
+                                  '${investment.isin}'
+                            : '${formatQuantity(investment.quantityHeld, accountAssetClass)} '
+                                  'unités',
                       ).muted().xSmall(),
                   ],
                 ),
@@ -621,20 +714,34 @@ class _EditAccountForm extends StatelessWidget {
   final AssetClass assetClass;
   final TextEditingController nameController;
 
-  /// Le champ "Nom du compte" est masqué pour l'épargne, dont l'identité
-  /// est le type (enveloppe) + une description facultative — le nom suit
-  /// alors la banque (voir `_commitEditAccount`).
+  /// Le champ "Nom du compte" n'apparaît que pour les enveloppes sans
+  /// établissement (immobilier, crypto, métaux) : ailleurs le nom découle du
+  /// type de compte (enveloppe) ou de la banque pour l'épargne — voir
+  /// `_commitEditAccountName`.
   final bool showNameField;
 
-  /// Pré-rempli avec la banque actuelle du compte, effaçable (champ vide →
-  /// `null`) — le champ n'apparaît que si [showBankField].
-  final TextEditingController bankNameController;
+  /// Établissements (banques, brokers...) déjà créés dans le vault — on
+  /// change de banque en la sélectionnant dans cette liste, on n'en saisit
+  /// pas de nouvelle à la volée (la création d'un établissement passe par le
+  /// flux "Compléter mon patrimoine"). Le champ n'apparaît que si
+  /// [showBankField].
+  final List<String> bankNames;
+  final String? bankName;
+  final ValueChanged<String> onBankNameChanged;
   final bool showBankField;
 
   /// Pré-rempli avec la description actuelle, effaçable (champ vide →
-  /// `null`) — le champ n'apparaît que si [showDescriptionField] (épargne).
+  /// `null`).
   final TextEditingController descriptionController;
-  final bool showDescriptionField;
+
+  /// Date d'ouverture en cours d'édition (voir
+  /// `InvestmentAccount.openingDate`), effaçable — le champ n'apparaît que
+  /// si [showOpeningDateField] (comptes d'investissement, voir
+  /// `accountHasOpeningDate`).
+  final DateTime? openingDate;
+  final bool showOpeningDateField;
+  final ValueChanged<DateTime?> onOpeningDateChanged;
+
   final AccountEnvelope envelope;
   final ValueChanged<AccountEnvelope> onEnvelopeChanged;
   final VoidCallback onSave;
@@ -644,10 +751,14 @@ class _EditAccountForm extends StatelessWidget {
     required this.assetClass,
     required this.nameController,
     required this.showNameField,
-    required this.bankNameController,
+    required this.bankNames,
+    required this.bankName,
+    required this.onBankNameChanged,
     required this.showBankField,
     required this.descriptionController,
-    required this.showDescriptionField,
+    required this.openingDate,
+    required this.showOpeningDateField,
+    required this.onOpeningDateChanged,
     required this.envelope,
     required this.onEnvelopeChanged,
     required this.onSave,
@@ -698,26 +809,64 @@ class _EditAccountForm extends StatelessWidget {
                   const SizedBox(width: 8),
                 ],
                 if (showBankField) ...[
-                  SizedBox(
-                    width: 240,
-                    child: TextField(
-                      controller: bankNameController,
-                      placeholder: const shadcn.Text(
-                        'Banque (ex: Boursorama)',
+                  // Sélection d'un établissement existant : contrairement au
+                  // nom, la banque ne se saisit pas à la volée (la création
+                  // d'un établissement passe par le flux "Compléter mon
+                  // patrimoine").
+                  Select<String>(
+                    value: bankName,
+                    constraints: const BoxConstraints(minWidth: 200),
+                    placeholder: const shadcn.Text('Établissement (banque)'),
+                    onChanged: (v) {
+                      if (v != null) onBankNameChanged(v);
+                    },
+                    itemBuilder: (context, value) => shadcn.Text(value),
+                    popup: (context) => SelectPopup(
+                      items: SelectItemList(
+                        children: [
+                          for (final bank in {...bankNames, ?bankName}.toList()
+                            ..sort())
+                            SelectItemButton(
+                              value: bank,
+                              child: shadcn.Text(bank),
+                            ),
+                        ],
                       ),
-                      autofocus: !showNameField,
                     ),
                   ),
+                  const SizedBox(width: 8),
                 ],
               ],
             ),
             const SizedBox(height: 12),
-            if (showDescriptionField) ...[
-              TextField(
-                controller: descriptionController,
-                placeholder: const shadcn.Text(
-                  'Description (facultative, ex: Épargne vacances)',
-                ),
+            TextField(
+              controller: descriptionController,
+              placeholder: const shadcn.Text(
+                'Description (facultative, ex: Épargne vacances)',
+              ),
+              // Autofocus sur la description quand il n'y a pas de champ de
+              // saisie libre (nom) au-dessus.
+              autofocus: !showNameField && !showBankField,
+            ),
+            const SizedBox(height: 12),
+            if (showOpeningDateField) ...[
+              Row(
+                children: [
+                  DatePicker(
+                    value: openingDate,
+                    onChanged: onOpeningDateChanged,
+                    placeholder: const shadcn.Text('Date d\'ouverture'),
+                  ),
+                  // La date reste effaçable une fois renseignée (le picker
+                  // seul n'expose pas de "désélectionner" évident).
+                  if (openingDate != null) ...[
+                    const SizedBox(width: 8),
+                    GhostButton(
+                      onPressed: () => onOpeningDateChanged(null),
+                      child: const shadcn.Text('Effacer la date'),
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(height: 12),
             ],

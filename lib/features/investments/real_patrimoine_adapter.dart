@@ -36,7 +36,9 @@ const _categoryMeta = {
   ),
   AssetClass.crypto: (
     LucideIcons.bitcoin,
-    Color(0xFFFBBF24),
+    // Orange, pour se distinguer du jaune des métaux précieux
+    // (`0xFFEAB308`) avec lequel l'ancien ambre était confondu.
+    Color(0xFFF97316),
     AllocationTier.opportuniste,
     'Cryptomonnaies détenues sur wallet froid ou plateforme.',
   ),
@@ -215,10 +217,22 @@ PatrimoineAccount _buildAccountLeaf(
   String vaultPath,
 ) {
   final account = pairs.first.$1;
+  // Seules les positions encore détenues représentent ce que le compte
+  // contient *actuellement* — une position entièrement soldée (ex : un
+  // titre entièrement revendu, une devise entièrement dépensée) disparaît
+  // de l'accordéon établissement → comptes, mais reste visible dans son
+  // historique de transactions (`investment_detail_screen.dart`, qui lit
+  // `Investment.transactions` directement, indépendamment de cette
+  // fonction) — voir aussi [buildRealTopAssets], qui applique déjà le même
+  // filtre pour les meilleurs actifs du Dashboard.
+  final heldPairs = [
+    for (final pair in pairs)
+      if (pair.$2.quantityHeld > 0) pair,
+  ];
   var valeur = 0.0;
   var plusValueAbs = 0.0;
   var costBasis = 0.0;
-  for (final (_, investment) in pairs) {
+  for (final (_, investment) in heldPairs) {
     final v = investment.marketValue ?? investment.investedAmount;
     final gain = investment.unrealizedGain ?? 0;
     valeur += v;
@@ -231,11 +245,26 @@ PatrimoineAccount _buildAccountLeaf(
     // fiscale — Livret A, LDDS...) en première ligne, avec une description
     // facultative en dessous : le nom de la banque est déjà porté par la
     // ligne de l'établissement de l'accordéon (voir `_buildAccountAccordions`).
-    // Les autres classes gardent le nom du compte + son enveloppe.
-    name: account.assetClass == AssetClass.epargne
+    // Les autres classes gardent le nom du compte + son enveloppe. Un compte
+    // d'épargne *sans* banque (créé avant l'introduction du champ) garde
+    // quant à lui son nom réel en première ligne : sans établissement pour
+    // porter l'identité, c'est son nom qui la porte — et la clé de
+    // groupement de l'accordéon (`bankName ?? name`, voir
+    // `category_detail_screen.dart`) retombe dessus plutôt que sur le
+    // libellé d'enveloppe, ce qui fusionnerait des comptes différents du
+    // même type (deux "Livret A" dans des banques distinctes) en un seul
+    // accordéon et ferait disparaître la banque.
+    name: account.assetClass == AssetClass.epargne && account.bankName != null
         ? account.envelope?.label ?? account.name
         : account.name,
-    subtitle: account.assetClass == AssetClass.epargne
+    // Comme pour l'épargne, les comptes "Actions & Fonds" (PEA, CTO,
+    // assurance vie...) présentent la description facultative en seconde
+    // ligne : leur nom porte déjà le type (le libellé d'enveloppe — voir
+    // `_selectAccountEnvelope` dans `complete_patrimoine_dialog.dart`), un
+    // sous-titre répétant l'enveloppe ne ferait que dupliquer le nom. Les
+    // autres classes gardent le nom du compte + son enveloppe en sous-titre.
+    subtitle: account.assetClass == AssetClass.epargne ||
+            account.assetClass == AssetClass.actionsEtFonds
         ? account.description
         : account.envelope?.label,
     // L'établissement du compte réel — la clé de groupement "banque" de
@@ -246,7 +275,7 @@ PatrimoineAccount _buildAccountLeaf(
     plusValueAbs: plusValueAbs,
     plusValuePercent: costBasis == 0 ? 0 : plusValueAbs / costBasis * 100,
     investments: [
-      for (final (investmentAccount, investment) in pairs)
+      for (final (investmentAccount, investment) in heldPairs)
         _buildLeaf(
           investmentAccount,
           investment,
@@ -346,7 +375,10 @@ PatrimoineAccount _buildLeaf(
     name: investment.label,
     subtitle: showAccountSubtitle ? account.name : null,
     quantite: investment.quantityHeld == 0 ? null : investment.quantityHeld,
-    cours: investment.lastPrice,
+    // Le cours est toujours affiché en euros : un titre coté en devise
+    // étrangère (META en USD) voit son dernier cours converti au taux de
+    // change enregistré (voir [Investment.quoteCurrency]).
+    cours: _lastPriceToEur(investment),
     valeur: valeur,
     pru: investment.pru,
     priceUnavailable: investment.priceUnavailable,
@@ -354,8 +386,9 @@ PatrimoineAccount _buildLeaf(
     plusValuePercent: costBasis == 0 ? 0 : plusValueAbs / costBasis * 100,
     // Métaux précieux : l'avatar affiche la photo du produit (pièce/lingot)
     // téléchargée localement quand elle existe — sauf ETC logé dans un CTO,
-    // sans produit physique associé, où l'avatar affiche "ETC". Épargne :
-    // l'avatar affiche le code de la devise tenue (EUR, GBP...).
+    // sans produit physique associé, où l'avatar affiche "ETC". Position en
+    // devise (épargne, ou devise d'un compte-titres) : l'avatar affiche le
+    // code de la devise tenue (EUR, GBP...).
     avatarImagePath: _metalAvatarImagePath(account, investment, vaultPath),
     avatarInitials:
         _currencyAvatarInitials(account, investment) ??
@@ -363,17 +396,16 @@ PatrimoineAccount _buildLeaf(
   );
 }
 
-/// Investissement "Épargne" tenu dans une devise (EUR, USD, GBP... — la
-/// devise est l'identifiant de l'investissement, voir
-/// `identifierOptionsFor`) : l'avatar affiche le code de la devise plutôt
-/// que des initiales dérivées du libellé, pour distinguer au premier coup
-/// d'œil les comptes multi-devises.
+/// Position en devise (épargne tenue en EUR/USD/GBP..., ou devise logée dans
+/// un compte-titres — la devise est alors l'identifiant de l'investissement,
+/// voir `identifierOptionsFor`) : l'avatar affiche le code de la devise
+/// plutôt que des initiales dérivées du libellé, pour distinguer au premier
+/// coup d'œil les comptes multi-devises.
 String? _currencyAvatarInitials(
   InvestmentAccount account,
   Investment investment,
 ) {
-  final effectiveClass = investment.assetClass ?? account.assetClass;
-  if (effectiveClass != AssetClass.epargne) return null;
+  if (!isCurrencyInvestment(account, investment)) return null;
   final currency = investment.isin.trim().toUpperCase();
   return currency.isEmpty ? null : currency;
 }
@@ -418,6 +450,16 @@ String? _metalAvatarInitials(
   return isMetalEtc(account) ? 'ETC' : null;
 }
 
+/// Le cours de marché en euros : le dernier cours brut (dans sa devise de
+/// cotation, voir [Investment.lastPrice]) converti au taux de change
+/// enregistré ([Investment.lastFxRateToEur]) — vaut le cours brut pour un
+/// titre coté en euros, `null` sans cours connu.
+double? _lastPriceToEur(Investment investment) {
+  final lastPrice = investment.lastPrice;
+  if (lastPrice == null) return null;
+  return lastPrice * (investment.lastFxRateToEur ?? 1.0);
+}
+
 /// Un [DashboardAsset] par investissement valorisé, pour réutiliser
 /// [TopAssetsRow] tel quel. [DashboardAsset.changePercent] est ici la
 /// plus-value latente réelle (pas de retour réel par période — la
@@ -443,7 +485,13 @@ List<DashboardAsset> buildRealTopAssets(
               for (final p in history.skip(math.max(0, history.length - 10)))
                 p.close,
             ]
-          : [investment.pru, investment.lastPrice ?? investment.pru];
+          : [
+              investment.pru,
+              // Sans historique, la sparkline en deux points compare le PRU
+              // au dernier cours — en euros, taux de change compris, pour
+              // rester homogène (voir [_lastPriceToEur]).
+              _lastPriceToEur(investment) ?? investment.pru,
+            ];
       assets.add(
         DashboardAsset(
           name: investment.label,
