@@ -57,10 +57,20 @@ class _GlobalSearchBarState extends State<GlobalSearchBar> {
   final ValueNotifier<List<SearchEntry>> _results = ValueNotifier(const []);
   final ValueNotifier<int> _selectedIndex = ValueNotifier(-1);
 
+  /// Source de la dernière sélection : `true` quand elle vient du clavier
+  /// (flèches ↑/↓), `false` quand elle vient du survol. Seule la navigation
+  /// clavier fait défiler le panneau — le survol ne doit pas le faire
+  /// « sauter » sous le curseur.
+  bool _selectionFromKeyboard = false;
+
   @override
   void initState() {
     super.initState();
     _controller.addListener(_onQueryChanged);
+    // `overlayOpen` est relu dans `build` pour activer les raccourcis
+    // clavier : sans ce rebuild, le panneau s'ouvre mais les flèches
+    // restent inactives (l'état n'était jamais rafraîchi à l'ouverture).
+    _popoverController.addListener(_onPopoverChanged);
     _rebuildIndex();
   }
 
@@ -70,9 +80,14 @@ class _GlobalSearchBarState extends State<GlobalSearchBar> {
     if (oldWidget.vaultPath != widget.vaultPath) _rebuildIndex();
   }
 
+  void _onPopoverChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _controller.removeListener(_onQueryChanged);
+    _popoverController.removeListener(_onPopoverChanged);
     _controller.dispose();
     _focusNode.dispose();
     _results.dispose();
@@ -145,6 +160,7 @@ class _GlobalSearchBarState extends State<GlobalSearchBar> {
     var next = _selectedIndex.value + delta;
     if (next < 0) next = results.length - 1;
     if (next >= results.length) next = 0;
+    _selectionFromKeyboard = true;
     _selectedIndex.value = next;
   }
 
@@ -210,8 +226,10 @@ class _GlobalSearchBarState extends State<GlobalSearchBar> {
                   _SearchResultRow(
                     entry: entry,
                     selected: index == _selectedIndex.value,
+                    autoScrollOnSelect: _selectionFromKeyboard,
                     onHover: () {
                       if (_selectedIndex.value != index) {
+                        _selectionFromKeyboard = false;
                         _selectedIndex.value = index;
                       }
                     },
@@ -300,10 +318,17 @@ class _SearchResultRow extends StatefulWidget {
   final VoidCallback onHover;
   final VoidCallback onTap;
 
+  /// `true` quand la sélection vient du clavier : la ligne devient
+  /// sélectionnée, elle doit être défilée dans le viewport. Le survol ne
+  /// doit pas déclencher de défilement (le panneau sauterait sous le
+  /// curseur).
+  final bool autoScrollOnSelect;
+
   const _SearchResultRow({
     required this.entry,
     required this.selected,
     required this.onHover,
+    this.autoScrollOnSelect = false,
     required this.onTap,
   });
 
@@ -315,12 +340,15 @@ class _SearchResultRowState extends State<_SearchResultRow> {
   @override
   void didUpdateWidget(covariant _SearchResultRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Devenu sélectionné (navigation clavier) : s'assurer que la ligne est
-    // visible dans le panneau défilant.
-    if (oldWidget.selected != widget.selected && widget.selected) {
+    // Devenu sélectionné via le clavier : s'assurer que la ligne est
+    // visible dans le panneau défilant — centrée (alignment 0.5) pour ne
+    // pas la coller contre le bord du panneau.
+    if (oldWidget.selected != widget.selected &&
+        widget.selected &&
+        widget.autoScrollOnSelect) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        Scrollable.ensureVisible(context);
+        Scrollable.ensureVisible(context, alignment: 0.5);
       });
     }
   }

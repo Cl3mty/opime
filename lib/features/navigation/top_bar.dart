@@ -51,8 +51,10 @@ class TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Titre de la page sélectionnée, avant le champ de recherche.
-          shadcn.Text(navLabelForKey(currentPageKey)).medium.small,
+          // Fil d'Ariane de la page sélectionnée : pour un sous-menu (ex :
+          // « Simulation > Transmission »), le parent précède la page ; une
+          // page de premier niveau n'affiche que son libellé.
+          _buildBreadcrumb(theme),
           const SizedBox(width: 16),
           // Reconstruit l'index de recherche quand le profil actif change :
           // le patrimoine réel indexé dépend de ProfileController.activeDataPath.
@@ -75,6 +77,35 @@ class TopBar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Fil d'Ariane de la page courante : chaque segment du parcours sauf le
+  /// dernier est grisé et précédé d'une chevron (« Simulation › Transmission »).
+  Widget _buildBreadcrumb(ThemeData theme) {
+    final crumbs = navBreadcrumbForKey(currentPageKey);
+    final lastIndex = crumbs.length - 1;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < crumbs.length; i++) ...[
+          if (i > 0) ...[
+            const SizedBox(width: 6),
+            Icon(
+              LucideIcons.chevronRight,
+              size: 12,
+              color: theme.colorScheme.mutedForeground,
+            ),
+            const SizedBox(width: 6),
+          ],
+          shadcn.Text(
+            crumbs[i],
+            style: i == lastIndex
+                ? null
+                : TextStyle(color: theme.colorScheme.mutedForeground),
+          ).medium.small,
+        ],
+      ],
     );
   }
 }
