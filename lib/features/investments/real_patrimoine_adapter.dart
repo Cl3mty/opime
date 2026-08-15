@@ -717,6 +717,18 @@ List<Investment> investmentsForEffectiveClass(
   ];
 }
 
+/// Grille quotidienne complète entre [start] et [end] (bornes incluses) —
+/// contrairement à [evenDateGrid] (~30 points espacés, conçue pour
+/// l'économie de rendu du graphique dashboard), chaque jour calendaire est
+/// représenté. Nécessaire aux séries de rendements de l'écran Analyses
+/// (volatilité, corrélation...) : annualiser un écart-type par
+/// `sqrt(365)` suppose un pas régulier d'un jour — un pas plus grossier
+/// (mensuel sur une longue période avec [evenDateGrid]) rendrait ce facteur
+/// faux.
+List<DateTime> dailyDateGrid(DateTime start, DateTime end) => [
+  for (var d = start; !d.isAfter(end); d = d.add(const Duration(days: 1))) d,
+];
+
 /// Comme [netWorthHistoryFor], mais évalué aux dates de [grid] (voir
 /// [evenDateGrid]) plutôt que sur une grille propre à [investments] — pour
 /// que plusieurs classes d'actif partagent les mêmes abscisses et puissent

@@ -81,6 +81,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   bool _editingInvestment = false;
   final _editIsinController = TextEditingController();
   final _editLabelController = TextEditingController();
+  FundStyle? _editFundStyle;
 
   @override
   void initState() {
@@ -402,6 +403,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       _editingInvestment = true;
       _editIsinController.text = widget.investment.isin;
       _editLabelController.text = widget.investment.label;
+      _editFundStyle = widget.investment.fundStyle;
     });
   }
 
@@ -440,6 +442,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
           isinChanged ? null : widget.investment.priceUnavailable,
       assetClass: widget.investment.assetClass,
       realEstateType: widget.investment.realEstateType,
+      fundStyle: _editFundStyle,
       documents: widget.investment.documents,
     );
     await _saveInvestment(updatedInvestment);
@@ -619,6 +622,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               accountEnvelope: widget.account.envelope,
               isinController: _editIsinController,
               labelController: _editLabelController,
+              fundStyle: _editFundStyle,
+              onFundStyleChanged: (style) =>
+                  setState(() => _editFundStyle = style),
               onSave: _commitEditInvestment,
               onCancel: () => setState(() => _editingInvestment = false),
             )
@@ -648,6 +654,12 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             if (_isImmobilier && investment.realEstateType != null) ...[
               const SizedBox(height: 4),
               shadcn.Text(investment.realEstateType!.label).muted().small(),
+            ],
+            if (!_isImmobilier &&
+                !_isCurrency &&
+                investment.fundStyle != null) ...[
+              const SizedBox(height: 4),
+              shadcn.Text(investment.fundStyle!.label).muted().small(),
             ],
           ],
           const SizedBox(height: 12),
@@ -875,6 +887,8 @@ class _EditInvestmentForm extends StatelessWidget {
   final AccountEnvelope? accountEnvelope;
   final TextEditingController isinController;
   final TextEditingController labelController;
+  final FundStyle? fundStyle;
+  final ValueChanged<FundStyle?> onFundStyleChanged;
   final VoidCallback onSave;
   final VoidCallback onCancel;
 
@@ -884,6 +898,8 @@ class _EditInvestmentForm extends StatelessWidget {
     this.accountEnvelope,
     required this.isinController,
     required this.labelController,
+    required this.fundStyle,
+    required this.onFundStyleChanged,
     required this.onSave,
     required this.onCancel,
   });
@@ -925,6 +941,39 @@ class _EditInvestmentForm extends StatelessWidget {
                   ),
                 ],
               ),
+            if (assetClass == AssetClass.actionsEtFonds) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Select<FundStyle>(
+                    value: fundStyle,
+                    placeholder: const shadcn.Text('Style de gestion'),
+                    onChanged: (style) {
+                      if (style != null) onFundStyleChanged(style);
+                    },
+                    itemBuilder: (context, style) => shadcn.Text(style.label),
+                    popup: (context) => SelectPopup(
+                      items: SelectItemList(
+                        children: [
+                          for (final style in FundStyle.values)
+                            SelectItemButton(
+                              value: style,
+                              child: shadcn.Text(style.label),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (fundStyle != null) ...[
+                    const SizedBox(width: 4),
+                    IconButton.ghost(
+                      icon: const Icon(LucideIcons.x, size: 14),
+                      onPressed: () => onFundStyleChanged(null),
+                    ),
+                  ],
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [

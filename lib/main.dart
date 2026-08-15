@@ -1,7 +1,9 @@
+import 'dart:async' show unawaited;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/assistant/assistant_chat_controller.dart';
 import 'core/assistant/assistant_config_controller.dart';
+import 'core/notifications/notifications_settings_controller.dart';
 import 'core/privacy/amount_visibility_controller.dart';
 import 'core/storage/vault_folder_service.dart';
 import 'core/profiles/profile_controller.dart';
@@ -17,13 +19,16 @@ import 'app/app_shell.dart';
 import 'core/platform_info.dart';
 import 'core/ui/load_error_view.dart';
 import 'core/ui/mobile_orientation.dart';
+import 'features/analyses/analyses_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/dashboard/onboarding_highlight_controller.dart';
+import 'features/projects/projects_screen.dart';
 import 'features/investments/investments_models.dart' show AssetClass;
 import 'features/investments/patrimoine_refresh_controller.dart';
 import 'features/investments/price_sync_banner.dart';
 import 'features/investments/price_sync_status_controller.dart';
 import 'features/investments/real_category_detail_screen.dart';
+import 'features/notifications/notifications_controller.dart';
 import 'features/liabilities/liabilities_models.dart' show LiabilityType;
 import 'features/liabilities/real_passif_detail_screen.dart';
 import 'features/strategy/strategy_screen.dart';
@@ -85,6 +90,8 @@ class _OpimeAppState extends State<OpimeApp> {
   final _themeController = ThemeController();
   final _amountVisibilityController = AmountVisibilityController();
   final _assistantConfigController = AssistantConfigController();
+  final _notificationsSettingsController = NotificationsSettingsController();
+  final _notificationsController = NotificationsController();
   final _patrimoineRefreshController = PatrimoineRefreshController();
   final _priceSyncStatusController = PriceSyncStatusController();
   final _onboardingHighlightController = OnboardingHighlightController();
@@ -107,9 +114,46 @@ class _OpimeAppState extends State<OpimeApp> {
   /// profil = autre conversation).
   String? _assistantChatScope;
 
+  /// Clé de contexte du dernier rafraîchissement des notifications
+  /// (`vaultPath|profileId`) — même rôle que [_assistantChatScope], pour ne
+  /// relancer un rafraîchissement que quand le profil/vault a réellement
+  /// changé.
+  String? _notificationsScope;
+
   void _handleProfileControllerChanged() {
     _recreateAssistantChat();
+    _refreshNotificationsIfNeeded();
     if (mounted) setState(() {});
+  }
+
+  /// Recharge les notifications (actualités/alertes) pour le profil actif
+  /// si le contexte a changé, ou ne fait rien si la fonctionnalité est
+  /// désactivée dans les Réglages — aucune requête réseau tant qu'elle ne
+  /// l'est pas.
+  void _refreshNotificationsIfNeeded() {
+    if (!_notificationsSettingsController.enabled) return;
+    final profile = _profileController;
+    if (profile == null || profile.active == null) return;
+    final scope = '$_vaultPath|${profile.active!.id}';
+    if (scope == _notificationsScope) return;
+    _notificationsScope = scope;
+    unawaited(
+      _notificationsController.refresh(
+        profile.activeDataPath,
+        lastSeen: _notificationsSettingsController.lastSeen,
+      ),
+    );
+  }
+
+  /// Activer la fonctionnalité depuis les Réglages doit peupler le badge
+  /// sans attendre l'ouverture du panneau : réinitialise le contexte
+  /// mémorisé pour forcer [_refreshNotificationsIfNeeded] à relancer un
+  /// chargement dès la transition désactivé → activé.
+  void _onNotificationsSettingsChanged() {
+    if (_notificationsSettingsController.enabled) {
+      _notificationsScope = null;
+      _refreshNotificationsIfNeeded();
+    }
   }
 
   /// (Re)crée le controller de chat quand le vault ou le profil actif a
@@ -156,6 +200,10 @@ class _OpimeAppState extends State<OpimeApp> {
     _themeController.addListener(() => setState(() {}));
     _amountVisibilityController.load();
     _assistantConfigController.load();
+    _notificationsSettingsController.load();
+    _notificationsSettingsController.addListener(
+      _onNotificationsSettingsChanged,
+    );
     _loadVault();
   }
 
@@ -206,6 +254,7 @@ class _OpimeAppState extends State<OpimeApp> {
       _sidebarPrefsController = sidebarPrefs;
     });
     _recreateAssistantChat();
+    _refreshNotificationsIfNeeded();
   }
 
   void _retryInitProfiles() {
@@ -223,6 +272,7 @@ class _OpimeAppState extends State<OpimeApp> {
     _assistantChatController?.dispose();
     _assistantChatController = null;
     _assistantChatScope = null;
+    _notificationsScope = null;
     setState(() {
       _vaultPath = null;
       _profileController = null;
@@ -291,6 +341,8 @@ class _OpimeAppState extends State<OpimeApp> {
           priceSyncStatusController: _priceSyncStatusController,
           assistantConfigController: _assistantConfigController,
           assistantChatController: _assistantChatController!,
+          notificationsSettingsController: _notificationsSettingsController,
+          notificationsController: _notificationsController,
           pages: {
             'dashboard': (_) => DashboardScreen(
               key: ValueKey(_profileController!.activeDataPath),
@@ -299,6 +351,15 @@ class _OpimeAppState extends State<OpimeApp> {
               refreshSignal: _patrimoineRefreshController,
               priceSyncStatus: _priceSyncStatusController,
               onboardingHighlight: _onboardingHighlightController,
+            ),
+            'analyses': (_) => AnalysesScreen(
+              key: ValueKey(_profileController!.activeDataPath),
+              vaultPath: _profileController!.activeDataPath,
+              amountVisibility: _amountVisibilityController,
+            ),
+            'projets': (_) => ProjectsScreen(
+              key: ValueKey(_profileController!.activeDataPath),
+              vaultPath: _profileController!.activeDataPath,
             ),
             for (final assetClass in AssetClass.values)
               assetClass.categoryId: (_) => RealCategoryDetailScreen(
@@ -393,6 +454,7 @@ class _OpimeAppState extends State<OpimeApp> {
               onNoVaultSelected: _resetVault,
               themeController: _themeController,
               assistantConfigController: _assistantConfigController,
+              notificationsSettingsController: _notificationsSettingsController,
               githubOwner: _githubOwner,
               githubRepo: _githubRepo,
             ),

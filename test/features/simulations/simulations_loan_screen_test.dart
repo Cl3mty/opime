@@ -17,7 +17,7 @@ void main() {
         montantEmprunte: montant,
         dureeAnnees: dureeAnnees,
         tauxInteret: tauxInteret,
-        tauxAssurance: 0,
+        assuranceMensuelle: 0,
         fraisDossier: 0,
         fraisGarantie: 0,
         type: LoanType.amortissable,
@@ -34,7 +34,7 @@ void main() {
         montantEmprunte: 200000,
         dureeAnnees: 15,
         tauxInteret: 2.8,
-        tauxAssurance: 0.2,
+        assuranceMensuelle: 30,
         fraisDossier: 500,
         fraisGarantie: 900,
         type: LoanType.amortissable,
@@ -57,7 +57,7 @@ void main() {
           montantEmprunte: 100000,
           dureeAnnees: 20,
           tauxInteret: 3.5,
-          tauxAssurance: 0.15,
+          assuranceMensuelle: 12.5,
           fraisDossier: 800,
           fraisGarantie: 1200,
           type: LoanType.amortissable,
@@ -84,7 +84,7 @@ void main() {
           montantEmprunte: 150000,
           dureeAnnees: 10,
           tauxInteret: 4.0,
-          tauxAssurance: 0.1,
+          assuranceMensuelle: 12.5,
           fraisDossier: 0,
           fraisGarantie: 0,
           type: LoanType.inFine,
@@ -119,7 +119,7 @@ void main() {
           montantEmprunte: 100000,
           dureeAnnees: 20,
           tauxInteret: 3.5,
-          tauxAssurance: 0.15,
+          assuranceMensuelle: 12.5,
           fraisDossier: 0,
           fraisGarantie: 0,
           type: LoanType.amortissable,
@@ -129,7 +129,7 @@ void main() {
         );
 
         final expectedInterest = 100000 * (3.5 / 100 / 12);
-        final expectedInsurance = 100000 * (0.15 / 100 / 12);
+        const expectedInsurance = 12.5;
         expect(
           result.mensualiteDifferee,
           closeTo(expectedInterest + expectedInsurance, 0.01),
@@ -144,7 +144,7 @@ void main() {
           montantEmprunte: 100000,
           dureeAnnees: 20,
           tauxInteret: 3.5,
-          tauxAssurance: 0.15,
+          assuranceMensuelle: 12.5,
           fraisDossier: 0,
           fraisGarantie: 0,
           type: LoanType.amortissable,
@@ -153,7 +153,7 @@ void main() {
           typeDiffere: DeferType.totale,
         );
 
-        final expectedInsurance = 100000 * (0.15 / 100 / 12);
+        const expectedInsurance = 12.5;
         // Régression : la mensualité affichée pendant un différé total ne doit
         // pas inclure les intérêts (capitalisés, donc non payés), seulement
         // l'assurance qui reste due.
@@ -168,7 +168,7 @@ void main() {
           montantEmprunte: 100000,
           dureeAnnees: 20,
           tauxInteret: 3.5,
-          tauxAssurance: 0,
+          assuranceMensuelle: 0,
           fraisDossier: 0,
           fraisGarantie: 0,
           type: LoanType.amortissable,
@@ -180,7 +180,7 @@ void main() {
           montantEmprunte: 100000,
           dureeAnnees: 20,
           tauxInteret: 3.5,
-          tauxAssurance: 0,
+          assuranceMensuelle: 0,
           fraisDossier: 0,
           fraisGarantie: 0,
           type: LoanType.amortissable,

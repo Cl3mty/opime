@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../core/assistant/assistant_chat_controller.dart';
 import '../core/assistant/assistant_config_controller.dart';
+import '../core/notifications/notifications_settings_controller.dart';
 import '../core/privacy/amount_visibility_controller.dart';
 import '../core/profiles/profile_controller.dart';
 import '../core/ui/app_background.dart';
@@ -15,6 +16,9 @@ import '../features/navigation/top_bar_actions.dart';
 import '../features/dashboard/onboarding_highlight_controller.dart';
 import '../features/investments/patrimoine_refresh_controller.dart';
 import '../features/investments/price_sync_status_controller.dart';
+import '../features/notifications/news_button.dart';
+import '../features/notifications/notifications_controller.dart';
+import '../features/patrimoine_export/patrimoine_export_button.dart';
 import 'theme_controller.dart';
 
 const _breakpoint = 800.0;
@@ -59,6 +63,8 @@ class AppShell extends StatefulWidget {
   final PriceSyncStatusController priceSyncStatusController;
   final AssistantConfigController assistantConfigController;
   final AssistantChatController assistantChatController;
+  final NotificationsSettingsController notificationsSettingsController;
+  final NotificationsController notificationsController;
   final Map<String, WidgetBuilder> pages;
 
   const AppShell({
@@ -72,6 +78,8 @@ class AppShell extends StatefulWidget {
     required this.priceSyncStatusController,
     required this.assistantConfigController,
     required this.assistantChatController,
+    required this.notificationsSettingsController,
+    required this.notificationsController,
     required this.pages,
   });
 
@@ -342,6 +350,9 @@ class _AppShellState extends State<AppShell> {
                         onboardingHighlight:
                             widget.onboardingHighlightController,
                         priceSyncStatus: widget.priceSyncStatusController,
+                        notificationsSettings:
+                            widget.notificationsSettingsController,
+                        notificationsController: widget.notificationsController,
                         currentPageKey: _selectedKey,
                         onSelect: _select,
                       ),
@@ -370,6 +381,14 @@ class _AppShellState extends State<AppShell> {
           trailing: [
             AmountVisibilityToggleButton(
               amountVisibility: widget.amountVisibilityController,
+            ),
+            NewsButton(
+              settings: widget.notificationsSettingsController,
+              controller: widget.notificationsController,
+              vaultPath: widget.profileController.activeDataPath,
+            ),
+            PatrimoineExportButton(
+              profileController: widget.profileController,
             ),
             AddMenuButton(
               profileController: widget.profileController,

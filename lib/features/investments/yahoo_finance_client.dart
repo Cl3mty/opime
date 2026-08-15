@@ -2,6 +2,7 @@ import 'dart:async' show TimeoutException;
 import 'dart:convert';
 import 'dart:io' show SocketException;
 import 'package:http/http.dart' as http;
+import '../notifications/notification_models.dart' show NewsArticleItem;
 
 /// Un point de cours quotidien (clôture) pour un actif.
 class PricePoint {
@@ -205,6 +206,63 @@ class YahooFinanceClient {
       return (points: const <PricePoint>[], currency: null);
     } catch (_) {
       return (points: const <PricePoint>[], currency: null);
+    }
+  }
+
+  /// Actualités liées à [query] (ticker de préférence — [Investment.symbol]
+  /// — ISIN en repli si le cours n'a pas encore été résolu), extraites du
+  /// même endpoint de recherche que [resolveSymbol] (le champ `news`,
+  /// jusqu'ici totalement ignoré) — appel séparé de [resolveSymbol] car les
+  /// deux sont invoqués à des moments différents (résolution de cours
+  /// pendant le rafraîchissement des prix, actualités au démarrage/à
+  /// l'ouverture du panneau de notifications), pas dans la même passe. Ne
+  /// garde que les entrées avec un identifiant et un lien exploitables.
+  Future<List<NewsArticleItem>> fetchNews(
+    String query, {
+    void Function()? onNetworkError,
+    void Function()? onNetworkSuccess,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://query1.finance.yahoo.com/v1/finance/search'
+          '?q=${Uri.encodeComponent(query)}',
+        ),
+      );
+      onNetworkSuccess?.call();
+      if (response.statusCode != 200) return [];
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final news = json['news'] as List?;
+      if (news == null) return [];
+      return news
+          .map((e) {
+            final item = e as Map<String, dynamic>;
+            final publishTime = (item['providerPublishTime'] as num?)
+                ?.toInt();
+            return NewsArticleItem(
+              uuid: item['uuid'] as String? ?? '',
+              title: item['title'] as String? ?? '',
+              publisher: item['publisher'] as String? ?? '',
+              link: item['link'] as String? ?? '',
+              publishedAt: publishTime != null
+                  ? DateTime.fromMillisecondsSinceEpoch(publishTime * 1000)
+                  : DateTime.now(),
+              relatedSymbol: query,
+            );
+          })
+          .where((a) => a.uuid.isNotEmpty && a.link.isNotEmpty)
+          .toList();
+    } on SocketException catch (_) {
+      onNetworkError?.call();
+      return [];
+    } on http.ClientException catch (_) {
+      onNetworkError?.call();
+      return [];
+    } on TimeoutException catch (_) {
+      onNetworkError?.call();
+      return [];
+    } catch (_) {
+      return [];
     }
   }
 

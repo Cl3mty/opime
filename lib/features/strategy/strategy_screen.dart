@@ -65,9 +65,20 @@ class _StrategyScreenState extends State<StrategyScreen> {
       // fournisseur cloud est indisponible : un délai borné évite un
       // spinner infini et silencieux, remplacé par un état d'erreur
       // explicite avec bouton "Réessayer".
-      final notes = await _repo.listNotes().timeout(
+      var notes = await _repo.listNotes().timeout(
         const Duration(seconds: 15),
       );
+      // Premier passage dans l'onglet Stratégie : on crée les notes
+      // modèle (Watchlist, Thèse, ...) pour inciter à prendre des notes.
+      // La création est sans effet si elle a déjà eu lieu une fois.
+      if (notes.isEmpty) {
+        final created = await _repo.createTemplatesIfFirstVisit().timeout(
+          const Duration(seconds: 15),
+        );
+        if (created) {
+          notes = await _repo.listNotes();
+        }
+      }
       if (!mounted || generation != _loadGeneration) return;
       _notes.value = notes;
       if (_loading || _loadError) {

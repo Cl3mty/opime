@@ -107,6 +107,34 @@ enum RealEstateType {
   }
 }
 
+/// Style de gestion d'un investissement `actionsEtFonds`, renseigné
+/// manuellement par l'utilisateur (aucune heuristique automatique sur le
+/// libellé/ISIN, trop peu fiable) — sert à calculer la répartition gestion
+/// active/passive dans l'écran Analyses (voir `analyses_calculations.dart`'s
+/// `fundStyleAllocation`). `null` sur [Investment.fundStyle] tant que
+/// l'utilisateur ne l'a pas classé : traité comme "non classé", jamais deviné.
+enum FundStyle {
+  activeGere,
+  indiciel,
+  actionIndividuelle,
+  autre;
+
+  String get label => switch (this) {
+    FundStyle.activeGere => 'Géré activement',
+    FundStyle.indiciel => 'Indiciel (ETF, tracker)',
+    FundStyle.actionIndividuelle => 'Action individuelle',
+    FundStyle.autre => 'Autre',
+  };
+
+  static FundStyle? fromName(String? name) {
+    if (name == null) return null;
+    for (final style in FundStyle.values) {
+      if (style.name == name) return style;
+    }
+    return null;
+  }
+}
+
 /// Retrouve la [AssetClass] correspondant à un id de catégorie Dashboard
 /// (`'actifs_crypto'`...), ou `null` s'il n'y en a pas (id inconnu, ou
 /// catégorie de passifs — pas encore de classe d'actif réelle associée).
@@ -392,6 +420,10 @@ class Investment {
   final AssetClass? assetClass;
   final RealEstateType? realEstateType;
 
+  /// Style de gestion (actif/passif/stock-picking), pertinent seulement pour
+  /// la classe `actionsEtFonds` — voir [FundStyle].
+  final FundStyle? fundStyle;
+
   final List<VaultDocument> documents;
 
   Investment({
@@ -408,6 +440,7 @@ class Investment {
     this.priceUnavailable,
     this.assetClass,
     this.realEstateType,
+    this.fundStyle,
     this.documents = const [],
   }) : id = id ?? generateInvestmentId('inv');
 
@@ -422,6 +455,7 @@ class Investment {
     bool? priceUnavailable,
     AssetClass? assetClass,
     RealEstateType? realEstateType,
+    FundStyle? fundStyle,
     List<VaultDocument>? documents,
   }) => Investment(
     id: id,
@@ -437,6 +471,7 @@ class Investment {
     priceUnavailable: priceUnavailable ?? this.priceUnavailable,
     assetClass: assetClass ?? this.assetClass,
     realEstateType: realEstateType ?? this.realEstateType,
+    fundStyle: fundStyle ?? this.fundStyle,
     documents: documents ?? this.documents,
   );
 
@@ -505,6 +540,7 @@ class Investment {
         ? AssetClass.fromName(json['assetClass'] as String)
         : null,
     realEstateType: RealEstateType.fromName(json['realEstateType'] as String?),
+    fundStyle: FundStyle.fromName(json['fundStyle'] as String?),
     documents: (json['documents'] as List? ?? [])
         .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
         .toList(),
@@ -529,6 +565,7 @@ class Investment {
     if (priceUnavailable != null) 'priceUnavailable': priceUnavailable,
     if (assetClass != null) 'assetClass': assetClass!.name,
     if (realEstateType != null) 'realEstateType': realEstateType!.name,
+    if (fundStyle != null) 'fundStyle': fundStyle!.name,
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
   };

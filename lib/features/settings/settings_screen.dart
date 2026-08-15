@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme_controller.dart';
 import '../../core/assistant/assistant_config_controller.dart';
+import '../../core/notifications/notifications_settings_controller.dart';
 import '../../core/storage/vault_folder_service.dart';
 import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
@@ -12,6 +13,7 @@ class SettingsScreen extends StatelessWidget {
   final VoidCallback onNoVaultSelected;
   final ThemeController themeController;
   final AssistantConfigController assistantConfigController;
+  final NotificationsSettingsController notificationsSettingsController;
   final String githubOwner;
   final String githubRepo;
 
@@ -22,6 +24,7 @@ class SettingsScreen extends StatelessWidget {
     required this.onNoVaultSelected,
     required this.themeController,
     required this.assistantConfigController,
+    required this.notificationsSettingsController,
     required this.githubOwner,
     required this.githubRepo,
   });
@@ -41,6 +44,8 @@ class SettingsScreen extends StatelessWidget {
           _ThemeCard(themeController: themeController),
           const SizedBox(height: 16),
           _AssistantCard(configController: assistantConfigController),
+          const SizedBox(height: 16),
+          _NotificationsCard(configController: notificationsSettingsController),
           const SizedBox(height: 16),
           _VersionCard(githubOwner: githubOwner, githubRepo: githubRepo),
           const SizedBox(height: 16),
@@ -418,6 +423,56 @@ class _AssistantCardState extends State<_AssistantCard> {
       trailing: const Text(
         'Inclure une synthèse de mon patrimoine dans le contexte du modèle',
       ).small(),
+    );
+  }
+}
+
+class _NotificationsCard extends StatelessWidget {
+  final NotificationsSettingsController configController;
+
+  const _NotificationsCard({required this.configController});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: configController,
+      builder: (context, _) {
+        final enabled = configController.enabled;
+        return FrostedCard(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      LucideIcons.bell,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Actualités').large().medium()),
+                    Switch(
+                      value: enabled,
+                      onChanged: (value) =>
+                          configController.setEnabled(value),
+                    ),
+                  ],
+                ),
+                if (enabled) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Actualités Yahoo Finance pour tes actions/ETF détenus, '
+                    'et alertes de variation de prix (CoinGecko) pour tes '
+                    'cryptomonnaies détenues. Aucune requête réseau n\'est '
+                    'effectuée si désactivé.',
+                  ).muted().small(),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

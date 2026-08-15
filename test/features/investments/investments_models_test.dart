@@ -309,4 +309,31 @@ void main() {
       expect(json.containsKey('lastFxRateToEur'), isFalse);
     });
   });
+
+  group('FundStyle (style de gestion)', () {
+    Investment stock({FundStyle? fundStyle}) => Investment(
+      isin: 'FR0000120271',
+      label: 'TotalEnergies',
+      transactions: const [],
+      fundStyle: fundStyle,
+    );
+
+    test('toJson/fromJson round-trip quand renseigné', () {
+      final roundTripped = Investment.fromJson(
+        stock(fundStyle: FundStyle.indiciel).toJson(),
+      );
+      expect(roundTripped.fundStyle, FundStyle.indiciel);
+    });
+
+    test('non classé (null) : clé omise du JSON, reste null au décodage', () {
+      final json = stock().toJson();
+      expect(json.containsKey('fundStyle'), isFalse);
+      expect(Investment.fromJson(json).fundStyle, isNull);
+    });
+
+    test('FundStyle.fromName : nom inconnu renvoie null, pas de repli par défaut', () {
+      expect(FundStyle.fromName('inconnu'), isNull);
+      expect(FundStyle.fromName(null), isNull);
+    });
+  });
 }

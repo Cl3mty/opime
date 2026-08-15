@@ -38,6 +38,17 @@ class LiabilitiesRepository {
 
   Future<List<Liability>> listAll() => _readAll();
 
+  /// Résout un seul passif par id — utile à un appelant qui n'a besoin que
+  /// d'un élément précis (ex : l'éditeur de projet, `project_editor.dart`)
+  /// sans charger tout l'écran Passifs.
+  Future<Liability?> find(String id) async {
+    final all = await _readAll();
+    for (final liability in all) {
+      if (liability.id == id) return liability;
+    }
+    return null;
+  }
+
   /// Ajoute un nouveau passif, ou remplace un passif existant de même id.
   Future<void> saveLiability(Liability liability) async {
     final all = await _readAll();

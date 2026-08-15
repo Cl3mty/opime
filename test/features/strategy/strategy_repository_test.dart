@@ -20,6 +20,47 @@ void main() {
     expect(await repo.listNotes(), isEmpty);
   });
 
+  test(
+    'createTemplatesIfFirstVisit crée les 5 notes modèle au premier passage',
+    () async {
+      final created = await repo.createTemplatesIfFirstVisit();
+      expect(created, isTrue);
+
+      final notes = await repo.listNotes();
+      expect(notes, hasLength(5));
+
+      final titles = notes.map((n) => n.title).toList();
+      for (final expected in [
+        'Watchlist',
+        "Thèse d'investissement",
+        'Stratégie',
+        'Objectifs',
+        'Checklist',
+      ]) {
+        expect(
+          titles.any((t) => t.contains(expected)),
+          isTrue,
+          reason: 'La note modèle "$expected" est absente',
+        );
+      }
+
+      // Chaque note ne contient qu'un emoji et un titre.
+      for (final note in notes) {
+        final content = await repo.readNote(note.id);
+        expect(content, matches(RegExp(r'^# .+\n$')));
+      }
+    },
+  );
+
+  test(
+    'createTemplatesIfFirstVisit est sans effet au second passage',
+    () async {
+      await repo.createTemplatesIfFirstVisit();
+      expect(await repo.createTemplatesIfFirstVisit(), isFalse);
+      expect(await repo.listNotes(), hasLength(5));
+    },
+  );
+
   test('createNote crée une note avec un titre par défaut', () async {
     final note = await repo.createNote();
     expect(note.title, 'Nouvelle note');

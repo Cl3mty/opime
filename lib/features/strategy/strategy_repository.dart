@@ -35,6 +35,17 @@ class StrategyRepository {
     }
   }
 
+  /// Notes "modèle" créées au tout premier passage dans l'onglet
+  /// Stratégie, pour inciter un nouvel utilisateur à prendre des notes :
+  /// chacune ne contient qu'un emoji et un titre.
+  static const List<(String, String)> _templateNotes = [
+    ('👀', 'Watchlist'),
+    ('💡', 'Thèse d\'investissement'),
+    ('♟️', 'Stratégie'),
+    ('🎯', 'Objectifs'),
+    ('✅', 'Checklist'),
+  ];
+
   String _titleFromMarkdown(String markdown) {
     final firstLine = markdown
         .split('\n')
@@ -90,6 +101,28 @@ class StrategyRepository {
     await _ensureDir();
     final file = File(p.join(_dir.path, '$id.md'));
     await file.writeAsString(markdown);
+  }
+
+  /// Crée les notes "modèle" au tout premier passage dans l'onglet
+  /// Stratégie, puis ne fait plus rien ensuite — même si l'utilisateur
+  /// supprime ensuite toutes ses notes (marqueur `.templates_created`
+  /// dans le dossier strategy). Retourne `true` si les notes ont été
+  /// créées, `false` si elles existent déjà.
+  Future<bool> createTemplatesIfFirstVisit() async {
+    await _ensureDir();
+    final marker = File(p.join(_dir.path, '.templates_created'));
+    if (await marker.exists()) return false;
+
+    // Plusieurs notes sont créées quasi dans la même milliseconde : on
+    // incrémente l'id (timestamp) pour garantir leur unicité.
+    final baseMillis = DateTime.now().millisecondsSinceEpoch;
+    for (var i = 0; i < _templateNotes.length; i++) {
+      final (emoji, title) = _templateNotes[i];
+      final id = (baseMillis + i).toString();
+      await writeNote(id, '# $emoji $title\n');
+    }
+    await marker.writeAsString(DateTime.now().toIso8601String());
+    return true;
   }
 
   Future<StrategyNote> createNote() async {

@@ -67,9 +67,10 @@ class LoanResult {
 }
 
 /// Comme [simulateLoan], mais en "montant fixe + durée en mois" plutôt
-/// qu'en "taux + durée en années" — les deux quantités réellement
-/// nécessaires au calcul, [simulateLoan] n'étant qu'une conversion vers
-/// elles pour l'UI du simulateur (taux d'assurance en %, durée en années).
+/// qu'en "montant + durée en années" — les deux quantités réellement
+/// nécessaires au calcul, [simulateLoan] ne faisant que la conversion
+/// durée (années → mois), la mensualité d'assurance étant passée telle
+/// quelle.
 /// Utilisée directement par `features/liabilities/` (formulaire de crédit
 /// réel, dont les champs sont "assurance mensuelle (€)" et "nombre
 /// d'échéances (mois)"), où [totalMonths] n'est pas forcément un multiple
@@ -216,14 +217,14 @@ LoanResult simulateLoanByMonths({
 }
 
 /// Point d'entrée du simulateur (`simulations/simulations_loan_screen.dart`),
-/// dont les champs restent un taux d'assurance (%) et une durée en années —
+/// dont les champs sont une assurance mensuelle (€) et une durée en années —
 /// convertis ici vers les unités attendues par [simulateLoanByMonths], qui
 /// porte tout le calcul.
 LoanResult simulateLoan({
   required double montantEmprunte,
   required int dureeAnnees,
   required double tauxInteret,
-  required double tauxAssurance,
+  required double assuranceMensuelle,
   required double fraisDossier,
   required double fraisGarantie,
   required LoanType type,
@@ -234,7 +235,7 @@ LoanResult simulateLoan({
   montantEmprunte: montantEmprunte,
   totalMonths: dureeAnnees * 12,
   tauxInteret: tauxInteret,
-  assuranceMensuelle: montantEmprunte * tauxAssurance / 100 / 12,
+  assuranceMensuelle: assuranceMensuelle,
   fraisDossier: fraisDossier,
   fraisGarantie: fraisGarantie,
   type: type,

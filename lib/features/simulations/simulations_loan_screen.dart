@@ -26,7 +26,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
   double _montantEmprunte = 100000;
   int _dureeAnnees = 20;
   double _tauxInteret = 3.5;
-  double _tauxAssurance = 0.15;
+  double _assuranceMensuelle = 20;
   double _fraisDossier = 800;
   double _fraisGarantie = 1200;
 
@@ -70,11 +70,19 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
         fallback: _dureeAnnees,
       ).clamp(1, 35);
       _tauxInteret = _readDouble(data, 'tauxInteret', fallback: _tauxInteret);
-      _tauxAssurance = _readDouble(
-        data,
-        'tauxAssurance',
-        fallback: _tauxAssurance,
-      );
+      // Migration depuis l'ancien format (taux d'assurance en % du capital
+      // emprunté) vers une mensualité d'assurance en euros.
+      if (data.containsKey('tauxAssurance') &&
+          !data.containsKey('assuranceMensuelle')) {
+        final taux = _readDouble(data, 'tauxAssurance', fallback: 0);
+        _assuranceMensuelle = _montantEmprunte * taux / 100 / 12;
+      } else {
+        _assuranceMensuelle = _readDouble(
+          data,
+          'assuranceMensuelle',
+          fallback: _assuranceMensuelle,
+        );
+      }
       _fraisDossier = _readDouble(
         data,
         'fraisDossier',
@@ -105,7 +113,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
       'montantEmprunte': _montantEmprunte,
       'dureeAnnees': _dureeAnnees,
       'tauxInteret': _tauxInteret,
-      'tauxAssurance': _tauxAssurance,
+      'assuranceMensuelle': _assuranceMensuelle,
       'fraisDossier': _fraisDossier,
       'fraisGarantie': _fraisGarantie,
       'type': _type.name,
@@ -182,7 +190,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
       _montantEmprunte = 100000;
       _dureeAnnees = 20;
       _tauxInteret = 3.5;
-      _tauxAssurance = 0.15;
+      _assuranceMensuelle = 20;
       _fraisDossier = 800;
       _fraisGarantie = 1200;
       _type = LoanType.amortissable;
@@ -210,7 +218,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     montantEmprunte: _montantEmprunte,
     dureeAnnees: _dureeAnnees,
     tauxInteret: _tauxInteret,
-    tauxAssurance: _tauxAssurance,
+    assuranceMensuelle: _assuranceMensuelle,
     fraisDossier: _fraisDossier,
     fraisGarantie: _fraisGarantie,
     type: _type,
@@ -278,12 +286,12 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: "Taux d'assurance",
-                suffix: '%',
-                value: _tauxAssurance,
-                step: 0.05,
+                label: "Assurance mensuelle",
+                suffix: '€/mois',
+                value: _assuranceMensuelle,
+                step: 5,
                 decimals: 2,
-                onChanged: (v) => _update(() => _tauxAssurance = v),
+                onChanged: (v) => _update(() => _assuranceMensuelle = v),
               ),
             ),
           ],

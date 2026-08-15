@@ -34,6 +34,16 @@ const patrimoineGroup = NavGroup(
       label: 'Tableau de bord',
       icon: LucideIcons.gauge,
     ),
+    NavItem(
+      key: 'analyses',
+      label: 'Analyses',
+      icon: LucideIcons.radar,
+    ),
+    NavItem(
+      key: 'projets',
+      label: 'Projets',
+      icon: LucideIcons.target,
+    ),
   ],
 );
 
