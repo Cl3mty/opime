@@ -144,6 +144,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   /// GBP...) plutôt qu'un titre (ISIN) — voir `_InvestmentStep`.
   bool _creatingDevise = false;
   RealEstateType _realEstateType = RealEstateType.residencePrincipale;
+  FundStyle? _fundStyle;
   final _isinController = TextEditingController();
   final _labelController = TextEditingController();
 
@@ -595,6 +596,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       realEstateType: assetClass == AssetClass.immobilier
           ? _realEstateType
           : null,
+      fundStyle: assetClass == AssetClass.actionsEtFonds && !_creatingDevise
+          ? _fundStyle
+          : null,
     );
     final updatedAccount = account.copyWith(
       investments: [...account.investments, investment],
@@ -610,6 +614,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       _investmentId = investment.id;
       _creatingInvestment = false;
       _creatingDevise = false;
+      _fundStyle = null;
       _step = _Step.transaction;
     });
     // Nouvelle transaction : devise et taux remis à l'euro.
@@ -930,6 +935,8 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           realEstateType: _realEstateType,
           onRealEstateTypeChanged: (type) =>
               setState(() => _realEstateType = type),
+          fundStyle: _fundStyle,
+          onFundStyleChanged: (style) => setState(() => _fundStyle = style),
           onBack: () => setState(() {
             _step = _assetClass == AssetClass.immobilier
                 ? _Step.assetClass
@@ -1587,6 +1594,8 @@ class _InvestmentStep extends StatelessWidget {
   final TextEditingController labelController;
   final RealEstateType realEstateType;
   final ValueChanged<RealEstateType> onRealEstateTypeChanged;
+  final FundStyle? fundStyle;
+  final ValueChanged<FundStyle?> onFundStyleChanged;
   final VoidCallback onBack;
   final ValueChanged<String> onSelectInvestment;
   final VoidCallback onStartCreate;
@@ -1608,6 +1617,8 @@ class _InvestmentStep extends StatelessWidget {
     required this.labelController,
     required this.realEstateType,
     required this.onRealEstateTypeChanged,
+    required this.fundStyle,
+    required this.onFundStyleChanged,
     required this.onBack,
     required this.onSelectInvestment,
     required this.onStartCreate,
@@ -1722,6 +1733,42 @@ class _InvestmentStep extends StatelessWidget {
                     controller: labelController,
                     placeholder: const shadcn.Text('Libellé (ex: TotalEnergies)'),
                   ),
+                if (assetClass == AssetClass.actionsEtFonds) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Select<FundStyle>(
+                        value: fundStyle,
+                        placeholder: const shadcn.Text(
+                          'Style de gestion (facultatif)',
+                        ),
+                        onChanged: (style) {
+                          if (style != null) onFundStyleChanged(style);
+                        },
+                        itemBuilder: (context, style) =>
+                            shadcn.Text(style.label),
+                        popup: (context) => SelectPopup(
+                          items: SelectItemList(
+                            children: [
+                              for (final style in FundStyle.values)
+                                SelectItemButton(
+                                  value: style,
+                                  child: shadcn.Text(style.label),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (fundStyle != null) ...[
+                        const SizedBox(width: 4),
+                        IconButton.ghost(
+                          icon: const Icon(LucideIcons.x, size: 14),
+                          onPressed: () => onFundStyleChanged(null),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
               ],
             ],
             onCreate: onCreate,
