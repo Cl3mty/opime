@@ -23,7 +23,8 @@ class LoanSimulationScreen extends StatefulWidget {
 }
 
 class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
-  double _montantEmprunte = 100000;
+  double _montantProjet = 100000;
+  double _apport = 0;
   int _dureeAnnees = 20;
   double _tauxInteret = 3.5;
   double _assuranceMensuelle = 20;
@@ -59,11 +60,12 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     if (!mounted || data.isEmpty) return;
 
     setState(() {
-      _montantEmprunte = _readDouble(
+      _montantProjet = _readDouble(
         data,
         'montantEmprunte',
-        fallback: _montantEmprunte,
+        fallback: _montantProjet,
       );
+      _apport = _readDouble(data, 'apport', fallback: _apport);
       _dureeAnnees = _readInt(
         data,
         'dureeAnnees',
@@ -75,7 +77,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
       if (data.containsKey('tauxAssurance') &&
           !data.containsKey('assuranceMensuelle')) {
         final taux = _readDouble(data, 'tauxAssurance', fallback: 0);
-        _assuranceMensuelle = _montantEmprunte * taux / 100 / 12;
+        _assuranceMensuelle = _montantEmprunteDerive * taux / 100 / 12;
       } else {
         _assuranceMensuelle = _readDouble(
           data,
@@ -110,7 +112,8 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
 
   Future<void> _saveState() {
     return _stateRepo.write('loan', {
-      'montantEmprunte': _montantEmprunte,
+      'montantEmprunte': _montantProjet,
+      'apport': _apport,
       'dureeAnnees': _dureeAnnees,
       'tauxInteret': _tauxInteret,
       'assuranceMensuelle': _assuranceMensuelle,
@@ -187,7 +190,8 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     await _stateRepo.delete('loan');
     if (!mounted) return;
     setState(() {
-      _montantEmprunte = 100000;
+      _montantProjet = 100000;
+      _apport = 0;
       _dureeAnnees = 20;
       _tauxInteret = 3.5;
       _assuranceMensuelle = 20;
@@ -205,17 +209,21 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
     final result = _simulate();
     final hidden = widget.amountVisibility.hidden;
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: _LoanSplitCard(
-        left: _buildInputsContent(),
-        right: _buildResultsContent(result, hidden),
-      ),
+    return _LoanSplitCard(
+      left: _buildInputsContent(),
+      right: _buildResultsContent(result, hidden),
     );
   }
 
+  /// Montant réellement emprunté, dérivé du coût du projet moins l'apport
+  /// (jamais négatif) — même principe que l'onglet Estimation, qui peut
+  /// écrire ces deux valeurs ici (clés `montantEmprunte`/`apport` du JSON
+  /// persisté) via le bouton "Utiliser le prêt configuré".
+  double get _montantEmprunteDerive =>
+      (_montantProjet - _apport).clamp(0.0, double.infinity);
+
   LoanResult _simulate() => simulateLoan(
-    montantEmprunte: _montantEmprunte,
+    montantEmprunte: _montantEmprunteDerive,
     dureeAnnees: _dureeAnnees,
     tauxInteret: _tauxInteret,
     assuranceMensuelle: _assuranceMensuelle,
@@ -242,23 +250,37 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
             SelectedButton(
               value: _type == LoanType.amortissable,
               onChanged: (_) => _update(() => _type = LoanType.amortissable),
+              selectedStyle: const ButtonStyle.primary(),
               child: const shadcn.Text('Amortissable'),
             ),
             SelectedButton(
               value: _type == LoanType.inFine,
               onChanged: (_) => _update(() => _type = LoanType.inFine),
+              selectedStyle: const ButtonStyle.primary(),
               child: const shadcn.Text('In fine'),
             ),
           ],
         ),
         const SizedBox(height: 20),
         _NumberField(
-          label: 'Montant emprunté',
+          label: 'Montant du projet',
           suffix: '€',
-          value: _montantEmprunte,
+          value: _montantProjet,
           step: 1000,
-          onChanged: (v) => _update(() => _montantEmprunte = v),
+          onChanged: (v) => _update(() => _montantProjet = v),
         ),
+        const SizedBox(height: 16),
+        _NumberField(
+          label: 'Apport',
+          suffix: '€',
+          value: _apport,
+          step: 1000,
+          onChanged: (v) => _update(() => _apport = v),
+        ),
+        const SizedBox(height: 4),
+        shadcn.Text(
+          'Montant emprunté (dérivé) : ${displayEuros(_montantEmprunteDerive, widget.amountVisibility.hidden)}',
+        ).muted().small(),
         const SizedBox(height: 16),
         _NumberField(
           label: 'Durée de remboursement',
@@ -348,12 +370,14 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
                   value: _typeDiffere == DeferType.partielle,
                   onChanged: (_) =>
                       _update(() => _typeDiffere = DeferType.partielle),
+                  selectedStyle: const ButtonStyle.primary(),
                   child: const shadcn.Text('Franchise partielle'),
                 ),
                 SelectedButton(
                   value: _typeDiffere == DeferType.totale,
                   onChanged: (_) =>
                       _update(() => _typeDiffere = DeferType.totale),
+                  selectedStyle: const ButtonStyle.primary(),
                   child: const shadcn.Text('Franchise totale'),
                 ),
               ],

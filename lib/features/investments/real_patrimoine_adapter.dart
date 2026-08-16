@@ -258,7 +258,7 @@ PatrimoineAccount _buildAccountLeaf(
   var plusValueAbs = 0.0;
   var costBasis = 0.0;
   for (final (_, investment) in heldPairs) {
-    final v = investment.marketValue ?? investment.investedAmount;
+    final v = investment.effectiveMarketValue ?? investment.investedAmount;
     final gain = investment.unrealizedGain ?? 0;
     valeur += v;
     plusValueAbs += gain;
@@ -391,7 +391,7 @@ PatrimoineAccount _buildLeaf(
   String vaultPath, {
   bool showAccountSubtitle = true,
 }) {
-  final valeur = investment.marketValue ?? investment.investedAmount;
+  final valeur = investment.effectiveMarketValue ?? investment.investedAmount;
   final plusValueAbs = investment.unrealizedGain ?? 0;
   final costBasis = valeur - plusValueAbs;
   return PatrimoineAccount(

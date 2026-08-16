@@ -302,7 +302,7 @@ _AnalysesMetrics _computeMetrics(AnalysesSnapshot snapshot, DashboardPeriod peri
     final transactions = [for (final inv in investments) ...inv.transactions];
     final currentValue = investments.fold<double>(
       0,
-      (sum, inv) => sum + (inv.marketValue ?? inv.investedAmount),
+      (sum, inv) => sum + (inv.effectiveMarketValue ?? inv.investedAmount),
     );
     final tri = transactions.isEmpty
         ? null
@@ -344,7 +344,7 @@ _AnalysesMetrics _computeMetrics(AnalysesSnapshot snapshot, DashboardPeriod peri
   ];
   final totalCurrentValue = allInvestments.fold<double>(
     0,
-    (sum, inv) => sum + (inv.marketValue ?? inv.investedAmount),
+    (sum, inv) => sum + (inv.effectiveMarketValue ?? inv.investedAmount),
   );
   final totalTri = allTransactions.isEmpty
       ? null
@@ -384,14 +384,14 @@ _AnalysesMetrics _computeMetrics(AnalysesSnapshot snapshot, DashboardPeriod peri
 
   final allocation = fundStyleAllocation(
     actionsEtFondsInvestments,
-    valueOf: (inv) => inv.marketValue ?? inv.investedAmount,
+    valueOf: (inv) => inv.effectiveMarketValue ?? inv.investedAmount,
   );
 
   // Endettement/levier : instantané d'aujourd'hui, indépendant de la
   // période sélectionnée (voir libellé "Aujourd'hui" dans la carte).
   final totalAssets = allInvestments.fold<double>(
     0,
-    (sum, inv) => sum + (inv.marketValue ?? inv.investedAmount),
+    (sum, inv) => sum + (inv.effectiveMarketValue ?? inv.investedAmount),
   );
   final totalLiabilities = snapshot.liabilities.fold<double>(
     0,

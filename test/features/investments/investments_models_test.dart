@@ -336,4 +336,79 @@ void main() {
       expect(FundStyle.fromName(null), isNull);
     });
   });
+
+  group('Estimation immobilière (surfaceM2/estimatedPricePerSqm)', () {
+    Investment property({
+      double? surfaceM2,
+      double? estimatedPricePerSqm,
+      DateTime? estimatedValueAt,
+      double buyAmount = 200000,
+    }) => Investment(
+      isin: 'immo-1',
+      label: 'Appartement',
+      assetClass: AssetClass.immobilier,
+      transactions: [
+        Transaction(date: DateTime(2020, 1, 1), isBuy: true, quantity: 1, unitPrice: buyAmount),
+      ],
+      surfaceM2: surfaceM2,
+      estimatedPricePerSqm: estimatedPricePerSqm,
+      estimatedValueAt: estimatedValueAt,
+    );
+
+    test('round-trip JSON des nouveaux champs', () {
+      final original = property(
+        surfaceM2: 65,
+        estimatedPricePerSqm: 4200,
+        estimatedValueAt: DateTime.utc(2026, 8, 15),
+      );
+      final restored = Investment.fromJson(original.toJson());
+
+      expect(restored.surfaceM2, 65);
+      expect(restored.estimatedPricePerSqm, 4200);
+      expect(restored.estimatedValueAt, DateTime.utc(2026, 8, 15));
+    });
+
+    test('champs absents : clés omises du JSON, restent null au décodage', () {
+      final json = property().toJson();
+      expect(json.containsKey('surfaceM2'), isFalse);
+      expect(json.containsKey('estimatedPricePerSqm'), isFalse);
+      expect(json.containsKey('estimatedValueAt'), isFalse);
+
+      final restored = Investment.fromJson(json);
+      expect(restored.surfaceM2, isNull);
+      expect(restored.estimatedPricePerSqm, isNull);
+      expect(restored.estimatedValue, isNull);
+    });
+
+    test('estimatedValue null si un seul des deux facteurs est renseigné', () {
+      expect(property(surfaceM2: 65).estimatedValue, isNull);
+      expect(property(estimatedPricePerSqm: 4200).estimatedValue, isNull);
+    });
+
+    test('estimatedValue = surface × prix/m² quand les deux sont connus', () {
+      final investment = property(surfaceM2: 65, estimatedPricePerSqm: 4200);
+      expect(investment.estimatedValue, 65 * 4200);
+    });
+
+    test('effectiveMarketValue retombe sur estimatedValue sans cours de marché', () {
+      final investment = property(surfaceM2: 65, estimatedPricePerSqm: 4200);
+      expect(investment.marketValue, isNull); // pas de lastPrice pour l'immobilier
+      expect(investment.effectiveMarketValue, 65 * 4200);
+    });
+
+    test('unrealizedGain calculé à partir de l\'estimation quand présente', () {
+      final investment = property(
+        surfaceM2: 65,
+        estimatedPricePerSqm: 4200,
+        buyAmount: 250000,
+      );
+      expect(investment.unrealizedGain, 65 * 4200 - 250000);
+    });
+
+    test('sans estimation : unrealizedGain reste null (aucune régression)', () {
+      final investment = property();
+      expect(investment.effectiveMarketValue, isNull);
+      expect(investment.unrealizedGain, isNull);
+    });
+  });
 }

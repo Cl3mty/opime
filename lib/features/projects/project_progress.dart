@@ -34,7 +34,7 @@ ProjectProgress computeProjectProgress({
       if (account.id != link.accountId) continue;
       for (final investment in account.investments) {
         if (investment.id == link.investmentId) {
-          assetsValue += investment.marketValue ?? investment.investedAmount;
+          assetsValue += investment.effectiveMarketValue ?? investment.investedAmount;
         }
       }
     }

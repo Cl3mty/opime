@@ -424,6 +424,30 @@ class Investment {
   /// la classe `actionsEtFonds` — voir [FundStyle].
   final FundStyle? fundStyle;
 
+  /// Surface habitable (m²) d'un bien immobilier — avec
+  /// [estimatedPricePerSqm], permet de calculer [estimatedValue]. `null`
+  /// tant que le bien n'a jamais été estimé (voir "Réestimer" dans
+  /// `investment_detail_screen.dart`) — pertinent uniquement pour la classe
+  /// `immobilier`.
+  final double? surfaceM2;
+
+  /// Adresse et localisation du bien, telles que retenues lors de la
+  /// dernière estimation (voir `real_estate_pricing/`) — [addressCityCode]
+  /// (code INSEE) est la clé de jointure vers les données DVF, réutilisée
+  /// pour une réestimation ultérieure sans redemander l'adresse.
+  final String? addressLabel;
+  final String? addressCityCode;
+  final double? addressLat;
+  final double? addressLon;
+
+  /// Dernier prix au m² estimé (voir `real_estate_pricing/price_estimator.dart`)
+  /// et date de cette estimation — un seul instantané conservé (pas un
+  /// historique), mis à jour uniquement par une action explicite de
+  /// l'utilisateur, jamais automatiquement (voir [_expectsMarketPrice] dans
+  /// `price_refresh_service.dart`, qui exclut toujours `immobilier`).
+  final double? estimatedPricePerSqm;
+  final DateTime? estimatedValueAt;
+
   final List<VaultDocument> documents;
 
   Investment({
@@ -441,6 +465,13 @@ class Investment {
     this.assetClass,
     this.realEstateType,
     this.fundStyle,
+    this.surfaceM2,
+    this.addressLabel,
+    this.addressCityCode,
+    this.addressLat,
+    this.addressLon,
+    this.estimatedPricePerSqm,
+    this.estimatedValueAt,
     this.documents = const [],
   }) : id = id ?? generateInvestmentId('inv');
 
@@ -456,6 +487,13 @@ class Investment {
     AssetClass? assetClass,
     RealEstateType? realEstateType,
     FundStyle? fundStyle,
+    double? surfaceM2,
+    String? addressLabel,
+    String? addressCityCode,
+    double? addressLat,
+    double? addressLon,
+    double? estimatedPricePerSqm,
+    DateTime? estimatedValueAt,
     List<VaultDocument>? documents,
   }) => Investment(
     id: id,
@@ -472,6 +510,13 @@ class Investment {
     assetClass: assetClass ?? this.assetClass,
     realEstateType: realEstateType ?? this.realEstateType,
     fundStyle: fundStyle ?? this.fundStyle,
+    surfaceM2: surfaceM2 ?? this.surfaceM2,
+    addressLabel: addressLabel ?? this.addressLabel,
+    addressCityCode: addressCityCode ?? this.addressCityCode,
+    addressLat: addressLat ?? this.addressLat,
+    addressLon: addressLon ?? this.addressLon,
+    estimatedPricePerSqm: estimatedPricePerSqm ?? this.estimatedPricePerSqm,
+    estimatedValueAt: estimatedValueAt ?? this.estimatedValueAt,
     documents: documents ?? this.documents,
   );
 
@@ -515,10 +560,30 @@ class Investment {
     return quantityHeld * lastPrice! * (lastFxRateToEur ?? 1.0);
   }
 
+  /// Valeur estimée d'un bien immobilier (surface × dernier prix/m² estimé,
+  /// voir `real_estate_pricing/`) — `null` tant que l'un des deux facteurs
+  /// manque (bien jamais réestimé). Un bien immobilier est toujours détenu
+  /// en une seule unité ([quantityHeld] == 1), donc directement comparable
+  /// à [investedAmount], sans multiplication de quantité.
+  double? get estimatedValue =>
+      (surfaceM2 != null && estimatedPricePerSqm != null)
+          ? surfaceM2! * estimatedPricePerSqm!
+          : null;
+
+  /// Meilleure valorisation connue hors montant investi : un cours de
+  /// marché ([marketValue], jamais renseigné pour l'immobilier aujourd'hui)
+  /// sinon une estimation €/m² ([estimatedValue]) si l'utilisateur en a
+  /// demandé une. Ne remplace jamais [marketValue] lui-même : la jauge
+  /// TWR/MWR de `investment_detail_screen.dart` continue de dépendre
+  /// uniquement d'un vrai historique de cours, qu'une estimation ponctuelle
+  /// ne fournit pas.
+  double? get effectiveMarketValue => marketValue ?? estimatedValue;
+
   /// Plus/moins-value latente par rapport au coût d'achat, ou `null` sans
-  /// cours connu.
-  double? get unrealizedGain =>
-      marketValue == null ? null : marketValue! - investedAmount;
+  /// valorisation connue (ni cours de marché, ni estimation).
+  double? get unrealizedGain => effectiveMarketValue == null
+      ? null
+      : effectiveMarketValue! - investedAmount;
 
   factory Investment.fromJson(Map<String, dynamic> json) => Investment(
     id: json['id'] as String? ?? generateInvestmentId('inv'),
@@ -541,6 +606,15 @@ class Investment {
         : null,
     realEstateType: RealEstateType.fromName(json['realEstateType'] as String?),
     fundStyle: FundStyle.fromName(json['fundStyle'] as String?),
+    surfaceM2: (json['surfaceM2'] as num?)?.toDouble(),
+    addressLabel: json['addressLabel'] as String?,
+    addressCityCode: json['addressCityCode'] as String?,
+    addressLat: (json['addressLat'] as num?)?.toDouble(),
+    addressLon: (json['addressLon'] as num?)?.toDouble(),
+    estimatedPricePerSqm: (json['estimatedPricePerSqm'] as num?)?.toDouble(),
+    estimatedValueAt: json['estimatedValueAt'] != null
+        ? DateTime.parse(json['estimatedValueAt'] as String)
+        : null,
     documents: (json['documents'] as List? ?? [])
         .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
         .toList(),
@@ -566,6 +640,14 @@ class Investment {
     if (assetClass != null) 'assetClass': assetClass!.name,
     if (realEstateType != null) 'realEstateType': realEstateType!.name,
     if (fundStyle != null) 'fundStyle': fundStyle!.name,
+    if (surfaceM2 != null) 'surfaceM2': surfaceM2,
+    if (addressLabel != null) 'addressLabel': addressLabel,
+    if (addressCityCode != null) 'addressCityCode': addressCityCode,
+    if (addressLat != null) 'addressLat': addressLat,
+    if (addressLon != null) 'addressLon': addressLon,
+    if (estimatedPricePerSqm != null) 'estimatedPricePerSqm': estimatedPricePerSqm,
+    if (estimatedValueAt != null)
+      'estimatedValueAt': estimatedValueAt!.toIso8601String(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
   };

@@ -525,7 +525,7 @@ class _InvestmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final value = investment.marketValue ?? investment.investedAmount;
+    final value = investment.effectiveMarketValue ?? investment.investedAmount;
     final crossClass =
         investment.assetClass != null &&
         investment.assetClass != accountAssetClass;

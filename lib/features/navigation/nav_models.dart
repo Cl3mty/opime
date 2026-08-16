@@ -265,9 +265,9 @@ const outilsGroup = NavGroup(
           icon: LucideIcons.trendingUp,
         ),
         NavItem(
-          key: 'simulation_pret',
-          label: 'Prêt',
-          icon: LucideIcons.handCoins,
+          key: 'simulation_immobilier',
+          label: 'Immobilier',
+          icon: LucideIcons.house,
         ),
         NavItem(
           key: 'simulation_taxation',

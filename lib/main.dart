@@ -37,7 +37,7 @@ import 'package:flutter_quill/flutter_quill.dart'
 import 'features/budget/budget_screen.dart';
 import 'features/simulations/simulations_taxation_screen.dart';
 import 'features/simulations/simulations_wealth_screen.dart';
-import 'features/simulations/simulations_loan_screen.dart';
+import 'features/simulations/simulations_real_estate_screen.dart';
 import 'features/simulations/simulations_transmission_screen.dart';
 import 'features/budget/budget_tracking_screen.dart';
 import 'features/academy/envelope_sheet_screen.dart';
@@ -429,7 +429,7 @@ class _OpimeAppState extends State<OpimeApp> {
               vaultPath: _profileController!.activeDataPath,
               amountVisibility: _amountVisibilityController,
             ),
-            'simulation_pret': (_) => LoanSimulationScreen(
+            'simulation_immobilier': (_) => RealEstateSimulationScreen(
               key: ValueKey(_profileController!.activeDataPath),
               vaultPath: _profileController!.activeDataPath,
               amountVisibility: _amountVisibilityController,

@@ -10,6 +10,7 @@ import 'currency_format.dart';
 import 'document_storage.dart';
 import 'documents_section.dart';
 import 'investment_identifier_field.dart';
+import 'investment_reestimate_dialog.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
 import 'metal_price_client.dart';
@@ -465,6 +466,12 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               child: const shadcn.Text('Modifier'),
               onPressed: (_) => _startEditInvestment(),
             ),
+            if (_isImmobilier)
+              MenuButton(
+                leading: const Icon(LucideIcons.mapPin, size: 14),
+                child: const shadcn.Text('Réestimer la valeur (€/m²)'),
+                onPressed: (_) => _openReestimateDialog(),
+              ),
             MenuButton(
               enabled: _canDelete,
               leading: const Icon(LucideIcons.trash2, size: 14),
@@ -479,6 +486,18 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _openReestimateDialog() async {
+    await showRealEstateReestimateDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      investment: widget.investment,
+      onEstimated: (updated) async {
+        await _saveInvestment(updated);
+        await widget.onChanged();
+      },
     );
   }
 
@@ -575,7 +594,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     final investment = widget.investment;
     final theme = Theme.of(context);
     final hasPrice = investment.marketValue != null;
-    final displayValue = investment.marketValue ?? investment.investedAmount;
+    final displayValue = investment.effectiveMarketValue ?? investment.investedAmount;
 
     PerformanceResult? performance;
     if (hasPrice) {
