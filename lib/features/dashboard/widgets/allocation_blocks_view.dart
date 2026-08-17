@@ -1,6 +1,8 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
+import 'allocation_hover_tooltip.dart';
+
 /// Une part affichée comme bloc dans [AllocationBlocksView] — assez
 /// générique pour représenter aussi bien une catégorie d'allocation
 /// (carte Allocation) qu'un compte au sein d'une catégorie (Distribution
@@ -139,14 +141,16 @@ class _Block extends StatelessWidget {
       ),
     );
     // Toujours un tooltip au survol : le titre et le pourcentage du bloc
-    // survolé doivent s'afficher — comme dans les autres vues d'allocation,
-    // pas de description détaillée.
+    // survolé doivent s'afficher — même bulle (fond neutre) que les vues
+    // pyramide et anneau, voir [AllocationHoverTooltip]. Sans délai
+    // d'apparition (`waitDuration: Duration.zero`) : les vues pyramide/anneau
+    // affichent la leur dès le premier `onHover` (elles gèrent le survol
+    // elles-mêmes, sans passer par ce widget [Tooltip]), un délai par défaut
+    // ici les aurait rendues visiblement moins réactives au survol.
     return Tooltip(
-      tooltip: (context) => TooltipContainer(
-        child: shadcn.Text(
-          '${slice.label} · $percentText %',
-        ).semiBold().small(),
-      ),
+      waitDuration: Duration.zero,
+      tooltip: (context) =>
+          AllocationHoverTooltip(label: slice.label, percent: slice.percent),
       child: content,
     );
   }
