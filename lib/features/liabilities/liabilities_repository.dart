@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path/path.dart' as p;
+import '../../core/storage/vault_crypto.dart' show VaultCipher;
+import '../../core/storage/vault_session.dart';
+import '../../core/storage/vault_file_storage.dart';
 import 'liabilities_models.dart';
 
 /// Persiste les passifs réels de l'utilisateur — même pattern que
@@ -9,18 +10,20 @@ import 'liabilities_models.dart';
 /// chaque sauvegarde.
 class LiabilitiesRepository {
   final String vaultPath;
-  LiabilitiesRepository(this.vaultPath);
+  late final VaultFileStorage _storage;
 
-  File get _file => File(p.join(vaultPath, 'passifs', 'emprunts.json'));
-
-  Future<void> _ensureDir() async {
-    final dir = Directory(p.join(vaultPath, 'passifs'));
-    if (!await dir.exists()) await dir.create(recursive: true);
+  LiabilitiesRepository(this.vaultPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: vaultPath,
+      cipher: cipher ?? VaultSession.current,
+    );
   }
 
+  static const _relativePath = 'passifs/emprunts.json';
+
   Future<List<Liability>> _readAll() async {
-    if (!await _file.exists()) return [];
-    final content = await _file.readAsString();
+    if (!await _storage.exists(_relativePath)) return [];
+    final content = await _storage.readString(_relativePath);
     if (content.trim().isEmpty) return [];
     final list = jsonDecode(content) as List;
     return list
@@ -29,9 +32,9 @@ class LiabilitiesRepository {
   }
 
   Future<void> _writeAll(List<Liability> all) async {
-    await _ensureDir();
     final jsonList = all.map((l) => l.toJson()).toList();
-    await _file.writeAsString(
+    await _storage.writeString(
+      _relativePath,
       const JsonEncoder.withIndent('  ').convert(jsonList),
     );
   }

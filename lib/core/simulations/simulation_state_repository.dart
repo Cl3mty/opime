@@ -1,22 +1,30 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../storage/vault_crypto.dart' show VaultCipher;
+import '../storage/vault_session.dart';
+import '../storage/vault_file_storage.dart';
+
 class SimulationStateRepository {
   final String profileDataPath;
+  late final VaultFileStorage _storage;
 
-  const SimulationStateRepository(this.profileDataPath);
+  SimulationStateRepository(this.profileDataPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: profileDataPath,
+      cipher: cipher ?? VaultSession.current,
+    );
+  }
 
-  File _fileFor(String key) =>
-      File(p.join(profileDataPath, 'simulations', '$key.json'));
+  String _relativePathFor(String key) => p.join('simulations', '$key.json');
 
   Future<Map<String, dynamic>> read(String key) async {
-    final file = _fileFor(key);
-    if (!await file.exists()) return {};
+    final relativePath = _relativePathFor(key);
+    if (!await _storage.exists(relativePath)) return {};
 
     try {
-      final content = await file.readAsString();
+      final content = await _storage.readString(relativePath);
       if (content.trim().isEmpty) return {};
       final decoded = jsonDecode(content);
       if (decoded is Map<String, dynamic>) return decoded;
@@ -26,19 +34,11 @@ class SimulationStateRepository {
     }
   }
 
-  Future<void> write(String key, Map<String, dynamic> data) async {
-    final file = _fileFor(key);
-    final dir = file.parent;
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
-  }
+  Future<void> write(String key, Map<String, dynamic> data) =>
+      _storage.writeString(
+        _relativePathFor(key),
+        const JsonEncoder.withIndent('  ').convert(data),
+      );
 
-  Future<void> delete(String key) async {
-    final file = _fileFor(key);
-    if (await file.exists()) {
-      await file.delete();
-    }
-  }
+  Future<void> delete(String key) => _storage.delete(_relativePathFor(key));
 }

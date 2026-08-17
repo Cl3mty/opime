@@ -1,10 +1,18 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path/path.dart' as p;
+import '../../core/storage/vault_crypto.dart' show VaultCipher;
+import '../../core/storage/vault_session.dart';
+import '../../core/storage/vault_file_storage.dart';
 
 class BudgetCategoriesRepository {
   final String vaultPath;
-  BudgetCategoriesRepository(this.vaultPath);
+  late final VaultFileStorage _storage;
+
+  BudgetCategoriesRepository(this.vaultPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: vaultPath,
+      cipher: cipher ?? VaultSession.current,
+    );
+  }
 
   static const defaults = [
     'Logement',
@@ -15,15 +23,14 @@ class BudgetCategoriesRepository {
     'Épargne',
   ];
 
-  File get _file =>
-      File(p.join(vaultPath, 'budget', 'tracking', 'categories.json'));
+  static const _relativePath = 'budget/tracking/categories.json';
 
   Future<List<String>> load() async {
-    if (!await _file.exists()) {
+    if (!await _storage.exists(_relativePath)) {
       await save(defaults);
       return List.of(defaults);
     }
-    final content = await _file.readAsString();
+    final content = await _storage.readString(_relativePath);
     if (content.trim().isEmpty) return List.of(defaults);
     try {
       return (jsonDecode(content) as List).map((e) => e as String).toList();
@@ -33,9 +40,7 @@ class BudgetCategoriesRepository {
   }
 
   Future<void> save(List<String> categories) async {
-    final dir = _file.parent;
-    if (!await dir.exists()) await dir.create(recursive: true);
-    await _file.writeAsString(jsonEncode(categories));
+    await _storage.writeString(_relativePath, jsonEncode(categories));
   }
 
   Future<List<String>> addCategory(String name) async {

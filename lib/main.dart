@@ -6,12 +6,18 @@ import 'core/assistant/assistant_config_controller.dart';
 import 'core/notifications/notifications_settings_controller.dart';
 import 'core/privacy/amount_visibility_controller.dart';
 import 'core/shortcuts/keyboard_shortcuts_controller.dart';
+import 'core/storage/vault_crypto.dart' show VaultCipher;
+import 'core/storage/vault_encryption_metadata.dart';
+import 'core/storage/vault_encryption_repository.dart';
 import 'core/storage/vault_folder_service.dart';
+import 'core/storage/vault_session.dart';
 import 'core/profiles/profile_controller.dart';
 import 'core/profiles/profile_repository.dart';
 import 'core/profiles/sidebar_prefs_controller.dart';
 import 'core/updates/update_banner.dart';
 import 'features/onboarding/onboarding_screen.dart';
+import 'features/onboarding/vault_recovery_screen.dart';
+import 'features/onboarding/vault_unlock_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/account_management_screen.dart';
 import 'features/assistant/assistant_screen.dart';
@@ -104,6 +110,18 @@ class _OpimeAppState extends State<OpimeApp> {
   ProfileController? _profileController;
   SidebarPrefsController? _sidebarPrefsController;
   Object? _profilesLoadError;
+
+  /// Métadonnées de chiffrement du vault actif, non nulles dès que
+  /// `.opime/vault_encryption.json` existe et `enabled == true` — voir
+  /// [_initProfiles], qui bloque le chargement des profils tant que
+  /// [_vaultLocked] est vrai (aucun repository ne peut rien lire sans la
+  /// DEK déverrouillée, voir `VaultSession.current`).
+  VaultEncryptionMetadata? _vaultEncryptionMetadata;
+  bool _vaultLocked = false;
+
+  /// Bascule vers l'écran de récupération (clé de récupération → nouveau
+  /// mot de passe) depuis l'écran de déverrouillage classique.
+  bool _showingVaultRecovery = false;
 
   /// Conversation avec l'assistant : vit ici (et non dans l'écran) pour
   /// que les réponses continuent en arrière-plan quand on navigue ailleurs.
@@ -221,6 +239,28 @@ class _OpimeAppState extends State<OpimeApp> {
   }
 
   Future<void> _initProfiles(String vaultPath) async {
+    // Vault chiffré et pas encore déverrouillé pour cette session : aucun
+    // repository ne peut rien lire sans la DEK (voir `VaultSession.current`)
+    // — on affiche l'écran de déverrouillage au lieu de continuer, voir
+    // `_buildHome`. Après un déverrouillage réussi, `_onVaultUnlocked`
+    // rappelle `_initProfiles` : `VaultSession.current` est alors posé, ce
+    // garde-fou ne se redéclenche pas.
+    if (VaultSession.current == null) {
+      final metadata = await VaultEncryptionRepository(vaultPath).load();
+      if (metadata != null && metadata.enabled) {
+        if (!mounted) return;
+        setState(() {
+          _vaultPath = vaultPath;
+          _vaultEncryptionMetadata = metadata;
+          _vaultLocked = true;
+          _profileController = null;
+          _sidebarPrefsController = null;
+          _profilesLoadError = null;
+        });
+        return;
+      }
+    }
+
     final oldController = _profileController;
     oldController?.removeListener(_handleProfileControllerChanged);
     oldController?.dispose();
@@ -269,6 +309,37 @@ class _OpimeAppState extends State<OpimeApp> {
     await _initProfiles(path);
   }
 
+  /// Déverrouillage réussi (mot de passe ou récupération, voir
+  /// [_onVaultRecovered]) : pose la clé pour le reste du process
+  /// ([VaultSession.current], jamais persistée — voir sa documentation)
+  /// puis relance le chargement des profils, cette fois avec la clé posée.
+  void _onVaultUnlocked(VaultCipher cipher) {
+    VaultSession.current = cipher;
+    setState(() {
+      _vaultLocked = false;
+      _showingVaultRecovery = false;
+    });
+    final path = _vaultPath;
+    if (path != null) _initProfiles(path);
+  }
+
+  /// Récupération par clé terminée (voir `VaultRecoveryScreen`) : persiste
+  /// la nouvelle enveloppe mot de passe avant de déverrouiller la session,
+  /// pour que le prochain lancement utilise directement le nouveau mot de
+  /// passe (l'ancien ne fonctionne plus, voir
+  /// `VaultEncryptionMetadata.rewrapPassword`).
+  Future<void> _onVaultRecovered(
+    VaultEncryptionMetadata updatedMetadata,
+    VaultCipher cipher,
+  ) async {
+    final path = _vaultPath;
+    if (path == null) return;
+    await VaultEncryptionRepository(path).save(updatedMetadata);
+    if (!mounted) return;
+    setState(() => _vaultEncryptionMetadata = updatedMetadata);
+    _onVaultUnlocked(cipher);
+  }
+
   void _resetVault() {
     _profileController?.removeListener(_handleProfileControllerChanged);
     _profileController?.dispose();
@@ -276,10 +347,14 @@ class _OpimeAppState extends State<OpimeApp> {
     _assistantChatController = null;
     _assistantChatScope = null;
     _notificationsScope = null;
+    VaultSession.current = null;
     setState(() {
       _vaultPath = null;
       _profileController = null;
       _sidebarPrefsController = null;
+      _vaultEncryptionMetadata = null;
+      _vaultLocked = false;
+      _showingVaultRecovery = false;
     });
   }
 
@@ -314,6 +389,29 @@ class _OpimeAppState extends State<OpimeApp> {
       return OnboardingScreen(
         vaultFolderService: _vaultFolderService,
         onVaultReady: _onVaultReady,
+      );
+    }
+    if (_vaultLocked) {
+      final metadata = _vaultEncryptionMetadata;
+      if (metadata == null) {
+        // Ne devrait jamais arriver (_vaultLocked implique metadata non
+        // nulle, voir _initProfiles) — filet de sécurité plutôt qu'un
+        // écran cassé.
+        return const Scaffold(
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
+      if (_showingVaultRecovery) {
+        return VaultRecoveryScreen(
+          metadata: metadata,
+          onRecovered: _onVaultRecovered,
+          onCancel: () => setState(() => _showingVaultRecovery = false),
+        );
+      }
+      return VaultUnlockScreen(
+        metadata: metadata,
+        onUnlocked: _onVaultUnlocked,
+        onForgotPassword: () => setState(() => _showingVaultRecovery = true),
       );
     }
     if (_profilesLoadError != null) {
@@ -444,9 +542,7 @@ class _OpimeAppState extends State<OpimeApp> {
               amountVisibility: _amountVisibilityController,
             ),
             'assistant': (_) => AssistantScreen(
-              key: ValueKey(
-                'assistant_${_profileController!.activeDataPath}',
-              ),
+              key: ValueKey('assistant_${_profileController!.activeDataPath}'),
               configController: _assistantConfigController,
               chatController: _assistantChatController!,
             ),
@@ -460,6 +556,8 @@ class _OpimeAppState extends State<OpimeApp> {
               assistantConfigController: _assistantConfigController,
               notificationsSettingsController: _notificationsSettingsController,
               keyboardShortcutsController: _keyboardShortcutsController,
+              vaultPath: _vaultPath!,
+              onVaultEncryptionChanged: () => _initProfiles(_vaultPath!),
               githubOwner: _githubOwner,
               githubRepo: _githubRepo,
             ),

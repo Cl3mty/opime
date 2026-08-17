@@ -5,9 +5,12 @@ import '../../core/assistant/assistant_config_controller.dart';
 import '../../core/notifications/notifications_settings_controller.dart';
 import '../../core/shortcuts/app_shortcuts.dart';
 import '../../core/shortcuts/keyboard_shortcuts_controller.dart';
+import '../../core/storage/vault_encryption_metadata.dart';
+import '../../core/storage/vault_encryption_repository.dart';
 import '../../core/storage/vault_folder_service.dart';
 import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
+import 'vault_encryption_dialogs.dart';
 
 class SettingsScreen extends StatelessWidget {
   final VaultFolderService vaultFolderService;
@@ -17,6 +20,15 @@ class SettingsScreen extends StatelessWidget {
   final AssistantConfigController assistantConfigController;
   final NotificationsSettingsController notificationsSettingsController;
   final KeyboardShortcutsController keyboardShortcutsController;
+  final String vaultPath;
+
+  /// Appelé après une activation/désactivation réussie du chiffrement (ou
+  /// une régénération de clé de récupération) — recharge le profil actif
+  /// pour que les repositories déjà construits (qui ont capturé
+  /// `VaultSession.current` une fois pour toutes à leur construction, voir
+  /// `vault_file_storage.dart`) soient reconstruits avec la nouvelle
+  /// session.
+  final VoidCallback onVaultEncryptionChanged;
   final String githubOwner;
   final String githubRepo;
 
@@ -29,6 +41,8 @@ class SettingsScreen extends StatelessWidget {
     required this.assistantConfigController,
     required this.notificationsSettingsController,
     required this.keyboardShortcutsController,
+    required this.vaultPath,
+    required this.onVaultEncryptionChanged,
     required this.githubOwner,
     required this.githubRepo,
   });
@@ -52,6 +66,11 @@ class SettingsScreen extends StatelessWidget {
           _NotificationsCard(configController: notificationsSettingsController),
           const SizedBox(height: 16),
           _ShortcutsCard(configController: keyboardShortcutsController),
+          const SizedBox(height: 16),
+          _EncryptionCard(
+            vaultPath: vaultPath,
+            onChanged: onVaultEncryptionChanged,
+          ),
           const SizedBox(height: 16),
           _VersionCard(githubOwner: githubOwner, githubRepo: githubRepo),
           const SizedBox(height: 16),
@@ -356,9 +375,7 @@ class _AssistantCardState extends State<_AssistantCard> {
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Text('Assistant IA').large().medium(),
-                    ),
+                    Expanded(child: Text('Assistant IA').large().medium()),
                     Switch(
                       value: enabled,
                       onChanged: (value) =>
@@ -460,8 +477,7 @@ class _NotificationsCard extends StatelessWidget {
                     Expanded(child: Text('Actualités').large().medium()),
                     Switch(
                       value: enabled,
-                      onChanged: (value) =>
-                          configController.setEnabled(value),
+                      onChanged: (value) => configController.setEnabled(value),
                     ),
                   ],
                 ),
@@ -558,6 +574,141 @@ class _KeycapBadge extends StatelessWidget {
         label,
         style: const TextStyle(fontWeight: FontWeight.w600),
       ).xSmall(),
+    );
+  }
+}
+
+class _EncryptionCard extends StatefulWidget {
+  final String vaultPath;
+  final VoidCallback onChanged;
+
+  const _EncryptionCard({required this.vaultPath, required this.onChanged});
+
+  @override
+  State<_EncryptionCard> createState() => _EncryptionCardState();
+}
+
+class _EncryptionCardState extends State<_EncryptionCard> {
+  VaultEncryptionMetadata? _metadata;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final metadata = await VaultEncryptionRepository(widget.vaultPath).load();
+    if (!mounted) return;
+    setState(() {
+      _metadata = metadata;
+      _loading = false;
+    });
+  }
+
+  Future<void> _enable() async {
+    final activated = await showEnableEncryptionDialog(
+      context,
+      vaultPath: widget.vaultPath,
+    );
+    if (!activated) return;
+    await _load();
+    widget.onChanged();
+  }
+
+  Future<void> _disable() async {
+    final metadata = _metadata;
+    if (metadata == null) return;
+    final deactivated = await showDisableEncryptionDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      metadata: metadata,
+    );
+    if (!deactivated) return;
+    await _load();
+    widget.onChanged();
+  }
+
+  Future<void> _regenerateRecoveryKey() async {
+    final metadata = _metadata;
+    if (metadata == null) return;
+    await showRegenerateRecoveryKeyDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      metadata: metadata,
+    );
+    await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const FrostedCard(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    final enabled = _metadata?.enabled ?? false;
+    return FrostedCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  LucideIcons.shieldCheck,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Chiffrement du vault').large().medium()),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              enabled
+                  ? 'Les données privées de ce vault (comptes, budget, '
+                        'passifs, projets, notes de stratégie, simulations) '
+                        'sont chiffrées. Le mot de passe est redemandé à '
+                        'chaque lancement de l\'app.'
+                  : 'Chiffre les données privées de ce vault avec un mot de '
+                        'passe que tu définis. Les caches publics (cours de '
+                        'marché, données immobilières, loyers...) restent '
+                        'toujours en clair.',
+            ).muted().small(),
+            const SizedBox(height: 12),
+            if (enabled)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlineButton(
+                    onPressed: _regenerateRecoveryKey,
+                    leading: const Icon(LucideIcons.keyRound),
+                    child: const Text(
+                      'Générer une nouvelle clé de récupération',
+                    ),
+                  ),
+                  DestructiveButton(
+                    onPressed: _disable,
+                    leading: const Icon(LucideIcons.lockOpen),
+                    child: const Text('Désactiver le chiffrement'),
+                  ),
+                ],
+              )
+            else
+              PrimaryButton(
+                onPressed: _enable,
+                leading: const Icon(LucideIcons.lock),
+                child: const Text('Activer le chiffrement'),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

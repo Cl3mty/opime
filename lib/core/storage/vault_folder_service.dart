@@ -79,8 +79,19 @@ class VaultFolderService {
   static const _channel = MethodChannel('com.opime/secure_bookmarks');
 
   /// Nom du dossier vault. Un vault `.freenary` créé avant le rebranding
-  /// Freenary → Opime n'est plus reconnu.
-  static const _vaultFolderName = '.opime';
+  /// Freenary → Opime n'est plus reconnu. Visible (`Opime`) depuis la
+  /// migration de renommage (voir [_migrateVaultFolderNameIfNeeded]) — les
+  /// vaults `.opime` (caché) créés avant cette migration restent reconnus
+  /// et renommés automatiquement, [_legacyHiddenVaultFolderName].
+  static const _vaultFolderName = 'Opime';
+  static const _legacyHiddenVaultFolderName = '.opime';
+
+  /// Sous-dossier caché réservé, à l'intérieur du vault, à la
+  /// configuration logicielle (distincte des données utilisateur portées
+  /// par le reste du vault) — pas encore utilisé par une fonctionnalité,
+  /// mais créé dès maintenant (nouveau vault ou migration) pour que le nom
+  /// soit déjà pris et cohérent d'une installation à l'autre.
+  static const _configSubfolderName = '.opime';
 
   Future<String?> getSavedVaultPath() async {
     final activeVault = await getActiveVault();
@@ -90,6 +101,7 @@ class VaultFolderService {
   Future<List<SavedVault>> listVaults() async {
     final prefs = await SharedPreferences.getInstance();
     await _migrateLegacyVaultIfNeeded(prefs);
+    await _migrateVaultFolderNameIfNeeded(prefs);
     final raw = prefs.getString(_vaultsKey);
     if (raw == null || raw.trim().isEmpty) return [];
 
@@ -196,10 +208,11 @@ class VaultFolderService {
   /// Sélectionne un nouveau dossier de données.
   ///
   /// - Le dialogue demande normalement le dossier **parent** où sera créé
-  ///   `.opime` (voir [_vaultFolderName]).
+  ///   `Opime` (voir [_vaultFolderName]).
   /// - Protection : si l'utilisateur sélectionne directement un dossier déjà
-  ///   nommé `.opime` (erreur de manipulation fréquente), on l'utilise tel
-  ///   quel comme vault au lieu d'en créer un autre dedans.
+  ///   nommé `Opime` ou `.opime` (erreur de manipulation fréquente, ou ancien
+  ///   vault), on l'utilise tel quel comme vault au lieu d'en créer un autre
+  ///   dedans — un `.opime` sélectionné ainsi est renommé en `Opime`.
   /// - Si le vault résultant existe déjà, on le charge tel quel (aucune
   ///   copie). Sinon, si [currentVaultPath] est fourni, on migre les
   ///   données existantes vers le nouvel emplacement.
@@ -249,8 +262,10 @@ class VaultFolderService {
       result = picked;
     }
 
-    final selectedIsAlreadyVault = p.basename(result) == _vaultFolderName;
-    final vaultDir = selectedIsAlreadyVault
+    final selectedIsAlreadyVault =
+        p.basename(result) == _vaultFolderName ||
+        p.basename(result) == _legacyHiddenVaultFolderName;
+    var vaultDir = selectedIsAlreadyVault
         ? Directory(result)
         : Directory(p.join(result, _vaultFolderName));
     final alreadyExists = await vaultDir.exists();
@@ -282,6 +297,13 @@ class VaultFolderService {
         }
       }
     }
+
+    // L'utilisateur a directement sélectionné un ancien dossier `.opime` :
+    // le renommer tout de suite en `Opime` avant de créer le bookmark, pour
+    // que celui-ci porte sur le chemin définitif plutôt que de dépendre de
+    // la survie du bookmark à un renommage qu'on vient de faire nous-mêmes.
+    vaultDir = await _ensureModernVaultFolder(vaultDir);
+    if (selectedIsAlreadyVault) result = vaultDir.path;
 
     String? bookmarkData = iosBookmarkData;
     if (Platform.isMacOS) {
@@ -374,7 +396,12 @@ class VaultFolderService {
             legacyBookmarkData,
           );
           if (parentPath != null) {
-            legacyPath = p.join(parentPath, _vaultFolderName);
+            // Un vault pré-multi-vault (avant l'introduction de
+            // `saved_vaults_json`) a forcément été créé sous l'ancien nom
+            // caché : la migration de renommage (`_migrateVaultFolderNameIfNeeded`,
+            // appelée juste après celle-ci dans `listVaults()`) le renommera
+            // en `Opime` dans la foulée.
+            legacyPath = p.join(parentPath, _legacyHiddenVaultFolderName);
           }
         } catch (_) {}
       }
@@ -435,10 +462,99 @@ class VaultFolderService {
     final trimmed = explicitName?.trim();
     if (trimmed != null && trimmed.isNotEmpty) return trimmed;
     final base = p.basename(vaultPath);
-    if (base == _vaultFolderName) {
+    if (base == _vaultFolderName || base == _legacyHiddenVaultFolderName) {
       final parent = p.basename(p.dirname(vaultPath));
       if (parent.isNotEmpty && parent != '.') return parent;
     }
     return base.isNotEmpty ? base : 'Vault';
+  }
+
+  /// Renomme un dossier vault encore sous l'ancien nom caché (`.opime`) en
+  /// `Opime`, crée le sous-dossier de configuration réservé
+  /// ([_configSubfolderName]) s'il manque, et pose (sur macOS, au mieux)
+  /// l'icône Opime sur le dossier — utilisé aussi bien à la création d'un
+  /// nouveau vault qu'à la migration d'un vault déjà enregistré (voir
+  /// [_migrateVaultFolderNameIfNeeded]). Si un dossier `Opime` existe déjà
+  /// à l'emplacement cible (cas improbable), l'ancien dossier `.opime` est
+  /// laissé tel quel plutôt que de risquer d'écraser des données — il sera
+  /// retenté au prochain lancement.
+  Future<Directory> _ensureModernVaultFolder(Directory vaultDir) async {
+    var dir = vaultDir;
+    if (p.basename(dir.path) == _legacyHiddenVaultFolderName) {
+      final modernPath = p.join(p.dirname(dir.path), _vaultFolderName);
+      if (!await Directory(modernPath).exists()) {
+        try {
+          dir = await dir.rename(modernPath);
+        } catch (_) {
+          // Renommage impossible (ex. changement de volume) : repli sur une
+          // copie intégrale puis suppression de l'original.
+          final destination = Directory(modernPath);
+          final errors = await _copyDirectoryContents(dir, destination, () {});
+          if (errors.isEmpty) {
+            try {
+              await dir.delete(recursive: true);
+            } catch (_) {}
+            dir = destination;
+          }
+        }
+      }
+    }
+
+    final configDir = Directory(p.join(dir.path, _configSubfolderName));
+    if (!await configDir.exists()) await configDir.create(recursive: true);
+
+    if (Platform.isMacOS) {
+      try {
+        await _channel.invokeMethod('setFolderIcon', dir.path);
+      } catch (_) {
+        // Icône décorative uniquement : un échec ne doit jamais bloquer
+        // l'accès au vault.
+      }
+    }
+
+    return dir;
+  }
+
+  /// Migre chaque vault enregistré encore sous l'ancien nom caché
+  /// (`.opime`) vers le nom moderne (`Opime`) — idempotent (relit
+  /// directement `_vaultsKey` plutôt que de passer par [listVaults], pour
+  /// éviter la récursion : cette méthode est elle-même appelée depuis
+  /// [listVaults]), et tolérant à l'échec par vault (un vault qui ne peut
+  /// pas être migré maintenant reste accessible sous son ancien nom, la
+  /// migration sera retentée au prochain lancement).
+  Future<void> _migrateVaultFolderNameIfNeeded(SharedPreferences prefs) async {
+    final raw = prefs.getString(_vaultsKey);
+    if (raw == null || raw.trim().isEmpty) return;
+
+    List<SavedVault> vaults;
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      vaults = list
+          .whereType<Map<String, dynamic>>()
+          .map(SavedVault.fromJson)
+          .toList();
+    } catch (_) {
+      return;
+    }
+
+    final needsMigration = vaults.any(
+      (vault) => p.basename(vault.vaultPath) == _legacyHiddenVaultFolderName,
+    );
+    if (!needsMigration) return;
+
+    final migrated = <SavedVault>[];
+    for (final vault in vaults) {
+      if (p.basename(vault.vaultPath) != _legacyHiddenVaultFolderName) {
+        migrated.add(vault);
+        continue;
+      }
+      try {
+        final dir = await _ensureModernVaultFolder(Directory(vault.vaultPath));
+        migrated.add(vault.copyWith(vaultPath: dir.path));
+      } catch (_) {
+        migrated.add(vault);
+      }
+    }
+    await _saveVaults(migrated);
   }
 }

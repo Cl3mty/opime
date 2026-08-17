@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/storage/vault_folder_service.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Ces tests couvrent la gestion multi-vaults (liste, actif, renommage, oubli)
@@ -195,4 +196,87 @@ void main() {
       expect(await service.getActiveVault(), isNull);
     },
   );
+
+  group('migration de renommage .opime -> Opime', () {
+    late Directory parentDir;
+    late Directory legacyVaultDir;
+
+    setUp(() async {
+      parentDir = await Directory.systemTemp.createTemp('opime_rename_test_');
+      legacyVaultDir = Directory(p.join(parentDir.path, '.opime'));
+      await legacyVaultDir.create(recursive: true);
+      await File(
+        p.join(legacyVaultDir.path, 'profiles.json'),
+      ).writeAsString('{"marker": true}');
+    });
+
+    tearDown(() async {
+      if (await parentDir.exists()) await parentDir.delete(recursive: true);
+    });
+
+    test('un vault ".opime" est renommé en "Opime"', () async {
+      SharedPreferences.setMockInitialValues({
+        'saved_vaults_json': jsonEncode([
+          vaultJson(id: 'a', name: 'Vault A', path: legacyVaultDir.path),
+        ]),
+      });
+
+      final vaults = await service.listVaults();
+
+      expect(vaults.single.vaultPath, p.join(parentDir.path, 'Opime'));
+      expect(await legacyVaultDir.exists(), isFalse);
+      expect(await Directory(p.join(parentDir.path, 'Opime')).exists(), isTrue);
+      // Le contenu (pas seulement le dossier) a bien suivi le renommage.
+      expect(
+        await File(p.join(parentDir.path, 'Opime', 'profiles.json')).exists(),
+        isTrue,
+      );
+    });
+
+    test(
+      'crée le sous-dossier de configuration ".opime" à l\'intérieur du vault renommé',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'saved_vaults_json': jsonEncode([
+            vaultJson(id: 'a', name: 'Vault A', path: legacyVaultDir.path),
+          ]),
+        });
+
+        await service.listVaults();
+
+        expect(
+          await Directory(p.join(parentDir.path, 'Opime', '.opime')).exists(),
+          isTrue,
+        );
+      },
+    );
+
+    test('idempotente : un second appel ne change plus rien', () async {
+      SharedPreferences.setMockInitialValues({
+        'saved_vaults_json': jsonEncode([
+          vaultJson(id: 'a', name: 'Vault A', path: legacyVaultDir.path),
+        ]),
+      });
+
+      final first = await service.listVaults();
+      final second = await service.listVaults();
+
+      expect(first.single.vaultPath, second.single.vaultPath);
+      expect(second.single.vaultPath, p.join(parentDir.path, 'Opime'));
+    });
+
+    test('un vault déjà nommé "Opime" est laissé tel quel', () async {
+      final modernDir = Directory(p.join(parentDir.path, 'Opime'));
+      await modernDir.create(recursive: true);
+      SharedPreferences.setMockInitialValues({
+        'saved_vaults_json': jsonEncode([
+          vaultJson(id: 'a', name: 'Vault A', path: modernDir.path),
+        ]),
+      });
+
+      final vaults = await service.listVaults();
+
+      expect(vaults.single.vaultPath, modernDir.path);
+    });
+  });
 }

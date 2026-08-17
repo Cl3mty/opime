@@ -61,6 +61,21 @@ class MainFlutterWindow: NSWindow {
           result(FlutterError(code: "resolve_failed", message: error.localizedDescription, details: nil))
         }
 
+      case "setFolderIcon":
+        // Icône Finder du dossier vault ("Opime") — purement décorative,
+        // voir vault_folder_service.dart's `_ensureModernVaultFolder`, qui
+        // ignore déjà tout échec renvoyé ici (dépend seulement de l'asset
+        // AppIcon déjà embarqué, jamais bloquant si un jour absent).
+        guard let path = call.arguments as? String else {
+          result(FlutterError(code: "bad_args", message: "expected String path", details: nil))
+          return
+        }
+        guard let icon = NSImage(named: "AppIcon") else {
+          result(false)
+          return
+        }
+        result(NSWorkspace.shared.setIcon(icon, forFile: path, options: []))
+
       default:
         result(FlutterMethodNotImplemented)
       }

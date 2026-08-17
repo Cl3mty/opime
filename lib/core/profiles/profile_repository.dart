@@ -2,22 +2,36 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
+import '../storage/vault_crypto.dart' show VaultCipher;
+import '../storage/vault_session.dart';
+import '../storage/vault_file_storage.dart';
 import 'profile_models.dart';
 
 const String masterProfileId = 'master';
 
 class ProfileRepository {
   final String vaultPath;
-  ProfileRepository(this.vaultPath);
+  late final VaultFileStorage _storage;
 
-  File get _file => File(p.join(vaultPath, 'profiles.json'));
+  /// [cipher] : `null` sur un vault en clair (comportement inchangé), une
+  /// [VaultCipher] déverrouillée sur un vault chiffré — voir
+  /// `vault_file_storage.dart`. `profiles.json` porte les noms des membres
+  /// de la famille suivis dans ce vault, une donnée privée.
+  ProfileRepository(this.vaultPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: vaultPath,
+      cipher: cipher ?? VaultSession.current,
+    );
+  }
+
+  static const _profilesRelativePath = 'profiles.json';
 
   String pathFor(String profileId) => p.join(vaultPath, 'profiles', profileId);
 
   Future<List<Profile>> listAll() async {
     await _migrateLegacyDataIfNeeded();
 
-    if (!await _file.exists()) {
+    if (!await _storage.exists(_profilesRelativePath)) {
       final master = Profile(
         id: masterProfileId,
         name: 'Moi',
@@ -30,7 +44,7 @@ class ProfileRepository {
       return [master];
     }
 
-    final content = await _file.readAsString();
+    final content = await _storage.readString(_profilesRelativePath);
     if (content.trim().isEmpty) {
       // Un profiles.json existant mais vide n'est jamais un état légitime
       // (on n'écrit jamais un tableau vide nous-mêmes) : c'est le signe
@@ -51,9 +65,8 @@ class ProfileRepository {
   }
 
   Future<void> _writeAll(List<Profile> profiles) async {
-    final dir = Directory(vaultPath);
-    if (!await dir.exists()) await dir.create(recursive: true);
-    await _file.writeAsString(
+    await _storage.writeString(
+      _profilesRelativePath,
       const JsonEncoder.withIndent(
         '  ',
       ).convert(profiles.map((p) => p.toJson()).toList()),
@@ -102,7 +115,7 @@ class ProfileRepository {
   }
 
   Future<void> _migrateLegacyDataIfNeeded() async {
-    if (await _file.exists()) return;
+    if (await _storage.exists(_profilesRelativePath)) return;
 
     final masterDir = Directory(pathFor(masterProfileId));
     var hasLegacyData = false;

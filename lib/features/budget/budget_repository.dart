@@ -1,23 +1,26 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
+import '../../core/storage/vault_crypto.dart' show VaultCipher;
+import '../../core/storage/vault_session.dart';
+import '../../core/storage/vault_file_storage.dart';
 import 'budget_models.dart';
 
 class BudgetRepository {
   final String vaultPath;
-  BudgetRepository(this.vaultPath);
+  late final VaultFileStorage _storage;
 
-  File get _file => File(p.join(vaultPath, 'budget', 'budget_history.json'));
-
-  Future<void> _ensureDir() async {
-    final dir = Directory(p.join(vaultPath, 'budget'));
-    if (!await dir.exists()) await dir.create(recursive: true);
+  BudgetRepository(this.vaultPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: vaultPath,
+      cipher: cipher ?? VaultSession.current,
+    );
   }
 
+  static const _relativePath = 'budget/budget_history.json';
+
   Future<List<BudgetSnapshot>> _readAll() async {
-    if (!await _file.exists()) return [];
-    final content = await _file.readAsString();
+    if (!await _storage.exists(_relativePath)) return [];
+    final content = await _storage.readString(_relativePath);
     if (content.trim().isEmpty) return [];
     final list = jsonDecode(content) as List;
     return list
@@ -26,9 +29,9 @@ class BudgetRepository {
   }
 
   Future<void> _writeAll(List<BudgetSnapshot> all) async {
-    await _ensureDir();
     final jsonList = all.map((s) => s.toJson()).toList();
-    await _file.writeAsString(
+    await _storage.writeString(
+      _relativePath,
       const JsonEncoder.withIndent('  ').convert(jsonList),
     );
   }

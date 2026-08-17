@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path/path.dart' as p;
+import '../../core/storage/vault_crypto.dart' show VaultCipher;
+import '../../core/storage/vault_session.dart';
+import '../../core/storage/vault_file_storage.dart';
 import 'investments_models.dart';
 import 'metal_mirror_repository.dart';
 
@@ -11,18 +12,20 @@ import 'metal_mirror_repository.dart';
 /// chaque sauvegarde.
 class InvestmentsRepository {
   final String vaultPath;
-  InvestmentsRepository(this.vaultPath);
+  late final VaultFileStorage _storage;
 
-  File get _file => File(p.join(vaultPath, 'investissements', 'comptes.json'));
-
-  Future<void> _ensureDir() async {
-    final dir = Directory(p.join(vaultPath, 'investissements'));
-    if (!await dir.exists()) await dir.create(recursive: true);
+  InvestmentsRepository(this.vaultPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: vaultPath,
+      cipher: cipher ?? VaultSession.current,
+    );
   }
 
+  static const _relativePath = 'investissements/comptes.json';
+
   Future<List<InvestmentAccount>> _readAll() async {
-    if (!await _file.exists()) return [];
-    final content = await _file.readAsString();
+    if (!await _storage.exists(_relativePath)) return [];
+    final content = await _storage.readString(_relativePath);
     if (content.trim().isEmpty) return [];
     final list = jsonDecode(content) as List;
     return list
@@ -31,15 +34,18 @@ class InvestmentsRepository {
   }
 
   Future<void> _writeAll(List<InvestmentAccount> all) async {
-    await _ensureDir();
     final jsonList = all.map((a) => a.toJson()).toList();
-    await _file.writeAsString(
+    await _storage.writeString(
+      _relativePath,
       const JsonEncoder.withIndent('  ').convert(jsonList),
     );
     // Projette les métaux précieux vers leur dossier miroir daté
     // (`metaux_precieux/<or|argent>/<date>/`, voir
     // `metal_mirror_repository.dart`) — à chaque écriture, pour que toute
-    // modification (transaction, document, suppression) soit reflétée.
+    // modification (transaction, document, suppression) soit reflétée. Ce
+    // miroir est volontairement laissé en clair même sur un vault chiffré :
+    // c'est un "miroir lisible" explicitement conçu pour être consulté hors
+    // de l'app (Finder/Explorer), voir sa documentation de tête.
     await MetalMirrorRepository(vaultPath).sync(all);
   }
 

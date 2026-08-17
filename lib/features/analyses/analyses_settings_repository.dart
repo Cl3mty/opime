@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path/path.dart' as p;
+import '../../core/storage/vault_crypto.dart' show VaultCipher;
+import '../../core/storage/vault_session.dart';
+import '../../core/storage/vault_file_storage.dart';
 
 /// Paramètres de l'écran Analyses propres à un profil — aujourd'hui
 /// seulement le ticker du benchmark utilisé pour l'alpha (voir
@@ -25,14 +26,20 @@ class AnalysesSettings {
 
 class AnalysesSettingsRepository {
   final String vaultPath;
-  AnalysesSettingsRepository(this.vaultPath);
+  late final VaultFileStorage _storage;
 
-  File get _file =>
-      File(p.join(vaultPath, 'analyses', 'parametres.json'));
+  AnalysesSettingsRepository(this.vaultPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: vaultPath,
+      cipher: cipher ?? VaultSession.current,
+    );
+  }
+
+  static const _relativePath = 'analyses/parametres.json';
 
   Future<AnalysesSettings> load() async {
-    if (!await _file.exists()) return AnalysesSettings.empty();
-    final content = await _file.readAsString();
+    if (!await _storage.exists(_relativePath)) return AnalysesSettings.empty();
+    final content = await _storage.readString(_relativePath);
     if (content.trim().isEmpty) return AnalysesSettings.empty();
     try {
       return AnalysesSettings.fromJson(
@@ -44,9 +51,8 @@ class AnalysesSettingsRepository {
   }
 
   Future<void> save(AnalysesSettings settings) async {
-    final dir = Directory(p.join(vaultPath, 'analyses'));
-    if (!await dir.exists()) await dir.create(recursive: true);
-    await _file.writeAsString(
+    await _storage.writeString(
+      _relativePath,
       const JsonEncoder.withIndent('  ').convert(settings.toJson()),
     );
   }

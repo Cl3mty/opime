@@ -1,5 +1,8 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import '../../core/storage/vault_crypto.dart' show VaultCipher;
+import '../../core/storage/vault_session.dart';
+import '../../core/storage/vault_file_storage.dart';
 
 class StrategyNote {
   final String id;
@@ -17,9 +20,17 @@ class StrategyNote {
 
 class StrategyRepository {
   final String vaultPath;
-  StrategyRepository(this.vaultPath);
+  late final VaultFileStorage _storage;
+
+  StrategyRepository(this.vaultPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: vaultPath,
+      cipher: cipher ?? VaultSession.current,
+    );
+  }
 
   Directory get _dir => Directory(p.join(vaultPath, 'strategy'));
+  String _relativePathFor(String id) => p.join('strategy', '$id.md');
 
   Future<void> _ensureDir() async {
     try {
@@ -74,9 +85,9 @@ class StrategyRepository {
         .toList();
     final notes = <StrategyNote>[];
     for (final f in files) {
-      final content = await f.readAsString();
-      final stat = await f.stat();
       final id = p.basenameWithoutExtension(f.path);
+      final content = await _storage.readString(_relativePathFor(id));
+      final stat = await f.stat();
       notes.add(
         StrategyNote(
           id: id,
@@ -92,16 +103,13 @@ class StrategyRepository {
   }
 
   Future<String> readNote(String id) async {
-    final file = File(p.join(_dir.path, '$id.md'));
-    if (!await file.exists()) return '';
-    return file.readAsString();
+    final relativePath = _relativePathFor(id);
+    if (!await _storage.exists(relativePath)) return '';
+    return _storage.readString(relativePath);
   }
 
-  Future<void> writeNote(String id, String markdown) async {
-    await _ensureDir();
-    final file = File(p.join(_dir.path, '$id.md'));
-    await file.writeAsString(markdown);
-  }
+  Future<void> writeNote(String id, String markdown) =>
+      _storage.writeString(_relativePathFor(id), markdown);
 
   /// Crée les notes "modèle" au tout premier passage dans l'onglet
   /// Stratégie, puis ne fait plus rien ensuite — même si l'utilisateur
@@ -138,8 +146,5 @@ class StrategyRepository {
     );
   }
 
-  Future<void> deleteNote(String id) async {
-    final file = File(p.join(_dir.path, '$id.md'));
-    if (await file.exists()) await file.delete();
-  }
+  Future<void> deleteNote(String id) => _storage.delete(_relativePathFor(id));
 }

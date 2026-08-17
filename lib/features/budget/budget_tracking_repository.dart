@@ -1,25 +1,29 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path/path.dart' as p;
+import '../../core/storage/vault_crypto.dart' show VaultCipher;
+import '../../core/storage/vault_session.dart';
+import '../../core/storage/vault_file_storage.dart';
 import 'budget_tracking_models.dart';
 
 class BudgetTrackingRepository {
   final String vaultPath;
-  BudgetTrackingRepository(this.vaultPath);
+  late final VaultFileStorage _storage;
 
-  File _fileFor(int year, int month) => File(
-    p.join(
-      vaultPath,
-      'budget',
-      'tracking',
-      '${year}_${month.toString().padLeft(2, '0')}.json',
-    ),
-  );
+  BudgetTrackingRepository(this.vaultPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: vaultPath,
+      cipher: cipher ?? VaultSession.current,
+    );
+  }
+
+  String _relativePathFor(int year, int month) =>
+      'budget/tracking/${year}_${month.toString().padLeft(2, '0')}.json';
 
   Future<BudgetTrackingMonth> load(int year, int month) async {
-    final file = _fileFor(year, month);
-    if (!await file.exists()) return BudgetTrackingMonth.empty(month, year);
-    final content = await file.readAsString();
+    final relativePath = _relativePathFor(year, month);
+    if (!await _storage.exists(relativePath)) {
+      return BudgetTrackingMonth.empty(month, year);
+    }
+    final content = await _storage.readString(relativePath);
     if (content.trim().isEmpty) return BudgetTrackingMonth.empty(month, year);
     try {
       return BudgetTrackingMonth.fromJson(
@@ -31,10 +35,8 @@ class BudgetTrackingRepository {
   }
 
   Future<void> save(BudgetTrackingMonth data) async {
-    final file = _fileFor(data.year, data.month);
-    final dir = file.parent;
-    if (!await dir.exists()) await dir.create(recursive: true);
-    await file.writeAsString(
+    await _storage.writeString(
+      _relativePathFor(data.year, data.month),
       const JsonEncoder.withIndent('  ').convert(data.toJson()),
     );
   }
