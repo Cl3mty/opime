@@ -707,6 +707,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 _StatChip(
                   label: 'Dernier cours',
                   value: _lastPriceDisplay,
+                  trailing: investment.isPriceFresh
+                      ? const _FreshPriceBadge()
+                      : null,
                 ),
             ],
           ),
@@ -1017,8 +1020,9 @@ class _EditInvestmentForm extends StatelessWidget {
 class _StatChip extends StatelessWidget {
   final String label;
   final String value;
+  final Widget? trailing;
 
-  const _StatChip({required this.label, required this.value});
+  const _StatChip({required this.label, required this.value, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -1033,10 +1037,32 @@ class _StatChip extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          shadcn.Text(label).muted().xSmall(),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              shadcn.Text(label).muted().xSmall(),
+              if (trailing != null) ...[const SizedBox(width: 6), trailing!],
+            ],
+          ),
           shadcn.Text(value).medium(),
         ],
       ),
+    );
+  }
+}
+
+/// Petit badge affiché à côté du "Dernier cours" quand
+/// [Investment.isPriceFresh] — le cours affiché vient bien du dernier
+/// rafraîchissement du jour, pas d'un cache potentiellement daté (voir
+/// `price_refresh_service.dart`).
+class _FreshPriceBadge extends StatelessWidget {
+  const _FreshPriceBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlineBadge(
+      leading: const Icon(LucideIcons.circleCheck, size: 10, color: Colors.green),
+      child: shadcn.Text('à jour').xSmall(),
     );
   }
 }

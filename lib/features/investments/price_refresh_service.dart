@@ -67,8 +67,8 @@ Future<void> refreshAllPrices({
           // résolu : un ETC dont le `lastPrice` avait été écrit par
           // l'ancien chemin "cours au gramme" (avant que l'enveloppe du
           // compte ne devienne un CTO) porte un cours sans `symbol`, et
-          // `_pricedToday` l'empêcherait sinon de se corriger.
-          if (!_pricedToday(investment) || investment.symbol == null) {
+          // `isPriceFresh` l'empêcherait sinon de se corriger.
+          if (!investment.isPriceFresh || investment.symbol == null) {
             updated = await _resolveInvestmentPrice(
               vaultPath: vaultPath,
               account: account,
@@ -84,7 +84,7 @@ Future<void> refreshAllPrices({
           final imageFileName =
               metalImageFiles[investment.isin] ??
               metalImageFiles[investment.label];
-          if (_pricedToday(investment)) {
+          if (investment.isPriceFresh) {
             // Déjà valorisé aujourd'hui : au plus rattacher l'image
             // fraîchement résolue, sans écraser le cours.
             if (imageFileName != null &&
@@ -343,15 +343,6 @@ Future<MetalPriceSnapshot?> _resolveMetalSnapshot(
   if (fetched == null) return stored?.snapshot;
   await repo.save(metal, fetched, date: today);
   return fetched;
-}
-
-bool _pricedToday(Investment investment) {
-  final lastFetch = investment.lastPriceDate;
-  if (lastFetch == null) return false;
-  final today = DateTime.now();
-  return lastFetch.year == today.year &&
-      lastFetch.month == today.month &&
-      lastFetch.day == today.day;
 }
 
 /// Date de la transaction la plus ancienne de [investment] — `null` sans

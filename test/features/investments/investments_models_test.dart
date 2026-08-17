@@ -310,6 +310,30 @@ void main() {
     });
   });
 
+  group('isPriceFresh', () {
+    Investment withPriceDate(DateTime? date) => Investment(
+      isin: 'US0378331005',
+      label: 'META',
+      transactions: const [],
+      lastPrice: 100,
+      lastPriceDate: date,
+    );
+
+    test('true quand le cours a été récupéré aujourd\'hui', () {
+      final now = DateTime.now();
+      expect(withPriceDate(now).isPriceFresh, isTrue);
+    });
+
+    test('false quand le cours date d\'un jour antérieur', () {
+      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+      expect(withPriceDate(yesterday).isPriceFresh, isFalse);
+    });
+
+    test('false sans lastPriceDate (jamais rafraîchi)', () {
+      expect(withPriceDate(null).isPriceFresh, isFalse);
+    });
+  });
+
   group('FundStyle (style de gestion)', () {
     Investment stock({FundStyle? fundStyle}) => Investment(
       isin: 'FR0000120271',

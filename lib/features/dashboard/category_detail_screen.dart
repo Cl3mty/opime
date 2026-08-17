@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/date_format.dart';
 import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/frosted_card.dart';
@@ -1213,11 +1214,9 @@ class _AccountLine extends StatelessWidget {
                         color: theme.colorScheme.mutedForeground,
                       ),
                     )
-                  : shadcn.Text(
-                      account.cours != null
-                          ? displayEuros(account.cours!, hidden)
-                          : '—',
-                    ).small(),
+                  : account.cours == null
+                      ? shadcn.Text('—').small()
+                      : _CoursCell(account: account, hidden: hidden),
             ),
           ),
           SizedBox(
@@ -1266,6 +1265,43 @@ class _AccountLine extends StatelessWidget {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(onTap: onTap, child: row),
+    );
+  }
+}
+
+/// Cellule "Cours" d'une ligne d'investissement : le prix, suivi d'un petit
+/// badge quand [PatrimoineAccount.isPriceFresh] (cours récupéré aujourd'hui,
+/// voir `Investment.isPriceFresh`). Survoler la cellule affiche la date de
+/// dernière récupération, connue ou non fraîche.
+class _CoursCell extends StatelessWidget {
+  final PatrimoineAccount account;
+  final bool hidden;
+
+  const _CoursCell({required this.account, required this.hidden});
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        shadcn.Text(displayEuros(account.cours!, hidden)).small(),
+        if (account.isPriceFresh) ...[
+          const SizedBox(width: 4),
+          Icon(LucideIcons.badgeCheck, size: 12, color: Colors.green),
+        ],
+      ],
+    );
+    final lastPriceDate = account.lastPriceDate;
+    if (lastPriceDate == null) return content;
+    return Tooltip(
+      tooltip: (context) => TooltipContainer(
+        child: shadcn.Text(
+          account.isPriceFresh
+              ? 'Cours à jour, récupéré le ${formatDateDdMmYyyy(lastPriceDate)}.'
+              : 'Dernière mise à jour du cours : ${formatDateDdMmYyyy(lastPriceDate)}.',
+        ),
+      ),
+      child: content,
     );
   }
 }

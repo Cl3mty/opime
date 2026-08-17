@@ -146,6 +146,12 @@ class PatrimoineAccount {
   /// colonne Cours.
   final bool? priceUnavailable;
 
+  /// Date de dernière récupération de [cours] — voir `Investment.
+  /// lastPriceDate` côté réel, propagé par `real_patrimoine_adapter.dart`'s
+  /// `_buildLeaf`. `null` pour une ligne qui représente un compte (pas un
+  /// investissement unique) ou dont le cours n'a jamais été récupéré.
+  final DateTime? lastPriceDate;
+
   /// Établissement (banque) de ce compte réel — la clé qui regroupe les
   /// comptes d'une même banque sous un accordéon avec logo sur les pages de
   /// catégorie (voir `category_detail_screen.dart`'s `_BankAccordionTile`).
@@ -177,10 +183,24 @@ class PatrimoineAccount {
     this.avatarInitials,
     this.isCurrency = false,
     this.priceUnavailable,
+    this.lastPriceDate,
     this.bankName,
   });
 
   String get initials => initialsFor(name);
+
+  /// `true` si [lastPriceDate] tombe le jour calendaire courant — même
+  /// logique que `Investment.isPriceFresh`, dupliquée ici plutôt que
+  /// partagée pour garder ce fichier découplé du module Investissements
+  /// (voir le commentaire d'en-tête du fichier).
+  bool get isPriceFresh {
+    final date = lastPriceDate;
+    if (date == null) return false;
+    final today = DateTime.now();
+    return date.year == today.year &&
+        date.month == today.month &&
+        date.day == today.day;
+  }
 }
 
 /// Une catégorie d'actif ou de passif (même `id` que dans

@@ -560,6 +560,19 @@ class Investment {
     return quantityHeld * lastPrice! * (lastFxRateToEur ?? 1.0);
   }
 
+  /// `true` si [lastPriceDate] tombe le jour calendaire courant — sert à
+  /// afficher un badge "à jour" dans l'UI et, côté
+  /// `price_refresh_service.dart`, à éviter de rafraîchir un cours déjà
+  /// récupéré aujourd'hui.
+  bool get isPriceFresh {
+    final date = lastPriceDate;
+    if (date == null) return false;
+    final today = DateTime.now();
+    return date.year == today.year &&
+        date.month == today.month &&
+        date.day == today.day;
+  }
+
   /// Valeur estimée d'un bien immobilier (surface × dernier prix/m² estimé,
   /// voir `real_estate_pricing/`) — `null` tant que l'un des deux facteurs
   /// manque (bien jamais réestimé). Un bien immobilier est toujours détenu

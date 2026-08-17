@@ -406,6 +406,7 @@ PatrimoineAccount _buildLeaf(
     valeur: valeur,
     pru: investment.pru,
     priceUnavailable: investment.priceUnavailable,
+    lastPriceDate: investment.lastPriceDate,
     plusValueAbs: plusValueAbs,
     plusValuePercent: costBasis == 0 ? 0 : plusValueAbs / costBasis * 100,
     // Métaux précieux : l'avatar affiche la photo du produit (pièce/lingot)
