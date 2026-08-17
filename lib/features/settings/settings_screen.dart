@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme_controller.dart';
 import '../../core/assistant/assistant_config_controller.dart';
 import '../../core/notifications/notifications_settings_controller.dart';
+import '../../core/shortcuts/app_shortcuts.dart';
+import '../../core/shortcuts/keyboard_shortcuts_controller.dart';
 import '../../core/storage/vault_folder_service.dart';
 import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
@@ -14,6 +16,7 @@ class SettingsScreen extends StatelessWidget {
   final ThemeController themeController;
   final AssistantConfigController assistantConfigController;
   final NotificationsSettingsController notificationsSettingsController;
+  final KeyboardShortcutsController keyboardShortcutsController;
   final String githubOwner;
   final String githubRepo;
 
@@ -25,6 +28,7 @@ class SettingsScreen extends StatelessWidget {
     required this.themeController,
     required this.assistantConfigController,
     required this.notificationsSettingsController,
+    required this.keyboardShortcutsController,
     required this.githubOwner,
     required this.githubRepo,
   });
@@ -46,6 +50,8 @@ class SettingsScreen extends StatelessWidget {
           _AssistantCard(configController: assistantConfigController),
           const SizedBox(height: 16),
           _NotificationsCard(configController: notificationsSettingsController),
+          const SizedBox(height: 16),
+          _ShortcutsCard(configController: keyboardShortcutsController),
           const SizedBox(height: 16),
           _VersionCard(githubOwner: githubOwner, githubRepo: githubRepo),
           const SizedBox(height: 16),
@@ -473,6 +479,85 @@ class _NotificationsCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ShortcutsCard extends StatelessWidget {
+  final KeyboardShortcutsController configController;
+
+  const _ShortcutsCard({required this.configController});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: configController,
+      builder: (context, _) {
+        final enabled = configController.enabled;
+        return FrostedCard(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      LucideIcons.keyboard,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Raccourcis clavier').large().medium(),
+                    ),
+                    Switch(
+                      value: enabled,
+                      onChanged: (value) => configController.setEnabled(value),
+                    ),
+                  ],
+                ),
+                if (enabled) ...[
+                  const SizedBox(height: 12),
+                  for (final action in AppShortcutAction.values) ...[
+                    if (action != AppShortcutAction.values.first)
+                      const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: Text(action.label).small()),
+                        _KeycapBadge(label: action.displayLabel),
+                      ],
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Bulle façon "touche" affichant une combinaison de raccourci (ex : "⌘B").
+class _KeycapBadge extends StatelessWidget {
+  final String label;
+
+  const _KeycapBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.muted,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: theme.colorScheme.border),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ).xSmall(),
     );
   }
 }

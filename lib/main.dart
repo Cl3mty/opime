@@ -5,6 +5,7 @@ import 'core/assistant/assistant_chat_controller.dart';
 import 'core/assistant/assistant_config_controller.dart';
 import 'core/notifications/notifications_settings_controller.dart';
 import 'core/privacy/amount_visibility_controller.dart';
+import 'core/shortcuts/keyboard_shortcuts_controller.dart';
 import 'core/storage/vault_folder_service.dart';
 import 'core/profiles/profile_controller.dart';
 import 'core/profiles/profile_repository.dart';
@@ -89,6 +90,7 @@ class _OpimeAppState extends State<OpimeApp> {
 
   final _themeController = ThemeController();
   final _amountVisibilityController = AmountVisibilityController();
+  final _keyboardShortcutsController = KeyboardShortcutsController();
   final _assistantConfigController = AssistantConfigController();
   final _notificationsSettingsController = NotificationsSettingsController();
   final _notificationsController = NotificationsController();
@@ -199,6 +201,7 @@ class _OpimeAppState extends State<OpimeApp> {
     _themeController.load();
     _themeController.addListener(() => setState(() {}));
     _amountVisibilityController.load();
+    _keyboardShortcutsController.load();
     _assistantConfigController.load();
     _notificationsSettingsController.load();
     _notificationsSettingsController.addListener(
@@ -336,6 +339,7 @@ class _OpimeAppState extends State<OpimeApp> {
           profileController: _profileController!,
           sidebarPrefsController: _sidebarPrefsController!,
           amountVisibilityController: _amountVisibilityController,
+          keyboardShortcutsController: _keyboardShortcutsController,
           patrimoineRefreshController: _patrimoineRefreshController,
           onboardingHighlightController: _onboardingHighlightController,
           priceSyncStatusController: _priceSyncStatusController,
@@ -455,6 +459,7 @@ class _OpimeAppState extends State<OpimeApp> {
               themeController: _themeController,
               assistantConfigController: _assistantConfigController,
               notificationsSettingsController: _notificationsSettingsController,
+              keyboardShortcutsController: _keyboardShortcutsController,
               githubOwner: _githubOwner,
               githubRepo: _githubRepo,
             ),

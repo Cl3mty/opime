@@ -4,6 +4,8 @@ import '../core/assistant/assistant_config_controller.dart';
 import '../core/notifications/notifications_settings_controller.dart';
 import '../core/privacy/amount_visibility_controller.dart';
 import '../core/profiles/profile_controller.dart';
+import '../core/shortcuts/app_shortcuts.dart';
+import '../core/shortcuts/keyboard_shortcuts_controller.dart';
 import '../core/ui/app_background.dart';
 import '../core/profiles/sidebar_prefs_controller.dart';
 import '../features/navigation/account_switcher_menu.dart';
@@ -19,6 +21,7 @@ import '../features/investments/price_sync_status_controller.dart';
 import '../features/notifications/news_button.dart';
 import '../features/notifications/notifications_controller.dart';
 import '../features/patrimoine_export/patrimoine_export_button.dart';
+import '../features/patrimoine_export/patrimoine_export_dialog.dart';
 import 'theme_controller.dart';
 
 const _breakpoint = 800.0;
@@ -58,6 +61,7 @@ class AppShell extends StatefulWidget {
   final ProfileController profileController;
   final SidebarPrefsController sidebarPrefsController;
   final AmountVisibilityController amountVisibilityController;
+  final KeyboardShortcutsController keyboardShortcutsController;
   final PatrimoineRefreshController patrimoineRefreshController;
   final OnboardingHighlightController onboardingHighlightController;
   final PriceSyncStatusController priceSyncStatusController;
@@ -73,6 +77,7 @@ class AppShell extends StatefulWidget {
     required this.profileController,
     required this.sidebarPrefsController,
     required this.amountVisibilityController,
+    required this.keyboardShortcutsController,
     required this.patrimoineRefreshController,
     required this.onboardingHighlightController,
     required this.priceSyncStatusController,
@@ -127,19 +132,31 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     _lastAssistantEnabled = widget.assistantConfigController.enabled;
     widget.assistantConfigController.addListener(_onAssistantConfigChanged);
-    widget.assistantChatController.unreadResponses
-        .addListener(_onAssistantUnreadChanged);
+    widget.assistantChatController.unreadResponses.addListener(
+      _onAssistantUnreadChanged,
+    );
+    widget.keyboardShortcutsController.addListener(_onKeyboardShortcutsChanged);
     _onAssistantVisibilityChanged();
+  }
+
+  /// Les Réglages peuvent activer/désactiver les raccourcis clavier à tout
+  /// moment — sans ce listener, [_wrapWithShortcuts] (évalué seulement au
+  /// `build`) ne relirait la nouvelle valeur qu'au prochain rebuild
+  /// déclenché par autre chose.
+  void _onKeyboardShortcutsChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void didUpdateWidget(covariant AppShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.assistantChatController != widget.assistantChatController) {
-      oldWidget.assistantChatController.unreadResponses
-          .removeListener(_onAssistantUnreadChanged);
-      widget.assistantChatController.unreadResponses
-          .addListener(_onAssistantUnreadChanged);
+      oldWidget.assistantChatController.unreadResponses.removeListener(
+        _onAssistantUnreadChanged,
+      );
+      widget.assistantChatController.unreadResponses.addListener(
+        _onAssistantUnreadChanged,
+      );
       _onAssistantVisibilityChanged();
     }
   }
@@ -147,8 +164,12 @@ class _AppShellState extends State<AppShell> {
   @override
   void dispose() {
     widget.assistantConfigController.removeListener(_onAssistantConfigChanged);
-    widget.assistantChatController.unreadResponses
-        .removeListener(_onAssistantUnreadChanged);
+    widget.assistantChatController.unreadResponses.removeListener(
+      _onAssistantUnreadChanged,
+    );
+    widget.keyboardShortcutsController.removeListener(
+      _onKeyboardShortcutsChanged,
+    );
     super.dispose();
   }
 
@@ -167,7 +188,9 @@ class _AppShellState extends State<AppShell> {
           leading: const Icon(LucideIcons.bot, size: 18),
           title: const Text('Réponse de l\'assistant prête'),
           subtitle: Text(
-            unread > 1 ? '$unread réponses en attente' : 'Une réponse est prête',
+            unread > 1
+                ? '$unread réponses en attente'
+                : 'Une réponse est prête',
           ),
           trailing: PrimaryButton(
             onPressed: () {
@@ -293,6 +316,30 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  /// Raccourcis clavier globaux (voir `app_shortcuts.dart`'s
+  /// [AppShortcutAction]) — sans effet si désactivés dans les Réglages
+  /// (`widget.keyboardShortcutsController`). Le `Focus` interne garantit
+  /// qu'un descendant tient le focus dès le premier build (sinon aucun
+  /// widget ne serait sur la chaîne de focus pour intercepter les
+  /// événements clavier tant que l'utilisateur n'a encore rien cliqué).
+  Widget _wrapWithShortcuts(Widget child) {
+    if (!widget.keyboardShortcutsController.enabled) return child;
+    return CallbackShortcuts(
+      bindings: {
+        AppShortcutAction.toggleSidebar.activator: () =>
+            setState(() => _collapsed = !_collapsed),
+        AppShortcutAction.toggleAmountsHidden.activator: () =>
+            widget.amountVisibilityController.toggle(),
+        AppShortcutAction.exportPdf.activator: () => showPatrimoineExportDialog(
+          context,
+          vaultPath: widget.profileController.activeDataPath,
+          profileName: widget.profileController.active?.name ?? '',
+        ),
+      },
+      child: Focus(autofocus: true, child: child),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // shortestSide (et non width) : reste stable quelle que soit
@@ -327,111 +374,119 @@ class _AppShellState extends State<AppShell> {
           assistantUnread: widget.assistantChatController.unreadResponses,
         ),
       );
-      return Scaffold(
-        // SafeArea : sans elle, la sidebar et la TopBar démarrent au tout
-        // haut de l'écran physique et chevauchent la barre système
-        // (batterie/heure) sur tablette. Sans effet sur desktop, où
-        // MediaQuery.padding.top est toujours nul.
-        child: SafeArea(
-          bottom: false,
-          child: Row(
-            children: [
-              sidebar,
-              Container(width: 1, color: Theme.of(context).colorScheme.border),
-              Expanded(
-                child: Column(
-                  children: [
-                    AppBackground(
-                      child: TopBar(
-                        amountVisibility: widget.amountVisibilityController,
-                        profileController: widget.profileController,
-                        patrimoineRefreshController:
-                            widget.patrimoineRefreshController,
-                        onboardingHighlight:
-                            widget.onboardingHighlightController,
-                        priceSyncStatus: widget.priceSyncStatusController,
-                        notificationsSettings:
-                            widget.notificationsSettingsController,
-                        notificationsController: widget.notificationsController,
-                        currentPageKey: _selectedKey,
-                        onSelect: _select,
-                      ),
-                    ),
-                    Expanded(child: page),
-                  ],
+      return _wrapWithShortcuts(
+        Scaffold(
+          // SafeArea : sans elle, la sidebar et la TopBar démarrent au tout
+          // haut de l'écran physique et chevauchent la barre système
+          // (batterie/heure) sur tablette. Sans effet sur desktop, où
+          // MediaQuery.padding.top est toujours nul.
+          child: SafeArea(
+            bottom: false,
+            child: Row(
+              children: [
+                sidebar,
+                Container(
+                  width: 1,
+                  color: Theme.of(context).colorScheme.border,
                 ),
-              ),
-            ],
+                Expanded(
+                  child: Column(
+                    children: [
+                      AppBackground(
+                        child: TopBar(
+                          amountVisibility: widget.amountVisibilityController,
+                          profileController: widget.profileController,
+                          patrimoineRefreshController:
+                              widget.patrimoineRefreshController,
+                          onboardingHighlight:
+                              widget.onboardingHighlightController,
+                          priceSyncStatus: widget.priceSyncStatusController,
+                          notificationsSettings:
+                              widget.notificationsSettingsController,
+                          notificationsController:
+                              widget.notificationsController,
+                          currentPageKey: _selectedKey,
+                          onSelect: _select,
+                        ),
+                      ),
+                      Expanded(child: page),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
-    return Scaffold(
-      headers: [
-        AppBar(
-          title: Text(_mobileTitle),
-          leading: [
-            if (_mobileCanGoBack)
-              IconButton.ghost(
-                icon: const Icon(LucideIcons.chevronLeft),
-                onPressed: _mobileBack,
+    return _wrapWithShortcuts(
+      Scaffold(
+        headers: [
+          AppBar(
+            title: Text(_mobileTitle),
+            leading: [
+              if (_mobileCanGoBack)
+                IconButton.ghost(
+                  icon: const Icon(LucideIcons.chevronLeft),
+                  onPressed: _mobileBack,
+                ),
+            ],
+            trailing: [
+              AmountVisibilityToggleButton(
+                amountVisibility: widget.amountVisibilityController,
               ),
-          ],
-          trailing: [
-            AmountVisibilityToggleButton(
-              amountVisibility: widget.amountVisibilityController,
-            ),
-            NewsButton(
-              settings: widget.notificationsSettingsController,
-              controller: widget.notificationsController,
-              vaultPath: widget.profileController.activeDataPath,
-            ),
-            PatrimoineExportButton(
-              profileController: widget.profileController,
-            ),
-            AddMenuButton(
-              profileController: widget.profileController,
-              patrimoineRefreshController: widget.patrimoineRefreshController,
-              onboardingHighlight: widget.onboardingHighlightController,
-              priceSyncStatus: widget.priceSyncStatusController,
-              compact: true,
-              currentPageKey: _selectedKey,
-            ),
-            Builder(
-              builder: (barContext) => IconButton.ghost(
-                icon: const Icon(LucideIcons.userRound),
-                onPressed: () => openAccountSwitcherMenu(
-                  barContext,
-                  profileController: widget.profileController,
-                  onSelect: _select,
+              NewsButton(
+                settings: widget.notificationsSettingsController,
+                controller: widget.notificationsController,
+                vaultPath: widget.profileController.activeDataPath,
+              ),
+              PatrimoineExportButton(
+                profileController: widget.profileController,
+              ),
+              AddMenuButton(
+                profileController: widget.profileController,
+                patrimoineRefreshController: widget.patrimoineRefreshController,
+                onboardingHighlight: widget.onboardingHighlightController,
+                priceSyncStatus: widget.priceSyncStatusController,
+                compact: true,
+                currentPageKey: _selectedKey,
+              ),
+              Builder(
+                builder: (barContext) => IconButton.ghost(
+                  icon: const Icon(LucideIcons.userRound),
+                  onPressed: () => openAccountSwitcherMenu(
+                    barContext,
+                    profileController: widget.profileController,
+                    onSelect: _select,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
-      footers: [
-        NavigationBar(
-          alignment: NavigationBarAlignment.spaceAround,
-          children: [
-            for (final tab in _mobileTabs)
-              NavigationItem(
-                label: Text(tab.label),
-                selectedStyle: const ButtonStyle.primaryIcon(),
-                selected: _mobileActiveTab == tab.key,
-                onChanged: (isSelected) {
-                  if (isSelected) _selectMobileTab(tab.key);
-                },
-                child: Icon(tab.icon),
-              ),
-          ],
-        ),
-      ],
-      // Contenu de page en aplat uni, comme en desktop : pas de dégradé
-      // ici (réservé aux barres — AppBar/NavigationBar restent telles
-      // quelles pour l'instant côté mobile).
-      child: _mobileContent(context),
+            ],
+          ),
+        ],
+        footers: [
+          NavigationBar(
+            alignment: NavigationBarAlignment.spaceAround,
+            children: [
+              for (final tab in _mobileTabs)
+                NavigationItem(
+                  label: Text(tab.label),
+                  selectedStyle: const ButtonStyle.primaryIcon(),
+                  selected: _mobileActiveTab == tab.key,
+                  onChanged: (isSelected) {
+                    if (isSelected) _selectMobileTab(tab.key);
+                  },
+                  child: Icon(tab.icon),
+                ),
+            ],
+          ),
+        ],
+        // Contenu de page en aplat uni, comme en desktop : pas de dégradé
+        // ici (réservé aux barres — AppBar/NavigationBar restent telles
+        // quelles pour l'instant côté mobile).
+        child: _mobileContent(context),
+      ),
     );
   }
 }
