@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/storage/vault_crypto.dart';
 import '../../core/storage/vault_encryption_metadata.dart';
+import '../../core/storage/vault_folder_service.dart';
 
 /// Écran affiché au lancement quand le vault actif est chiffré (voir
 /// `main.dart`'s `_buildHome`, entre "vault trouvé" et le chargement des
@@ -13,11 +14,20 @@ class VaultUnlockScreen extends StatefulWidget {
   final ValueChanged<VaultCipher> onUnlocked;
   final VoidCallback onForgotPassword;
 
+  /// Permettent de changer de dossier vault directement depuis cet écran —
+  /// utile si le mot de passe saisi n'est pas celui du vault actuellement
+  /// sélectionné (ex : mauvais dossier iCloud/Dropbox), sans devoir d'abord
+  /// se déverrouiller pour atteindre les Réglages.
+  final VaultFolderService vaultFolderService;
+  final Future<void> Function(String path) onVaultActivated;
+
   const VaultUnlockScreen({
     super.key,
     required this.metadata,
     required this.onUnlocked,
     required this.onForgotPassword,
+    required this.vaultFolderService,
+    required this.onVaultActivated,
   });
 
   @override
@@ -27,6 +37,7 @@ class VaultUnlockScreen extends StatefulWidget {
 class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
   final _controller = TextEditingController();
   bool _loading = false;
+  bool _pickingFolder = false;
   String? _error;
 
   @override
@@ -52,6 +63,25 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
         _error = 'Mot de passe incorrect.';
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _changeFolder() async {
+    setState(() {
+      _pickingFolder = true;
+      _error = null;
+    });
+    try {
+      final vault = await widget.vaultFolderService.pickAndRememberVault(
+        dialogTitle: 'Choisis ou crée un vault Opime',
+      );
+      if (vault != null) await widget.onVaultActivated(vault.vaultPath);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Impossible de changer de dossier : $e');
+      }
+    } finally {
+      if (mounted) setState(() => _pickingFolder = false);
     }
   }
 
@@ -91,7 +121,7 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
                 ),
                 const SizedBox(height: 16),
                 PrimaryButton(
-                  onPressed: _loading ? null : _unlock,
+                  onPressed: (_loading || _pickingFolder) ? null : _unlock,
                   leading: _loading
                       ? const SizedBox(
                           width: 16,
@@ -105,8 +135,27 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
                 ),
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: _loading ? null : widget.onForgotPassword,
+                  onPressed: (_loading || _pickingFolder)
+                      ? null
+                      : widget.onForgotPassword,
                   child: const shadcn.Text('Mot de passe oublié ?'),
+                ),
+                TextButton(
+                  onPressed: (_loading || _pickingFolder)
+                      ? null
+                      : _changeFolder,
+                  leading: _pickingFolder
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(),
+                        )
+                      : const Icon(LucideIcons.folderOpen, size: 14),
+                  child: shadcn.Text(
+                    _pickingFolder
+                        ? 'Sélection en cours...'
+                        : 'Changer de dossier de vault',
+                  ),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 8),

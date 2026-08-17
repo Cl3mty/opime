@@ -181,11 +181,21 @@ class _CategoryTile extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(category.icon, size: 18, color: category.color),
                         const SizedBox(width: 8),
-                        shadcn.Text(category.label).medium(),
+                        // Flexible + maxLines/overflow : sans ça, un libellé
+                        // long (ex. "Assurance-vie multisupport") déborde
+                        // sur les colonnes Montant/Évolution au lieu de
+                        // s'arrêter à la largeur réservée par l'Expanded
+                        // parent (visible surtout en dessous de 800px).
+                        Flexible(
+                          child: shadcn.Text(
+                            category.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ).medium(),
+                        ),
                       ],
                     ),
                   ),

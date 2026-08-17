@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import '../profiles/profile_repository.dart';
 import 'vault_crypto.dart' show VaultCipher;
 import 'vault_file_storage.dart';
+import 'vault_migration_marker.dart';
 import 'vault_private_paths.dart';
 
 /// Chiffre ou déchiffre en place tous les fichiers privés d'un vault (voir
@@ -50,6 +51,17 @@ class VaultEncryptionMigrationService {
     required VaultCipher? to,
     void Function(int done, int total)? onProgress,
   }) async {
+    // Écrit AVANT le premier octet touché, effacé seulement après le tout
+    // dernier fichier — voir `VaultMigrationMarker` : si l'app est tuée
+    // n'importe où entre les deux (crash, force-quit), ce marqueur survit
+    // sur disque et permet au prochain lancement de détecter un vault
+    // potentiellement dans un état mixte plutôt que de le charger comme si
+    // de rien n'était.
+    await VaultMigrationMarker.write(
+      vaultPath,
+      operation: to != null ? 'encrypt' : 'decrypt',
+    );
+
     final roots = await _rootsToMigrate(vaultPath, readCipher: from);
     final total = roots.fold<int>(0, (sum, root) => sum + root.$2.length);
     var done = 0;
@@ -65,6 +77,8 @@ class VaultEncryptionMigrationService {
         onProgress?.call(done, total);
       }
     }
+
+    await VaultMigrationMarker.clear(vaultPath);
   }
 
   /// Une entrée par racine à parcourir : `(vaultPath, ['profiles.json'])`

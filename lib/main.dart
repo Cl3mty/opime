@@ -10,12 +10,14 @@ import 'core/storage/vault_crypto.dart' show VaultCipher;
 import 'core/storage/vault_encryption_metadata.dart';
 import 'core/storage/vault_encryption_repository.dart';
 import 'core/storage/vault_folder_service.dart';
+import 'core/storage/vault_migration_marker.dart';
 import 'core/storage/vault_session.dart';
 import 'core/profiles/profile_controller.dart';
 import 'core/profiles/profile_repository.dart';
 import 'core/profiles/sidebar_prefs_controller.dart';
 import 'core/updates/update_banner.dart';
 import 'features/onboarding/onboarding_screen.dart';
+import 'features/onboarding/vault_migration_interrupted_screen.dart';
 import 'features/onboarding/vault_recovery_screen.dart';
 import 'features/onboarding/vault_unlock_screen.dart';
 import 'features/settings/settings_screen.dart';
@@ -118,6 +120,13 @@ class _OpimeAppState extends State<OpimeApp> {
   /// DEK déverrouillée, voir `VaultSession.current`).
   VaultEncryptionMetadata? _vaultEncryptionMetadata;
   bool _vaultLocked = false;
+
+  /// Vrai quand `VaultMigrationMarker` détecte qu'une opération activer/
+  /// désactiver le chiffrement a été interrompue avant sa fin sur ce vault
+  /// (voir `vault_migration_interrupted_screen.dart`) — bloque tout
+  /// chargement de profil tant que l'utilisateur n'a pas explicitement
+  /// choisi de continuer malgré l'avertissement.
+  bool _vaultMigrationInterrupted = false;
 
   /// Bascule vers l'écran de récupération (clé de récupération → nouveau
   /// mot de passe) depuis l'écran de déverrouillage classique.
@@ -239,6 +248,33 @@ class _OpimeAppState extends State<OpimeApp> {
   }
 
   Future<void> _initProfiles(String vaultPath) async {
+    // Priorité absolue sur tout le reste, chiffré ou non : une migration
+    // interrompue peut avoir laissé des fichiers privés dans un état mixte
+    // (voir `VaultMigrationMarker`) — mieux vaut bloquer explicitement que
+    // de charger un vault potentiellement incohérent en silence.
+    if (await VaultMigrationMarker.exists(vaultPath)) {
+      if (!mounted) return;
+      setState(() {
+        _vaultPath = vaultPath;
+        _vaultMigrationInterrupted = true;
+        _profileController = null;
+        _sidebarPrefsController = null;
+        _profilesLoadError = null;
+      });
+      return;
+    }
+
+    // Changement de vault pendant qu'une clé d'un AUTRE vault était encore
+    // posée (ex : "Changer de dossier de vault" depuis l'écran de
+    // déverrouillage, ou changement de vault actif depuis les Réglages) :
+    // sans cette invalidation, les repositories du nouveau vault
+    // hériteraient de la clé de l'ancien via VaultSession.current, ce qui
+    // chiffrerait/déchiffrerait ses fichiers avec la mauvaise clé.
+    if (VaultSession.current != null && VaultSession.vaultPath != vaultPath) {
+      VaultSession.current = null;
+      VaultSession.vaultPath = null;
+    }
+
     // Vault chiffré et pas encore déverrouillé pour cette session : aucun
     // repository ne peut rien lire sans la DEK (voir `VaultSession.current`)
     // — on affiche l'écran de déverrouillage au lieu de continuer, voir
@@ -253,6 +289,7 @@ class _OpimeAppState extends State<OpimeApp> {
           _vaultPath = vaultPath;
           _vaultEncryptionMetadata = metadata;
           _vaultLocked = true;
+          _vaultMigrationInterrupted = false;
           _profileController = null;
           _sidebarPrefsController = null;
           _profilesLoadError = null;
@@ -270,6 +307,14 @@ class _OpimeAppState extends State<OpimeApp> {
       _profileController = null;
       _sidebarPrefsController = null;
       _profilesLoadError = null;
+      _vaultMigrationInterrupted = false;
+      // Sans ça, changer de vault chiffré -> non chiffré (bouton "Changer
+      // de dossier de vault" sur VaultUnlockScreen) laisse _vaultLocked à
+      // true : _buildHome reste bloqué sur l'écran de déverrouillage de
+      // l'ANCIEN vault alors que les profils du nouveau viennent de
+      // charger normalement en dessous.
+      _vaultLocked = false;
+      _vaultEncryptionMetadata = null;
     });
 
     final controller = ProfileController(ProfileRepository(vaultPath));
@@ -305,6 +350,17 @@ class _OpimeAppState extends State<OpimeApp> {
     if (path != null) _initProfiles(path);
   }
 
+  /// L'utilisateur choisit d'ignorer l'avertissement de migration
+  /// interrompue (voir [VaultMigrationInterruptedScreen]) : efface le
+  /// marqueur puis relance le chargement normalement.
+  Future<void> _continueDespiteInterruptedMigration() async {
+    final path = _vaultPath;
+    if (path == null) return;
+    await VaultMigrationMarker.clear(path);
+    setState(() => _vaultMigrationInterrupted = false);
+    await _initProfiles(path);
+  }
+
   Future<void> _onVaultReady(String path) async {
     await _initProfiles(path);
   }
@@ -315,6 +371,7 @@ class _OpimeAppState extends State<OpimeApp> {
   /// puis relance le chargement des profils, cette fois avec la clé posée.
   void _onVaultUnlocked(VaultCipher cipher) {
     VaultSession.current = cipher;
+    VaultSession.vaultPath = _vaultPath;
     setState(() {
       _vaultLocked = false;
       _showingVaultRecovery = false;
@@ -348,6 +405,7 @@ class _OpimeAppState extends State<OpimeApp> {
     _assistantChatScope = null;
     _notificationsScope = null;
     VaultSession.current = null;
+    VaultSession.vaultPath = null;
     setState(() {
       _vaultPath = null;
       _profileController = null;
@@ -391,6 +449,12 @@ class _OpimeAppState extends State<OpimeApp> {
         onVaultReady: _onVaultReady,
       );
     }
+    if (_vaultMigrationInterrupted) {
+      return VaultMigrationInterruptedScreen(
+        vaultPath: _vaultPath!,
+        onContinueAnyway: _continueDespiteInterruptedMigration,
+      );
+    }
     if (_vaultLocked) {
       final metadata = _vaultEncryptionMetadata;
       if (metadata == null) {
@@ -412,6 +476,8 @@ class _OpimeAppState extends State<OpimeApp> {
         metadata: metadata,
         onUnlocked: _onVaultUnlocked,
         onForgotPassword: () => setState(() => _showingVaultRecovery = true),
+        vaultFolderService: _vaultFolderService,
+        onVaultActivated: _onVaultReady,
       );
     }
     if (_profilesLoadError != null) {

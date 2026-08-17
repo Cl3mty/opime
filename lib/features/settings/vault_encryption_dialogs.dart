@@ -3,7 +3,9 @@ import 'dart:typed_data' show Uint8List;
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:window_manager/window_manager.dart';
 
+import '../../core/platform_info.dart';
 import '../../core/storage/vault_crypto.dart';
 import '../../core/storage/vault_encryption_metadata.dart';
 import '../../core/storage/vault_encryption_migration_service.dart';
@@ -12,6 +14,23 @@ import '../../core/storage/vault_session.dart';
 import '../../core/ui/frosted_card.dart';
 
 const _migrationService = VaultEncryptionMigrationService();
+
+/// Empêche la fermeture de la fenêtre (bouton rouge, Cmd+Q) pendant qu'une
+/// migration chiffrer/déchiffrer-en-place tourne — une interruption en
+/// plein milieu laisse le vault dans un état mixte (voir
+/// `VaultMigrationMarker`). `window_manager` n'a pas d'implémentation
+/// mobile, d'où le garde `isDesktopPlatform` (même convention que
+/// `main.dart`). Toujours rétabli via `finally`, y compris si la migration
+/// lève une exception.
+Future<T> _withCloseProtection<T>(Future<T> Function() body) async {
+  if (!isDesktopPlatform) return body();
+  await windowManager.setPreventClose(true);
+  try {
+    return await body();
+  } finally {
+    await windowManager.setPreventClose(false);
+  }
+}
 
 /// Ouvre le flux "Activer le chiffrement" : mot de passe → clé de
 /// récupération (affichée une seule fois, confirmation obligatoire) →
@@ -117,6 +136,25 @@ class _ProgressView extends StatelessWidget {
         shadcn.Text(
           total == 0 ? 'Préparation...' : '$done / $total fichier(s)',
         ).muted().small(),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              LucideIcons.triangleAlert,
+              size: 16,
+              color: Theme.of(context).colorScheme.destructive,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: shadcn.Text(
+                'Ne ferme pas l\'application pendant cette opération '
+                '(la fermeture de la fenêtre est bloquée le temps qu\'elle '
+                'se termine).',
+              ).muted().xSmall(),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -256,20 +294,23 @@ class _EnableEncryptionDialogState extends State<_EnableEncryptionDialog> {
   Future<void> _runMigration() async {
     setState(() => _step = _EnableStep.migrating);
     final cipher = VaultCipher(_dek!);
-    await _migrationService.encryptInPlace(
-      vaultPath: widget.vaultPath,
-      cipher: cipher,
-      onProgress: (done, total) {
-        if (mounted) {
-          setState(() {
-            _done = done;
-            _total = total;
-          });
-        }
-      },
-    );
-    await VaultEncryptionRepository(widget.vaultPath).save(_metadata!);
-    VaultSession.current = cipher;
+    await _withCloseProtection(() async {
+      await _migrationService.encryptInPlace(
+        vaultPath: widget.vaultPath,
+        cipher: cipher,
+        onProgress: (done, total) {
+          if (mounted) {
+            setState(() {
+              _done = done;
+              _total = total;
+            });
+          }
+        },
+      );
+      await VaultEncryptionRepository(widget.vaultPath).save(_metadata!);
+      VaultSession.current = cipher;
+      VaultSession.vaultPath = widget.vaultPath;
+    });
     if (mounted) Navigator.of(context).pop(true);
   }
 
@@ -401,20 +442,23 @@ class _DisableEncryptionDialogState extends State<_DisableEncryptionDialog> {
     if (!mounted) return;
     setState(() => _step = _DisableStep.migrating);
     final cipher = VaultCipher(dek);
-    await _migrationService.decryptInPlace(
-      vaultPath: widget.vaultPath,
-      cipher: cipher,
-      onProgress: (done, total) {
-        if (mounted) {
-          setState(() {
-            _done = done;
-            _total = total;
-          });
-        }
-      },
-    );
-    await VaultEncryptionRepository(widget.vaultPath).delete();
-    VaultSession.current = null;
+    await _withCloseProtection(() async {
+      await _migrationService.decryptInPlace(
+        vaultPath: widget.vaultPath,
+        cipher: cipher,
+        onProgress: (done, total) {
+          if (mounted) {
+            setState(() {
+              _done = done;
+              _total = total;
+            });
+          }
+        },
+      );
+      await VaultEncryptionRepository(widget.vaultPath).delete();
+      VaultSession.current = null;
+      VaultSession.vaultPath = null;
+    });
     if (mounted) Navigator.of(context).pop(true);
   }
 

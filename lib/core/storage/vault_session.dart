@@ -16,4 +16,11 @@ class VaultSession {
   VaultSession._();
 
   static VaultCipher? current;
+
+  /// Chemin du vault auquel appartient [current] — permet à `main.dart`'s
+  /// `_initProfiles` de détecter un changement de vault (ex : bouton
+  /// "Changer de dossier de vault") et d'invalider une clé devenue obsolète
+  /// avant de construire les repositories du nouveau vault, plutôt que de
+  /// risquer de (dé)chiffrer ses fichiers avec la clé de l'ancien.
+  static String? vaultPath;
 }

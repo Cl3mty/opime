@@ -7,6 +7,7 @@ import '../core/profiles/profile_controller.dart';
 import '../core/shortcuts/app_shortcuts.dart';
 import '../core/shortcuts/keyboard_shortcuts_controller.dart';
 import '../core/ui/app_background.dart';
+import '../core/ui/responsive.dart';
 import '../core/profiles/sidebar_prefs_controller.dart';
 import '../features/navigation/account_switcher_menu.dart';
 import '../features/navigation/app_sidebar.dart';
@@ -23,8 +24,6 @@ import '../features/notifications/notifications_controller.dart';
 import '../features/patrimoine_export/patrimoine_export_button.dart';
 import '../features/patrimoine_export/patrimoine_export_dialog.dart';
 import 'theme_controller.dart';
-
-const _breakpoint = 800.0;
 
 /// Les 4 onglets de la barre de navigation mobile (en dessous de
 /// [_breakpoint]), qui remplace la sidebar desktop. Pas d'onglet Assistant
@@ -342,13 +341,10 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    // shortestSide (et non width) : reste stable quelle que soit
-    // l'orientation d'un téléphone donné, contrairement à width qui
-    // dépasse 800 en paysage sur un iPhone large. Sans ça, faire pivoter
-    // le téléphone bascule à tort vers la sidebar desktop (donc vers
-    // l'Assistant, absent de la version mobile). Une vraie tablette garde
-    // un shortestSide >= 800 dans les deux orientations.
-    final isWide = MediaQuery.of(context).size.shortestSide >= _breakpoint;
+    // Sans ça, faire pivoter le téléphone bascule à tort vers la sidebar
+    // desktop (donc vers l'Assistant, absent de la version mobile) — voir
+    // le commentaire de isWideLayout() sur le choix de shortestSide.
+    final isWide = isWideLayout(context);
 
     if (isWide) {
       final page = NavigationScope(
@@ -424,7 +420,15 @@ class _AppShellState extends State<AppShell> {
       Scaffold(
         headers: [
           AppBar(
-            title: Text(_mobileTitle),
+            // FittedBox plutôt qu'un simple Text : un titre trop long
+            // (ex. un nom de compte long) doit rétrécir pour tenir sur une
+            // ligne au lieu de passer sur deux et pousser le contenu de
+            // l'AppBar.
+            title: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(_mobileTitle, maxLines: 1, softWrap: false),
+            ),
             leading: [
               if (_mobileCanGoBack)
                 IconButton.ghost(

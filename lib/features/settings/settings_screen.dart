@@ -10,6 +10,7 @@ import '../../core/storage/vault_encryption_repository.dart';
 import '../../core/storage/vault_folder_service.dart';
 import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/responsive.dart';
 import 'vault_encryption_dialogs.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -49,6 +50,12 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // L'Assistant IA n'a pas d'onglet en version mobile (voir
+    // nav_models.dart) et les raccourcis clavier supposent un clavier
+    // physique : les deux cartes n'ont pas d'équivalent utile en dessous du
+    // seuil desktop, donc on les masque plutôt que d'afficher des réglages
+    // sans effet.
+    final isWide = isWideLayout(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
       // Toute la largeur disponible, comme les autres pages : plus de
@@ -61,12 +68,16 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
           _ThemeCard(themeController: themeController),
           const SizedBox(height: 16),
-          _AssistantCard(configController: assistantConfigController),
-          const SizedBox(height: 16),
+          if (isWide) ...[
+            _AssistantCard(configController: assistantConfigController),
+            const SizedBox(height: 16),
+          ],
           _NotificationsCard(configController: notificationsSettingsController),
           const SizedBox(height: 16),
-          _ShortcutsCard(configController: keyboardShortcutsController),
-          const SizedBox(height: 16),
+          if (isWide) ...[
+            _ShortcutsCard(configController: keyboardShortcutsController),
+            const SizedBox(height: 16),
+          ],
           _EncryptionCard(
             vaultPath: vaultPath,
             onChanged: onVaultEncryptionChanged,

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/storage/vault_crypto.dart';
 import 'package:opime/core/storage/vault_encryption_migration_service.dart';
+import 'package:opime/core/storage/vault_migration_marker.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
@@ -112,6 +113,37 @@ void main() {
       // Progression cohérente : se termine à total/total.
       expect(progress, isNotEmpty);
       expect(progress.last.$1, progress.last.$2);
+
+      // Le marqueur de migration en cours (voir VaultMigrationMarker) doit
+      // avoir disparu : une migration menée à son terme ne doit jamais
+      // laisser un vault signalé comme "potentiellement interrompu".
+      expect(await VaultMigrationMarker.exists(vaultDir.path), isFalse);
+    },
+  );
+
+  test(
+    'le marqueur de migration en cours existe pendant l\'opération, '
+    'disparaît une fois terminée',
+    () async {
+      final markerFile = File(
+        p.join(vaultDir.path, '.opime', 'migration_in_progress.json'),
+      );
+      final markerPresentDuringProgress = <bool>[];
+
+      await service.encryptInPlace(
+        vaultPath: vaultDir.path,
+        cipher: VaultCipher(generateDek()),
+        // existsSync (pas exists()) : onProgress n'est pas async, et le
+        // marqueur doit être présent à CHAQUE tour de la boucle de
+        // migration, pas seulement en moyenne.
+        onProgress: (done, total) {
+          if (total > 0) markerPresentDuringProgress.add(markerFile.existsSync());
+        },
+      );
+
+      expect(markerPresentDuringProgress, isNotEmpty);
+      expect(markerPresentDuringProgress, everyElement(isTrue));
+      expect(markerFile.existsSync(), isFalse);
     },
   );
 
