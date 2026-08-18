@@ -4,8 +4,6 @@ import '../core/assistant/assistant_config_controller.dart';
 import '../core/notifications/notifications_settings_controller.dart';
 import '../core/privacy/amount_visibility_controller.dart';
 import '../core/profiles/profile_controller.dart';
-import '../core/shortcuts/app_shortcuts.dart';
-import '../core/shortcuts/keyboard_shortcuts_controller.dart';
 import '../core/ui/app_background.dart';
 import '../core/ui/responsive.dart';
 import '../core/profiles/sidebar_prefs_controller.dart';
@@ -22,7 +20,6 @@ import '../features/investments/price_sync_status_controller.dart';
 import '../features/notifications/news_button.dart';
 import '../features/notifications/notifications_controller.dart';
 import '../features/patrimoine_export/patrimoine_export_button.dart';
-import '../features/patrimoine_export/patrimoine_export_dialog.dart';
 import 'theme_controller.dart';
 
 /// Les 4 onglets de la barre de navigation mobile (en dessous de
@@ -60,7 +57,6 @@ class AppShell extends StatefulWidget {
   final ProfileController profileController;
   final SidebarPrefsController sidebarPrefsController;
   final AmountVisibilityController amountVisibilityController;
-  final KeyboardShortcutsController keyboardShortcutsController;
   final PatrimoineRefreshController patrimoineRefreshController;
   final OnboardingHighlightController onboardingHighlightController;
   final PriceSyncStatusController priceSyncStatusController;
@@ -70,13 +66,21 @@ class AppShell extends StatefulWidget {
   final NotificationsController notificationsController;
   final Map<String, WidgetBuilder> pages;
 
+  /// État (replié/déplié) de la sidebar, remonté à `main.dart` pour que le
+  /// raccourci clavier ⌘B puisse le basculer depuis la racine de l'app —
+  /// voir sa documentation dans `main.dart` pour pourquoi les raccourcis ne
+  /// peuvent plus vivre ici (`CallbackShortcuts` posé sur le contenu d'une
+  /// route ne voit jamais les évènements clavier tant qu'une boîte de
+  /// dialogue d'une AUTRE route a le focus — ce qui les rendait
+  /// silencieusement inopérants dès qu'un dialogue était ouvert).
+  final ValueNotifier<bool> sidebarCollapsed;
+
   const AppShell({
     super.key,
     required this.themeController,
     required this.profileController,
     required this.sidebarPrefsController,
     required this.amountVisibilityController,
-    required this.keyboardShortcutsController,
     required this.patrimoineRefreshController,
     required this.onboardingHighlightController,
     required this.priceSyncStatusController,
@@ -85,6 +89,7 @@ class AppShell extends StatefulWidget {
     required this.notificationsSettingsController,
     required this.notificationsController,
     required this.pages,
+    required this.sidebarCollapsed,
   });
 
   @override
@@ -93,7 +98,6 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   String _selectedKey = 'dashboard';
-  bool _collapsed = false;
   int _dashboardEpoch = 0;
   bool _lastAssistantEnabled = false;
 
@@ -134,15 +138,14 @@ class _AppShellState extends State<AppShell> {
     widget.assistantChatController.unreadResponses.addListener(
       _onAssistantUnreadChanged,
     );
-    widget.keyboardShortcutsController.addListener(_onKeyboardShortcutsChanged);
+    widget.sidebarCollapsed.addListener(_onSidebarCollapsedChanged);
     _onAssistantVisibilityChanged();
   }
 
-  /// Les Réglages peuvent activer/désactiver les raccourcis clavier à tout
-  /// moment — sans ce listener, [_wrapWithShortcuts] (évalué seulement au
-  /// `build`) ne relirait la nouvelle valeur qu'au prochain rebuild
-  /// déclenché par autre chose.
-  void _onKeyboardShortcutsChanged() {
+  /// Le raccourci clavier ⌘B (posé à la racine de l'app, voir `main.dart`)
+  /// modifie [AppShell.sidebarCollapsed] directement plutôt que par un
+  /// `setState` local — ce listener répercute le changement sur ce widget.
+  void _onSidebarCollapsedChanged() {
     if (mounted) setState(() {});
   }
 
@@ -166,9 +169,7 @@ class _AppShellState extends State<AppShell> {
     widget.assistantChatController.unreadResponses.removeListener(
       _onAssistantUnreadChanged,
     );
-    widget.keyboardShortcutsController.removeListener(
-      _onKeyboardShortcutsChanged,
-    );
+    widget.sidebarCollapsed.removeListener(_onSidebarCollapsedChanged);
     super.dispose();
   }
 
@@ -315,30 +316,6 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  /// Raccourcis clavier globaux (voir `app_shortcuts.dart`'s
-  /// [AppShortcutAction]) — sans effet si désactivés dans les Réglages
-  /// (`widget.keyboardShortcutsController`). Le `Focus` interne garantit
-  /// qu'un descendant tient le focus dès le premier build (sinon aucun
-  /// widget ne serait sur la chaîne de focus pour intercepter les
-  /// événements clavier tant que l'utilisateur n'a encore rien cliqué).
-  Widget _wrapWithShortcuts(Widget child) {
-    if (!widget.keyboardShortcutsController.enabled) return child;
-    return CallbackShortcuts(
-      bindings: {
-        AppShortcutAction.toggleSidebar.activator: () =>
-            setState(() => _collapsed = !_collapsed),
-        AppShortcutAction.toggleAmountsHidden.activator: () =>
-            widget.amountVisibilityController.toggle(),
-        AppShortcutAction.exportPdf.activator: () => showPatrimoineExportDialog(
-          context,
-          vaultPath: widget.profileController.activeDataPath,
-          profileName: widget.profileController.active?.name ?? '',
-        ),
-      },
-      child: Focus(autofocus: true, child: child),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // Sans ça, faire pivoter le téléphone bascule à tort vers la sidebar
@@ -362,135 +339,126 @@ class _AppShellState extends State<AppShell> {
         child: AppSidebar(
           selectedKey: _selectedKey,
           onSelect: _select,
-          collapsed: _collapsed,
-          onToggleCollapse: () => setState(() => _collapsed = !_collapsed),
+          collapsed: widget.sidebarCollapsed.value,
+          onToggleCollapse: () =>
+              widget.sidebarCollapsed.value = !widget.sidebarCollapsed.value,
           profileController: widget.profileController,
           sidebarPrefsController: widget.sidebarPrefsController,
           assistantEnabled: widget.assistantConfigController.enabled,
           assistantUnread: widget.assistantChatController.unreadResponses,
         ),
       );
-      return _wrapWithShortcuts(
-        Scaffold(
-          // SafeArea : sans elle, la sidebar et la TopBar démarrent au tout
-          // haut de l'écran physique et chevauchent la barre système
-          // (batterie/heure) sur tablette. Sans effet sur desktop, où
-          // MediaQuery.padding.top est toujours nul.
-          child: SafeArea(
-            bottom: false,
-            child: Row(
-              children: [
-                sidebar,
-                Container(
-                  width: 1,
-                  color: Theme.of(context).colorScheme.border,
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      AppBackground(
-                        child: TopBar(
-                          amountVisibility: widget.amountVisibilityController,
-                          profileController: widget.profileController,
-                          patrimoineRefreshController:
-                              widget.patrimoineRefreshController,
-                          onboardingHighlight:
-                              widget.onboardingHighlightController,
-                          priceSyncStatus: widget.priceSyncStatusController,
-                          notificationsSettings:
-                              widget.notificationsSettingsController,
-                          notificationsController:
-                              widget.notificationsController,
-                          currentPageKey: _selectedKey,
-                          onSelect: _select,
-                        ),
+      return Scaffold(
+        // SafeArea : sans elle, la sidebar et la TopBar démarrent au tout
+        // haut de l'écran physique et chevauchent la barre système
+        // (batterie/heure) sur tablette. Sans effet sur desktop, où
+        // MediaQuery.padding.top est toujours nul.
+        child: SafeArea(
+          bottom: false,
+          child: Row(
+            children: [
+              sidebar,
+              Container(width: 1, color: Theme.of(context).colorScheme.border),
+              Expanded(
+                child: Column(
+                  children: [
+                    AppBackground(
+                      child: TopBar(
+                        amountVisibility: widget.amountVisibilityController,
+                        profileController: widget.profileController,
+                        patrimoineRefreshController:
+                            widget.patrimoineRefreshController,
+                        onboardingHighlight:
+                            widget.onboardingHighlightController,
+                        priceSyncStatus: widget.priceSyncStatusController,
+                        notificationsSettings:
+                            widget.notificationsSettingsController,
+                        notificationsController: widget.notificationsController,
+                        currentPageKey: _selectedKey,
+                        onSelect: _select,
                       ),
-                      Expanded(child: page),
-                    ],
-                  ),
+                    ),
+                    Expanded(child: page),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
     }
 
-    return _wrapWithShortcuts(
-      Scaffold(
-        headers: [
-          AppBar(
-            // FittedBox plutôt qu'un simple Text : un titre trop long
-            // (ex. un nom de compte long) doit rétrécir pour tenir sur une
-            // ligne au lieu de passer sur deux et pousser le contenu de
-            // l'AppBar.
-            title: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(_mobileTitle, maxLines: 1, softWrap: false),
+    return Scaffold(
+      headers: [
+        AppBar(
+          // FittedBox plutôt qu'un simple Text : un titre trop long
+          // (ex. un nom de compte long) doit rétrécir pour tenir sur une
+          // ligne au lieu de passer sur deux et pousser le contenu de
+          // l'AppBar.
+          title: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(_mobileTitle, maxLines: 1, softWrap: false),
+          ),
+          leading: [
+            if (_mobileCanGoBack)
+              IconButton.ghost(
+                icon: const Icon(LucideIcons.chevronLeft),
+                onPressed: _mobileBack,
+              ),
+          ],
+          trailing: [
+            AmountVisibilityToggleButton(
+              amountVisibility: widget.amountVisibilityController,
             ),
-            leading: [
-              if (_mobileCanGoBack)
-                IconButton.ghost(
-                  icon: const Icon(LucideIcons.chevronLeft),
-                  onPressed: _mobileBack,
-                ),
-            ],
-            trailing: [
-              AmountVisibilityToggleButton(
-                amountVisibility: widget.amountVisibilityController,
-              ),
-              NewsButton(
-                settings: widget.notificationsSettingsController,
-                controller: widget.notificationsController,
-                vaultPath: widget.profileController.activeDataPath,
-              ),
-              PatrimoineExportButton(
-                profileController: widget.profileController,
-              ),
-              AddMenuButton(
-                profileController: widget.profileController,
-                patrimoineRefreshController: widget.patrimoineRefreshController,
-                onboardingHighlight: widget.onboardingHighlightController,
-                priceSyncStatus: widget.priceSyncStatusController,
-                compact: true,
-                currentPageKey: _selectedKey,
-              ),
-              Builder(
-                builder: (barContext) => IconButton.ghost(
-                  icon: const Icon(LucideIcons.userRound),
-                  onPressed: () => openAccountSwitcherMenu(
-                    barContext,
-                    profileController: widget.profileController,
-                    onSelect: _select,
-                  ),
+            NewsButton(
+              settings: widget.notificationsSettingsController,
+              controller: widget.notificationsController,
+              vaultPath: widget.profileController.activeDataPath,
+            ),
+            PatrimoineExportButton(profileController: widget.profileController),
+            AddMenuButton(
+              profileController: widget.profileController,
+              patrimoineRefreshController: widget.patrimoineRefreshController,
+              onboardingHighlight: widget.onboardingHighlightController,
+              priceSyncStatus: widget.priceSyncStatusController,
+              compact: true,
+              currentPageKey: _selectedKey,
+            ),
+            Builder(
+              builder: (barContext) => IconButton.ghost(
+                icon: const Icon(LucideIcons.userRound),
+                onPressed: () => openAccountSwitcherMenu(
+                  barContext,
+                  profileController: widget.profileController,
+                  onSelect: _select,
                 ),
               ),
-            ],
-          ),
-        ],
-        footers: [
-          NavigationBar(
-            alignment: NavigationBarAlignment.spaceAround,
-            children: [
-              for (final tab in _mobileTabs)
-                NavigationItem(
-                  label: Text(tab.label),
-                  selectedStyle: const ButtonStyle.primaryIcon(),
-                  selected: _mobileActiveTab == tab.key,
-                  onChanged: (isSelected) {
-                    if (isSelected) _selectMobileTab(tab.key);
-                  },
-                  child: Icon(tab.icon),
-                ),
-            ],
-          ),
-        ],
-        // Contenu de page en aplat uni, comme en desktop : pas de dégradé
-        // ici (réservé aux barres — AppBar/NavigationBar restent telles
-        // quelles pour l'instant côté mobile).
-        child: _mobileContent(context),
-      ),
+            ),
+          ],
+        ),
+      ],
+      footers: [
+        NavigationBar(
+          alignment: NavigationBarAlignment.spaceAround,
+          children: [
+            for (final tab in _mobileTabs)
+              NavigationItem(
+                label: Text(tab.label),
+                selectedStyle: const ButtonStyle.primaryIcon(),
+                selected: _mobileActiveTab == tab.key,
+                onChanged: (isSelected) {
+                  if (isSelected) _selectMobileTab(tab.key);
+                },
+                child: Icon(tab.icon),
+              ),
+          ],
+        ),
+      ],
+      // Contenu de page en aplat uni, comme en desktop : pas de dégradé
+      // ici (réservé aux barres — AppBar/NavigationBar restent telles
+      // quelles pour l'instant côté mobile).
+      child: _mobileContent(context),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'core/assistant/assistant_chat_controller.dart';
 import 'core/assistant/assistant_config_controller.dart';
 import 'core/notifications/notifications_settings_controller.dart';
 import 'core/privacy/amount_visibility_controller.dart';
+import 'core/shortcuts/app_shortcuts.dart';
 import 'core/shortcuts/keyboard_shortcuts_controller.dart';
 import 'core/storage/vault_crypto.dart' show VaultCipher;
 import 'core/storage/vault_encryption_metadata.dart';
@@ -38,6 +39,7 @@ import 'features/investments/price_sync_banner.dart';
 import 'features/investments/price_sync_status_controller.dart';
 import 'features/investments/real_category_detail_screen.dart';
 import 'features/notifications/notifications_controller.dart';
+import 'features/patrimoine_export/patrimoine_export_dialog.dart';
 import 'features/liabilities/liabilities_models.dart' show LiabilityType;
 import 'features/liabilities/real_passif_detail_screen.dart';
 import 'features/strategy/strategy_screen.dart';
@@ -106,6 +108,19 @@ class _OpimeAppState extends State<OpimeApp> {
   final _priceSyncStatusController = PriceSyncStatusController();
   final _onboardingHighlightController = OnboardingHighlightController();
   final _vaultFolderService = VaultFolderService();
+
+  /// État (replié/déplié) de la sidebar — remonté ici depuis `AppShell` pour
+  /// que le raccourci clavier ⌘B, posé à la racine de l'app (voir
+  /// `ShadcnApp`'s `builder` dans [build]), puisse le modifier. Un
+  /// `CallbackShortcuts` posé plus bas dans l'arbre (à l'intérieur d'une
+  /// route, comme c'était le cas avant dans `AppShell`) ne reçoit jamais les
+  /// évènements clavier tant que le focus est ailleurs — typiquement dans
+  /// une boîte de dialogue, elle-même une AUTRE route du même Navigator,
+  /// donc pas un descendant du contenu de la route "accueil" : c'est ce qui
+  /// rendait les raccourcis silencieusement inopérants dès qu'un dialogue
+  /// était ouvert. Posés ici, en ancêtre du Navigator lui-même, ils restent
+  /// actifs quel que soit ce qui a le focus.
+  final _sidebarCollapsed = ValueNotifier<bool>(false);
 
   bool _checkingVault = true;
   String? _vaultPath;
@@ -229,6 +244,11 @@ class _OpimeAppState extends State<OpimeApp> {
     _themeController.addListener(() => setState(() {}));
     _amountVisibilityController.load();
     _keyboardShortcutsController.load();
+    // Réévalue le `builder` de ShadcnApp (voir [build]) quand les Réglages
+    // activent/désactivent les raccourcis clavier — sans ça, la nouvelle
+    // valeur ne serait relue qu'au prochain rebuild déclenché par autre
+    // chose.
+    _keyboardShortcutsController.addListener(() => setState(() {}));
     _assistantConfigController.load();
     _notificationsSettingsController.load();
     _notificationsSettingsController.addListener(
@@ -436,6 +456,35 @@ class _OpimeAppState extends State<OpimeApp> {
       themeMode: _themeController.mode,
       home: _buildHome(),
       localizationsDelegates: FlutterQuillLocalizations.localizationsDelegates,
+      // Ancêtre du Navigator (donc de toute route, y compris une boîte de
+      // dialogue) plutôt que posés à l'intérieur de la route "accueil" —
+      // voir la documentation de [_sidebarCollapsed] pour pourquoi c'est le
+      // seul endroit où ces raccourcis fonctionnent de façon fiable.
+      builder: (context, child) => _buildShortcuts(context, child!),
+    );
+  }
+
+  Widget _buildShortcuts(BuildContext context, Widget child) {
+    if (!_keyboardShortcutsController.enabled) return child;
+    return CallbackShortcuts(
+      bindings: {
+        AppShortcutAction.toggleSidebar.activator: () =>
+            _sidebarCollapsed.value = !_sidebarCollapsed.value,
+        AppShortcutAction.toggleAmountsHidden.activator: () =>
+            _amountVisibilityController.toggle(),
+        AppShortcutAction.exportPdf.activator: () {
+          final profileController = _profileController;
+          // Rien à exporter avant qu'un vault/profil ne soit chargé (écrans
+          // d'onboarding/déverrouillage) — le raccourci reste sans effet.
+          if (profileController == null) return;
+          showPatrimoineExportDialog(
+            context,
+            vaultPath: profileController.activeDataPath,
+            profileName: profileController.active?.name ?? '',
+          );
+        },
+      },
+      child: Focus(autofocus: true, child: child),
     );
   }
 
@@ -503,7 +552,6 @@ class _OpimeAppState extends State<OpimeApp> {
           profileController: _profileController!,
           sidebarPrefsController: _sidebarPrefsController!,
           amountVisibilityController: _amountVisibilityController,
-          keyboardShortcutsController: _keyboardShortcutsController,
           patrimoineRefreshController: _patrimoineRefreshController,
           onboardingHighlightController: _onboardingHighlightController,
           priceSyncStatusController: _priceSyncStatusController,
@@ -511,6 +559,7 @@ class _OpimeAppState extends State<OpimeApp> {
           assistantChatController: _assistantChatController!,
           notificationsSettingsController: _notificationsSettingsController,
           notificationsController: _notificationsController,
+          sidebarCollapsed: _sidebarCollapsed,
           pages: {
             'dashboard': (_) => DashboardScreen(
               key: ValueKey(_profileController!.activeDataPath),

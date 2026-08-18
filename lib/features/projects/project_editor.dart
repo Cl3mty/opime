@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/date_format.dart';
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
+import '../dashboard/widgets/net_worth_chart.dart';
 import '../investments/investments_models.dart'
     show InvestmentAccount;
 import '../investments/investments_repository.dart';
@@ -11,6 +12,8 @@ import '../liabilities/liabilities_repository.dart';
 import 'project_models.dart';
 import 'project_progress.dart';
 import 'project_repository.dart';
+import 'project_trajectory.dart';
+import 'widgets/goal_progress_bar.dart';
 
 String _assetKey(String accountId, String investmentId) =>
     '$accountId|$investmentId';
@@ -191,6 +194,14 @@ class _ProjectEditorState extends State<ProjectEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (isEditing) ...[
+            _ProjectDetailSection(
+              project: widget.project!,
+              accounts: _accounts,
+              liabilities: _liabilities,
+            ),
+            const SizedBox(height: 20),
+          ],
           shadcn.Text(isEditing ? 'Modifier le projet' : 'Nouveau projet')
               .large()
               .semiBold(),
@@ -250,14 +261,6 @@ class _ProjectEditorState extends State<ProjectEditor> {
             shadcn.Text(
               '1 lien ou plus ne se résout plus (élément supprimé depuis).',
             ).muted().xSmall(),
-          ],
-          if (isEditing) ...[
-            const SizedBox(height: 16),
-            _ProgressPreview(
-              project: widget.project!,
-              accounts: _accounts,
-              liabilities: _liabilities,
-            ),
           ],
           const SizedBox(height: 16),
           Row(
@@ -387,12 +390,21 @@ class _SelectableChip extends StatelessWidget {
   }
 }
 
-class _ProgressPreview extends StatelessWidget {
+/// Vue détail riche d'un projet — barre de progression (montant actuel /
+/// montant cible), badge "En bonne voie"/"En retard", graphique de
+/// trajectoire projetée (croissance composée au rendement attendu, voir
+/// `project_trajectory.dart`), tuiles de statistiques, et détail des
+/// actifs/passifs liés avec leur valeur individuelle. Remplace l'ancien
+/// petit encart "Avancement" — inspirée de la page "Objectifs" de Finary,
+/// adaptée aux champs déjà présents dans le modèle `Project` (pas de champ
+/// de versement récurrent aujourd'hui, donc pas de tuile "Contribution
+/// cible" ni de seconde courbe "Valeur des versements").
+class _ProjectDetailSection extends StatelessWidget {
   final Project project;
   final List<InvestmentAccount> accounts;
   final List<Liability> liabilities;
 
-  const _ProgressPreview({
+  const _ProjectDetailSection({
     required this.project,
     required this.accounts,
     required this.liabilities,
@@ -400,36 +412,190 @@ class _ProgressPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final today = DateTime.now();
     final progress = computeProjectProgress(
       project: project,
       accounts: accounts,
       liabilities: liabilities,
-      today: DateTime.now(),
+      today: today,
+    );
+    final onTrack = isProjectOnTrack(
+      currentValue: progress.currentNetValue,
+      rendementAttenduPercent: project.rendementAttendu,
+      montantCible: project.montantCible,
+      today: today,
+      echeance: project.echeance,
+    );
+    final trajectory = computeProjectTrajectory(
+      currentValue: progress.currentNetValue,
+      rendementAttenduPercent: project.rendementAttendu,
+      today: today,
+      echeance: project.echeance,
     );
     final days = progress.timeRemaining.inDays;
-    final timeLabel = days >= 0
-        ? 'Échéance dans $days jours'
-        : 'Échéance dépassée depuis ${-days} jours';
+    final montantCible = project.montantCible;
+
+    final linkedAssets = <(String, double)>[
+      for (final link in project.assetLinks)
+        for (final account in accounts)
+          if (account.id == link.accountId)
+            for (final investment in account.investments)
+              if (investment.id == link.investmentId)
+                (
+                  '${investment.label} (${account.name})',
+                  investment.effectiveMarketValue ?? investment.investedAmount,
+                ),
+    ];
+    final linkedLiabilities = <(String, double)>[
+      for (final link in project.liabilityLinks)
+        for (final liability in liabilities)
+          if (liability.id == link.liabilityId)
+            (liability.name, -liability.remainingBalance),
+    ];
 
     return FrostedCard(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            shadcn.Text('Avancement').muted().small(),
-            const SizedBox(height: 4),
-            shadcn.Text(formatEuros(progress.currentNetValue)).large().semiBold(),
-            if (progress.percent != null) ...[
-              const SizedBox(height: 4),
-              shadcn.Text(
-                '${progress.percent!.toStringAsFixed(1)} % du montant cible',
-              ).muted().small(),
+            Row(
+              children: [
+                Expanded(child: shadcn.Text(project.name).large().bold()),
+                ProjectOnTrackBadge(onTrack: onTrack),
+              ],
+            ),
+            const SizedBox(height: 2),
+            shadcn.Text(
+              formatEcheanceRelative(project.echeance, today),
+            ).muted().small(),
+            const SizedBox(height: 20),
+            GoalProgressBar(
+              currentValue: progress.currentNetValue,
+              montantCible: montantCible,
+              height: 14,
+            ),
+            if (trajectory.length >= 2) ...[
+              const SizedBox(height: 24),
+              shadcn.Text('Trajectoire projetée').semiBold().small(),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 160,
+                child: NetWorthChart(
+                  points: trajectory,
+                  formatValue: formatEuros,
+                  axisLabelFormat: formatEurosCompact,
+                  lineColor: theme.colorScheme.primary,
+                  gridColor: theme.colorScheme.border,
+                  textColor: theme.colorScheme.mutedForeground,
+                ),
+              ),
             ],
-            const SizedBox(height: 4),
-            shadcn.Text(timeLabel).muted().small(),
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _StatTile(
+                  label: 'Rendement attendu',
+                  value: '${project.rendementAttendu.toStringAsFixed(2)} %/an',
+                ),
+                _StatTile(
+                  label: 'Temps restant',
+                  value: days >= 0 ? '$days jours' : 'Échéance dépassée',
+                ),
+                _StatTile(
+                  label: 'Montant actuel',
+                  value: formatEuros(progress.currentNetValue),
+                ),
+                if (montantCible != null)
+                  _StatTile(
+                    label: 'Reste à atteindre',
+                    value: formatEuros(
+                      (montantCible - progress.currentNetValue).clamp(
+                        0,
+                        double.infinity,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            if (linkedAssets.isNotEmpty || linkedLiabilities.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              shadcn.Text('Actifs et passifs liés').semiBold().small(),
+              const SizedBox(height: 8),
+              for (final (label, value) in linkedAssets)
+                _LinkedItemRow(label: label, value: value),
+              for (final (label, value) in linkedLiabilities)
+                _LinkedItemRow(label: label, value: value),
+            ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StatTile({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      constraints: const BoxConstraints(minWidth: 130),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.muted.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          shadcn.Text(label).muted().xSmall(),
+          const SizedBox(height: 2),
+          shadcn.Text(value).semiBold(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Ligne d'un actif/passif lié, avec sa valeur — un passif est déjà passé
+/// en négatif par l'appelant (voir [_ProjectDetailSection]), affiché en
+/// rouge pour le distinguer d'un actif au premier coup d'œil.
+class _LinkedItemRow extends StatelessWidget {
+  final String label;
+  final double value;
+
+  const _LinkedItemRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final negative = value < 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: shadcn.Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ).small(),
+          ),
+          shadcn.Text(
+            formatEuros(value.abs()),
+            style: TextStyle(
+              color: negative ? const Color(0xFFEF4444) : null,
+            ),
+          ).small(),
+        ],
       ),
     );
   }

@@ -229,8 +229,9 @@ class DocumentsSection extends StatelessWidget {
   }
 
   Future<void> _open(VaultDocument document) async {
-    final file = DocumentStorage(vaultPath).fileFor(document);
-    if (!await file.exists()) return;
+    final storage = DocumentStorage(vaultPath);
+    if (!await storage.fileFor(document).exists()) return;
+    final file = await storage.materializeForExternalOpen(document);
     await launchUrl(Uri.file(file.path));
   }
 
@@ -309,8 +310,9 @@ Future<void> showDocumentViewDialog(
   required List<VaultDocument> documents,
 }) async {
   Future<void> open(VaultDocument document) async {
-    final file = DocumentStorage(vaultPath).fileFor(document);
-    if (!await file.exists()) return;
+    final storage = DocumentStorage(vaultPath);
+    if (!await storage.fileFor(document).exists()) return;
+    final file = await storage.materializeForExternalOpen(document);
     await launchUrl(Uri.file(file.path));
   }
 

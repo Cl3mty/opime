@@ -77,7 +77,6 @@ class _RealEstateEstimationScreenState
   List<RentalUnit> _units = [_defaultUnit];
 
   double _travaux = 0;
-  double _apport = 20000;
   double _fraisNotairePercent = 7.5;
   double _chargesAnnuelles = 1500;
 
@@ -168,7 +167,6 @@ class _RealEstateEstimationScreenState
         ];
       }
       _travaux = (data['travaux'] as num?)?.toDouble() ?? _travaux;
-      _apport = (data['apport'] as num?)?.toDouble() ?? _apport;
       _fraisNotairePercent =
           (data['fraisNotairePercent'] as num?)?.toDouble() ?? _fraisNotairePercent;
       _chargesAnnuelles =
@@ -200,7 +198,9 @@ class _RealEstateEstimationScreenState
     if (_manualPricePerSqm != null) 'manualPricePerSqm': _manualPricePerSqm,
     'units': [for (final u in _units) u.toJson()],
     'travaux': _travaux,
-    'apport': _apport,
+    // Pas d'apport ici : réglé exclusivement dans l'onglet Prêt (voir
+    // [_LoanParams]), pour ne plus avoir deux champs éditables indépendants
+    // pouvant diverger entre les deux onglets.
     'fraisNotairePercent': _fraisNotairePercent,
     'chargesAnnuelles': _chargesAnnuelles,
     'cashPurchase': _cashPurchase,
@@ -289,7 +289,8 @@ class _RealEstateEstimationScreenState
 
   LoanResult? _simulateLoan() {
     if (_cashPurchase) return null;
-    final montantEmprunte = (_coutTotalProjet - _apport).clamp(0.0, double.infinity);
+    final montantEmprunte =
+        (_coutTotalProjet - _loanParams.apport).clamp(0.0, double.infinity);
     if (montantEmprunte <= 0) return null;
     return simulateLoan(
       montantEmprunte: montantEmprunte,
@@ -307,18 +308,19 @@ class _RealEstateEstimationScreenState
 
   bool _loanJustSynced = false;
 
-  /// Copie le coût total du projet et l'apport courants vers l'onglet Prêt
-  /// (clés `montantEmprunte`/`apport` de sa clé de persistance `'loan'`),
-  /// sans écraser ses autres réglages (différé...) : lit l'état complet
-  /// existant, ne remplace que ces deux clés, puis réécrit. Voir la
+  /// Copie le coût total du projet courant vers l'onglet Prêt (clé
+  /// `montantEmprunte` de sa clé de persistance `'loan'`), sans écraser ses
+  /// autres réglages (différé...) ni son apport — l'apport est réglé
+  /// exclusivement dans l'onglet Prêt (voir [_LoanParams]), cet écran ne
+  /// fait que lui fournir le coût du projet qu'il évalue. Lit l'état
+  /// complet existant, ne remplace que cette clé, puis réécrit. Voir la
   /// documentation de [_loanParams] pour le sens inverse (Estimation lit
-  /// les paramètres de taux depuis Prêt).
+  /// les paramètres de taux et l'apport depuis Prêt).
   Future<void> _useConfiguredLoan() async {
     final current = await _stateRepo.read('loan');
     await _stateRepo.write('loan', {
       ...current,
       'montantEmprunte': _coutTotalProjet,
-      'apport': _apport,
     });
     if (!mounted) return;
     _update(() => _cashPurchase = false);
@@ -333,7 +335,7 @@ class _RealEstateEstimationScreenState
         prixAchat: _prixAchat,
         fraisNotairePercent: _fraisNotairePercent,
         travaux: _travaux,
-        apport: _apport,
+        apport: _loanParams.apport,
         units: _units,
         chargesAnnuelles: _chargesAnnuelles,
         loan: loan,
@@ -573,14 +575,6 @@ class _RealEstateEstimationScreenState
           step: 100,
           onChanged: (v) => _update(() => _chargesAnnuelles = v),
         ),
-        const SizedBox(height: 16),
-        _NumberField(
-          label: 'Apport',
-          suffix: '€',
-          value: _apport,
-          step: 1000,
-          onChanged: (v) => _update(() => _apport = v),
-        ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -594,11 +588,14 @@ class _RealEstateEstimationScreenState
         if (!_cashPurchase) ...[
           const SizedBox(height: 12),
           shadcn.Text(
-            'Montant emprunté (dérivé) : ${displayEuros((_coutTotalProjet - _apport).clamp(0.0, double.infinity), widget.amountVisibility.hidden)}',
+            'Montant emprunté (dérivé) : ${displayEuros((_coutTotalProjet - _loanParams.apport).clamp(0.0, double.infinity), widget.amountVisibility.hidden)}',
           ).muted().small(),
           const SizedBox(height: 4),
           shadcn.Text(
-            "Taux ${_loanParams.tauxInteret.toStringAsFixed(2)} % sur ${_loanParams.dureeAnnees} ans, "
+            // Apport réglé exclusivement dans l'onglet Prêt (voir
+            // [_LoanParams]) — plus de champ dupliqué ici.
+            "Apport ${displayEuros(_loanParams.apport, widget.amountVisibility.hidden)}, "
+            "taux ${_loanParams.tauxInteret.toStringAsFixed(2)} % sur ${_loanParams.dureeAnnees} ans, "
             "assurance ${displayEuros(_loanParams.assuranceMensuelle, widget.amountVisibility.hidden)}/mois "
             "— réglés dans l'onglet Prêt.",
           ).muted().xSmall(),
@@ -772,7 +769,10 @@ class _RealEstateEstimationScreenState
 /// Prêt (`simulations_loan_screen.dart`, clé `'loan'`) utilisé par cet
 /// écran pour son propre calcul de mensualité — les valeurs par défaut
 /// reprennent celles de `_LoanSimulationScreenState` tant que l'onglet Prêt
-/// n'a jamais été configuré.
+/// n'a jamais été configuré. [apport] en fait partie au même titre que le
+/// taux/la durée : un seul apport pour toute la simulation Immobilier,
+/// réglé dans l'onglet Prêt — avant, chaque onglet avait son propre champ
+/// éditable, pouvant diverger l'un de l'autre sans que ce soit visible.
 class _LoanParams {
   final double tauxInteret;
   final int dureeAnnees;
@@ -780,6 +780,7 @@ class _LoanParams {
   final double fraisDossier;
   final double fraisGarantie;
   final LoanType loanType;
+  final double apport;
 
   const _LoanParams({
     this.tauxInteret = 3.5,
@@ -788,6 +789,7 @@ class _LoanParams {
     this.fraisDossier = 800,
     this.fraisGarantie = 1200,
     this.loanType = LoanType.amortissable,
+    this.apport = 0,
   });
 
   factory _LoanParams.fromJson(Map<String, dynamic> json) => _LoanParams(
@@ -800,6 +802,7 @@ class _LoanParams {
       (t) => t.name == json['type'],
       orElse: () => LoanType.amortissable,
     ),
+    apport: (json['apport'] as num?)?.toDouble() ?? 0,
   );
 }
 

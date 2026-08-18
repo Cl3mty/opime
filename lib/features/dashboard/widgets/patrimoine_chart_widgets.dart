@@ -279,8 +279,10 @@ class PeriodChangeRow extends StatelessWidget {
   }
 }
 
-/// Couleur de la courbe "Patrimoine net" (dorée).
-const netWorthColor = Color(0xFFF59E0B);
+/// Couleur de la courbe "Patrimoine net" — le doré d'accent du thème
+/// (`_accent` dans `app/theme.dart`, identique en clair et en sombre),
+/// pas une couleur orangée indépendante comme avant.
+const netWorthColor = Color(0xFFF4BE7E);
 
 /// Données prêtes à l'emploi pour [StackedNetWorthChart] (mode Valeur),
 /// résultant de la sélection Patrimoine net/brut.

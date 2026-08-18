@@ -136,7 +136,12 @@ class MetalMirrorRepository {
         if (!await source.exists()) continue;
         final targetName = _uniqueTargetName(dayDir, doc, wantedFiles);
         final target = File(p.join(dayDir.path, targetName));
-        if (!await target.exists()) await source.copy(target.path);
+        if (!await target.exists()) {
+          // Jamais `source.copy` : ce fichier est chiffré dès que le vault
+          // l'est, et ce miroir doit toujours rester lisible en clair —
+          // voir `document_storage.dart`'s `readBytes`.
+          await target.writeAsBytes(await docStorage.readBytes(doc));
+        }
         wantedFiles.add(targetName);
         resolved.add((doc, targetName));
       }

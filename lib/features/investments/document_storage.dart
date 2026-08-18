@@ -27,11 +27,14 @@ class DocumentStorage {
 
   static const _dirRelativePath = 'investissements/documents';
 
-  /// Chemin absolu du fichier d'un document — utilisé par
-  /// `metal_mirror_repository.dart` pour copier ses pièces justificatives
-  /// vers le miroir lisible (voir sa documentation de tête : ce miroir est
-  /// volontairement laissé en clair, la copie s'y fait donc sur les octets
-  /// bruts, chiffrés ou non selon l'état de ce fichier source).
+  /// Chemin absolu du fichier d'un document — utile pour vérifier son
+  /// existence uniquement. **Ne jamais ouvrir ou copier ce fichier tel
+  /// quel** (que ce soit vers le miroir métaux précieux, voir
+  /// `metal_mirror_repository.dart`, ou via `launchUrl`/l'application par
+  /// défaut du système, voir `documents_section.dart`'s
+  /// `materializeForExternalOpen`) : ses octets sont chiffrés dès que le
+  /// vault l'est, une application externe ne sait pas les déchiffrer.
+  /// Utiliser [readBytes] ou [materializeForExternalOpen] selon le besoin.
   File fileFor(VaultDocument document) {
     final ext = p.extension(document.fileName);
     return File(p.join(vaultPath, _dirRelativePath, '${document.id}$ext'));
@@ -47,4 +50,34 @@ class DocumentStorage {
 
   Future<void> delete(VaultDocument document) =>
       _storage.delete(_relativePathFor(document));
+
+  /// Contenu déchiffré d'un document — à utiliser (plutôt que [fileFor])
+  /// partout où le contenu doit rester exploitable une fois recopié
+  /// ailleurs, quel que soit l'état de chiffrement du vault. Voir
+  /// `metal_mirror_repository.dart`, dont le miroir doit toujours rester en
+  /// clair.
+  Future<Uint8List> readBytes(VaultDocument document) =>
+      _storage.readBytes(_relativePathFor(document));
+
+  /// Écrit le contenu déchiffré de [document] dans un nouveau fichier
+  /// temporaire (hors du vault, dans le dossier temp du système), à ouvrir
+  /// avec l'application par défaut du système (voir
+  /// `documents_section.dart`'s `_open`/`showDocumentViewDialog`) —
+  /// `launchUrl(Uri.file(...))` directement sur [fileFor] ouvrirait sinon
+  /// les octets chiffrés tels quels dès que le vault l'est (l'application
+  /// externe ne sait pas les déchiffrer). Un nouveau fichier à chaque
+  /// appel, jamais réutilisé : ce sont de petites pièces justificatives, le
+  /// coût est négligeable, et ça évite une copie déchiffrée périmée si le
+  /// document a changé depuis un appel précédent. Le fichier temporaire
+  /// n'est pas supprimé après coup (on ne sait pas quand l'application
+  /// externe a fini de le lire) — laissé au nettoyage périodique du dossier
+  /// temp du système, même compromis que la plupart des apps qui ouvrent
+  /// une pièce jointe chiffrée avec un visualiseur externe.
+  Future<File> materializeForExternalOpen(VaultDocument document) async {
+    final bytes = await readBytes(document);
+    final dir = await Directory.systemTemp.createTemp('opime_document_');
+    final file = File(p.join(dir.path, document.fileName));
+    await file.writeAsBytes(bytes);
+    return file;
+  }
 }

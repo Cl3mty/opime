@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:opime/core/storage/vault_crypto.dart';
+import 'package:opime/core/storage/vault_session.dart';
 import 'package:opime/features/investments/document_storage.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/metal_mirror_repository.dart';
@@ -241,6 +243,75 @@ void main() {
       isFalse,
     );
   });
+
+  test(
+    'un document source chiffré est copié en clair dans le miroir '
+    '(pas un copy() brut des octets chiffrés)',
+    () async {
+      final vault = tempDir.path;
+      final cipher = VaultCipher(generateDek());
+      final repo = MetalMirrorRepository(vault);
+      final docStorage = DocumentStorage(vault, cipher: cipher);
+
+      final originalBytes = Uint8List.fromList([9, 8, 7, 6, 5]);
+      final facture = VaultDocument(
+        fileName: 'facture.png',
+        note: 'Facture',
+        transactionId: 'txn_6',
+      );
+      await docStorage.save(facture, originalBytes);
+
+      // Le fichier source, lui, est bien chiffré sur disque (sinon ce test
+      // ne prouverait rien).
+      final sourceBytes = await docStorage.fileFor(facture).readAsBytes();
+      expect(sourceBytes, isNot(originalBytes));
+
+      final account = InvestmentAccount(
+        assetClass: AssetClass.metauxPrecieux,
+        envelope: AccountEnvelope.coffrePersonnel,
+        name: 'Coffre maison',
+        investments: [
+          Investment(
+            id: 'inv_6',
+            isin: '20 Francs Napoléon',
+            label: '20 Francs Napoléon',
+            transactions: [
+              Transaction(
+                id: 'txn_6',
+                date: DateTime(2026, 8, 11),
+                isBuy: true,
+                quantity: 1,
+                unitPrice: 650.0,
+              ),
+            ],
+            documents: [facture],
+          ),
+        ],
+      );
+
+      // sync() lit lui-même via VaultSession.current, jamais un cipher
+      // explicite passé en paramètre — même mécanisme que les repositories
+      // en session réelle (voir `vault_session.dart`).
+      VaultSession.current = cipher;
+      try {
+        await repo.sync([account]);
+      } finally {
+        VaultSession.current = null;
+      }
+
+      final mirrored = File(
+        p.join(
+          vault,
+          'investissements',
+          'metaux_precieux',
+          'or',
+          '2026-08-11',
+          'facture.png',
+        ),
+      );
+      expect(await mirrored.readAsBytes(), originalBytes);
+    },
+  );
 
   test('ne crée rien sans investissement métal détenu', () async {
     final vault = tempDir.path;

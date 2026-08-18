@@ -12,6 +12,8 @@ import 'project_editor.dart';
 import 'project_models.dart';
 import 'project_progress.dart';
 import 'project_repository.dart';
+import 'project_trajectory.dart';
+import 'widgets/goal_progress_bar.dart';
 
 /// Largeur en dessous de laquelle il n'y a plus assez de place pour la
 /// liste de projets ET l'éditeur côte à côte (mode desktop) — même seuil et
@@ -276,9 +278,10 @@ class _ProjectsListPanel extends StatelessWidget {
                   child: shadcn.Text('Aucun projet').muted().small(),
                 );
               }
-              return ListView.builder(
-                padding: EdgeInsets.zero,
+              return ListView.separated(
+                padding: const EdgeInsets.all(8),
                 itemCount: all.length,
+                separatorBuilder: (context, i) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
                   final project = all[i];
                   final selected = project.id == selectedId;
@@ -288,50 +291,80 @@ class _ProjectsListPanel extends StatelessWidget {
                     liabilities: liabilities,
                     today: today,
                   );
+                  final onTrack = isProjectOnTrack(
+                    currentValue: progress.currentNetValue,
+                    rendementAttenduPercent: project.rendementAttendu,
+                    montantCible: project.montantCible,
+                    today: today,
+                    echeance: project.echeance,
+                  );
                   final theme = Theme.of(context);
                   return GestureDetector(
                     key: ValueKey(project.id),
                     onTap: () => onOpen(project),
                     child: Container(
-                      color: selected
-                          ? theme.colorScheme.accent
-                          : Colors.transparent,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? theme.colorScheme.accent
+                            : theme.colorScheme.muted.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selected
+                              ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                              : theme.colorScheme.border,
+                        ),
                       ),
-                      child: Row(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                shadcn.Text(
-                                  project.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                shadcn.Text(
-                                  formatEcheanceRelative(project.echeance, today),
-                                ).muted().small(),
-                                if (progress.percent != null) ...[
-                                  const SizedBox(height: 4),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(999),
-                                    child: LinearProgressIndicator(
-                                      value: (progress.percent! / 100).clamp(0, 1),
-                                      minHeight: 4,
-                                      backgroundColor: theme.colorScheme.muted,
-                                    ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: 0.16,
                                   ),
-                                ],
-                              ],
-                            ),
+                                ),
+                                child: Icon(
+                                  LucideIcons.target,
+                                  size: 16,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    shadcn.Text(
+                                      project.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ).medium(),
+                                    shadcn.Text(
+                                      formatEcheanceRelative(project.echeance, today),
+                                    ).muted().xSmall(),
+                                  ],
+                                ),
+                              ),
+                              ProjectOnTrackBadge(onTrack: onTrack),
+                              IconButton.ghost(
+                                icon: const Icon(LucideIcons.trash2, size: 16),
+                                onPressed: () => onDelete(project.id),
+                              ),
+                            ],
                           ),
-                          IconButton.ghost(
-                            icon: const Icon(LucideIcons.trash2, size: 16),
-                            onPressed: () => onDelete(project.id),
+                          const SizedBox(height: 10),
+                          GoalProgressBar(
+                            currentValue: progress.currentNetValue,
+                            montantCible: project.montantCible,
                           ),
                         ],
                       ),
