@@ -118,6 +118,15 @@ class _OpimeAppState extends State<OpimeApp> {
   /// SOUS le Navigator, valide pour ces opérations.
   final _navigatorKey = GlobalKey<NavigatorState>();
 
+  /// `showDialog` empile une nouvelle route (avec sa propre pénombre) à
+  /// chaque appel — sans ce garde, appuyer plusieurs fois sur ⌘P empilait
+  /// autant de boîtes de dialogue transparentes les unes sur les autres, ce
+  /// qui assombrissait progressivement l'écran au lieu de rouvrir/fermer un
+  /// seul dialogue. Vrai pendant toute la durée de vie du dialogue (posé à
+  /// l'ouverture, remis à `false` quand `showPatrimoineExportDialog` se
+  /// termine, quelle que soit la façon dont il se ferme).
+  bool _exportDialogOpen = false;
+
   /// État (replié/déplié) de la sidebar — remonté ici depuis `AppShell` pour
   /// que le raccourci clavier ⌘B, posé à la racine de l'app (voir
   /// `ShadcnApp`'s `builder` dans [build]), puisse le modifier. Un
@@ -489,16 +498,24 @@ class _OpimeAppState extends State<OpimeApp> {
           // du Navigator lui-même, valide pour ouvrir une boîte de dialogue.
           final navigatorContext = _navigatorKey.currentContext;
           if (navigatorContext == null) return;
+          // Rejouer ⌘P pendant que le dialogue est déjà ouvert le referme —
+          // un vrai toggle, plutôt que d'empiler une boîte de dialogue de
+          // plus à chaque pression.
+          if (_exportDialogOpen) {
+            Navigator.of(navigatorContext).pop();
+            return;
+          }
           final profileController = _profileController;
           if (profileController == null) {
             _showExportUnavailableToast(navigatorContext);
             return;
           }
+          _exportDialogOpen = true;
           showPatrimoineExportDialog(
             navigatorContext,
             vaultPath: profileController.activeDataPath,
             profileName: profileController.active?.name ?? '',
-          );
+          ).whenComplete(() => _exportDialogOpen = false);
         },
       },
       child: Focus(autofocus: true, child: child),
