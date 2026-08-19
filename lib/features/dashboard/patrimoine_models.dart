@@ -52,24 +52,31 @@ enum DashboardPeriod {
   }
 }
 
-/// Un actif affiché dans "Mes meilleurs actifs".
+/// Un actif affiché dans "Mes meilleures performances".
 class DashboardAsset {
   final String name;
   final String ticker;
-  final List<double> sparkline;
 
-  /// Rendement réel sur une période donnée, dérivé de l'historique de cours
-  /// de l'investissement (voir `real_patrimoine_adapter.dart`'s
-  /// `buildRealTopAssets`) — `null` sans historique de cours couvrant le
-  /// début de la période (investissement tout juste ajouté, cours pas
-  /// encore résolu...).
-  final double? Function(DashboardPeriod period) changePercentForPeriod;
+  /// Valeur de MA position (pas le cours du titre) échantillonnée sur la
+  /// période donnée — voir `real_patrimoine_adapter.dart`'s
+  /// `buildRealTopAssets`. Redemandée à chaque changement d'onglet de
+  /// période plutôt que figée une fois pour toutes, pour rester cohérente
+  /// avec [changeForPeriod] sur la même fenêtre.
+  final List<double> Function(DashboardPeriod period) sparklineForPeriod;
+
+  /// MA performance sur la position sur une période donnée — voir
+  /// `real_patrimoine_adapter.dart`'s `buildRealTopAssets`. `euros` est
+  /// toujours défini ; `percent` reste `null` quand le montant net investi
+  /// en début de période n'est pas strictement positif (rare : diviser
+  /// par ce montant n'aurait pas de sens).
+  final ({double euros, double? percent})? Function(DashboardPeriod period)
+  changeForPeriod;
 
   const DashboardAsset({
     required this.name,
     required this.ticker,
-    required this.sparkline,
-    required this.changePercentForPeriod,
+    required this.sparklineForPeriod,
+    required this.changeForPeriod,
   });
 
   String get initials => initialsFor(name);

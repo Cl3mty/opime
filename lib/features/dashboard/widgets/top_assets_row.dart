@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../patrimoine_models.dart';
 import 'net_worth_chart.dart' show PeriodTabs;
+import 'patrimoine_chart_widgets.dart' show ExtremePercentLabel;
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
@@ -19,14 +21,18 @@ const _avatarPalette = [
   Color(0xFFFBBF24),
 ];
 
-/// Section "Mes meilleurs actifs" : une ligne de mini-cartes (nom, ticker,
-/// variation, sparkline) qui défile horizontalement plutôt que de
-/// s'enrouler, pour rester lisible même avec une dizaine d'actifs. Triée
-/// par rendement décroissant sur la période choisie via [PeriodTabs].
+/// Section "Mes meilleures performances" : une ligne de mini-cartes (nom,
+/// ticker, +/- value, %, sparkline de la valeur de ma position) qui défile
+/// horizontalement plutôt que de s'enrouler, pour rester lisible même avec
+/// une dizaine d'actifs. Triée par performance décroissante sur la période
+/// choisie via [PeriodTabs] — MA performance sur la position, pas le
+/// rendement du cours du titre seul (voir
+/// `real_patrimoine_adapter.dart`'s `buildRealTopAssets`).
 class TopAssetsRow extends StatefulWidget {
   final List<DashboardAsset> assets;
+  final bool hidden;
 
-  const TopAssetsRow({super.key, required this.assets});
+  const TopAssetsRow({super.key, required this.assets, required this.hidden});
 
   @override
   State<TopAssetsRow> createState() => _TopAssetsRowState();
@@ -38,12 +44,12 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
   @override
   Widget build(BuildContext context) {
     final period = DashboardPeriod.values[_periodIndex];
-    // Rendements nuls (pas d'historique de cours couvrant le début de la
-    // période) relégués en fin de liste plutôt que de perturber le tri.
+    // Performances nulles (rien d'investi ni détenu en début de période)
+    // reléguées en fin de liste plutôt que de perturber le tri.
     final sorted = [...widget.assets]
       ..sort((a, b) {
-        final aPercent = a.changePercentForPeriod(period);
-        final bPercent = b.changePercentForPeriod(period);
+        final aPercent = a.changeForPeriod(period)?.percent;
+        final bPercent = b.changeForPeriod(period)?.percent;
         if (aPercent == null && bPercent == null) return 0;
         if (aPercent == null) return 1;
         if (bPercent == null) return -1;
@@ -55,7 +61,7 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
       children: [
         Row(
           children: [
-            const shadcn.Text('Mes meilleurs actifs').large().medium(),
+            const shadcn.Text('Mes meilleures performances').large().medium(),
             const Spacer(),
             PeriodTabs(
               labels: [for (final p in DashboardPeriod.values) p.label],
@@ -75,7 +81,9 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
               width: 200,
               child: _AssetCard(
                 asset: sorted[i],
-                changePercent: sorted[i].changePercentForPeriod(period),
+                change: sorted[i].changeForPeriod(period),
+                sparkline: sorted[i].sparklineForPeriod(period),
+                hidden: widget.hidden,
                 avatarColor: _avatarPalette[i % _avatarPalette.length],
               ),
             ),
@@ -88,20 +96,24 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
 
 class _AssetCard extends StatelessWidget {
   final DashboardAsset asset;
-  final double? changePercent;
+  final ({double euros, double? percent})? change;
+  final List<double> sparkline;
+  final bool hidden;
   final Color avatarColor;
 
   const _AssetCard({
     required this.asset,
-    required this.changePercent,
+    required this.change,
+    required this.sparkline,
+    required this.hidden,
     required this.avatarColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final percent = changePercent;
-    final positive = percent != null && percent >= 0;
-    final color = percent == null
+    final percent = change?.percent;
+    final positive = (percent ?? change?.euros ?? 0) >= 0;
+    final color = change == null
         ? const Color(0xFF94A3B8)
         : (positive ? _green : _red);
 
@@ -140,21 +152,34 @@ class _AssetCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                shadcn.Text(
-                  percent == null
-                      ? '—'
-                      : '${positive ? '+' : ''}${percent.toStringAsFixed(2)} %',
-                  style: TextStyle(color: color, fontWeight: FontWeight.w600),
-                ).small(),
-                const Spacer(),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      shadcn.Text(
+                        change == null
+                            ? '—'
+                            : displayEuros(change!.euros, hidden),
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ).small(),
+                      if (percent != null)
+                        ExtremePercentLabel(
+                          percent: percent,
+                          color: color,
+                          style: Theme.of(context).typography.xSmall,
+                        ),
+                    ],
+                  ),
+                ),
                 SizedBox(
-                  width: 64,
+                  width: 56,
                   height: 24,
                   child: CustomPaint(
-                    painter: _SparklinePainter(
-                      values: asset.sparkline,
-                      color: color,
-                    ),
+                    painter: _SparklinePainter(values: sparkline, color: color),
                   ),
                 ),
               ],

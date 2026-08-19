@@ -494,8 +494,11 @@ double? _lastPriceToEur(Investment investment) {
 /// que de renvoyer `null` quand [date] précède le premier point (un
 /// produit dont l'historique Yahoo commence après l'achat, par exemple),
 /// pour éviter une pique verticale trompeuse en début de courbe. `null`
-/// seulement si [history] est vide.
-double? _priceAt(List<PricePoint> history, DateTime date) {
+/// seulement si [history] est vide. Public (contrairement aux autres
+/// fonctions internes de ce fichier) : réutilisé tel quel par
+/// `analyses_screen.dart` pour la comparaison au benchmark, plutôt que d'y
+/// dupliquer une variante qui ne prolonge pas vers le passé.
+double? priceAt(List<PricePoint> history, DateTime date) {
   double? priceAtDate;
   for (final p in history) {
     if (p.date.isAfter(date)) break;
@@ -507,34 +510,66 @@ double? _priceAt(List<PricePoint> history, DateTime date) {
   return priceAtDate;
 }
 
-/// Rendement réel sur [period], dérivé du cours à son début et à
-/// aujourd'hui (voir [_priceAt]) — `null` sans historique suffisant (moins
-/// de deux points, ou aucun cours positif exploitable).
-double? _priceReturnForPeriod(
-  List<PricePoint> history,
+/// Quelques dates régulièrement espacées entre [start] et [end] inclus,
+/// toujours terminées par [end] — même principe que [evenDateGrid], mais
+/// avec beaucoup moins de points : suffisant pour une sparkline de
+/// quelques dizaines de pixels dans "Mes meilleures performances", pas
+/// besoin de la résolution ~30 points du graphique principal.
+List<DateTime> _sparklineDateGrid(
+  DateTime start,
+  DateTime end, {
+  int points = 8,
+}) {
+  if (!end.isAfter(start)) return [start, end];
+  final totalDays = end.difference(start).inDays;
+  final stepDays = math.max(1, (totalDays / (points - 1)).ceil());
+  final dates = <DateTime>[
+    for (var offset = 0; offset < totalDays; offset += stepDays)
+      start.add(Duration(days: offset)),
+  ];
+  dates.add(end);
+  return dates;
+}
+
+/// Rendement de MA position sur [period] : la valeur de la position
+/// aujourd'hui comparée à sa valeur en tout début de période, plus les
+/// flux réels (achats/ventes) survenus depuis — même modèle que le
+/// rendement money-weighted "période courte" de [calculateMwr]
+/// (`performance_calculator.dart`), simplement amorcé par la valeur de la
+/// position en début de période plutôt que par zéro. Contrairement à
+/// l'ancien [_priceReturnForPeriod] (rendement du cours seul), reflète ce
+/// que j'ai réellement gagné ou perdu sur MA position — une position
+/// achetée en cours de période n'est jamais pénalisée/avantagée par un
+/// mouvement de cours antérieur à mon achat. `null` seulement si rien
+/// n'était investi ni détenu au départ (position ouverte pile aujourd'hui).
+({double euros, double? percent})? _positionReturnForPeriod(
+  Investment investment,
+  Map<String, List<PricePoint>> priceHistories,
   DashboardPeriod period,
 ) {
-  if (history.length < 2) return null;
   final today = DateTime.utc(
     DateTime.now().year,
     DateTime.now().month,
     DateTime.now().day,
   );
-  final firstDate = history.first.date;
-  final earliest = DateTime.utc(firstDate.year, firstDate.month, firstDate.day);
+  final earliest = earliestTransactionDate([investment]) ?? today;
   final start = period.startFor(today: today, earliest: earliest);
-  final priceStart = _priceAt(history, start);
-  final priceEnd = _priceAt(history, today);
-  if (priceStart == null || priceStart <= 0 || priceEnd == null) return null;
-  return (priceEnd - priceStart) / priceStart * 100;
+  var netInvested = _valuationAt([investment], priceHistories, start);
+  for (final t in investment.transactions) {
+    if (!_onOrBeforeDay(t.date, start)) {
+      netInvested += t.isBuy ? t.amount : -t.amount;
+    }
+  }
+  final valuationToday = _valuationAt([investment], priceHistories, today);
+  final euros = valuationToday - netInvested;
+  final percent = netInvested > 0 ? euros / netInvested * 100 : null;
+  return (euros: euros, percent: percent);
 }
 
 /// Un [DashboardAsset] par investissement valorisé, pour réutiliser
-/// [TopAssetsRow] tel quel — [DashboardAsset.changePercentForPeriod] donne
-/// un rendement réel par cours, le même calcul pour les 6 périodes (y
-/// compris "Tout", qui n'utilise donc plus la plus-value latente comme
-/// autrefois : cohérent avec les 5 autres onglets plutôt qu'une mesure
-/// différente pour un seul d'entre eux).
+/// [TopAssetsRow] tel quel — [DashboardAsset.changeForPeriod] donne MA
+/// performance sur la position (voir [_positionReturnForPeriod]), le même
+/// calcul pour les 6 périodes.
 List<DashboardAsset> buildRealTopAssets(
   List<InvestmentAccount> accounts,
   Map<String, List<PricePoint>> priceHistories,
@@ -544,25 +579,34 @@ List<DashboardAsset> buildRealTopAssets(
     for (final investment in account.investments) {
       if (investment.quantityHeld <= 0) continue;
       final history = priceHistories[investment.isin] ?? const [];
-      final sparkline = history.length >= 2
-          ? [
-              for (final p in history.skip(math.max(0, history.length - 10)))
-                p.close,
-            ]
-          : [
-              investment.pru,
-              // Sans historique, la sparkline en deux points compare le PRU
-              // au dernier cours — en euros, taux de change compris, pour
-              // rester homogène (voir [_lastPriceToEur]).
-              _lastPriceToEur(investment) ?? investment.pru,
-            ];
       assets.add(
         DashboardAsset(
           name: investment.label,
           ticker: investment.isin,
-          sparkline: sparkline,
-          changePercentForPeriod: (period) =>
-              _priceReturnForPeriod(history, period),
+          sparklineForPeriod: (period) {
+            if (history.length < 2) {
+              // Sans historique, la sparkline en deux points compare le PRU
+              // au dernier cours — en euros, taux de change compris, pour
+              // rester homogène (voir [_lastPriceToEur]).
+              return [
+                investment.pru,
+                _lastPriceToEur(investment) ?? investment.pru,
+              ];
+            }
+            final today = DateTime.utc(
+              DateTime.now().year,
+              DateTime.now().month,
+              DateTime.now().day,
+            );
+            final earliest = earliestTransactionDate([investment]) ?? today;
+            final start = period.startFor(today: today, earliest: earliest);
+            return [
+              for (final date in _sparklineDateGrid(start, today))
+                _valuationAt([investment], priceHistories, date),
+            ];
+          },
+          changeForPeriod: (period) =>
+              _positionReturnForPeriod(investment, priceHistories, period),
         ),
       );
     }
@@ -667,7 +711,7 @@ double _valuationAt(
     }
     if (quantity == 0) continue;
 
-    // [_priceAt] prolonge le plus ancien cours connu vers le passé plutôt
+    // [priceAt] prolonge le plus ancien cours connu vers le passé plutôt
     // que de renvoyer `null` avant le premier point (un produit métal dont
     // le premier relevé quotidien est plus récent que l'achat, ou un titre
     // acheté avant le début de son historique Yahoo) : sans ce repli, la
@@ -677,7 +721,7 @@ double _valuationAt(
     // (`performance_calculator.dart`), qui valorise déjà la période
     // antérieure au premier cours au prix de ce premier cours.
     final history = priceHistories[investment.isin] ?? const [];
-    final priceAtDate = _priceAt(history, date);
+    final priceAtDate = priceAt(history, date);
     total += priceAtDate != null ? quantity * priceAtDate : invested;
   }
   return total;

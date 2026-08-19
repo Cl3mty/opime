@@ -360,10 +360,9 @@ void main() {
     expect(points.last.date, end);
   });
 
-  test('buildRealTopAssets : changePercentForPeriod calcule un rendement '
-      'réel par cours (régression : l\'ancienne formule était une '
-      'ondulation synthétique dérivée de la plus-value latente, pas un '
-      'vrai calcul par période)', () {
+  test('buildRealTopAssets : changeForPeriod calcule MA performance sur la '
+      'position (achat pile au début de l\'historique de cours connu → '
+      'coïncide avec le rendement du cours seul)', () {
     final priceHistory = [
       PricePoint(DateTime.utc(2025, 1, 1), 100),
       PricePoint(DateTime.utc(2025, 2, 1), 120),
@@ -392,16 +391,59 @@ void main() {
       {'FR0012345678': priceHistory},
     ).single;
 
-    // "Tout" : cours du premier point connu (100) au dernier (120) = +20 %.
-    expect(
-      asset.changePercentForPeriod(DashboardPeriod.all),
-      closeTo(20, 1e-6),
-    );
+    // Détenue depuis le tout début de l'historique connu (100) jusqu'au
+    // dernier cours (120) : +20 %, 5 × (120 − 100) = +100 €.
+    final change = asset.changeForPeriod(DashboardPeriod.all);
+    expect(change!.percent, closeTo(20, 1e-6));
+    expect(change.euros, closeTo(100, 1e-6));
   });
 
-  test('buildRealTopAssets : changePercentForPeriod est null sans '
-      'historique de cours suffisant, sans planter le tri de '
-      '"Mes meilleurs actifs"', () {
+  test('buildRealTopAssets : changeForPeriod reflète MA performance, pas '
+      'celle du titre depuis son plus ancien cours connu — un achat fait '
+      'après un pic n\'hérite pas de la hausse antérieure à mon achat', () {
+    final priceHistory = [
+      PricePoint(DateTime.utc(2025, 1, 1), 100),
+      PricePoint(DateTime.utc(2025, 1, 15), 150),
+      PricePoint(DateTime.utc(2025, 2, 1), 120),
+    ];
+    final account = InvestmentAccount(
+      assetClass: AssetClass.actionsEtFonds,
+      envelope: AccountEnvelope.cto,
+      name: 'CTO',
+      investments: [
+        Investment(
+          isin: 'FR0012345678',
+          label: 'TotalEnergies',
+          // Achetée le 20/01, après le pic à 150 du 15/01 — le cours à
+          // l'achat (dernier connu à ou avant le 20/01) est donc 150, pas
+          // le tout premier cours connu (100) du 01/01.
+          transactions: [
+            Transaction(
+              date: DateTime.utc(2025, 1, 20),
+              isBuy: true,
+              quantity: 5,
+              unitPrice: 140,
+            ),
+          ],
+        ),
+      ],
+    );
+    final asset = buildRealTopAssets(
+      [account],
+      {'FR0012345678': priceHistory},
+    ).single;
+
+    // Achetée à 150 (cours au 20/01), vaut 120 aujourd'hui : -20 %, pas
+    // +20 % (ce que donnerait, à tort, un rendement de cours parti du
+    // 01/01 — l'ancienne formule, avant ce changement).
+    final change = asset.changeForPeriod(DashboardPeriod.all);
+    expect(change!.percent, closeTo(-20, 1e-6));
+    expect(change.euros, closeTo(-150, 1e-6));
+  });
+
+  test('buildRealTopAssets : changeForPeriod reste défini (pas un plantage '
+      'du tri de "Mes meilleures performances") sans historique de cours, '
+      'avec un gain nul faute de cours pour le mesurer', () {
     final account = InvestmentAccount(
       assetClass: AssetClass.actionsEtFonds,
       envelope: AccountEnvelope.cto,
@@ -425,7 +467,12 @@ void main() {
       account,
     ], const <String, List<PricePoint>>{}).single;
 
-    expect(asset.changePercentForPeriod(DashboardPeriod.all), isNull);
+    // Sans historique de cours, la valorisation retombe sur le montant
+    // investi (450 €) au départ comme aujourd'hui : gain nul, mais un
+    // pourcentage de 0 % reste défini (netInvested > 0) — pas `null`.
+    final change = asset.changeForPeriod(DashboardPeriod.all);
+    expect(change!.euros, closeTo(0, 1e-6));
+    expect(change.percent, closeTo(0, 1e-6));
   });
 
   test('buildRealCategories : une position entièrement vendue (quantité '

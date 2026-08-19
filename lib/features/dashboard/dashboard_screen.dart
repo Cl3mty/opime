@@ -308,7 +308,7 @@ class _RealDashboardState extends State<_RealDashboard> {
               ),
               const SizedBox(height: 24),
               if (_topAssets.isNotEmpty) ...[
-                TopAssetsRow(assets: _topAssets),
+                TopAssetsRow(assets: _topAssets, hidden: hidden),
                 const SizedBox(height: 24),
               ],
               CategoryBreakdownCard(
