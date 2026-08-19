@@ -3,13 +3,11 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/ui/copyable_identifier.dart';
-import '../../core/ui/frosted_card.dart';
 import 'account_detail_screen.dart' show BackHeader;
 import 'confirm_delete_dialog.dart';
 import 'currency_format.dart';
 import 'document_storage.dart';
 import 'documents_section.dart';
-import 'investment_identifier_field.dart';
 import 'investment_reestimate_dialog.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
@@ -18,6 +16,8 @@ import 'metal_price_repository.dart';
 import 'performance_calculator.dart';
 import 'price_history_repository.dart';
 import 'transaction_price_currency.dart';
+import 'widgets/investment_edit_form.dart';
+import 'widgets/transaction_widgets.dart';
 import 'yahoo_finance_client.dart' show PricePoint;
 
 const _green = Color(0xFF22C55E);
@@ -233,21 +233,12 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       ? 1.0
       : _priceCurrencyController.resolvedRate;
 
-  /// Libellé du champ "Dernier cours" quand le titre est coté en devise
-  /// étrangère : le cours brut dans sa devise de cotation + son équivalent
-  /// en euros au taux enregistré (voir `Investment.quoteCurrency`).
-  String get _lastPriceDisplay {
-    final price = widget.investment.lastPrice!;
-    if (_isCurrency) return '${price.toStringAsFixed(4)} €';
-    final quoteCurrency = widget.investment.quoteCurrency;
-    if (quoteCurrency != null && quoteCurrency.toUpperCase() != 'EUR') {
-      final display =
-          '${price.toStringAsFixed(2)} ${currencySymbol(quoteCurrency)} · ≈ '
-          '${formatEuros(price * (widget.investment.lastFxRateToEur ?? 1.0))}';
-      return widget.hidden ? maskAmount(display) : display;
-    }
-    return displayEuros(price, widget.hidden);
-  }
+  /// Libellé du champ "Dernier cours" — voir [investmentLastPriceDisplay].
+  String get _lastPriceDisplay => investmentLastPriceDisplay(
+    widget.account,
+    widget.investment,
+    hidden: widget.hidden,
+  );
 
   Future<void> _commitCreateTransaction() async {
     final date = _newDate;
@@ -635,7 +626,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
           ),
           const SizedBox(height: 16),
           if (_editingInvestment)
-            _EditInvestmentForm(
+            InvestmentEditForm(
               assetClass: _effectiveClass,
               isImmobilier: _isImmobilier,
               accountEnvelope: widget.account.envelope,
@@ -687,11 +678,11 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             runSpacing: 12,
             children: [
               if (!_isImmobilier) ...[
-                _StatChip(
+                InvestmentStatChip(
                   label: 'Quantité détenue',
                   value: formatQuantity(investment.quantityHeld, _effectiveClass),
                 ),
-                _StatChip(
+                InvestmentStatChip(
                   label: 'PRU',
                   // Une position en devise (épargne ou devise d'un compte-
                   // titres) est tenue à un taux de change (le PRU est le
@@ -704,11 +695,11 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 ),
               ],
               if (hasPrice)
-                _StatChip(
+                InvestmentStatChip(
                   label: 'Dernier cours',
                   value: _lastPriceDisplay,
                   trailing: investment.isPriceFresh
-                      ? const _FreshPriceBadge()
+                      ? const FreshPriceBadge()
                       : null,
                 ),
             ],
@@ -800,7 +791,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
           const SizedBox(height: 12),
           for (final txn in investment.transactions.reversed) ...[
             if (txn.id == _editingTransactionId)
-              _CreateTransactionForm(
+              TransactionForm(
                 isBuy: _newIsBuy,
                 date: _newDate,
                 quantityController: _quantityController,
@@ -834,7 +825,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                     : null,
               )
             else
-              _TransactionRow(
+              TransactionRow(
                 transaction: txn,
                 hidden: widget.hidden,
                 assetClass: _effectiveClass,
@@ -860,7 +851,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             shadcn.Text('Aucune transaction pour l\'instant.').muted().small(),
           const SizedBox(height: 8),
           if (_creating)
-            _CreateTransactionForm(
+            TransactionForm(
               isBuy: _newIsBuy,
               date: _newDate,
               quantityController: _quantityController,
@@ -876,7 +867,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               onCancel: () => setState(() => _creating = false),
             )
           else
-            _AddTransactionButton(
+            AddTransactionButton(
               onTap: () => setState(() {
                 _editingTransactionId = null;
                 _newIsBuy = true;
@@ -900,489 +891,3 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   }
 }
 
-/// Formulaire d'édition de l'identifiant et du libellé d'un investissement
-/// — mêmes champs que `_CreateInvestmentForm` (`account_detail_screen.dart`)
-/// à la création, remplis avec les valeurs actuelles.
-class _EditInvestmentForm extends StatelessWidget {
-  final AssetClass assetClass;
-  final bool isImmobilier;
-  final AccountEnvelope? accountEnvelope;
-  final TextEditingController isinController;
-  final TextEditingController labelController;
-  final FundStyle? fundStyle;
-  final ValueChanged<FundStyle?> onFundStyleChanged;
-  final VoidCallback onSave;
-  final VoidCallback onCancel;
-
-  const _EditInvestmentForm({
-    required this.assetClass,
-    required this.isImmobilier,
-    this.accountEnvelope,
-    required this.isinController,
-    required this.labelController,
-    required this.fundStyle,
-    required this.onFundStyleChanged,
-    required this.onSave,
-    required this.onCancel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FrostedCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (isImmobilier)
-              TextField(
-                controller: labelController,
-                placeholder: const shadcn.Text(
-                  'Nom du bien (ex: Appartement Lyon 6e)',
-                ),
-              )
-            else
-              Row(
-                children: [
-                  Expanded(
-                    child: InvestmentIdentifierField(
-                      assetClass: assetClass,
-                      accountEnvelope: accountEnvelope,
-                      isinController: isinController,
-                      labelController: labelController,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: labelController,
-                      placeholder: const shadcn.Text(
-                        'Libellé (ex: TotalEnergies)',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            if (assetClass == AssetClass.actionsEtFonds) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Select<FundStyle>(
-                    value: fundStyle,
-                    placeholder: const shadcn.Text('Style de gestion'),
-                    onChanged: (style) {
-                      if (style != null) onFundStyleChanged(style);
-                    },
-                    itemBuilder: (context, style) => shadcn.Text(style.label),
-                    popup: (context) => SelectPopup(
-                      items: SelectItemList(
-                        children: [
-                          for (final style in FundStyle.values)
-                            SelectItemButton(
-                              value: style,
-                              child: shadcn.Text(style.label),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (fundStyle != null) ...[
-                    const SizedBox(width: 4),
-                    IconButton.ghost(
-                      icon: const Icon(LucideIcons.x, size: 14),
-                      onPressed: () => onFundStyleChanged(null),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                PrimaryButton(
-                  onPressed: onSave,
-                  child: const shadcn.Text('Enregistrer'),
-                ),
-                const SizedBox(width: 8),
-                OutlineButton(
-                  onPressed: onCancel,
-                  child: const shadcn.Text('Annuler'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final Widget? trailing;
-
-  const _StatChip({required this.label, required this.value, this.trailing});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.muted,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              shadcn.Text(label).muted().xSmall(),
-              if (trailing != null) ...[const SizedBox(width: 6), trailing!],
-            ],
-          ),
-          shadcn.Text(value).medium(),
-        ],
-      ),
-    );
-  }
-}
-
-/// Petit badge affiché à côté du "Dernier cours" quand
-/// [Investment.isPriceFresh] — le cours affiché vient bien du dernier
-/// rafraîchissement du jour, pas d'un cache potentiellement daté (voir
-/// `price_refresh_service.dart`).
-class _FreshPriceBadge extends StatelessWidget {
-  const _FreshPriceBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlineBadge(
-      leading: const Icon(LucideIcons.circleCheck, size: 10, color: Colors.green),
-      child: shadcn.Text('à jour').xSmall(),
-    );
-  }
-}
-
-class _TransactionRow extends StatelessWidget {
-  final Transaction transaction;
-  final bool hidden;
-  final bool displayTotalOnly;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  /// Classe d'actif effective de l'investissement porteur : sert à formater
-  /// la quantité (entière pour les pièces/lingots de métaux précieux).
-  final AssetClass assetClass;
-
-  /// Documents rattachés à cette transaction (pièces justificatives des
-  /// métaux précieux et "autres") — affiche un bouton de consultation
-  /// quand la liste est non vide.
-  final List<VaultDocument> documents;
-
-  /// Chemin du vault pour ouvrir les fichiers depuis [showDocumentViewDialog]
-  /// — inutilisé (et `null`) quand [documents] est vide.
-  final String? vaultPath;
-
-  const _TransactionRow({
-    required this.transaction,
-    required this.hidden,
-    this.displayTotalOnly = false,
-    required this.assetClass,
-    required this.onEdit,
-    required this.onDelete,
-    this.documents = const [],
-    this.vaultPath,
-  });
-
-  void _openMenu(BuildContext anchorContext) {
-    showDropdown(
-      context: anchorContext,
-      anchorAlignment: AlignmentDirectional.topEnd,
-      alignment: AlignmentDirectional.topStart,
-      offset: const Offset(0, 4),
-      builder: (context) => ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 180),
-        child: DropdownMenu(
-          children: [
-            MenuButton(
-              leading: const Icon(LucideIcons.pencil, size: 14),
-              child: const shadcn.Text('Modifier'),
-              onPressed: (_) => onEdit(),
-            ),
-            MenuButton(
-              leading: const Icon(LucideIcons.trash2, size: 14),
-              child: const shadcn.Text('Supprimer'),
-              onPressed: (_) => onDelete(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = transaction.isBuy ? _green : _red;
-    return FrostedCard(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: shadcn.Text(
-                transaction.displayLabel,
-                style: TextStyle(color: color, fontWeight: FontWeight.w600),
-              ).xSmall(),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: shadcn.Text(_formatDate(transaction.date)).small()),
-            if (!displayTotalOnly) ...[
-              shadcn.Text(
-                '${formatQuantity(transaction.quantity, assetClass)} × '
-                '${transaction.currency == 'EUR'
-                    ? displayEuros(transaction.unitPrice, hidden)
-                    : formatPriceInCurrency(
-                        transaction.unitPrice,
-                        transaction.currency,
-                        hidden: hidden,
-                      )}',
-              ).muted().xSmall(),
-              const SizedBox(width: 12),
-            ],
-            shadcn.Text(displayEuros(transaction.amount, hidden)).medium(),
-            if (documents.isNotEmpty && vaultPath != null) ...[
-              const SizedBox(width: 4),
-              // Consultation rapide des pièces justificatives de la
-              // transaction (métaux précieux et "autres") — l'ajout et la
-              // suppression restent sur le formulaire d'édition, voir
-              // `showDocumentViewDialog`.
-              Tooltip(
-                tooltip: (context) => TooltipContainer(
-                  child: shadcn.Text(
-                    '${documents.length} document'
-                    '${documents.length > 1 ? 's' : ''} rattaché'
-                    '${documents.length > 1 ? 's' : ''} — consulter',
-                  ),
-                ),
-                child: IconButton.ghost(
-                  icon: Icon(LucideIcons.paperclip, size: 15),
-                  onPressed: () => showDocumentViewDialog(
-                    context,
-                    vaultPath: vaultPath!,
-                    documents: documents,
-                  ),
-                ),
-              ),
-            ],
-            Builder(
-              builder: (context) => IconButton.ghost(
-                icon: const Icon(LucideIcons.ellipsisVertical, size: 16),
-                onPressed: () => _openMenu(context),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) =>
-      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-}
-
-class _AddTransactionButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _AddTransactionButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            LucideIcons.plus,
-            size: 16,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
-          shadcn.Text(
-            'Ajouter une transaction',
-            style: TextStyle(color: Theme.of(context).colorScheme.primary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CreateTransactionForm extends StatelessWidget {
-  final bool isBuy;
-  final DateTime? date;
-  final TextEditingController quantityController;
-  final TextEditingController priceController;
-  final ValueChanged<bool> onIsBuyChanged;
-  final ValueChanged<DateTime?> onDateChanged;
-  final VoidCallback onCreate;
-  final VoidCallback onCancel;
-  final String submitLabel;
-
-  /// Libellé du champ [quantityController] — "Quantité" par défaut,
-  /// `Montant (€)`/`Montant (<devise>)` pour une position en devise (voir
-  /// `InvestmentDetailView`'s `_quantityFieldLabel`).
-  final String quantityLabel;
-
-  /// Libellé du champ [priceController] — "Prix unitaire" par défaut,
-  /// "Cours de la paire de devise" pour une position en devise (voir
-  /// `InvestmentDetailView`'s `_priceFieldLabel`).
-  final String priceLabel;
-
-  /// `false` masque entièrement le champ [priceController] — une position
-  /// en devise tenue en euros n'a pas de taux de change à saisir (voir
-  /// `InvestmentDetailView`'s `_isEurCurrency`).
-  final bool showPriceField;
-
-  /// `true` affiche le sélecteur de devise à côté du champ prix (voir
-  /// `InvestmentDetailView`'s `_showCurrencySelector`) — faux pour une
-  /// position en devise, dont le "prix" est déjà le taux en euros.
-  final bool showCurrencySelector;
-
-  /// Contrôleur devise/taux du formulaire (voir
-  /// `transaction_price_currency.dart`) — utilisé quand [showCurrencySelector]
-  /// pour résoudre le taux et afficher la zone de rappel/conversion.
-  final TransactionPriceCurrencyController? priceCurrencyController;
-
-  /// Section "Documents" scopée à cette transaction (voir
-  /// `DocumentsSection`'s `fixedTransactionId`) — `null` pour une
-  /// transaction en cours de création (pas encore d'id persisté auquel
-  /// rattacher un document) ou hors métaux précieux.
-  final Widget? documentsSection;
-
-  const _CreateTransactionForm({
-    required this.isBuy,
-    required this.date,
-    required this.quantityController,
-    required this.priceController,
-    this.submitLabel = 'Ajouter la transaction',
-    this.quantityLabel = 'Quantité',
-    this.priceLabel = 'Prix unitaire',
-    this.showPriceField = true,
-    this.showCurrencySelector = false,
-    this.priceCurrencyController,
-    required this.onIsBuyChanged,
-    required this.onDateChanged,
-    required this.onCreate,
-    required this.onCancel,
-    this.documentsSection,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FrostedCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                ButtonGroup(
-                  children: [
-                    SelectedButton(
-                      value: isBuy,
-                      selectedStyle: const ButtonStyle.primary(),
-                      onChanged: (_) => onIsBuyChanged(true),
-                      child: const shadcn.Text('Achat'),
-                    ),
-                    SelectedButton(
-                      value: !isBuy,
-                      selectedStyle: const ButtonStyle.primary(),
-                      onChanged: (_) => onIsBuyChanged(false),
-                      child: const shadcn.Text('Vente'),
-                    ),
-                  ],
-                ),
-                DatePicker(
-                  value: date,
-                  onChanged: onDateChanged,
-                  placeholder: const shadcn.Text('Date'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: quantityController,
-                    placeholder: shadcn.Text(quantityLabel),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                  ),
-                ),
-                if (showPriceField) ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: priceController,
-                      placeholder: shadcn.Text(priceLabel),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                    ),
-                  ),
-                  if (showCurrencySelector &&
-                      priceCurrencyController != null) ...[
-                    const SizedBox(width: 8),
-                    TransactionPriceCurrencySelect(
-                      controller: priceCurrencyController!,
-                    ),
-                  ],
-                ],
-              ],
-            ),
-            if (showCurrencySelector && priceCurrencyController != null)
-              TransactionFxRateArea(
-                controller: priceCurrencyController!,
-                quantityController: quantityController,
-                priceController: priceController,
-              ),
-            if (documentsSection != null) ...[
-              const SizedBox(height: 16),
-              documentsSection!,
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                PrimaryButton(
-                  onPressed: onCreate,
-                  child: shadcn.Text(submitLabel),
-                ),
-                const SizedBox(width: 8),
-                OutlineButton(
-                  onPressed: onCancel,
-                  child: const shadcn.Text('Annuler'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

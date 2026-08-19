@@ -42,11 +42,16 @@ class CategoryBreakdownCard extends StatefulWidget {
 }
 
 class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
-  final Set<String> _expandedIds = {};
+  /// Catégories dépliées par défaut (voir [_CategoryTile]) : un clic
+  /// bascule l'id dedans ou hors de cet ensemble d'exceptions plutôt que de
+  /// suivre directement "repliée"/"dépliée" — inversé par rapport à
+  /// l'intuition, mais permet un défaut déplié sans state initial à
+  /// recalculer à chaque changement de [CategoryBreakdownCard.categories].
+  final Set<String> _collapsedIds = {};
 
   void _toggleExpanded(String id) {
     setState(() {
-      if (!_expandedIds.remove(id)) _expandedIds.add(id);
+      if (!_collapsedIds.remove(id)) _collapsedIds.add(id);
     });
   }
 
@@ -74,7 +79,7 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
             for (final category in populated)
               _CategoryTile(
                 category: category,
-                expanded: _expandedIds.contains(category.id),
+                expanded: !_collapsedIds.contains(category.id),
                 hidden: widget.hidden,
                 showPru: widget.showPru,
                 onToggleExpand: () => _toggleExpanded(category.id),

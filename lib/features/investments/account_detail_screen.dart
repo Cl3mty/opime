@@ -2,20 +2,16 @@ import 'dart:typed_data';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
-import '../../core/date_format.dart';
 import '../../core/ui/copyable_identifier.dart';
 import '../../core/ui/frosted_card.dart';
 import 'confirm_delete_dialog.dart';
 import 'document_storage.dart';
 import 'documents_section.dart';
 import 'ibkr/ibkr_import_dialog.dart';
-import 'investment_identifier_field.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
-import 'performance_calculator.dart';
-
-const _green = Color(0xFF22C55E);
-const _red = Color(0xFFEF4444);
+import 'widgets/account_summary_header.dart';
+import 'widgets/investment_edit_form.dart';
 
 /// Détail d'un compte de placement : montant total, liste des
 /// investissements (par ISIN) qui le composent, ajout d'un investissement
@@ -200,8 +196,9 @@ class _AccountDetailViewState extends State<AccountDetailView> {
   String _commitEditAccountName() {
     final isEpargne = widget.account.assetClass == AssetClass.epargne;
     if (isEpargne) return _editBankName ?? widget.account.name;
-    final requiresEstablishment =
-        assetClassRequiresEstablishmentStep(widget.account.assetClass);
+    final requiresEstablishment = assetClassRequiresEstablishmentStep(
+      widget.account.assetClass,
+    );
     if (requiresEstablishment) {
       // Nom = type de compte : on ne le renomme que si le type a changé.
       final envelopeChanged = _editEnvelope != widget.account.envelope;
@@ -314,21 +311,6 @@ class _AccountDetailViewState extends State<AccountDetailView> {
   @override
   Widget build(BuildContext context) {
     final account = widget.account;
-    final pricedInvestments = account.investments
-        .where((i) => i.marketValue != null)
-        .toList();
-    final mwr = pricedInvestments.isEmpty
-        ? null
-        : calculateMwr(
-            transactions: [
-              for (final i in pricedInvestments) ...i.transactions,
-            ],
-            currentValue: pricedInvestments.fold(
-              0.0,
-              (sum, i) => sum + i.marketValue!,
-            ),
-            asOf: DateTime.now(),
-          );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -350,7 +332,7 @@ class _AccountDetailViewState extends State<AccountDetailView> {
           ),
           const SizedBox(height: 16),
           if (_editingAccount)
-            _EditAccountForm(
+            AccountEditForm(
               assetClass: account.assetClass,
               // Le nom d'un compte n'est pas saisi librement : il découle du
               // type de compte (enveloppe) ou de la banque pour l'épargne —
@@ -358,8 +340,9 @@ class _AccountDetailViewState extends State<AccountDetailView> {
               // établissement (immobilier, crypto, métaux) gardent un champ
               // de saisie.
               nameController: _editNameController,
-              showNameField:
-                  !assetClassRequiresEstablishmentStep(account.assetClass),
+              showNameField: !assetClassRequiresEstablishmentStep(
+                account.assetClass,
+              ),
               // On change de banque via une liste déroulante des
               // établissements déjà créés dans le vault — la création d'un
               // établissement passe par le flux "Compléter mon patrimoine".
@@ -387,58 +370,8 @@ class _AccountDetailViewState extends State<AccountDetailView> {
               onSave: _commitEditAccount,
               onCancel: () => setState(() => _editingAccount = false),
             )
-          else ...[
-            shadcn.Text(
-              account.envelope != null
-                  ? '${account.assetClass.label} · ${account.envelope!.label}'
-                  : account.assetClass.label,
-            ).muted().small(),
-            if (account.openingDate != null) ...[
-              const SizedBox(height: 2),
-              shadcn.Text(
-                'Ouvert le ${formatDateDdMmYyyy(account.openingDate!)}',
-              ).muted().xSmall(),
-            ],
-            const SizedBox(height: 4),
-            shadcn.Text(
-              displayEuros(account.totalMarketValue, widget.hidden),
-            ).x2Large().bold(),
-            const SizedBox(height: 2),
-            shadcn.Text(
-              pricedInvestments.length == account.investments.length &&
-                      account.investments.isNotEmpty
-                  ? 'Valorisation au dernier cours connu'
-                  : 'Montant net investi (cours pas encore disponible pour '
-                        'tous les investissements)',
-            ).muted().xSmall(),
-          ],
-          if (mwr != null && !_editingAccount) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  mwr.rate >= 0
-                      ? LucideIcons.trendingUp
-                      : LucideIcons.trendingDown,
-                  size: 14,
-                  color: mwr.rate >= 0 ? _green : _red,
-                ),
-                const SizedBox(width: 4),
-                shadcn.Text(
-                  mwr.annualized
-                      ? '${displayPercent(mwr.rate * 100)} par an (MWR, '
-                            'rendement pondéré par vos apports)'
-                      : '${displayPercent(mwr.rate * 100)} depuis le début '
-                            '(MWR, moins d\'un an de recul)',
-                  style: TextStyle(
-                    color: mwr.rate >= 0 ? _green : _red,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ).xSmall(),
-              ],
-            ),
-          ],
+          else
+            AccountSummaryHeader(account: account, hidden: widget.hidden),
           const SizedBox(height: 24),
           const shadcn.Text('Investissements').large().medium(),
           const SizedBox(height: 12),
@@ -663,48 +596,12 @@ class _CreateInvestmentForm extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (assetClass == AssetClass.immobilier)
-              TextField(
-                controller: labelController,
-                placeholder: const shadcn.Text(
-                  'Nom du bien (ex: Appartement Lyon 6e)',
-                ),
-              )
-            else if (!requiresLabelFieldFor(
-              assetClass,
+            InvestmentIdentityFields(
+              assetClass: assetClass,
               accountEnvelope: accountEnvelope,
-            ))
-              // Métaux physiques : le libellé est le produit choisi dans la
-              // liste déroulante (pré-rempli automatiquement), inutile de
-              // demander un libellé séparé.
-              InvestmentIdentifierField(
-                assetClass: assetClass,
-                accountEnvelope: accountEnvelope,
-                isinController: isinController,
-                labelController: labelController,
-              )
-            else
-              Row(
-                children: [
-                  Expanded(
-                    child: InvestmentIdentifierField(
-                      assetClass: assetClass,
-                      accountEnvelope: accountEnvelope,
-                      isinController: isinController,
-                      labelController: labelController,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: labelController,
-                      placeholder: const shadcn.Text(
-                        'Libellé (ex: TotalEnergies)',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              isinController: isinController,
+              labelController: labelController,
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -726,7 +623,11 @@ class _CreateInvestmentForm extends StatelessWidget {
   }
 }
 
-class _EditAccountForm extends StatelessWidget {
+/// Formulaire d'édition d'un compte (enveloppe, nom, banque, description,
+/// date d'ouverture) — réutilisé par la page compte générique
+/// (`AccountDetailView`) et l'écran compte dédié Actions & Fonds
+/// (`stock_account/stock_account_screen.dart`).
+class AccountEditForm extends StatelessWidget {
   final AssetClass assetClass;
   final TextEditingController nameController;
 
@@ -763,7 +664,8 @@ class _EditAccountForm extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onCancel;
 
-  const _EditAccountForm({
+  const AccountEditForm({
+    super.key,
     required this.assetClass,
     required this.nameController,
     required this.showNameField,
@@ -840,8 +742,10 @@ class _EditAccountForm extends StatelessWidget {
                     popup: (context) => SelectPopup(
                       items: SelectItemList(
                         children: [
-                          for (final bank in {...bankNames, ?bankName}.toList()
-                            ..sort())
+                          for (final bank in {
+                            ...bankNames,
+                            ?bankName,
+                          }.toList()..sort())
                             SelectItemButton(
                               value: bank,
                               child: shadcn.Text(bank),

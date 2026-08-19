@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../dashboard/category_detail_screen.dart';
@@ -9,6 +10,7 @@ import 'investments_models.dart';
 import 'investments_repository.dart';
 import 'patrimoine_refresh_controller.dart';
 import 'real_patrimoine_adapter.dart';
+import 'stock_account_screen.dart';
 import 'yahoo_finance_client.dart' show PricePoint;
 
 /// Charge les comptes réels puis affiche [CategoryDetailScreen] pour la
@@ -18,12 +20,14 @@ import 'yahoo_finance_client.dart' show PricePoint;
 /// [CategoryDetailScreen] plutôt que rien.
 ///
 /// Cliquer sur une ligne du tableau ouvre en local (pas de `Navigator.push`,
-/// même principe que l'ancien "Mes comptes") la vue de détail du compte
-/// puis de l'investissement réel correspondant — actualisation de cours,
-/// historique complet des transactions, bascule TWR/MWR : ce sont les
-/// seuls écrans qui exposent encore ces actions, la création (compte/
-/// investissement/transaction) passant désormais uniquement par le flux
-/// "Compléter mon patrimoine" de la TopBar.
+/// même principe que l'ancien "Mes comptes") la vue de détail du compte —
+/// `StockAccountScreen` pour toutes les classes sauf l'immobilier
+/// (positions + transactions, popup de détail par position), l'ancienne
+/// paire `AccountDetailView`/`InvestmentDetailView` pour l'immobilier.
+/// Actualisation de cours, historique complet des transactions, bascule
+/// TWR/MWR : ce sont les seuls écrans qui exposent encore ces actions, la
+/// création (compte/investissement/transaction) passant désormais
+/// uniquement par le flux "Compléter mon patrimoine" de la TopBar.
 class RealCategoryDetailScreen extends StatefulWidget {
   final String vaultPath;
   final String categoryId;
@@ -194,6 +198,13 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
     });
   }
 
+  /// Chevron de la ligne de compte (voir [CategoryDetailScreen.onAccountOpen])
+  /// — ouvre [StockAccountScreen] en vue normale (pas en édition), pour
+  /// toutes les classes d'actif sauf l'immobilier — voir [build].
+  void _openAccountToView(PatrimoineAccount tapped) {
+    setState(() => _selectedAccountId = tapped.id);
+  }
+
   /// "Supprimer le compte" du menu "⋮" de l'accordéon (voir
   /// [CategoryDetailScreen.onAccountDelete]) — même garde-fou et même
   /// confirmation que `AccountDetailView`'s propre suppression
@@ -255,6 +266,14 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
     return names.toList()..sort();
   }
 
+  /// Cette page affiche-t-elle une classe d'actif avec sa page compte
+  /// dédiée (`StockAccountScreen`) ? — toutes sauf l'immobilier, voir
+  /// [build] et le commentaire de tête de `stock_account_screen.dart`.
+  bool get _usesStockAccountScreen {
+    final assetClass = assetClassForCategoryId(widget.categoryId);
+    return assetClass != null && assetClass != AssetClass.immobilier;
+  }
+
   @override
   Widget build(BuildContext context) {
     final category = _category;
@@ -266,6 +285,26 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
     final account = _selectedAccount;
     final investment = _selectedInvestment;
 
+    if (account != null && account.assetClass != AssetClass.immobilier) {
+      return StockAccountScreen(
+        vaultPath: widget.vaultPath,
+        account: account,
+        hidden: hidden,
+        bankNames: _bankNames,
+        startInEditMode: _openAccountInEditMode,
+        // Un clic sur une position directement depuis le tableau de
+        // catégorie (voir `_openInvestment`) ouvrait autrefois sa page
+        // dédiée directement — ouvre maintenant sa popup de détail dès
+        // l'arrivée sur la page compte, pour garder le même raccourci.
+        initialInvestmentId: investment?.id,
+        onBack: () => setState(() {
+          _selectedAccountId = null;
+          _selectedInvestmentId = null;
+          _openAccountInEditMode = false;
+        }),
+        onChanged: () => unawaited(_refresh()),
+      );
+    }
     if (account != null && investment != null) {
       return InvestmentDetailView(
         vaultPath: widget.vaultPath,
@@ -299,6 +338,11 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
       historyForPeriod: _historyForPeriod,
       onAccountEdit: _openAccountForEdit,
       onAccountDelete: _deleteAccountFromAccordion,
+      // Toutes les classes sauf l'immobilier ont une page compte dédiée
+      // assez riche (`StockAccountScreen`, avec son propre menu "Modifier"/
+      // "Supprimer") pour justifier un chevron direct plutôt que le menu
+      // "⋮" — l'immobilier garde le comportement "⋮" existant.
+      onAccountOpen: _usesStockAccountScreen ? _openAccountToView : null,
       // Permet d'importer les logos des banques (avatar cliquable).
       vaultPath: widget.vaultPath,
       // Les avatars restent affichés pour toutes les classes d'actif : pour

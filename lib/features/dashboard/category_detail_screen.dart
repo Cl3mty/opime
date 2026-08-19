@@ -85,6 +85,23 @@ class CategoryDetailScreen extends StatefulWidget {
   final ValueChanged<PatrimoineAccount>? onAccountEdit;
   final Future<void> Function(PatrimoineAccount)? onAccountDelete;
 
+  /// Remplace le menu "⋮" (Modifier/Supprimer) d'une ligne de *compte* par
+  /// un chevron ouvrant directement sa page dédiée — utilisé par
+  /// `RealCategoryDetailScreen` pour toutes les classes d'actif sauf
+  /// l'immobilier (voir `StockAccountScreen`, qui expose "Modifier"/
+  /// "Supprimer" dans son propre menu, rendant le raccourci "⋮" du tableau
+  /// redondant). Quand renseigné, masque aussi le chevron des lignes
+  /// d'investissement du second niveau de l'accordéon : cliquer une
+  /// position n'y ouvre plus une page mais une popup, un chevron y serait
+  /// trompeur. `null` (défaut) laisse le comportement "⋮" existant.
+  final ValueChanged<PatrimoineAccount>? onAccountOpen;
+
+  /// `true` (défaut) déplie tous les accordéons (banque et compte) — voir
+  /// tout d'un coup d'œil sans avoir à cliquer plutôt que devoir déplier
+  /// chaque ligne une à une. `false` conserve un état replié par défaut, si
+  /// jamais un appelant en a besoin.
+  final bool defaultExpanded;
+
   /// Chemin du vault — permet d'importer/remplacer les logos de banques
   /// (l'avatar d'une banque est cliquable, voir `BankLogoAvatar`). `null`
   /// rend l'avatar non cliquable.
@@ -103,6 +120,8 @@ class CategoryDetailScreen extends StatefulWidget {
     this.accountsCardTitle = 'Actifs',
     this.onAccountEdit,
     this.onAccountDelete,
+    this.onAccountOpen,
+    this.defaultExpanded = true,
     this.vaultPath,
   });
 
@@ -304,6 +323,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 title: widget.accountsCardTitle,
                 onAccountEdit: widget.onAccountEdit,
                 onAccountDelete: widget.onAccountDelete,
+                onAccountOpen: widget.onAccountOpen,
+                defaultExpanded: widget.defaultExpanded,
                 bankLogos: _bankLogos,
                 onImportLogo: widget.vaultPath == null ? null : _importBankLogo,
               ),
@@ -416,9 +437,7 @@ class _DistributionCardState extends State<_DistributionCard> {
     for (final account in accounts) {
       byCurrency.putIfAbsent(account.name, () => []).add(account);
     }
-    return [
-      for (final poches in byCurrency.values) _mergePoches(poches),
-    ];
+    return [for (final poches in byCurrency.values) _mergePoches(poches)];
   }
 
   PatrimoineAccount _mergePoches(List<PatrimoineAccount> poches) {
@@ -472,8 +491,8 @@ class _DistributionCardState extends State<_DistributionCard> {
         : (_mode == _DistributionMode.parCompte
               ? byAccount
               : category.id == AssetClass.epargne.categoryId
-                  ? _epargneLinesByCurrency(category.accounts)
-                  : category.accounts);
+              ? _epargneLinesByCurrency(category.accounts)
+              : category.accounts);
     final montant = lines.fold(0.0, (sum, a) => sum + a.valeur);
     final slices = [
       for (var i = 0; i < lines.length; i++)
@@ -618,6 +637,12 @@ class _AccountsCard extends StatefulWidget {
   final ValueChanged<PatrimoineAccount>? onAccountEdit;
   final Future<void> Function(PatrimoineAccount)? onAccountDelete;
 
+  /// Voir [CategoryDetailScreen.onAccountOpen].
+  final ValueChanged<PatrimoineAccount>? onAccountOpen;
+
+  /// Voir [CategoryDetailScreen.defaultExpanded].
+  final bool defaultExpanded;
+
   /// Logos importés par nom de banque → chemin absolu de l'image — voir
   /// `_CategoryDetailScreenState._bankLogos`.
   final Map<String, String> bankLogos;
@@ -635,6 +660,8 @@ class _AccountsCard extends StatefulWidget {
     required this.title,
     this.onAccountEdit,
     this.onAccountDelete,
+    this.onAccountOpen,
+    this.defaultExpanded = false,
     this.bankLogos = const {},
     this.onImportLogo,
   });
@@ -644,11 +671,20 @@ class _AccountsCard extends StatefulWidget {
 }
 
 class _AccountsCardState extends State<_AccountsCard> {
-  final Set<String> _expandedIds = {};
+  /// Accordéons dont l'état diffère du défaut ([_AccountsCard.defaultExpanded])
+  /// — un clic bascule l'état d'un id dedans ou hors de cet ensemble plutôt
+  /// que de suivre directement "replié"/"déplié", pour permettre un défaut
+  /// déplié (Actions & Fonds) comme replié (toutes les autres classes)
+  /// avec le même état.
+  final Set<String> _toggledIds = {};
+
+  bool _isExpanded(String id) => widget.defaultExpanded
+      ? !_toggledIds.contains(id)
+      : _toggledIds.contains(id);
 
   void _toggleExpanded(String id) {
     setState(() {
-      if (!_expandedIds.remove(id)) _expandedIds.add(id);
+      if (!_toggledIds.remove(id)) _toggledIds.add(id);
     });
   }
 
@@ -680,11 +716,12 @@ class _AccountsCardState extends State<_AccountsCard> {
             showAvatar: widget.showAvatar,
             showPru: showPru,
             quantityAssetClass: quantityAssetClass,
-            expanded: _expandedIds.contains(account.id ?? account.name),
+            expanded: _isExpanded(account.id ?? account.name),
             onToggleExpand: () => _toggleExpanded(account.id ?? account.name),
             onInvestmentTap: widget.onAccountTap,
             onEdit: widget.onAccountEdit,
             onDelete: widget.onAccountDelete,
+            onAccountOpen: widget.onAccountOpen,
           ),
         );
         continue;
@@ -703,11 +740,12 @@ class _AccountsCardState extends State<_AccountsCard> {
             showAvatar: false,
             showPru: showPru,
             quantityAssetClass: quantityAssetClass,
-            expanded: _expandedIds.contains(account.id ?? account.name),
+            expanded: _isExpanded(account.id ?? account.name),
             onToggleExpand: () => _toggleExpanded(account.id ?? account.name),
             onInvestmentTap: widget.onAccountTap,
             onEdit: widget.onAccountEdit,
             onDelete: widget.onAccountDelete,
+            onAccountOpen: widget.onAccountOpen,
           ),
         );
       }
@@ -719,7 +757,7 @@ class _AccountsCardState extends State<_AccountsCard> {
           onImportLogo: widget.onImportLogo,
           hidden: widget.hidden,
           showPru: showPru,
-          expanded: _expandedIds.contains('bank:$group.key'),
+          expanded: _isExpanded('bank:$group.key'),
           onToggleExpand: () => _toggleExpanded('bank:$group.key'),
           children: children,
         ),
@@ -790,6 +828,9 @@ class _AccountAccordionTile extends StatelessWidget {
   final ValueChanged<PatrimoineAccount>? onEdit;
   final Future<void> Function(PatrimoineAccount)? onDelete;
 
+  /// Voir [CategoryDetailScreen.onAccountOpen].
+  final ValueChanged<PatrimoineAccount>? onAccountOpen;
+
   /// `false` masque aussi l'avatar (initiales) des lignes d'investissement
   /// du second niveau de l'accordéon — voir [CategoryDetailScreen.showAvatar].
   final bool showAvatar;
@@ -811,6 +852,7 @@ class _AccountAccordionTile extends StatelessWidget {
     this.onInvestmentTap,
     this.onEdit,
     this.onDelete,
+    this.onAccountOpen,
     this.showAvatar = true,
     this.showPru = false,
     this.quantityAssetClass,
@@ -849,11 +891,16 @@ class _AccountAccordionTile extends StatelessWidget {
                       ),
                     )
                   : const SizedBox(width: 28),
-              trailing: _AccountActionsMenu(
-                account: account,
-                onEdit: onEdit,
-                onDelete: onDelete,
-              ),
+              trailing: onAccountOpen != null
+                  ? _OpenAccountChevron(
+                      account: account,
+                      onOpen: onAccountOpen!,
+                    )
+                  : _AccountActionsMenu(
+                      account: account,
+                      onEdit: onEdit,
+                      onDelete: onDelete,
+                    ),
             ),
           ),
         ),
@@ -873,6 +920,10 @@ class _AccountAccordionTile extends StatelessWidget {
                             showAvatar: showAvatar,
                             showPru: showPru,
                             quantityAssetClass: quantityAssetClass,
+                            // Une position ouvre une popup (voir
+                            // `onAccountOpen`), pas une page : le chevron de
+                            // navigation serait trompeur dans ce cas.
+                            showChevron: onAccountOpen == null,
                             onTap: onInvestmentTap == null
                                 ? null
                                 : () => onInvestmentTap!(investment),
@@ -992,9 +1043,7 @@ class _BankAccordionTile extends StatelessWidget {
                     width: _colWidth,
                     child: Align(
                       alignment: Alignment.centerRight,
-                      child: shadcn.Text(
-                        displayEuros(total, hidden),
-                      ).small(),
+                      child: shadcn.Text(displayEuros(total, hidden)).small(),
                     ),
                   ),
                   SizedBox(
@@ -1091,10 +1140,8 @@ class _AccountAvatar extends StatelessWidget {
     return _initials();
   }
 
-  Widget _initials() => Avatar(
-    size: 28,
-    initials: account.avatarInitials ?? account.initials,
-  );
+  Widget _initials() =>
+      Avatar(size: 28, initials: account.avatarInitials ?? account.initials);
 }
 
 class _AccountLine extends StatelessWidget {
@@ -1125,6 +1172,12 @@ class _AccountLine extends StatelessWidget {
   /// catégorie sans classe d'actif (passifs) : formatage par défaut.
   final AssetClass? quantityAssetClass;
 
+  /// `false` masque le chevron par défaut affiché en bout de ligne quand
+  /// [onTap] est renseigné sans [trailing] — voir
+  /// [CategoryDetailScreen.onAccountOpen] : cliquer une position ouvre une
+  /// popup, pas une page, le chevron y serait trompeur.
+  final bool showChevron;
+
   const _AccountLine({
     required this.account,
     required this.hidden,
@@ -1134,6 +1187,7 @@ class _AccountLine extends StatelessWidget {
     this.showAvatar = true,
     this.showPru = false,
     this.quantityAssetClass,
+    this.showChevron = true,
   });
 
   @override
@@ -1175,8 +1229,11 @@ class _AccountLine extends StatelessWidget {
               child: shadcn.Text(
                 account.quantite != null
                     ? quantityAssetClass != null
-                        ? formatQuantity(account.quantite!, quantityAssetClass!)
-                        : account.quantite!.toStringAsFixed(2)
+                          ? formatQuantity(
+                              account.quantite!,
+                              quantityAssetClass!,
+                            )
+                          : account.quantite!.toStringAsFixed(2)
                     : '—',
               ).small(),
             ),
@@ -1215,8 +1272,8 @@ class _AccountLine extends StatelessWidget {
                       ),
                     )
                   : account.cours == null
-                      ? shadcn.Text('—').small()
-                      : _CoursCell(account: account, hidden: hidden),
+                  ? shadcn.Text('—').small()
+                  : _CoursCell(account: account, hidden: hidden),
             ),
           ),
           SizedBox(
@@ -1248,7 +1305,7 @@ class _AccountLine extends StatelessWidget {
             child: Center(
               child:
                   trailing ??
-                  (onTap != null
+                  (onTap != null && showChevron
                       ? Icon(
                           LucideIcons.chevronRight,
                           size: 16,
@@ -1302,6 +1359,32 @@ class _CoursCell extends StatelessWidget {
         ),
       ),
       child: content,
+    );
+  }
+}
+
+/// Chevron cliquable en bout de ligne de compte — voir
+/// [CategoryDetailScreen.onAccountOpen]. Remplace [_AccountActionsMenu]
+/// pour les classes d'actif dont la page compte expose déjà son propre
+/// menu "Modifier"/"Supprimer" (Actions & Fonds, voir `StockAccountScreen`).
+class _OpenAccountChevron extends StatelessWidget {
+  final PatrimoineAccount account;
+  final ValueChanged<PatrimoineAccount> onOpen;
+
+  const _OpenAccountChevron({required this.account, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => onOpen(account),
+        child: Icon(
+          LucideIcons.chevronRight,
+          size: 18,
+          color: Theme.of(context).colorScheme.mutedForeground,
+        ),
+      ),
     );
   }
 }
