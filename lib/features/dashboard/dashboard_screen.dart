@@ -314,6 +314,7 @@ class _RealDashboardState extends State<_RealDashboard> {
               CategoryBreakdownCard(
                 title: 'Actifs',
                 categories: _categoriesByAccount,
+                categoriesByInvestment: _categories,
                 hidden: hidden,
                 // Le PRU reste visible sur les pages de détail de chaque
                 // classe d'actif, pas ici : la vue agrégée du Dashboard

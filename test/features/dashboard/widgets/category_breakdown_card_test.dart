@@ -70,4 +70,112 @@ void main() {
 
     expect(find.text('PEA Boursorama'), findsNothing);
   });
+
+  group('bascule Par compte / Par investissement', () {
+    PatrimoineCategory categoryByAccount() => PatrimoineCategory(
+      id: 'actifs_actions_fonds',
+      label: 'Actions & Fonds',
+      icon: LucideIcons.trendingUp,
+      color: const Color(0xFF000000),
+      tier: AllocationTier.fondation,
+      description: '',
+      accounts: const [
+        PatrimoineAccount(
+          id: 'acc-1',
+          name: 'PEA Boursorama',
+          valeur: 1000,
+          plusValueAbs: 50,
+          plusValuePercent: 5,
+        ),
+      ],
+    );
+
+    PatrimoineCategory categoryByInvestment() => PatrimoineCategory(
+      id: 'actifs_actions_fonds',
+      label: 'Actions & Fonds',
+      icon: LucideIcons.trendingUp,
+      color: const Color(0xFF000000),
+      tier: AllocationTier.fondation,
+      description: '',
+      accounts: const [
+        PatrimoineAccount(
+          id: 'inv-1',
+          name: 'Amundi MSCI World',
+          valeur: 600,
+          plusValueAbs: 30,
+          plusValuePercent: 5,
+        ),
+        PatrimoineAccount(
+          id: 'inv-2',
+          name: 'TotalEnergies',
+          valeur: 400,
+          plusValueAbs: 20,
+          plusValuePercent: 5,
+        ),
+      ],
+    );
+
+    testWidgets(
+      'sans categoriesByInvestment : pas de switch, vue par compte seule',
+      (tester) async {
+        await tester.pumpWidget(
+          ShadcnApp(
+            home: Scaffold(
+              child: CategoryBreakdownCard(
+                title: 'Actifs',
+                categories: [categoryByAccount()],
+                hidden: false,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('Par compte'), findsNothing);
+        expect(find.text('Par investissement'), findsNothing);
+        expect(find.text('PEA Boursorama'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'avec categoriesByInvestment : le switch bascule entre les deux vues',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 2400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ShadcnApp(
+            home: Scaffold(
+              child: CategoryBreakdownCard(
+                title: 'Actifs',
+                categories: [categoryByAccount()],
+                categoriesByInvestment: [categoryByInvestment()],
+                hidden: false,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Par défaut : vue par compte.
+        expect(find.text('PEA Boursorama'), findsOneWidget);
+        expect(find.text('Amundi MSCI World'), findsNothing);
+
+        await tester.tap(find.text('Par investissement'));
+        await tester.pump();
+
+        expect(find.text('PEA Boursorama'), findsNothing);
+        expect(find.text('Amundi MSCI World'), findsOneWidget);
+        expect(find.text('TotalEnergies'), findsOneWidget);
+
+        await tester.tap(find.text('Par compte'));
+        await tester.pump();
+
+        expect(find.text('PEA Boursorama'), findsOneWidget);
+        expect(find.text('Amundi MSCI World'), findsNothing);
+      },
+    );
+  });
 }

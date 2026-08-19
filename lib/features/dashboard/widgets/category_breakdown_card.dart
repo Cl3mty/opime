@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
+import '../../../core/ui/toggle_button_style.dart';
 import '../../navigation/navigation_scope.dart';
 import '../patrimoine_models.dart';
 
@@ -12,17 +13,34 @@ const _pruWidth = 76.0;
 const _montantWidth = 96.0;
 const _evolutionWidth = 110.0;
 
+enum _BreakdownMode { parCompte, parInvestissement }
+
+// Même correctif que le toggle "Par compte"/"Par actif" de la Distribution
+// (`category_detail_screen.dart`) : la densité "compact" de shadcn_flutter
+// rend ces boutons illisibles/trop petits, mais la taille normale déborde
+// sur les très grands écrans.
+const _toggleButtonSize = ButtonSize(0.95);
+const _toggleFontSize = 14.0 * 0.95;
+
 /// Carte "Actifs" ou "Passifs" du Dashboard : une ligne par catégorie
-/// (montant + évolution agrégés), dépliable pour révéler les comptes qui
-/// la composent (avec leur PRU — Prix de Revient Unitaire). Le détail par
-/// investissement au sein d'un compte est un niveau d'accordéon
-/// supplémentaire réservé à la page de détail de chaque classe d'actif
-/// (voir `_AccountsCard` dans `dashboard/category_detail_screen.dart`), pas
-/// dupliqué ici. Cliquer sur une catégorie (hors chevron) ouvre sa page de
-/// détail via [NavigationScope].
+/// (montant + évolution agrégés), dépliable pour révéler soit les comptes
+/// qui la composent (CTO/AV/PER/PEA...) soit, quand [categoriesByInvestment]
+/// est fourni, chaque investissement individuel (Google/Meta/Nvidia...) —
+/// un switch "Par compte"/"Par investissement" permet de basculer, comme
+/// pour la Distribution de la page de détail d'une classe d'actif. Sans
+/// [categoriesByInvestment] (Passifs, un prêt n'a pas de "positions" à
+/// détailler), le switch reste masqué. Cliquer sur une catégorie (hors
+/// chevron) ouvre sa page de détail via [NavigationScope].
 class CategoryBreakdownCard extends StatefulWidget {
   final String title;
   final List<PatrimoineCategory> categories;
+
+  /// Même catégories que [categories], mais chaque investissement
+  /// individuel plutôt que chaque compte — voir
+  /// `real_patrimoine_adapter.dart`'s `buildRealCategories`. `null` masque
+  /// le switch "Par compte"/"Par investissement".
+  final List<PatrimoineCategory>? categoriesByInvestment;
+
   final bool hidden;
 
   /// `false` masque la colonne PRU — un passif (prêt) n'a pas de Prix de
@@ -33,6 +51,7 @@ class CategoryBreakdownCard extends StatefulWidget {
     super.key,
     required this.title,
     required this.categories,
+    this.categoriesByInvestment,
     required this.hidden,
     this.showPru = true,
   });
@@ -49,6 +68,8 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
   /// recalculer à chaque changement de [CategoryBreakdownCard.categories].
   final Set<String> _collapsedIds = {};
 
+  _BreakdownMode _mode = _BreakdownMode.parCompte;
+
   void _toggleExpanded(String id) {
     setState(() {
       if (!_collapsedIds.remove(id)) _collapsedIds.add(id);
@@ -57,11 +78,16 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
 
   @override
   Widget build(BuildContext context) {
+    final byInvestment = widget.categoriesByInvestment;
+    final activeCategories =
+        byInvestment != null && _mode == _BreakdownMode.parInvestissement
+        ? byInvestment
+        : widget.categories;
     // Une catégorie sans le moindre compte n'apporte rien à la liste (pas
     // de montant à comparer aux autres) : elle reste toutefois accessible
     // depuis la sidebar/`AllocationCard`, juste pas listée ici.
     final populated = [
-      for (final category in widget.categories)
+      for (final category in activeCategories)
         if (category.accounts.isNotEmpty) category,
     ];
     if (populated.isEmpty) return const SizedBox.shrink();
@@ -72,7 +98,49 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            shadcn.Text(widget.title).semiBold().large(),
+            Row(
+              children: [
+                Expanded(child: shadcn.Text(widget.title).semiBold().large()),
+                if (byInvestment != null)
+                  ButtonGroup(
+                    children: [
+                      SelectedButton(
+                        value: _mode == _BreakdownMode.parCompte,
+                        selectedStyle: const ButtonStyle.primary(
+                          size: _toggleButtonSize,
+                        ),
+                        style: toggleUnselectedStyle(
+                          context,
+                          size: _toggleButtonSize,
+                        ),
+                        onChanged: (_) =>
+                            setState(() => _mode = _BreakdownMode.parCompte),
+                        child: shadcn.Text(
+                          'Par compte',
+                          style: const TextStyle(fontSize: _toggleFontSize),
+                        ),
+                      ),
+                      SelectedButton(
+                        value: _mode == _BreakdownMode.parInvestissement,
+                        selectedStyle: const ButtonStyle.primary(
+                          size: _toggleButtonSize,
+                        ),
+                        style: toggleUnselectedStyle(
+                          context,
+                          size: _toggleButtonSize,
+                        ),
+                        onChanged: (_) => setState(
+                          () => _mode = _BreakdownMode.parInvestissement,
+                        ),
+                        child: shadcn.Text(
+                          'Par investissement',
+                          style: const TextStyle(fontSize: _toggleFontSize),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
             const SizedBox(height: 16),
             _HeaderRow(showPru: widget.showPru),
             const SizedBox(height: 4),
