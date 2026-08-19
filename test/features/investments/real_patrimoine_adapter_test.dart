@@ -9,22 +9,20 @@ void main() {
     required String name,
     String? bankName,
     required AccountEnvelope envelope,
-  }) =>
-      InvestmentAccount(
-        assetClass: AssetClass.epargne,
-        envelope: envelope,
-        name: name,
-        bankName: bankName,
-        // Une enveloppe d'épargne tient sa devise (EUR) : sans elle, aucun
-        // investissement → aucune feuille ne serait construite par
-        // `buildRealCategoriesByAccount`.
-        investments: [
-          Investment(isin: 'EUR', label: 'EUR', transactions: const []),
-        ],
-      );
+  }) => InvestmentAccount(
+    assetClass: AssetClass.epargne,
+    envelope: envelope,
+    name: name,
+    bankName: bankName,
+    // Une enveloppe d'épargne tient sa devise (EUR) : sans elle, aucun
+    // investissement → aucune feuille ne serait construite par
+    // `buildRealCategoriesByAccount`.
+    investments: [
+      Investment(isin: 'EUR', label: 'EUR', transactions: const []),
+    ],
+  );
 
-  test(
-      'épargne sans banque garde son nom réel (comptes pré-bankName), '
+  test('épargne sans banque garde son nom réel (comptes pré-bankName), '
       'épargne avec banque affiche le libellé d\'enveloppe', () {
     // Compte créé avant l'introduction du champ "banque" : le nom réel
     // porte l'identité (ici la banque, dans le nom) — sans cela,
@@ -59,6 +57,12 @@ void main() {
   });
 
   test('une devise logée dans un CTO garde son code en avatar', () {
+    final buy = Transaction(
+      date: DateTime.utc(2024, 1, 1),
+      isBuy: true,
+      quantity: 10,
+      unitPrice: 40,
+    );
     final cto = InvestmentAccount(
       assetClass: AssetClass.actionsEtFonds,
       envelope: AccountEnvelope.cto,
@@ -66,9 +70,13 @@ void main() {
       bankName: 'Bourso',
       investments: [
         // Titre : avatar à initiales dérivées du libellé.
-        Investment(isin: 'FR0012345678', label: 'TotalEnergies', transactions: const []),
+        Investment(
+          isin: 'FR0012345678',
+          label: 'TotalEnergies',
+          transactions: [buy],
+        ),
         // Devise créée via la bascule "Investissement / Devise".
-        Investment(isin: 'USD', label: 'USD', transactions: const []),
+        Investment(isin: 'USD', label: 'USD', transactions: [buy]),
       ],
     );
     final categories = buildRealCategories(
@@ -125,8 +133,7 @@ void main() {
     expect(leaf.valeur, closeTo(1591.6, 1e-9));
   });
 
-  test(
-      'Actions & Fonds : sous-titre = description facultative, pas une '
+  test('Actions & Fonds : sous-titre = description facultative, pas une '
       'répétition du nom (comme l\'épargne)', () {
     final pea = InvestmentAccount(
       assetClass: AssetClass.actionsEtFonds,
@@ -173,8 +180,7 @@ void main() {
     expect(leafById[cto.id]!.subtitle, isNull);
   });
 
-  test(
-      'accordéon établissement → comptes : une position entièrement soldée '
+  test('accordéon établissement → comptes : une position entièrement soldée '
       'disparaît du compte, seul ce qui est encore détenu compte pour sa '
       'valeur', () {
     final cto = InvestmentAccount(
@@ -188,7 +194,12 @@ void main() {
           isin: 'FR0012345678',
           label: 'TotalEnergies',
           transactions: [
-            Transaction(date: DateTime(2026, 1, 10), isBuy: true, quantity: 5, unitPrice: 50),
+            Transaction(
+              date: DateTime(2026, 1, 10),
+              isBuy: true,
+              quantity: 5,
+              unitPrice: 50,
+            ),
           ],
         ),
         // Entièrement revendu (achat puis vente du même nombre de parts) :
@@ -199,8 +210,18 @@ void main() {
           isin: 'FR0098765432',
           label: 'Ancien titre soldé',
           transactions: [
-            Transaction(date: DateTime(2025, 6, 1), isBuy: true, quantity: 3, unitPrice: 20),
-            Transaction(date: DateTime(2025, 12, 1), isBuy: false, quantity: 3, unitPrice: 25),
+            Transaction(
+              date: DateTime(2025, 6, 1),
+              isBuy: true,
+              quantity: 3,
+              unitPrice: 20,
+            ),
+            Transaction(
+              date: DateTime(2025, 12, 1),
+              isBuy: false,
+              quantity: 3,
+              unitPrice: 25,
+            ),
           ],
         ),
       ],
@@ -222,8 +243,7 @@ void main() {
     expect(leaf.valeur, closeTo(250, 1e-9));
   });
 
-  test(
-      'un compte sans aucun investissement reste visible dans l\'accordéon '
+  test('un compte sans aucun investissement reste visible dans l\'accordéon '
       '(à l\'utilisateur de décider de le supprimer)', () {
     final emptyCto = InvestmentAccount(
       assetClass: AssetClass.actionsEtFonds,
@@ -249,8 +269,7 @@ void main() {
     expect(leaf.canDelete, isTrue);
   });
 
-  test(
-      'dans l\'accordéon d\'un compte, les positions en devise passent '
+  test('dans l\'accordéon d\'un compte, les positions en devise passent '
       'après les titres et sont marquées isCurrency', () {
     Transaction buy(double quantity) => Transaction(
       date: DateTime(2026, 1, 10),
@@ -291,18 +310,21 @@ void main() {
 
     // Les titres gardent leur ordre d'origine, suivis des devises, elles
     // aussi dans leur ordre d'origine.
-    expect(
-      leaf.investments.map((i) => i.name).toList(),
-      ['TotalEnergies', 'AMAZON.COM INC', 'USD', 'EUR'],
-    );
-    expect(
-      leaf.investments.map((i) => i.isCurrency).toList(),
-      [false, false, true, true],
-    );
+    expect(leaf.investments.map((i) => i.name).toList(), [
+      'TotalEnergies',
+      'AMAZON.COM INC',
+      'USD',
+      'EUR',
+    ]);
+    expect(leaf.investments.map((i) => i.isCurrency).toList(), [
+      false,
+      false,
+      true,
+      true,
+    ]);
   });
 
-  test(
-      'netWorthHistoryFor est bornée à [start, end] plutôt que sur '
+  test('netWorthHistoryFor est bornée à [start, end] plutôt que sur '
       'l\'historique complet (régression : "1M" sur un vieux compte '
       'montrait quasiment tout l\'historique, pas un mois réel)', () {
     final investment = Investment(
@@ -338,8 +360,7 @@ void main() {
     expect(points.last.date, end);
   });
 
-  test(
-      'buildRealTopAssets : changePercentForPeriod calcule un rendement '
+  test('buildRealTopAssets : changePercentForPeriod calcule un rendement '
       'réel par cours (régression : l\'ancienne formule était une '
       'ondulation synthétique dérivée de la plus-value latente, pas un '
       'vrai calcul par période)', () {
@@ -378,8 +399,7 @@ void main() {
     );
   });
 
-  test(
-      'buildRealTopAssets : changePercentForPeriod est null sans '
+  test('buildRealTopAssets : changePercentForPeriod est null sans '
       'historique de cours suffisant, sans planter le tri de '
       '"Mes meilleurs actifs"', () {
     final account = InvestmentAccount(
@@ -401,11 +421,74 @@ void main() {
         ),
       ],
     );
-    final asset = buildRealTopAssets(
-      [account],
-      const <String, List<PricePoint>>{},
-    ).single;
+    final asset = buildRealTopAssets([
+      account,
+    ], const <String, List<PricePoint>>{}).single;
 
     expect(asset.changePercentForPeriod(DashboardPeriod.all), isNull);
+  });
+
+  test('buildRealCategories : une position entièrement vendue (quantité '
+      'nulle) est exclue, une position partiellement vendue reste', () {
+    final cto = InvestmentAccount(
+      assetClass: AssetClass.actionsEtFonds,
+      envelope: AccountEnvelope.cto,
+      name: 'CTO Bourso',
+      bankName: 'Bourso',
+      investments: [
+        Investment(
+          id: 'sold-out',
+          isin: 'FR0000120271',
+          label: 'Totalement vendu',
+          lastPrice: 50,
+          transactions: [
+            Transaction(
+              date: DateTime.utc(2024, 1, 1),
+              isBuy: true,
+              quantity: 10,
+              unitPrice: 40,
+            ),
+            Transaction(
+              date: DateTime.utc(2025, 1, 1),
+              isBuy: false,
+              quantity: 10,
+              unitPrice: 50,
+            ),
+          ],
+        ),
+        Investment(
+          id: 'still-held',
+          isin: 'FR0012345678',
+          label: 'Encore détenu',
+          lastPrice: 50,
+          transactions: [
+            Transaction(
+              date: DateTime.utc(2024, 1, 1),
+              isBuy: true,
+              quantity: 10,
+              unitPrice: 40,
+            ),
+            Transaction(
+              date: DateTime.utc(2025, 1, 1),
+              isBuy: false,
+              quantity: 4,
+              unitPrice: 50,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final categories = buildRealCategories(
+      [cto],
+      const <String, List<PricePoint>>{},
+      '/vault',
+    );
+    final actions = categories.singleWhere(
+      (c) => c.id == AssetClass.actionsEtFonds.categoryId,
+    );
+
+    expect(actions.accounts, hasLength(1));
+    expect(actions.accounts.single.id, 'still-held');
   });
 }

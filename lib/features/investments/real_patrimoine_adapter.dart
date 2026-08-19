@@ -120,6 +120,11 @@ List<PatrimoineCategory> buildRealCategories(
   final byClass = <AssetClass, List<(InvestmentAccount, Investment)>>{};
   for (final account in accounts) {
     for (final investment in account.investments) {
+      // Une position entièrement vendue (quantité nulle) est un historique,
+      // pas une détention actuelle — même filtre que [buildRealTopAssets],
+      // pour ne pas laisser traîner une ligne à ~0 € dans la vue "par
+      // investissement".
+      if (investment.quantityHeld <= 0) continue;
       final effectiveClass = investment.assetClass ?? account.assetClass;
       byClass.putIfAbsent(effectiveClass, () => []).add((account, investment));
     }
@@ -177,7 +182,9 @@ List<PatrimoineCategory> buildRealCategoriesByAccount(
   final emptyAccountsByClass = <AssetClass, List<InvestmentAccount>>{};
   for (final account in accounts) {
     if (account.investments.isEmpty) {
-      emptyAccountsByClass.putIfAbsent(account.assetClass, () => []).add(account);
+      emptyAccountsByClass
+          .putIfAbsent(account.assetClass, () => [])
+          .add(account);
       continue;
     }
     for (final investment in account.investments) {
@@ -288,7 +295,8 @@ PatrimoineAccount _buildAccountLeaf(
     // `_selectAccountEnvelope` dans `complete_patrimoine_dialog.dart`), un
     // sous-titre répétant l'enveloppe ne ferait que dupliquer le nom. Les
     // autres classes gardent le nom du compte + son enveloppe en sous-titre.
-    subtitle: account.assetClass == AssetClass.epargne ||
+    subtitle:
+        account.assetClass == AssetClass.epargne ||
             account.assetClass == AssetClass.actionsEtFonds
         ? account.description
         : account.envelope?.label,
@@ -328,7 +336,11 @@ List<PatrimoineCategory> buildAllRealCategoriesByAccount(
   String vaultPath,
 ) {
   final populated = {
-    for (final c in buildRealCategoriesByAccount(accounts, priceHistories, vaultPath))
+    for (final c in buildRealCategoriesByAccount(
+      accounts,
+      priceHistories,
+      vaultPath,
+    ))
       c.id: c,
   };
   return [
@@ -453,22 +465,13 @@ String? _metalAvatarImagePath(
   if (isMetalEtc(account)) return null;
   final fileName = investment.imageFileName;
   if (fileName == null || fileName.isEmpty) return null;
-  return p.join(
-    vaultPath,
-    'investissements',
-    'metaux',
-    'images',
-    fileName,
-  );
+  return p.join(vaultPath, 'investissements', 'metaux', 'images', fileName);
 }
 
 /// Initiales d'avatar affichées à la place de celles dérivées du nom — "ETC"
 /// pour un métal précieux coté détenu dans un CTO (l'image du produit n'a
 /// pas de sens pour un titre financier).
-String? _metalAvatarInitials(
-  InvestmentAccount account,
-  Investment investment,
-) {
+String? _metalAvatarInitials(InvestmentAccount account, Investment investment) {
   if ((investment.assetClass ?? account.assetClass) !=
       AssetClass.metauxPrecieux) {
     return null;
@@ -518,11 +521,7 @@ double? _priceReturnForPeriod(
     DateTime.now().day,
   );
   final firstDate = history.first.date;
-  final earliest = DateTime.utc(
-    firstDate.year,
-    firstDate.month,
-    firstDate.day,
-  );
+  final earliest = DateTime.utc(firstDate.year, firstDate.month, firstDate.day);
   final start = period.startFor(today: today, earliest: earliest);
   final priceStart = _priceAt(history, start);
   final priceEnd = _priceAt(history, today);
