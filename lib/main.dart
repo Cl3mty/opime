@@ -109,6 +109,15 @@ class _OpimeAppState extends State<OpimeApp> {
   final _onboardingHighlightController = OnboardingHighlightController();
   final _vaultFolderService = VaultFolderService();
 
+  /// Le `BuildContext` reçu par `ShadcnApp.builder` (voir [_buildShortcuts])
+  /// est un ANCÊTRE du Navigator interne de l'app, pas un descendant — donc
+  /// invalide pour `showDialog`/`Navigator.of` (l'appel échoue silencieusement
+  /// avec "Navigator operation requested with a context that does not
+  /// include a Navigator", visible seulement dans les logs). Cette clé donne
+  /// accès, via `_navigatorKey.currentContext`, à un contexte réellement posé
+  /// SOUS le Navigator, valide pour ces opérations.
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
   /// État (replié/déplié) de la sidebar — remonté ici depuis `AppShell` pour
   /// que le raccourci clavier ⌘B, posé à la racine de l'app (voir
   /// `ShadcnApp`'s `builder` dans [build]), puisse le modifier. Un
@@ -439,6 +448,7 @@ class _OpimeAppState extends State<OpimeApp> {
   @override
   Widget build(BuildContext context) {
     return ShadcnApp(
+      navigatorKey: _navigatorKey,
       title: 'Opime',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -473,18 +483,51 @@ class _OpimeAppState extends State<OpimeApp> {
         AppShortcutAction.toggleAmountsHidden.activator: () =>
             _amountVisibilityController.toggle(),
         AppShortcutAction.exportPdf.activator: () {
+          // `context` ici (celui du builder de ShadcnApp) est un ancêtre du
+          // Navigator, pas un descendant : `showDialog` y échouerait
+          // silencieusement. `_navigatorKey.currentContext` est le contexte
+          // du Navigator lui-même, valide pour ouvrir une boîte de dialogue.
+          final navigatorContext = _navigatorKey.currentContext;
+          if (navigatorContext == null) return;
           final profileController = _profileController;
-          // Rien à exporter avant qu'un vault/profil ne soit chargé (écrans
-          // d'onboarding/déverrouillage) — le raccourci reste sans effet.
-          if (profileController == null) return;
+          if (profileController == null) {
+            _showExportUnavailableToast(navigatorContext);
+            return;
+          }
           showPatrimoineExportDialog(
-            context,
+            navigatorContext,
             vaultPath: profileController.activeDataPath,
             profileName: profileController.active?.name ?? '',
           );
         },
       },
       child: Focus(autofocus: true, child: child),
+    );
+  }
+
+  /// Explique pourquoi Cmd/Ctrl+P n'a rien fait plutôt que de rester
+  /// silencieux — le raccourci ne peut pas ouvrir l'export tant qu'aucun
+  /// profil n'est chargé (vault verrouillé, migration en attente, ou
+  /// chargement/erreur en cours).
+  void _showExportUnavailableToast(BuildContext context) {
+    final String title;
+    final String subtitle;
+    if (_vaultLocked) {
+      title = 'Vault verrouillé';
+      subtitle = "Déverrouille ton vault avant d'exporter.";
+    } else if (_vaultMigrationInterrupted) {
+      title = 'Migration en attente';
+      subtitle = "Termine la migration du vault avant d'exporter.";
+    } else {
+      title = 'Aucun profil chargé';
+      subtitle = 'Réessaie une fois le vault chargé.';
+    }
+    showToast(
+      context: context,
+      location: ToastLocation.bottomRight,
+      builder: (context, overlay) => SurfaceCard(
+        child: Basic(title: Text(title), subtitle: Text(subtitle)),
+      ),
     );
   }
 
