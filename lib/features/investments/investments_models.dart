@@ -533,8 +533,7 @@ class Investment {
   /// devises" du flux de complétion — un compte qui peut donc contenir des
   /// titres ET des devises côte à côte. Voir aussi [isCurrencyInvestment],
   /// qui couvre en plus l'épargne dont l'identifiant serait hors liste.
-  bool get isCurrency =>
-      kKnownCurrencies.contains(isin.trim().toUpperCase());
+  bool get isCurrency => kKnownCurrencies.contains(isin.trim().toUpperCase());
 
   /// Transactions du plus récent au plus ancien, quel que soit l'ordre de
   /// saisie — c'est l'ordre d'affichage utilisé partout (liste des
@@ -580,8 +579,8 @@ class Investment {
   /// à [investedAmount], sans multiplication de quantité.
   double? get estimatedValue =>
       (surfaceM2 != null && estimatedPricePerSqm != null)
-          ? surfaceM2! * estimatedPricePerSqm!
-          : null;
+      ? surfaceM2! * estimatedPricePerSqm!
+      : null;
 
   /// Meilleure valorisation connue hors montant investi : un cours de
   /// marché ([marketValue], jamais renseigné pour l'immobilier aujourd'hui)
@@ -658,7 +657,8 @@ class Investment {
     if (addressCityCode != null) 'addressCityCode': addressCityCode,
     if (addressLat != null) 'addressLat': addressLat,
     if (addressLon != null) 'addressLon': addressLon,
-    if (estimatedPricePerSqm != null) 'estimatedPricePerSqm': estimatedPricePerSqm,
+    if (estimatedPricePerSqm != null)
+      'estimatedPricePerSqm': estimatedPricePerSqm,
     if (estimatedValueAt != null)
       'estimatedValueAt': estimatedValueAt!.toIso8601String(),
     if (documents.isNotEmpty)
@@ -1002,6 +1002,112 @@ bool assetClassRequiresEstablishmentStep(AssetClass assetClass) {
 bool accountHasOpeningDate(AssetClass assetClass) =>
     assetClassRequiresEstablishmentStep(assetClass);
 
+/// Nature du jalon fiscal associé à une enveloppe, voir
+/// [accountFiscalMilestone] — un avantage fiscal reste accessible en
+/// laissant les fonds sur le compte (PEA, assurance vie). Le déblocage
+/// PEG/PEE n'est PAS de cette nature (jalon unique sur le compte) : chaque
+/// versement (intéressement, participation, abondement...) se débloque
+/// séparément 5 ans après sa propre date, pas après l'ouverture du compte —
+/// voir [pegPeeUnlockTranches].
+enum FiscalMilestoneKind { avantageFiscal }
+
+/// Jalon fiscal d'un compte : sa nature ([kind]), sa date, et si elle est
+/// déjà atteinte à la date de calcul — voir [accountFiscalMilestone].
+typedef FiscalMilestone = ({
+  FiscalMilestoneKind kind,
+  DateTime date,
+  bool reached,
+});
+
+/// Jalon fiscal associé à une enveloppe, calculé à partir de sa date
+/// d'ouverture — `null` si l'enveloppe n'a pas de jalon connu à durée fixe
+/// sur le compte entier (CTO, épargne réglementée, PER — dont le déblocage
+/// dépend du départ à la retraite, pas d'une durée fixe —, immobilier...),
+/// si [openingDate] est inconnue, ou pour PEG/PEE dont le déblocage se
+/// calcule par versement, pas sur le compte entier — voir
+/// [pegPeeUnlockTranches].
+///  - **PEA/PEA-PME** : exonération d'impôt sur le revenu sur les gains
+///    après 5 ans (seuls les prélèvements sociaux, ~17,2 %, restent dus) —
+///    un retrait avant cette date clôture en général le plan.
+///  - **Assurance vie/contrat de capitalisation** : abattement annuel sur
+///    les gains retirés après 8 ans (4 600 €, ou 9 200 € pour un couple),
+///    en plus d'un taux de prélèvement forfaitaire réduit sur une partie de
+///    l'encours.
+FiscalMilestone? accountFiscalMilestone({
+  required AccountEnvelope? envelope,
+  required DateTime? openingDate,
+  DateTime? today,
+}) {
+  if (envelope == null || openingDate == null) return null;
+  final int years;
+  switch (envelope) {
+    case AccountEnvelope.pea:
+    case AccountEnvelope.peaPme:
+      years = 5;
+    case AccountEnvelope.assuranceVie:
+    case AccountEnvelope.contratCapitalisation:
+      years = 8;
+    default:
+      return null;
+  }
+  final milestoneDate = DateTime(
+    openingDate.year + years,
+    openingDate.month,
+    openingDate.day,
+  );
+  final now = today ?? DateTime.now();
+  return (
+    kind: FiscalMilestoneKind.avantageFiscal,
+    date: milestoneDate,
+    reached: !milestoneDate.isAfter(now),
+  );
+}
+
+/// Une tranche de déblocage PEG/PEE : un versement (intéressement,
+/// participation, abondement, versement volontaire...) et sa propre date de
+/// déblocage, 5 ans après sa date — voir [pegPeeUnlockTranches].
+typedef UnlockTranche = ({
+  DateTime date,
+  double amount,
+  DateTime unlockDate,
+  bool unlocked,
+});
+
+/// Échéancier de déblocage d'un compte PEG/PEE : contrairement au PEA ou à
+/// l'assurance vie, le jalon ne porte pas sur le compte entier mais sur
+/// chaque versement séparément — un intéressement perçu il y a 3 ans n'est
+/// pas débloqué en même temps qu'un versement de la première année. Une
+/// tranche par achat ([Transaction.isBuy]) toutes investissements confondus
+/// sur le compte, chacune débloquée 5 ans après sa propre date. Triée par
+/// date de versement croissante (donc aussi par date de déblocage, l'écart
+/// étant constant).
+List<UnlockTranche> pegPeeUnlockTranches({
+  required List<Investment> investments,
+  DateTime? today,
+}) {
+  final now = today ?? DateTime.now();
+  final tranches =
+      [
+          for (final investment in investments)
+            for (final tx in investment.transactions)
+              if (tx.isBuy) tx,
+        ].map((tx) {
+          final unlockDate = DateTime(
+            tx.date.year + 5,
+            tx.date.month,
+            tx.date.day,
+          );
+          return (
+            date: tx.date,
+            amount: tx.amount,
+            unlockDate: unlockDate,
+            unlocked: !unlockDate.isAfter(now),
+          );
+        }).toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+  return tranches;
+}
+
 /// Un établissement (banque, broker...) a-t-il un sens pour un compte de
 /// [assetClass] ? — l'identité qui groupe les comptes en accordéons "banque
 /// → comptes" (`category_detail_screen.dart`) et sous laquelle le logo est
@@ -1032,10 +1138,7 @@ bool assetClassSupportsBankName(
 /// Comme [assetClassSupportsBankName], pour un [InvestmentAccount] réel —
 /// l'enveloppe du compte tranche pour les métaux précieux.
 bool supportsBankName(InvestmentAccount account) =>
-    assetClassSupportsBankName(
-      account.assetClass,
-      envelope: account.envelope,
-    );
+    assetClassSupportsBankName(account.assetClass, envelope: account.envelope);
 
 /// Un compte de placement créé par l'utilisateur (PEA, CTO...), contenant
 /// ses investissements identifiés par ISIN.
@@ -1178,7 +1281,7 @@ class InvestmentAccount {
       return i.toJson(
         round:
             !(requiresFullPricePrecision(effectiveClass) ||
-              isCurrencyInvestment(this, i)),
+                isCurrencyInvestment(this, i)),
       );
     }).toList(),
     if (documents.isNotEmpty)

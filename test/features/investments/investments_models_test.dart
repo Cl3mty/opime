@@ -87,10 +87,7 @@ void main() {
   test(
     'identifierOptionsFor : l\'épargne propose la liste des devises connues',
     () {
-      expect(
-        identifierOptionsFor(AssetClass.epargne),
-        kKnownCurrencies,
-      );
+      expect(identifierOptionsFor(AssetClass.epargne), kKnownCurrencies);
     },
   );
 
@@ -117,65 +114,70 @@ void main() {
       transactions: const [],
     );
 
-    test('Investment.isCurrency : une devise logée dans un CTO est reconnue',
-        () {
-      expect(devise('USD').isCurrency, isTrue);
-      expect(devise('usd').isCurrency, isTrue);
-      expect(devise('FR0012345678').isCurrency, isFalse);
-    });
-
-    test('isCurrencyInvestment : toute épargne est une devise, même hors liste',
-        () {
-      // Une épargne dont l'identifiant manquerait dans kKnownCurrencies reste
-      // une position en devise (règle de l'épargne : l'identifiant EST la
-      // devise tenue, voir `identifierOptionsFor`).
-      expect(isCurrencyInvestment(epargne, devise('XX')), isTrue);
-    });
-
     test(
-      'isCurrencyInvestment : une devise dans un CTO est reconnue, pas un '
-      'titre',
+      'Investment.isCurrency : une devise logée dans un CTO est reconnue',
       () {
-        expect(isCurrencyInvestment(cto, devise('USD')), isTrue);
-        expect(isCurrencyInvestment(cto, devise('FR0012345678')), isFalse);
+        expect(devise('USD').isCurrency, isTrue);
+        expect(devise('usd').isCurrency, isTrue);
+        expect(devise('FR0012345678').isCurrency, isFalse);
       },
     );
 
-    test('un titre et une devise peuvent coexister dans le même CTO', () {
-      final account = cto.copyWith(
-        investments: [
-          devise('USD'),
-          devise('FR0012345678'),
-        ],
-      );
-      expect(
-        account.investments.map((i) => isCurrencyInvestment(account, i)),
-        [true, false],
-      );
+    test(
+      'isCurrencyInvestment : toute épargne est une devise, même hors liste',
+      () {
+        // Une épargne dont l'identifiant manquerait dans kKnownCurrencies reste
+        // une position en devise (règle de l'épargne : l'identifiant EST la
+        // devise tenue, voir `identifierOptionsFor`).
+        expect(isCurrencyInvestment(epargne, devise('XX')), isTrue);
+      },
+    );
+
+    test('isCurrencyInvestment : une devise dans un CTO est reconnue, pas un '
+        'titre', () {
+      expect(isCurrencyInvestment(cto, devise('USD')), isTrue);
+      expect(isCurrencyInvestment(cto, devise('FR0012345678')), isFalse);
     });
 
-    test('toJson : la devise d\'un CTO garde sa précision au-delà du centime',
-        () {
-      // Même exigence que l'épargne en devise étrangère (1 JPY ≈ 0,006 €) :
-      // un arrondi au centime fausserait la quantité/cours d'un ordre de
-      // grandeur.
+    test('un titre et une devise peuvent coexister dans le même CTO', () {
       final account = cto.copyWith(
-        investments: [
-          Investment(
-            isin: 'JPY',
-            label: 'JPY',
-            transactions: [
-              Transaction(isBuy: true, date: DateTime(2026), quantity: 0.0067, unitPrice: 0.0062),
-            ],
-          ),
-        ],
+        investments: [devise('USD'), devise('FR0012345678')],
       );
-      final json = account.toJson();
-      final roundTripped = InvestmentAccount.fromJson(json);
-      final investment = roundTripped.investments.single;
-      expect(investment.quantityHeld, 0.0067);
-      expect(investment.pru, closeTo(0.0062, 1e-9));
+      expect(account.investments.map((i) => isCurrencyInvestment(account, i)), [
+        true,
+        false,
+      ]);
     });
+
+    test(
+      'toJson : la devise d\'un CTO garde sa précision au-delà du centime',
+      () {
+        // Même exigence que l'épargne en devise étrangère (1 JPY ≈ 0,006 €) :
+        // un arrondi au centime fausserait la quantité/cours d'un ordre de
+        // grandeur.
+        final account = cto.copyWith(
+          investments: [
+            Investment(
+              isin: 'JPY',
+              label: 'JPY',
+              transactions: [
+                Transaction(
+                  isBuy: true,
+                  date: DateTime(2026),
+                  quantity: 0.0067,
+                  unitPrice: 0.0062,
+                ),
+              ],
+            ),
+          ],
+        );
+        final json = account.toJson();
+        final roundTripped = InvestmentAccount.fromJson(json);
+        final investment = roundTripped.investments.single;
+        expect(investment.quantityHeld, 0.0067);
+        expect(investment.pru, closeTo(0.0062, 1e-9));
+      },
+    );
   });
 
   group('transactions saisies en devise étrangère (stock picking)', () {
@@ -221,30 +223,35 @@ void main() {
       expect(json.containsKey('amount'), isFalse);
     });
 
-    test('toJson rétro-compatible : une transaction en euros reste minimale', () {
-      final json = Transaction(
-        date: DateTime(2026),
-        isBuy: true,
-        quantity: 2,
-        unitPrice: 50,
-      ).toJson();
-      expect(json.containsKey('currency'), isFalse);
-      expect(json.containsKey('fxRateToEur'), isFalse);
-    });
+    test(
+      'toJson rétro-compatible : une transaction en euros reste minimale',
+      () {
+        final json = Transaction(
+          date: DateTime(2026),
+          isBuy: true,
+          quantity: 2,
+          unitPrice: 50,
+        ).toJson();
+        expect(json.containsKey('currency'), isFalse);
+        expect(json.containsKey('fxRateToEur'), isFalse);
+      },
+    );
 
-    test('fromJson rétro-compatible : une transaction sans devise est en euros',
-        () {
-      final txn = Transaction.fromJson({
-        'id': 'txn_1',
-        'date': '2026-01-01T00:00:00.000',
-        'isBuy': true,
-        'quantity': 2,
-        'unitPrice': 50,
-      });
-      expect(txn.currency, 'EUR');
-      expect(txn.fxRateToEur, 1.0);
-      expect(txn.amount, 100);
-    });
+    test(
+      'fromJson rétro-compatible : une transaction sans devise est en euros',
+      () {
+        final txn = Transaction.fromJson({
+          'id': 'txn_1',
+          'date': '2026-01-01T00:00:00.000',
+          'isBuy': true,
+          'quantity': 2,
+          'unitPrice': 50,
+        });
+        expect(txn.currency, 'EUR');
+        expect(txn.fxRateToEur, 1.0);
+        expect(txn.amount, 100);
+      },
+    );
 
     test('round-trip JSON d\'une transaction en devise étrangère', () {
       final txn = Transaction(
@@ -264,44 +271,70 @@ void main() {
   });
 
   group('investissement coté en devise étrangère', () {
-    Investment usStock({double? lastPrice, String? quoteCurrency, double? lastFxRateToEur}) =>
-        Investment(
-          isin: 'US0378331005',
-          label: 'META',
-          quoteCurrency: quoteCurrency,
-          lastPrice: lastPrice,
-          lastFxRateToEur: lastFxRateToEur,
-          transactions: const [],
-        );
+    Investment usStock({
+      double? lastPrice,
+      String? quoteCurrency,
+      double? lastFxRateToEur,
+    }) => Investment(
+      isin: 'US0378331005',
+      label: 'META',
+      quoteCurrency: quoteCurrency,
+      lastPrice: lastPrice,
+      lastFxRateToEur: lastFxRateToEur,
+      transactions: const [],
+    );
 
     test('marketValue : quantité × dernier cours × taux de change', () {
       // 10 actions × 173 $ = 1730 $ → 1591,60 €.
-      final i = usStock(lastPrice: 173, quoteCurrency: 'USD', lastFxRateToEur: 0.92).copyWith(
-        transactions: [
-          Transaction(date: DateTime(2026), isBuy: true, quantity: 10, unitPrice: 150),
-        ],
-      );
+      final i =
+          usStock(
+            lastPrice: 173,
+            quoteCurrency: 'USD',
+            lastFxRateToEur: 0.92,
+          ).copyWith(
+            transactions: [
+              Transaction(
+                date: DateTime(2026),
+                isBuy: true,
+                quantity: 10,
+                unitPrice: 150,
+              ),
+            ],
+          );
       expect(i.marketValue, closeTo(1591.6, 1e-9));
     });
 
-    test('marketValue : sans taux enregistré, vaut quantité × dernier cours',
-        () {
-      final i = usStock(lastPrice: 100).copyWith(
-        transactions: [
-          Transaction(date: DateTime(2026), isBuy: true, quantity: 2, unitPrice: 90),
-        ],
-      );
-      expect(i.marketValue, 200);
-    });
+    test(
+      'marketValue : sans taux enregistré, vaut quantité × dernier cours',
+      () {
+        final i = usStock(lastPrice: 100).copyWith(
+          transactions: [
+            Transaction(
+              date: DateTime(2026),
+              isBuy: true,
+              quantity: 2,
+              unitPrice: 90,
+            ),
+          ],
+        );
+        expect(i.marketValue, 200);
+      },
+    );
 
-    test('toJson/fromJson round-trip : devise de cotation et taux conservés',
-        () {
-      final i = usStock(lastPrice: 173.2, quoteCurrency: 'USD', lastFxRateToEur: 0.9211);
-      final roundTripped = Investment.fromJson(i.toJson());
-      expect(roundTripped.quoteCurrency, 'USD');
-      expect(roundTripped.lastFxRateToEur, 0.9211);
-      expect(roundTripped.marketValue, closeTo(i.marketValue!, 1e-9));
-    });
+    test(
+      'toJson/fromJson round-trip : devise de cotation et taux conservés',
+      () {
+        final i = usStock(
+          lastPrice: 173.2,
+          quoteCurrency: 'USD',
+          lastFxRateToEur: 0.9211,
+        );
+        final roundTripped = Investment.fromJson(i.toJson());
+        expect(roundTripped.quoteCurrency, 'USD');
+        expect(roundTripped.lastFxRateToEur, 0.9211);
+        expect(roundTripped.marketValue, closeTo(i.marketValue!, 1e-9));
+      },
+    );
 
     test('toJson minimal pour un titre coté en euros (rétro-compatible)', () {
       final json = usStock(lastPrice: 100).toJson();
@@ -355,10 +388,13 @@ void main() {
       expect(Investment.fromJson(json).fundStyle, isNull);
     });
 
-    test('FundStyle.fromName : nom inconnu renvoie null, pas de repli par défaut', () {
-      expect(FundStyle.fromName('inconnu'), isNull);
-      expect(FundStyle.fromName(null), isNull);
-    });
+    test(
+      'FundStyle.fromName : nom inconnu renvoie null, pas de repli par défaut',
+      () {
+        expect(FundStyle.fromName('inconnu'), isNull);
+        expect(FundStyle.fromName(null), isNull);
+      },
+    );
   });
 
   group('Estimation immobilière (surfaceM2/estimatedPricePerSqm)', () {
@@ -372,7 +408,12 @@ void main() {
       label: 'Appartement',
       assetClass: AssetClass.immobilier,
       transactions: [
-        Transaction(date: DateTime(2020, 1, 1), isBuy: true, quantity: 1, unitPrice: buyAmount),
+        Transaction(
+          date: DateTime(2020, 1, 1),
+          isBuy: true,
+          quantity: 1,
+          unitPrice: buyAmount,
+        ),
       ],
       surfaceM2: surfaceM2,
       estimatedPricePerSqm: estimatedPricePerSqm,
@@ -414,11 +455,17 @@ void main() {
       expect(investment.estimatedValue, 65 * 4200);
     });
 
-    test('effectiveMarketValue retombe sur estimatedValue sans cours de marché', () {
-      final investment = property(surfaceM2: 65, estimatedPricePerSqm: 4200);
-      expect(investment.marketValue, isNull); // pas de lastPrice pour l'immobilier
-      expect(investment.effectiveMarketValue, 65 * 4200);
-    });
+    test(
+      'effectiveMarketValue retombe sur estimatedValue sans cours de marché',
+      () {
+        final investment = property(surfaceM2: 65, estimatedPricePerSqm: 4200);
+        expect(
+          investment.marketValue,
+          isNull,
+        ); // pas de lastPrice pour l'immobilier
+        expect(investment.effectiveMarketValue, 65 * 4200);
+      },
+    );
 
     test('unrealizedGain calculé à partir de l\'estimation quand présente', () {
       final investment = property(
@@ -433,6 +480,201 @@ void main() {
       final investment = property();
       expect(investment.effectiveMarketValue, isNull);
       expect(investment.unrealizedGain, isNull);
+    });
+  });
+
+  group('accountFiscalMilestone', () {
+    final today = DateTime(2026, 6, 15);
+
+    test('null sans enveloppe ni date d\'ouverture', () {
+      expect(
+        accountFiscalMilestone(
+          envelope: null,
+          openingDate: DateTime(2020, 1, 1),
+        ),
+        isNull,
+      );
+      expect(
+        accountFiscalMilestone(
+          envelope: AccountEnvelope.pea,
+          openingDate: null,
+        ),
+        isNull,
+      );
+    });
+
+    test(
+      'null pour une enveloppe sans jalon à durée fixe (CTO, PER, livret A)',
+      () {
+        for (final envelope in [
+          AccountEnvelope.cto,
+          AccountEnvelope.per,
+          AccountEnvelope.livretA,
+        ]) {
+          expect(
+            accountFiscalMilestone(
+              envelope: envelope,
+              openingDate: DateTime(2020, 1, 1),
+            ),
+            isNull,
+          );
+        }
+      },
+    );
+
+    test('PEA : avantage fiscal à 5 ans, non atteint', () {
+      final milestone = accountFiscalMilestone(
+        envelope: AccountEnvelope.pea,
+        openingDate: DateTime(2023, 1, 1),
+        today: today,
+      )!;
+      expect(milestone.kind, FiscalMilestoneKind.avantageFiscal);
+      expect(milestone.date, DateTime(2028, 1, 1));
+      expect(milestone.reached, isFalse);
+    });
+
+    test('PEA-PME : même règle que le PEA (5 ans, avantage fiscal)', () {
+      final milestone = accountFiscalMilestone(
+        envelope: AccountEnvelope.peaPme,
+        openingDate: DateTime(2020, 1, 1),
+        today: today,
+      )!;
+      expect(milestone.kind, FiscalMilestoneKind.avantageFiscal);
+      expect(milestone.reached, isTrue);
+    });
+
+    test('PEG/PEE : null, le déblocage se calcule par versement, pas sur le '
+        'compte entier (voir pegPeeUnlockTranches)', () {
+      for (final envelope in [AccountEnvelope.peg, AccountEnvelope.pee]) {
+        expect(
+          accountFiscalMilestone(
+            envelope: envelope,
+            openingDate: DateTime(2023, 1, 1),
+            today: today,
+          ),
+          isNull,
+        );
+      }
+    });
+
+    test(
+      'Assurance vie/contrat de capitalisation : avantage fiscal à 8 ans',
+      () {
+        for (final envelope in [
+          AccountEnvelope.assuranceVie,
+          AccountEnvelope.contratCapitalisation,
+        ]) {
+          final milestone = accountFiscalMilestone(
+            envelope: envelope,
+            openingDate: DateTime(2020, 1, 1),
+            today: today,
+          )!;
+          expect(milestone.kind, FiscalMilestoneKind.avantageFiscal);
+          expect(milestone.date, DateTime(2028, 1, 1));
+          expect(milestone.reached, isFalse);
+        }
+      },
+    );
+
+    test('reached devient vrai exactement à la date du jalon', () {
+      final milestone = accountFiscalMilestone(
+        envelope: AccountEnvelope.pea,
+        openingDate: DateTime(2021, 6, 15),
+        today: DateTime(2026, 6, 15),
+      )!;
+      expect(milestone.date, DateTime(2026, 6, 15));
+      expect(milestone.reached, isTrue);
+    });
+
+    test('la veille du jalon, reached est encore faux', () {
+      final milestone = accountFiscalMilestone(
+        envelope: AccountEnvelope.pea,
+        openingDate: DateTime(2021, 6, 15),
+        today: DateTime(2026, 6, 14),
+      )!;
+      expect(milestone.reached, isFalse);
+    });
+  });
+
+  group('pegPeeUnlockTranches', () {
+    Transaction buy(DateTime date, double amount) =>
+        Transaction(date: date, isBuy: true, quantity: amount, unitPrice: 1);
+
+    test('vide sans investissement', () {
+      expect(pegPeeUnlockTranches(investments: const []), isEmpty);
+    });
+
+    test('chaque versement se débloque 5 ans après sa propre date, pas '
+        'la date du premier versement', () {
+      final today = DateTime(2026, 6, 15);
+      final investment = Investment(
+        isin: 'FR0000000001',
+        label: 'Fonds actions',
+        transactions: [
+          // Intéressement de la 1re année de présence : déjà débloqué.
+          buy(DateTime(2020, 1, 1), 1000),
+          // Intéressement de la 3e année : pas encore débloqué.
+          buy(DateTime(2023, 1, 1), 1000),
+        ],
+      );
+
+      final tranches = pegPeeUnlockTranches(
+        investments: [investment],
+        today: today,
+      );
+
+      expect(tranches, hasLength(2));
+      expect(tranches[0].date, DateTime(2020, 1, 1));
+      expect(tranches[0].unlockDate, DateTime(2025, 1, 1));
+      expect(tranches[0].unlocked, isTrue);
+      expect(tranches[1].date, DateTime(2023, 1, 1));
+      expect(tranches[1].unlockDate, DateTime(2028, 1, 1));
+      expect(tranches[1].unlocked, isFalse);
+    });
+
+    test('ignore les ventes, seuls les versements (achats) comptent', () {
+      final investment = Investment(
+        isin: 'FR0000000001',
+        label: 'Fonds actions',
+        transactions: [
+          buy(DateTime(2020, 1, 1), 1000),
+          Transaction(
+            date: DateTime(2021, 1, 1),
+            isBuy: false,
+            quantity: 100,
+            unitPrice: 1,
+          ),
+        ],
+      );
+
+      final tranches = pegPeeUnlockTranches(investments: [investment]);
+
+      expect(tranches, hasLength(1));
+      expect(tranches.single.date, DateTime(2020, 1, 1));
+    });
+
+    test('agrège les versements de tous les investissements du compte', () {
+      final today = DateTime(2026, 6, 15);
+      final fondsA = Investment(
+        isin: 'FR0000000001',
+        label: 'Fonds A',
+        transactions: [buy(DateTime(2020, 1, 1), 1000)],
+      );
+      final fondsB = Investment(
+        isin: 'FR0000000002',
+        label: 'Fonds B',
+        transactions: [buy(DateTime(2024, 1, 1), 500)],
+      );
+
+      final tranches = pegPeeUnlockTranches(
+        investments: [fondsA, fondsB],
+        today: today,
+      );
+
+      expect(tranches, hasLength(2));
+      // Triées par date de versement croissante, toutes sources confondues.
+      expect(tranches[0].amount, 1000);
+      expect(tranches[1].amount, 500);
     });
   });
 }

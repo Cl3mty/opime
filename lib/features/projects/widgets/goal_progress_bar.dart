@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
+import '../../../core/ui/gold_progress_bar.dart';
 
 /// Barre de progression "objectif" — montant actuel à gauche, montant
 /// cible à droite, remplissage doré dégradé entre les deux (même teinte
@@ -29,60 +30,17 @@ class GoalProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final target = montantCible;
     if (target == null || target <= 0) {
       return shadcn.Text(formatEuros(currentValue)).semiBold();
     }
 
     final fraction = (currentValue / target).clamp(0.0, 1.0);
-    final accent = theme.colorScheme.primary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            // `theme.colorScheme.border`/`.muted` sont trop proches du blanc
-            // en thème clair pour qu'on distingue où s'arrête la barre (à
-            // peine 231 vs 255 de luminosité, vérifié pixel par pixel) —
-            // teinté du même doré que le remplissage plutôt qu'un gris
-            // neutre. Le doré étant déjà clair, une opacité aussi faible que
-            // pour un gris neutre redevenait invisible sur fond blanc
-            // (vérifié pixel par pixel à nouveau) : opacité bien plus élevée
-            // ici pour compenser.
-            border: Border.all(color: accent.withValues(alpha: 0.9)),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: Stack(
-              children: [
-                Container(
-                  height: height,
-                  color: accent.withValues(alpha: 0.35),
-                ),
-                FractionallySizedBox(
-                  widthFactor: fraction,
-                  child: Container(
-                    height: height,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [accent.withValues(alpha: 0.7), accent],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: accent.withValues(alpha: 0.45),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        GoldProgressBar(fraction: fraction, height: height),
         const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
