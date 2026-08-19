@@ -45,12 +45,21 @@ class ChatEntry {
   /// Message d'erreur à afficher (uniquement quand [status] vaut [error]).
   String? error;
 
+  /// Diagnostic sur le contexte patrimoine envoyé pour ce tour (uniquement
+  /// renseigné sur une entrée assistant) — rend visible si les données
+  /// locales ont bien été transmises au modèle plutôt que de laisser deviner
+  /// si une réponse qui « ne connaît pas » le patrimoine vient d'un contexte
+  /// manquant/vide ou d'une limite du modèle local choisi (voir
+  /// [AssistantChatController._runRequest]).
+  String? contextInfo;
+
   ChatEntry({
     required this.id,
     required this.role,
     required this.content,
     required this.status,
     this.error,
+    this.contextInfo,
   });
 
   bool get streaming => status == ChatEntryStatus.streaming;
@@ -168,9 +177,23 @@ class AssistantChatController extends ChangeNotifier {
       try {
         context = await AssistantContextBuilder(_activeDataPath())
             .buildPatrimoineContext();
-      } catch (_) {
-        // Le contexte reste vide : le modèle répond sur la seule question.
+        // Sans ce diagnostic visible, une réponse qui semble ignorer le
+        // patrimoine était indiscernable entre "le contexte n'est jamais
+        // arrivé jusqu'au modèle" (bug à corriger) et "le modèle local
+        // choisi ne l'exploite pas bien" (limite du modèle) — voir
+        // `assistant_screen.dart`'s `_MessageBubble`.
+        assistantEntry.contextInfo = context.trim().isEmpty
+            ? 'Contexte patrimoine : aucune donnée trouvée pour ce profil.'
+            : 'Contexte patrimoine inclus (${context.length} caractères).';
+      } catch (e) {
+        // Le contexte reste vide (le modèle répond sur la seule question),
+        // mais l'échec n'est plus invisible.
+        assistantEntry.contextInfo =
+            'Contexte patrimoine : échec du chargement ($e).';
       }
+    } else {
+      assistantEntry.contextInfo =
+          'Contexte patrimoine désactivé (Réglages → Assistant IA).';
     }
     if (cancel.isCompleted) {
       assistantEntry
@@ -291,6 +314,15 @@ class AssistantChatController extends ChangeNotifier {
     if (context.isNotEmpty) {
       prompt.writeln();
       prompt.writeln('## Contexte (données locales du profil actif)');
+      prompt.writeln(
+        'Les données ci-dessous viennent directement du vault local de '
+        'l\'utilisateur (comptes, budget, notes, simulations) : elles sont '
+        'à jour et fiables, pas une supposition. Tu as bien accès à ces '
+        'données — ne dis JAMAIS que tu n\'as pas accès aux informations '
+        'financières de l\'utilisateur, ni que tu ne peux pas voir son '
+        'patrimoine : réponds directement avec les chiffres ci-dessous.',
+      );
+      prompt.writeln();
       prompt.writeln(context);
     }
     return prompt.toString();

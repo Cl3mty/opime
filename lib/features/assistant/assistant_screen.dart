@@ -627,6 +627,14 @@ class _MessageBubble extends StatelessWidget {
             _TypingIndicator()
           else
             _MemoMarkdown(entry: entry),
+          if (!isUser && entry.contextInfo != null) ...[
+            const SizedBox(height: 6),
+            _buildCaption(
+              context,
+              icon: LucideIcons.database,
+              text: entry.contextInfo!,
+            ),
+          ],
         ],
       ),
     );
