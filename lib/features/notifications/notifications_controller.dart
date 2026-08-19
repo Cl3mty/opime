@@ -109,6 +109,13 @@ class NotificationsController extends ChangeNotifier {
       }
     }
 
+    // Nettoyage automatique : un article Yahoo pour un titre peu suivi peut
+    // rester le "plus récent" renvoyé par l'API pendant des semaines — sans
+    // cette coupure, le panneau finirait par accumuler des actualités
+    // obsolètes plutôt que de rester centré sur ce qui vient de se passer.
+    final cutoff = DateTime.now().subtract(const Duration(days: 7));
+    items.retainWhere((item) => item.sortKey.isAfter(cutoff));
+
     items.sort((a, b) => b.sortKey.compareTo(a.sortKey));
     _items = items;
     _loading = false;

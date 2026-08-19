@@ -101,7 +101,7 @@ void main() {
       title: 'Titre',
       publisher: 'Reuters',
       link: 'https://example.com/a1',
-      publishedAt: DateTime.utc(2026, 8, 10),
+      publishedAt: DateTime.now().subtract(const Duration(days: 1)),
       relatedSymbol: 'AAPL',
     );
     final yahoo = _FakeYahooFinanceClient({'AAPL': [article]});
@@ -180,7 +180,8 @@ void main() {
   test('fusion et tri par date décroissante entre Yahoo et CoinGecko', () async {
     final older = NewsArticleItem(
       uuid: 'old', title: 'Ancien', publisher: 'P', link: 'https://x/old',
-      publishedAt: DateTime.utc(2026, 1, 1), relatedSymbol: 'AAPL',
+      publishedAt: DateTime.now().subtract(const Duration(days: 6)),
+      relatedSymbol: 'AAPL',
     );
     final yahoo = _FakeYahooFinanceClient({'AAPL': [older]});
     final coinGecko = _FakeCoinGeckoClient(
@@ -200,10 +201,50 @@ void main() {
     await controller.refresh(tempDir.path);
 
     // L'alerte crypto (observée maintenant) est plus récente que l'article
-    // Yahoo daté du 1er janvier 2026 : elle doit passer en premier.
+    // Yahoo vieux de 6 jours : elle doit passer en premier.
     expect(controller.items.first, isA<CryptoAlertItem>());
     expect(controller.items.last, isA<NewsArticleItem>());
   });
+
+  test(
+    'nettoyage automatique : un article plus vieux qu\'une semaine est '
+    'exclu, un article de moins d\'une semaine est conservé',
+    () async {
+      final tooOld = NewsArticleItem(
+        uuid: 'old',
+        title: 'Trop ancien',
+        publisher: 'P',
+        link: 'https://x/old',
+        publishedAt: DateTime.now().subtract(const Duration(days: 8)),
+        relatedSymbol: 'AAPL',
+      );
+      final recent = NewsArticleItem(
+        uuid: 'recent',
+        title: 'Récent',
+        publisher: 'P',
+        link: 'https://x/recent',
+        publishedAt: DateTime.now().subtract(const Duration(days: 2)),
+        relatedSymbol: 'AAPL',
+      );
+      final yahoo = _FakeYahooFinanceClient({
+        'AAPL': [tooOld, recent],
+      });
+      final coinGecko = _FakeCoinGeckoClient(
+        coinIdByTicker: const {},
+        marketData: const [],
+      );
+      final repo = InvestmentsRepository(tempDir.path);
+      await repo.saveAccount(
+        stockAccount(stock(isin: 'US0378331005', symbol: 'AAPL')),
+      );
+
+      final controller = NotificationsController(yahoo: yahoo, coinGecko: coinGecko);
+      await controller.refresh(tempDir.path);
+
+      expect(controller.items, hasLength(1));
+      expect((controller.items.single as NewsArticleItem).uuid, 'recent');
+    },
+  );
 
   test('positions en devise et classes hors actions/crypto sont exclues', () async {
     final yahoo = _FakeYahooFinanceClient(const {});
@@ -230,7 +271,8 @@ void main() {
     test('sans lastSeen, tous les éléments sont non lus', () async {
       final article = NewsArticleItem(
         uuid: 'a1', title: 'T', publisher: 'P', link: 'https://x/a1',
-        publishedAt: DateTime.utc(2026, 8, 10), relatedSymbol: 'AAPL',
+        publishedAt: DateTime.now().subtract(const Duration(days: 1)),
+        relatedSymbol: 'AAPL',
       );
       final yahoo = _FakeYahooFinanceClient({'AAPL': [article]});
       final coinGecko = _FakeCoinGeckoClient(coinIdByTicker: const {}, marketData: const []);
@@ -246,7 +288,8 @@ void main() {
     test('markAllSeen exclut les éléments antérieurs à la date de consultation', () async {
       final article = NewsArticleItem(
         uuid: 'a1', title: 'T', publisher: 'P', link: 'https://x/a1',
-        publishedAt: DateTime.utc(2026, 8, 10), relatedSymbol: 'AAPL',
+        publishedAt: DateTime.now().subtract(const Duration(days: 1)),
+        relatedSymbol: 'AAPL',
       );
       final yahoo = _FakeYahooFinanceClient({'AAPL': [article]});
       final coinGecko = _FakeCoinGeckoClient(coinIdByTicker: const {}, marketData: const []);
@@ -254,8 +297,9 @@ void main() {
       await repo.saveAccount(stockAccount(stock(isin: 'US0378331005', symbol: 'AAPL')));
 
       final controller = NotificationsController(yahoo: yahoo, coinGecko: coinGecko);
-      controller.markAllSeen(DateTime.utc(2026, 8, 20));
-      await controller.refresh(tempDir.path, lastSeen: DateTime.utc(2026, 8, 20));
+      final lastSeen = DateTime.now().add(const Duration(days: 1));
+      controller.markAllSeen(lastSeen);
+      await controller.refresh(tempDir.path, lastSeen: lastSeen);
 
       expect(controller.unreadCount.value, 0);
     });
