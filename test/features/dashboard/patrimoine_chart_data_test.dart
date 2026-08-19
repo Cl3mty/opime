@@ -214,5 +214,28 @@ void main() {
       expect(changePercentFor([_p(0, 100), _p(1, 120)]), closeTo(20, 1e-9));
       expect(changePercentFor([_p(0, 100), _p(1, 80)]), closeTo(-20, 1e-9));
     });
+
+    test(
+        'reste défini même quand le premier point est minuscule devant le '
+        'dernier (un versement ultérieur, même modeste, y apparaît comme '
+        'une hausse énorme — voir isExtremeChangePercent, qui signale ce '
+        'cas sans masquer le chiffre)', () {
+      // 0,40 € en premier point (première transaction minime, ex : un
+      // reliquat de dividende) puis 48 115 € au dernier : +12 028 375 %.
+      final percent = changePercentFor([_p(0, 0.40), _p(1, 48115)]);
+      expect(percent, closeTo(12028650, 1));
+    });
+  });
+
+  group('isExtremeChangePercent', () {
+    test('faux pour un pourcentage plausible', () {
+      expect(isExtremeChangePercent(20), isFalse);
+      expect(isExtremeChangePercent(-999), isFalse);
+    });
+
+    test('vrai au-delà de 1000 % en valeur absolue', () {
+      expect(isExtremeChangePercent(1000.01), isTrue);
+      expect(isExtremeChangePercent(-1000.01), isTrue);
+    });
   });
 }

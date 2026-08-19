@@ -227,7 +227,10 @@ class EmptySelectionAmount extends StatelessWidget {
 /// tout début d'historique — un prêt souscrit avant que les actifs
 /// n'existent encore). Voir [PeriodChangeRow], qui affiche ce pourcentage
 /// sans jamais s'en servir pour la couleur/icône de tendance (dérivées de
-/// la variation absolue, toujours définie).
+/// la variation absolue, toujours définie) — et [isExtremeChangePercent],
+/// qui signale (sans le masquer) le cas où le point de départ est si
+/// petit devant l'écart final que ce pourcentage n'a plus rien d'un
+/// "rendement" lisible.
 double? changePercentFor(List<NetWorthPoint> points) {
   if (points.length < 2) return null;
   final first = points.first.value;
@@ -235,11 +238,76 @@ double? changePercentFor(List<NetWorthPoint> points) {
   return (points.last.value - first) / first * 100;
 }
 
+/// `true` quand [percent] est démesuré au point de ne plus représenter un
+/// "rendement" lisible — typiquement "Tout" sur une catégorie dont la
+/// toute première transaction est minime : un versement ultérieur, même
+/// modeste, y apparaît comme une hausse de plusieurs milliers de %, alors
+/// qu'il s'agit surtout de capital ajouté, pas de plus-value. Les
+/// affichages de pourcentage de période (voir [PeriodChangeRow],
+/// [ExtremePercentLabel]) continuent de l'afficher (pas de valeur plus
+/// honnête à montrer à la place — l'évolution en euros seule perdrait
+/// l'information de sens) mais en couleur plus transparente, avec une
+/// explication au survol, plutôt que de le laisser passer pour un taux
+/// normal ou de le masquer entièrement.
+bool isExtremeChangePercent(double percent) => percent.abs() > 1000;
+
+/// Texte "+X,XX %"/"-X,XX %" — même traitement que la partie "(±X %)" de
+/// [PeriodChangeRow] pour un pourcentage affiché seul (pas accolé à un
+/// montant en euros) : couleur pleine tant que [percent] reste plausible,
+/// plus transparente avec une explication au survol quand
+/// [isExtremeChangePercent] est vrai. Utilisé par exemple par "Mes
+/// meilleures performances" (`top_assets_row.dart`), dont chaque carte
+/// n'affiche le pourcentage qu'en complément du montant, pas dans le même
+/// texte.
+class ExtremePercentLabel extends StatelessWidget {
+  final double percent;
+  final Color color;
+  final TextStyle? style;
+
+  const ExtremePercentLabel({
+    super.key,
+    required this.percent,
+    required this.color,
+    this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final extreme = isExtremeChangePercent(percent);
+    final positive = percent >= 0;
+    final label = shadcn.Text(
+      '${positive ? '+' : ''}${percent.toStringAsFixed(2)} %',
+      style: (style ?? const TextStyle()).copyWith(
+        color: extreme ? color.withValues(alpha: 0.45) : color,
+      ),
+    );
+    if (!extreme) return label;
+    return Tooltip(
+      tooltip: (context) => const TooltipContainer(
+        child: SizedBox(
+          width: 260,
+          child: shadcn.Text(
+            'Pourcentage énorme car la période démarre avec un montant '
+            'très faible (ex : toute première transaction minime) — '
+            'l\'essentiel de la hausse vient surtout de versements '
+            'ajoutés depuis, pas d\'une vraie plus-value.',
+          ),
+        ),
+      ),
+      child: label,
+    );
+  }
+}
+
 /// Ligne "+1 234 € (+4,56 %)" affichée sous le montant total — évolution
 /// absolue puis relative sur la période sélectionnée (les onglets de
 /// [PeriodTabs]). Le texte omet la parenthèse quand [changePercent] est
 /// `null` (voir [changePercentFor]) plutôt que d'afficher un pourcentage
-/// trompeur. [color]/[icon] restent au choix de l'appelant — toujours
+/// trompeur ; quand il est démesuré (voir [isExtremeChangePercent]), seule
+/// la partie "(±X %)" passe en couleur plus transparente (le montant en
+/// euros garde sa couleur pleine) — avec une explication au survol —
+/// plutôt que de le laisser passer pour un taux normal ou de le masquer
+/// entièrement. [color]/[icon] restent au choix de l'appelant — toujours
 /// dérivés du signe de [absoluteChange], jamais de [changePercent] — pour
 /// rester cohérents avec les constantes `_green`/`_red` déjà définies
 /// localement dans chaque carte.
@@ -262,18 +330,55 @@ class PeriodChangeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final percent = changePercent;
+    final euroText = displayEuros(absoluteChange, hidden);
+    final baseStyle = Theme.of(
+      context,
+    ).typography.small.copyWith(color: color, fontWeight: FontWeight.w600);
+
+    Widget label;
+    var extreme = false;
+    if (percent == null) {
+      label = shadcn.Text(euroText, style: baseStyle);
+    } else {
+      extreme = isExtremeChangePercent(percent);
+      label = RichText(
+        text: TextSpan(
+          style: baseStyle,
+          children: [
+            TextSpan(text: euroText),
+            TextSpan(
+              text: ' (${displayPercent(percent)})',
+              style: extreme
+                  ? baseStyle.copyWith(color: color.withValues(alpha: 0.45))
+                  : null,
+            ),
+          ],
+        ),
+      );
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 14, color: color),
         const SizedBox(width: 4),
-        shadcn.Text(
-          percent == null
-              ? displayEuros(absoluteChange, hidden)
-              : '${displayEuros(absoluteChange, hidden)} '
-                    '(${displayPercent(percent)})',
-          style: TextStyle(color: color, fontWeight: FontWeight.w600),
-        ).small(),
+        extreme
+            ? Tooltip(
+                tooltip: (context) => const TooltipContainer(
+                  child: SizedBox(
+                    width: 260,
+                    child: shadcn.Text(
+                      'Pourcentage énorme car la période démarre avec un '
+                      'montant très faible (ex : toute première '
+                      'transaction minime) — l\'essentiel de la hausse '
+                      'vient surtout de versements ajoutés depuis, pas '
+                      'd\'une vraie plus-value.',
+                    ),
+                  ),
+                ),
+                child: label,
+              )
+            : label,
       ],
     );
   }
