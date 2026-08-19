@@ -3,13 +3,42 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors;
 import '../../core/money_format.dart';
 import 'budget_models.dart';
 
+/// Palette cyclique pour distinguer chaque source de revenu quand il y en
+/// a plusieurs (voir [BudgetSankeyChart]) — variations de vert, cohérentes
+/// avec la couleur "revenus" déjà utilisée pour le nœud agrégé et les
+/// autres graphiques du budget.
+const _revenuePalette = [
+  Color(0xFF22C55E),
+  Color(0xFF16A34A),
+  Color(0xFF4ADE80),
+  Color(0xFF15803D),
+  Color(0xFF86EFAC),
+  Color(0xFF166534),
+];
+
 class _FlowNode {
   final String label;
   final int column;
   final Color color;
   double value = 0;
+
+  /// Plancher pour [value], calculé par [_FlowNode] elle-même à partir de
+  /// ses liens entrants/sortants (voir `BudgetSankeyChart._layout`) — utile
+  /// pour "Revenus" : si rien n'est encore catégorisé en dépense ou en
+  /// investissement (aucun lien sortant), son montant se déduirait sinon
+  /// de ses liens entrants seuls, qui n'existent que si plusieurs sources
+  /// de revenus se rejoignent en elle. Sans ce plancher, un revenu unique
+  /// sans dépense ni investissement encore saisi afficherait un nœud
+  /// invisible (hauteur nulle) plutôt que le vrai montant.
+  final double minValue;
+
   double x0 = 0, x1 = 0, y0 = 0, y1 = 0;
-  _FlowNode({required this.label, required this.column, required this.color});
+  _FlowNode({
+    required this.label,
+    required this.column,
+    required this.color,
+    this.minValue = 0,
+  });
 }
 
 class _FlowLink {
@@ -51,30 +80,60 @@ class BudgetSankeyChart extends StatelessWidget {
     final nodes = <_FlowNode>[];
     final links = <_FlowLink>[];
 
-    final revenusNode = _FlowNode(label: 'Revenus', column: 0, color: green);
-    final disponibleNode = _FlowNode(
-      label: 'Disponible',
-      column: 1,
-      color: green,
-    );
-    nodes.addAll([revenusNode, disponibleNode]);
+    // Plusieurs revenus (salaire + freelance + loyers perçus...) : chacun
+    // devient sa propre branche, fusionnant dans le nœud "Revenus" agrégé
+    // — une colonne de plus tout à gauche, plutôt qu'un seul revenu
+    // muet qui ne montrerait jamais d'où vient l'argent. Un seul revenu
+    // (le cas courant) garde le graphique tel qu'avant : une branche de
+    // plus n'apporterait rien de plus qu'un doublon du nœud "Revenus".
+    final positiveRevenues = [
+      for (final r in data.revenues)
+        if (r.amount > 0) r,
+    ];
+    final fanOutRevenues = positiveRevenues.length > 1;
+    final revenueColumnOffset = fanOutRevenues ? 1 : 0;
 
-    if (totalRevenues > 0) {
-      links.add(
-        _FlowLink(
-          source: revenusNode,
-          target: disponibleNode,
-          value: totalRevenues,
-        ),
-      );
+    // Pas de nœud "Disponible" séparé : un versement non dépensé/investi
+    // ne va nulle part d'autre que rester dans "Revenus", qui porte donc
+    // déjà tout ce que "Disponible" représenterait — une colonne de plus
+    // ne ferait que répéter le même montant sans ajouter d'information.
+    final revenusNode = _FlowNode(
+      label: 'Revenus',
+      column: revenueColumnOffset,
+      color: green,
+      minValue: totalRevenues,
+    );
+    nodes.add(revenusNode);
+
+    if (fanOutRevenues) {
+      for (var i = 0; i < positiveRevenues.length; i++) {
+        final revenue = positiveRevenues[i];
+        final revenueNode = _FlowNode(
+          label: revenue.name.isEmpty ? 'Revenu' : revenue.name,
+          column: 0,
+          color: _revenuePalette[i % _revenuePalette.length],
+        );
+        nodes.add(revenueNode);
+        links.add(
+          _FlowLink(
+            source: revenueNode,
+            target: revenusNode,
+            value: revenue.amount,
+          ),
+        );
+      }
     }
 
     if (totalExpenses > 0) {
-      final depensesNode = _FlowNode(label: 'Dépenses', column: 2, color: red);
+      final depensesNode = _FlowNode(
+        label: 'Dépenses',
+        column: 1 + revenueColumnOffset,
+        color: red,
+      );
       nodes.add(depensesNode);
       links.add(
         _FlowLink(
-          source: disponibleNode,
+          source: revenusNode,
           target: depensesNode,
           value: totalExpenses,
         ),
@@ -85,7 +144,7 @@ class BudgetSankeyChart extends StatelessWidget {
         if (sum <= 0) continue;
         final catNode = _FlowNode(
           label: category.name.isEmpty ? 'Sans catégorie' : category.name,
-          column: 3,
+          column: 2 + revenueColumnOffset,
           color: red,
         );
         nodes.add(catNode);
@@ -94,7 +153,7 @@ class BudgetSankeyChart extends StatelessWidget {
           if (item.amount <= 0) continue;
           final itemNode = _FlowNode(
             label: item.name.isEmpty ? 'Dépense' : item.name,
-            column: 4,
+            column: 3 + revenueColumnOffset,
             color: red,
           );
           nodes.add(itemNode);
@@ -108,13 +167,13 @@ class BudgetSankeyChart extends StatelessWidget {
     if (totalInvestments > 0) {
       final investNode = _FlowNode(
         label: 'Investissements',
-        column: 2,
+        column: 1 + revenueColumnOffset,
         color: accent,
       );
       nodes.add(investNode);
       links.add(
         _FlowLink(
-          source: disponibleNode,
+          source: revenusNode,
           target: investNode,
           value: totalInvestments,
         ),
@@ -125,7 +184,7 @@ class BudgetSankeyChart extends StatelessWidget {
         if (sum <= 0) continue;
         final catNode = _FlowNode(
           label: category.name.isEmpty ? 'Sans catégorie' : category.name,
-          column: 3,
+          column: 2 + revenueColumnOffset,
           color: accent,
         );
         nodes.add(catNode);
@@ -134,7 +193,7 @@ class BudgetSankeyChart extends StatelessWidget {
           if (item.amount <= 0) continue;
           final itemNode = _FlowNode(
             label: item.name.isEmpty ? 'Investissement' : item.name,
-            column: 4,
+            column: 3 + revenueColumnOffset,
             color: accent,
           );
           nodes.add(itemNode);
@@ -185,7 +244,8 @@ class BudgetSankeyChart extends StatelessWidget {
       final incoming = links
           .where((l) => l.target == node)
           .fold<double>(0, (s, l) => s + l.value);
-      node.value = outgoing > 0 ? outgoing : incoming;
+      final inferred = outgoing > 0 ? outgoing : incoming;
+      node.value = inferred > node.minValue ? inferred : node.minValue;
     }
 
     final columns = <int, List<_FlowNode>>{};
