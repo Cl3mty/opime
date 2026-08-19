@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/ui/toggle_button_style.dart';
 import '../simulations/loan_calculator.dart';
 
 /// Champs communs aux 3 formulaires de création/édition d'un passif réel
@@ -132,12 +133,14 @@ class LiabilityFormFields extends StatelessWidget {
                 SelectedButton(
                   value: loanType == LoanType.amortissable,
                   selectedStyle: const ButtonStyle.primary(),
+                  style: toggleUnselectedStyle(context),
                   onChanged: (_) => onLoanTypeChanged(LoanType.amortissable),
                   child: const shadcn.Text('Amortissable'),
                 ),
                 SelectedButton(
                   value: loanType == LoanType.inFine,
                   selectedStyle: const ButtonStyle.primary(),
+                  style: toggleUnselectedStyle(context),
                   onChanged: (_) => onLoanTypeChanged(LoanType.inFine),
                   child: const shadcn.Text('In fine'),
                 ),
@@ -148,12 +151,14 @@ class LiabilityFormFields extends StatelessWidget {
                 SelectedButton(
                   value: typeDiffere == DeferType.partielle,
                   selectedStyle: const ButtonStyle.primary(),
+                  style: toggleUnselectedStyle(context),
                   onChanged: (_) => onTypeDiffereChanged(DeferType.partielle),
                   child: const shadcn.Text('Franchise partielle'),
                 ),
                 SelectedButton(
                   value: typeDiffere == DeferType.totale,
                   selectedStyle: const ButtonStyle.primary(),
+                  style: toggleUnselectedStyle(context),
                   onChanged: (_) => onTypeDiffereChanged(DeferType.totale),
                   child: const shadcn.Text('Franchise totale'),
                 ),

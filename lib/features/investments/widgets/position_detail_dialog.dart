@@ -5,6 +5,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/copyable_identifier.dart';
 import '../../../core/ui/frosted_card.dart';
+import '../../../core/ui/toggle_button_style.dart';
 import '../confirm_delete_dialog.dart';
 import '../currency_format.dart';
 import '../document_storage.dart';
@@ -438,7 +439,8 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   Widget build(BuildContext context) {
     final investment = _investment;
     final hasPrice = investment.marketValue != null;
-    final displayValue = investment.effectiveMarketValue ?? investment.investedAmount;
+    final displayValue =
+        investment.effectiveMarketValue ?? investment.investedAmount;
 
     PerformanceResult? performance;
     if (hasPrice) {
@@ -473,9 +475,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                   Row(
                     children: [
                       Expanded(
-                        child: shadcn.Text(
-                          investment.label,
-                        ).large().semiBold(),
+                        child: shadcn.Text(investment.label).large().semiBold(),
                       ),
                       Builder(
                         builder: (context) => IconButton.ghost(
@@ -533,9 +533,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                     ).x2Large().bold(),
                     if (!_isCurrency && investment.fundStyle != null) ...[
                       const SizedBox(height: 4),
-                      shadcn.Text(
-                        investment.fundStyle!.label,
-                      ).muted().small(),
+                      shadcn.Text(investment.fundStyle!.label).muted().small(),
                     ],
                   ],
                   const SizedBox(height: 12),
@@ -582,6 +580,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                             SelectedButton(
                               value: _perfMode == _PerfMode.twr,
                               selectedStyle: const ButtonStyle.primary(),
+                              style: toggleUnselectedStyle(context),
                               onChanged: (_) =>
                                   setState(() => _perfMode = _PerfMode.twr),
                               child: const shadcn.Text('TWR'),
@@ -589,6 +588,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                             SelectedButton(
                               value: _perfMode == _PerfMode.mwr,
                               selectedStyle: const ButtonStyle.primary(),
+                              style: toggleUnselectedStyle(context),
                               onChanged: (_) =>
                                   setState(() => _perfMode = _PerfMode.mwr),
                               child: const shadcn.Text('MWR'),

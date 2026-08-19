@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/ui/copyable_identifier.dart';
+import '../../core/ui/toggle_button_style.dart';
 import 'account_detail_screen.dart' show BackHeader;
 import 'confirm_delete_dialog.dart';
 import 'currency_format.dart';
@@ -137,13 +138,14 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     // coté : son historique se lit comme celui d'une action.
     if (_effectiveClass == AssetClass.metauxPrecieux &&
         !isMetalEtc(widget.account)) {
-      final points = await MetalPriceRepository(widget.vaultPath).pricePointsFor(
-        metalKindForInvestment(
-          isin: widget.investment.isin,
-          label: widget.investment.label,
-        ),
-        widget.investment.isin,
-      );
+      final points = await MetalPriceRepository(widget.vaultPath)
+          .pricePointsFor(
+            metalKindForInvestment(
+              isin: widget.investment.isin,
+              label: widget.investment.label,
+            ),
+            widget.investment.isin,
+          );
       if (!mounted) return;
       setState(() => _priceHistory = points);
       return;
@@ -196,7 +198,8 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   /// créée dans un compte-titres via le flux de complétion — un compte peut
   /// loger des titres ET des devises côte à côte) ? — mêmes règles que
   /// `isCurrencyInvestment` au niveau du modèle.
-  bool get _isCurrency => isCurrencyInvestment(widget.account, widget.investment);
+  bool get _isCurrency =>
+      isCurrencyInvestment(widget.account, widget.investment);
 
   String get _quantityFieldLabel {
     if (_isImmobilier) return 'Montant total (€)';
@@ -208,9 +211,8 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     return 'Quantité';
   }
 
-  String get _priceFieldLabel => _isCurrency
-      ? 'Cours de la paire de devise'
-      : 'Prix unitaire';
+  String get _priceFieldLabel =>
+      _isCurrency ? 'Cours de la paire de devise' : 'Prix unitaire';
 
   /// Le sélecteur de devise s'affiche sur le champ prix dès qu'il est
   /// pertinent : hors immobilier (pas de prix unitaire), et hors position
@@ -229,9 +231,8 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   /// pour une transaction en euros, le taux résolu/saisi sinon (peut être
   /// `null` : devise étrangère dont aucun taux n'est encore disponible, le
   /// commit est alors impossible).
-  double? get _txnFxRateToEur => _txnCurrency == 'EUR'
-      ? 1.0
-      : _priceCurrencyController.resolvedRate;
+  double? get _txnFxRateToEur =>
+      _txnCurrency == 'EUR' ? 1.0 : _priceCurrencyController.resolvedRate;
 
   /// Libellé du champ "Dernier cours" — voir [investmentLastPriceDisplay].
   String get _lastPriceDisplay => investmentLastPriceDisplay(
@@ -428,10 +429,8 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       // La devise de cotation et son taux, résolus pour l'ancien
       // identifiant, sont tout aussi invalides une fois celui-ci changé.
       quoteCurrency: isinChanged ? null : widget.investment.quoteCurrency,
-      lastFxRateToEur:
-          isinChanged ? null : widget.investment.lastFxRateToEur,
-      priceUnavailable:
-          isinChanged ? null : widget.investment.priceUnavailable,
+      lastFxRateToEur: isinChanged ? null : widget.investment.lastFxRateToEur,
+      priceUnavailable: isinChanged ? null : widget.investment.priceUnavailable,
       assetClass: widget.investment.assetClass,
       realEstateType: widget.investment.realEstateType,
       fundStyle: _editFundStyle,
@@ -585,7 +584,8 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     final investment = widget.investment;
     final theme = Theme.of(context);
     final hasPrice = investment.marketValue != null;
-    final displayValue = investment.effectiveMarketValue ?? investment.investedAmount;
+    final displayValue =
+        investment.effectiveMarketValue ?? investment.investedAmount;
 
     PerformanceResult? performance;
     if (hasPrice) {
@@ -646,7 +646,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 children: [
                   CopyableIdentifier(
                     value: investment.isin,
-                    toastTitle: _isRealIsin ? 'ISIN copié' : 'Identifiant copié',
+                    toastTitle: _isRealIsin
+                        ? 'ISIN copié'
+                        : 'Identifiant copié',
                   ),
                   if (investment.symbol != null &&
                       investment.symbol!.isNotEmpty)
@@ -680,7 +682,10 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               if (!_isImmobilier) ...[
                 InvestmentStatChip(
                   label: 'Quantité détenue',
-                  value: formatQuantity(investment.quantityHeld, _effectiveClass),
+                  value: formatQuantity(
+                    investment.quantityHeld,
+                    _effectiveClass,
+                  ),
                 ),
                 InvestmentStatChip(
                   label: 'PRU',
@@ -716,6 +721,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                     SelectedButton(
                       value: _perfMode == _PerfMode.twr,
                       selectedStyle: const ButtonStyle.primary(),
+                      style: toggleUnselectedStyle(context),
                       onChanged: (_) =>
                           setState(() => _perfMode = _PerfMode.twr),
                       child: const shadcn.Text('TWR'),
@@ -723,6 +729,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                     SelectedButton(
                       value: _perfMode == _PerfMode.mwr,
                       selectedStyle: const ButtonStyle.primary(),
+                      style: toggleUnselectedStyle(context),
                       onChanged: (_) =>
                           setState(() => _perfMode = _PerfMode.mwr),
                       child: const shadcn.Text('MWR'),
@@ -890,4 +897,3 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     );
   }
 }
-

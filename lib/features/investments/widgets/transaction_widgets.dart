@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
+import '../../../core/ui/toggle_button_style.dart';
 import '../currency_format.dart';
 import '../documents_section.dart';
 import '../investments_models.dart';
@@ -64,7 +65,11 @@ class FreshPriceBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return OutlineBadge(
-      leading: const Icon(LucideIcons.circleCheck, size: 10, color: Colors.green),
+      leading: const Icon(
+        LucideIcons.circleCheck,
+        size: 10,
+        color: Colors.green,
+      ),
       child: shadcn.Text('à jour').xSmall(),
     );
   }
@@ -163,22 +168,14 @@ class TransactionRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             if (positionLabel != null) ...[
-              Expanded(
-                child: shadcn.Text(positionLabel!).small().medium(),
-              ),
+              Expanded(child: shadcn.Text(positionLabel!).small().medium()),
               const SizedBox(width: 12),
             ],
             Expanded(child: shadcn.Text(_formatDate(transaction.date)).small()),
             if (!displayTotalOnly) ...[
               shadcn.Text(
                 '${formatQuantity(transaction.quantity, assetClass)} × '
-                '${transaction.currency == 'EUR'
-                    ? displayEuros(transaction.unitPrice, hidden)
-                    : formatPriceInCurrency(
-                        transaction.unitPrice,
-                        transaction.currency,
-                        hidden: hidden,
-                      )}',
+                '${transaction.currency == 'EUR' ? displayEuros(transaction.unitPrice, hidden) : formatPriceInCurrency(transaction.unitPrice, transaction.currency, hidden: hidden)}',
               ).muted().xSmall(),
               const SizedBox(width: 12),
             ],
@@ -342,12 +339,14 @@ class TransactionForm extends StatelessWidget {
                     SelectedButton(
                       value: isBuy,
                       selectedStyle: const ButtonStyle.primary(),
+                      style: toggleUnselectedStyle(context),
                       onChanged: (_) => onIsBuyChanged(true),
                       child: const shadcn.Text('Achat'),
                     ),
                     SelectedButton(
                       value: !isBuy,
                       selectedStyle: const ButtonStyle.primary(),
+                      style: toggleUnselectedStyle(context),
                       onChanged: (_) => onIsBuyChanged(false),
                       child: const shadcn.Text('Vente'),
                     ),

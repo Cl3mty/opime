@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/toggle_button_style.dart';
 import '../real_estate_pricing/dvf_cache_repository.dart';
 import '../real_estate_pricing/geo_dvf_client.dart';
 import '../real_estate_pricing/price_estimator.dart';
@@ -150,12 +151,17 @@ class _ReestimateDialogState extends State<_ReestimateDialog> {
                     children: [
                       SelectedButton(
                         value: _propertyType == PropertyTypeFilter.maison,
-                        onChanged: (_) =>
-                            setState(() => _propertyType = PropertyTypeFilter.maison),
+                        selectedStyle: const ButtonStyle.primary(),
+                        style: toggleUnselectedStyle(context),
+                        onChanged: (_) => setState(
+                          () => _propertyType = PropertyTypeFilter.maison,
+                        ),
                         child: const shadcn.Text('Maison'),
                       ),
                       SelectedButton(
                         value: _propertyType == PropertyTypeFilter.appartement,
+                        selectedStyle: const ButtonStyle.primary(),
+                        style: toggleUnselectedStyle(context),
                         onChanged: (_) => setState(
                           () => _propertyType = PropertyTypeFilter.appartement,
                         ),
@@ -168,9 +174,13 @@ class _ReestimateDialogState extends State<_ReestimateDialog> {
                   const SizedBox(height: 6),
                   TextField(
                     controller: TextEditingController(
-                      text: _surfaceM2 == 0 ? '' : _surfaceM2.round().toString(),
+                      text: _surfaceM2 == 0
+                          ? ''
+                          : _surfaceM2.round().toString(),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     onChanged: (text) {
                       final parsed = double.tryParse(text.replaceAll(',', '.'));
                       if (parsed != null) _surfaceM2 = parsed;

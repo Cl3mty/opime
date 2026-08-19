@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
+import '../../core/ui/toggle_button_style.dart';
 import '../../core/ui/frosted_card.dart';
 import 'loan_calculator.dart';
 import 'loan_chart.dart';
@@ -251,12 +252,14 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
               value: _type == LoanType.amortissable,
               onChanged: (_) => _update(() => _type = LoanType.amortissable),
               selectedStyle: const ButtonStyle.primary(),
+              style: toggleUnselectedStyle(context),
               child: const shadcn.Text('Amortissable'),
             ),
             SelectedButton(
               value: _type == LoanType.inFine,
               onChanged: (_) => _update(() => _type = LoanType.inFine),
               selectedStyle: const ButtonStyle.primary(),
+              style: toggleUnselectedStyle(context),
               child: const shadcn.Text('In fine'),
             ),
           ],
@@ -371,6 +374,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
                   onChanged: (_) =>
                       _update(() => _typeDiffere = DeferType.partielle),
                   selectedStyle: const ButtonStyle.primary(),
+                  style: toggleUnselectedStyle(context),
                   child: const shadcn.Text('Franchise partielle'),
                 ),
                 SelectedButton(
@@ -378,6 +382,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
                   onChanged: (_) =>
                       _update(() => _typeDiffere = DeferType.totale),
                   selectedStyle: const ButtonStyle.primary(),
+                  style: toggleUnselectedStyle(context),
                   child: const shadcn.Text('Franchise totale'),
                 ),
               ],

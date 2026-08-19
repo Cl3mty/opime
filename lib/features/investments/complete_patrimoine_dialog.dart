@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/toggle_button_style.dart';
 import '../liabilities/liabilities_models.dart';
 import '../liabilities/liabilities_repository.dart';
 import '../liabilities/liability_form_fields.dart';
@@ -177,8 +178,16 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     // jour calendaire — conserver l'heure de `DateTime.now()` ferait passer
     // la transaction du jour au-dessus de minuit UTC de la grille de dates
     // des historiques (voir `_onOrBeforeDay` dans real_patrimoine_adapter).
-    _txnDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    _liabDateDebut = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    _txnDate = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+    _liabDateDebut = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
     _priceCurrencyController = TransactionPriceCurrencyController(
       vaultPath: widget.vaultPath,
     );
@@ -261,11 +270,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     final file = result?.files.singleOrNull;
     final bytes = file?.bytes;
     if (file == null || bytes == null) return;
-    final path = await BankLogoRepository(widget.vaultPath).importLogo(
-      bankName,
-      bytes,
-      sourceName: file.name,
-    );
+    final path = await BankLogoRepository(
+      widget.vaultPath,
+    ).importLogo(bankName, bytes, sourceName: file.name);
     if (path == null || !mounted) return;
     setState(() => _bankLogos = {..._bankLogos, bankName: path});
   }
@@ -508,7 +515,8 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       // (voir commentaire en tête de méthode) ; la date d'ouverture
       // seulement si le compte n'en a pas déjà une — on ne surcharge pas
       // une date existante par mégarde.
-      var updated = description.isNotEmpty && matching.description != description
+      var updated =
+          description.isNotEmpty && matching.description != description
           ? matching.copyWith(description: description)
           : matching;
       if (openingDate != null && updated.openingDate == null) {
@@ -570,9 +578,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         _creatingDevise ||
             (assetClass != null &&
                 identifierOptionsFor(
-                  assetClass,
-                  accountEnvelope: account?.envelope,
-                ) !=
+                      assetClass,
+                      accountEnvelope: account?.envelope,
+                    ) !=
                     null)
         ? rawIsin
         : rawIsin.toUpperCase();
@@ -872,8 +880,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         );
       case _Step.account:
         return _AccountStep(
-          stepLabel:
-              'Étape 3 sur $_totalSteps · ${_assetClass!.label}',
+          stepLabel: 'Étape 3 sur $_totalSteps · ${_assetClass!.label}',
           assetClass: _assetClass!,
           accounts: _accounts
               .where(
@@ -956,7 +963,8 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         );
       case _Step.transaction:
         return _TransactionStep(
-          stepLabel: 'Étape $_totalSteps sur $_totalSteps · ${_investment!.label}',
+          stepLabel:
+              'Étape $_totalSteps sur $_totalSteps · ${_investment!.label}',
           investment: _investment!,
           isBuy: _newIsBuy,
           date: _txnDate,
@@ -1161,11 +1169,7 @@ class _AccountStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _DialogHeader(
-          step: stepLabel,
-          title: 'Quel compte ?',
-          onBack: onBack,
-        ),
+        _DialogHeader(step: stepLabel, title: 'Quel compte ?', onBack: onBack),
         const SizedBox(height: 16),
         for (final account in accounts) ...[
           _OptionTile(
@@ -1338,7 +1342,9 @@ class _EstablishmentStep extends StatelessWidget {
                         Icon(
                           LucideIcons.wallet,
                           size: 16,
-                          color: Theme.of(dialogContext).colorScheme.mutedForeground,
+                          color: Theme.of(
+                            dialogContext,
+                          ).colorScheme.mutedForeground,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -1353,9 +1359,9 @@ class _EstablishmentStep extends StatelessWidget {
                                 account.envelope?.label ?? account.name,
                               ).medium().small(),
                               if (account.description != null)
-                                shadcn.Text(account.description!)
-                                    .muted()
-                                    .xSmall(),
+                                shadcn.Text(
+                                  account.description!,
+                                ).muted().xSmall(),
                             ],
                           ),
                         ),
@@ -1365,9 +1371,11 @@ class _EstablishmentStep extends StatelessWidget {
                               Navigator.of(dialogContext).pop();
                               final confirmed = await confirmDelete(
                                 context,
-                                title: 'Supprimer « '
+                                title:
+                                    'Supprimer « '
                                     '${account.envelope?.label ?? account.name} » ?',
-                                message: 'Ce compte et ses investissements '
+                                message:
+                                    'Ce compte et ses investissements '
                                     '(sans transaction) seront '
                                     'définitivement supprimés.',
                               );
@@ -1376,9 +1384,9 @@ class _EstablishmentStep extends StatelessWidget {
                             child: const shadcn.Text('Supprimer'),
                           )
                         else
-                          shadcn.Text('contient des transactions')
-                              .muted()
-                              .xSmall(),
+                          shadcn.Text(
+                            'contient des transactions',
+                          ).muted().xSmall(),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -1429,8 +1437,11 @@ class _EstablishmentStep extends StatelessWidget {
             trailing: _hasDeletableAccounts(entry.value)
                 ? IconButton.ghost(
                     icon: const Icon(LucideIcons.trash2, size: 16),
-                    onPressed: () =>
-                        _showDeleteAccountsDialog(context, entry.key, entry.value),
+                    onPressed: () => _showDeleteAccountsDialog(
+                      context,
+                      entry.key,
+                      entry.value,
+                    ),
                   )
                 : null,
             onTap: () => onSelectEstablishment(entry.key),
@@ -1518,11 +1529,7 @@ class _AccountEnvelopeStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _DialogHeader(
-          step: stepLabel,
-          title: 'Quel compte ?',
-          onBack: onBack,
-        ),
+        _DialogHeader(step: stepLabel, title: 'Quel compte ?', onBack: onBack),
         const SizedBox(height: 16),
         TextField(
           controller: descriptionController,
@@ -1533,11 +1540,13 @@ class _AccountEnvelopeStep extends StatelessWidget {
         const SizedBox(height: 8),
         DatePicker(
           value: openingDate,
-          onChanged: (date) => onOpeningDateChanged(date == null
-              ? null
-              // Jour calendaire sans heure, comme `_txnDate` et
-              // `_liabDateDebut` (voir `initState`).
-              : DateTime(date.year, date.month, date.day)),
+          onChanged: (date) => onOpeningDateChanged(
+            date == null
+                ? null
+                // Jour calendaire sans heure, comme `_txnDate` et
+                // `_liabDateDebut` (voir `initState`).
+                : DateTime(date.year, date.month, date.day),
+          ),
           placeholder: const shadcn.Text('Date d\'ouverture (facultative)'),
         ),
         if (existingAccounts.isNotEmpty) ...[
@@ -1632,11 +1641,7 @@ class _InvestmentStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _DialogHeader(
-          step: stepLabel,
-          title: title,
-          onBack: onBack,
-        ),
+        _DialogHeader(step: stepLabel, title: title, onBack: onBack),
         const SizedBox(height: 16),
         for (final investment in account.investments) ...[
           _OptionTile(
@@ -1645,8 +1650,8 @@ class _InvestmentStep extends StatelessWidget {
             // Immobilier : pas d'identifiant. Épargne et toute autre
             // position en devise : l'identifiant est la devise, déjà portée
             // par le libellé — pas besoin de la répéter en dessous.
-            sublabel: (assetClass == AssetClass.immobilier ||
-                    investment.isCurrency)
+            sublabel:
+                (assetClass == AssetClass.immobilier || investment.isCurrency)
                 ? null
                 : investment.isin,
             onTap: () => onSelectInvestment(investment.id),
@@ -1664,12 +1669,14 @@ class _InvestmentStep extends StatelessWidget {
                     SelectedButton(
                       value: !creatingDevise,
                       selectedStyle: const ButtonStyle.primary(),
+                      style: toggleUnselectedStyle(context),
                       onChanged: (_) => onDeviseModeChanged?.call(false),
                       child: const shadcn.Text('Investissement'),
                     ),
                     SelectedButton(
                       value: creatingDevise,
                       selectedStyle: const ButtonStyle.primary(),
+                      style: toggleUnselectedStyle(context),
                       onChanged: (_) => onDeviseModeChanged?.call(true),
                       child: const shadcn.Text('Devise'),
                     ),
@@ -1731,7 +1738,9 @@ class _InvestmentStep extends StatelessWidget {
                 ))
                   TextField(
                     controller: labelController,
-                    placeholder: const shadcn.Text('Libellé (ex: TotalEnergies)'),
+                    placeholder: const shadcn.Text(
+                      'Libellé (ex: TotalEnergies)',
+                    ),
                   ),
                 if (assetClass == AssetClass.actionsEtFonds) ...[
                   const SizedBox(height: 8),
@@ -1776,10 +1785,7 @@ class _InvestmentStep extends StatelessWidget {
             createLabel: createLabel,
           )
         else
-          _AddOptionButton(
-            label: addLabel,
-            onTap: onStartCreate,
-          ),
+          _AddOptionButton(label: addLabel, onTap: onStartCreate),
       ],
     );
   }
@@ -1853,12 +1859,14 @@ class _TransactionStep extends StatelessWidget {
                 SelectedButton(
                   value: isBuy,
                   selectedStyle: const ButtonStyle.primary(),
+                  style: toggleUnselectedStyle(context),
                   onChanged: (_) => onIsBuyChanged(true),
                   child: const shadcn.Text('Achat'),
                 ),
                 SelectedButton(
                   value: !isBuy,
                   selectedStyle: const ButtonStyle.primary(),
+                  style: toggleUnselectedStyle(context),
                   onChanged: (_) => onIsBuyChanged(false),
                   child: const shadcn.Text('Vente'),
                 ),
@@ -2084,10 +2092,7 @@ class _OptionTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null) ...[
-                trailing!,
-                const SizedBox(width: 4),
-              ],
+              if (trailing != null) ...[trailing!, const SizedBox(width: 4)],
               Icon(
                 LucideIcons.chevronRight,
                 size: 16,

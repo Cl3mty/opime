@@ -6,6 +6,7 @@ import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/toggle_button_style.dart';
 import '../real_estate_pricing/dvf_cache_repository.dart';
 import '../real_estate_pricing/geo_dvf_client.dart';
 import '../real_estate_pricing/price_estimator.dart';
@@ -163,12 +164,14 @@ class _RealEstateEstimationScreenState
       final unitsJson = data['units'] as List?;
       if (unitsJson != null && unitsJson.isNotEmpty) {
         _units = [
-          for (final u in unitsJson) RentalUnit.fromJson(u as Map<String, dynamic>),
+          for (final u in unitsJson)
+            RentalUnit.fromJson(u as Map<String, dynamic>),
         ];
       }
       _travaux = (data['travaux'] as num?)?.toDouble() ?? _travaux;
       _fraisNotairePercent =
-          (data['fraisNotairePercent'] as num?)?.toDouble() ?? _fraisNotairePercent;
+          (data['fraisNotairePercent'] as num?)?.toDouble() ??
+          _fraisNotairePercent;
       _chargesAnnuelles =
           (data['chargesAnnuelles'] as num?)?.toDouble() ?? _chargesAnnuelles;
       _cashPurchase = data['cashPurchase'] as bool? ?? _cashPurchase;
@@ -289,8 +292,10 @@ class _RealEstateEstimationScreenState
 
   LoanResult? _simulateLoan() {
     if (_cashPurchase) return null;
-    final montantEmprunte =
-        (_coutTotalProjet - _loanParams.apport).clamp(0.0, double.infinity);
+    final montantEmprunte = (_coutTotalProjet - _loanParams.apport).clamp(
+      0.0,
+      double.infinity,
+    );
     if (montantEmprunte <= 0) return null;
     return simulateLoan(
       montantEmprunte: montantEmprunte,
@@ -344,7 +349,9 @@ class _RealEstateEstimationScreenState
   @override
   Widget build(BuildContext context) {
     final loan = _simulateLoan();
-    final result = _usage == _UsageType.locatif ? _simulateProfitability(loan) : null;
+    final result = _usage == _UsageType.locatif
+        ? _simulateProfitability(loan)
+        : null;
     final hidden = widget.amountVisibility.hidden;
 
     return FrostedCard(
@@ -420,6 +427,7 @@ class _RealEstateEstimationScreenState
               onChanged: (_) =>
                   setState(() => _mapMetric = HeatmapMetric.pricePerSqm),
               selectedStyle: const ButtonStyle.primary(),
+              style: toggleUnselectedStyle(context),
               child: const shadcn.Text('Prix au m²'),
             ),
             SelectedButton(
@@ -427,6 +435,7 @@ class _RealEstateEstimationScreenState
               onChanged: (_) =>
                   setState(() => _mapMetric = HeatmapMetric.rentPerSqm),
               selectedStyle: const ButtonStyle.primary(),
+              style: toggleUnselectedStyle(context),
               child: const shadcn.Text('Loyer au m²'),
             ),
           ],
@@ -458,12 +467,14 @@ class _RealEstateEstimationScreenState
               value: _usage == _UsageType.locatif,
               onChanged: (_) => _update(() => _usage = _UsageType.locatif),
               selectedStyle: const ButtonStyle.primary(),
+              style: toggleUnselectedStyle(context),
               child: const shadcn.Text('Investissement locatif'),
             ),
             SelectedButton(
               value: _usage == _UsageType.residence,
               onChanged: (_) => _update(() => _usage = _UsageType.residence),
               selectedStyle: const ButtonStyle.primary(),
+              style: toggleUnselectedStyle(context),
               child: const shadcn.Text('Résidence principale/secondaire'),
             ),
           ],
@@ -481,6 +492,7 @@ class _RealEstateEstimationScreenState
                 _fetchRent();
               },
               selectedStyle: const ButtonStyle.primary(),
+              style: toggleUnselectedStyle(context),
               child: const shadcn.Text('Maison'),
             ),
             SelectedButton(
@@ -491,6 +503,7 @@ class _RealEstateEstimationScreenState
                 _fetchRent();
               },
               selectedStyle: const ButtonStyle.primary(),
+              style: toggleUnselectedStyle(context),
               child: const shadcn.Text('Appartement'),
             ),
           ],
@@ -517,7 +530,9 @@ class _RealEstateEstimationScreenState
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: shadcn.Text('Unités locatives').semiBold().small()),
+              Expanded(
+                child: shadcn.Text('Unités locatives').semiBold().small(),
+              ),
               IconButton.ghost(
                 icon: const Icon(LucideIcons.plus, size: 16),
                 onPressed: () => _update(
@@ -578,7 +593,9 @@ class _RealEstateEstimationScreenState
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: shadcn.Text('Achat comptant (sans crédit)').small()),
+            Expanded(
+              child: shadcn.Text('Achat comptant (sans crédit)').small(),
+            ),
             _SimpleSwitch(
               value: _cashPurchase,
               onChanged: (v) => _update(() => _cashPurchase = v),
@@ -649,7 +666,9 @@ class _RealEstateEstimationScreenState
             ', ${_priceEstimate!.yearsUsed.join('-')}.',
           ).muted().small()
         else if (_address != null)
-          shadcn.Text('Aucune vente comparable trouvée — prix à ajuster manuellement.').muted().small(),
+          shadcn.Text(
+            'Aucune vente comparable trouvée — prix à ajuster manuellement.',
+          ).muted().small(),
         if (_loadingRent) ...[
           const SizedBox(height: 4),
           shadcn.Text('Estimation du loyer en cours...').muted().small(),
@@ -677,17 +696,30 @@ class _RealEstateEstimationScreenState
         if (result != null) ...[
           _ProfitabilityStats(
             items: [
-              ('Revenu locatif brut', displayEuros(result.revenuLocatifAnnuelBrut, hidden), '/an'),
-              ('Revenu locatif net', displayEuros(result.revenuLocatifAnnuelNet, hidden), '/an'),
+              (
+                'Revenu locatif brut',
+                displayEuros(result.revenuLocatifAnnuelBrut, hidden),
+                '/an',
+              ),
+              (
+                'Revenu locatif net',
+                displayEuros(result.revenuLocatifAnnuelNet, hidden),
+                '/an',
+              ),
               if (!_cashPurchase)
-                ('Mensualité crédit', displayEuros(result.mensualiteCredit, hidden), '/mois'),
+                (
+                  'Mensualité crédit',
+                  displayEuros(result.mensualiteCredit, hidden),
+                  '/mois',
+                ),
             ],
           ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: (result.autofinance ? Colors.green : Colors.red).withValues(alpha: 0.1),
+              color: (result.autofinance ? Colors.green : Colors.red)
+                  .withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(theme.radiusMd),
               border: Border.all(
                 color: result.autofinance ? Colors.green : Colors.red,
@@ -696,7 +728,9 @@ class _RealEstateEstimationScreenState
             child: Row(
               children: [
                 Icon(
-                  result.autofinance ? LucideIcons.circleCheck : LucideIcons.triangleAlert,
+                  result.autofinance
+                      ? LucideIcons.circleCheck
+                      : LucideIcons.triangleAlert,
                   color: result.autofinance ? Colors.green : Colors.red,
                 ),
                 const SizedBox(width: 12),
@@ -705,7 +739,9 @@ class _RealEstateEstimationScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       shadcn.Text(
-                        result.autofinance ? 'Projet autofinancé' : 'Projet non autofinancé',
+                        result.autofinance
+                            ? 'Projet autofinancé'
+                            : 'Projet non autofinancé',
                       ).semiBold(),
                       shadcn.Text(
                         'Cash-flow mensuel : ${displayEuros(result.cashFlowMensuel, hidden)}',
@@ -839,9 +875,7 @@ class _RentalUnitEditor extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
-                child: shadcn.Text(unit.label).semiBold().small(),
-              ),
+              Expanded(child: shadcn.Text(unit.label).semiBold().small()),
               shadcn.Text(
                 '${unit.annualGrossRevenue.round()} €/an',
               ).muted().xSmall(),
@@ -860,7 +894,11 @@ class _RentalUnitEditor extends StatelessWidget {
             placeholder: const shadcn.Text('Stratégie'),
             onChanged: (kind) {
               if (kind == null) return;
-              onChanged(unit.copyWith(strategy: _defaultStrategyFor(kind, unit.strategy)));
+              onChanged(
+                unit.copyWith(
+                  strategy: _defaultStrategyFor(kind, unit.strategy),
+                ),
+              );
             },
             itemBuilder: (context, kind) => shadcn.Text(_strategyLabel(kind)),
             popup: (context) => SelectPopup(
@@ -876,7 +914,10 @@ class _RentalUnitEditor extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _buildStrategyFields(unit.strategy, (s) => onChanged(unit.copyWith(strategy: s))),
+          _buildStrategyFields(
+            unit.strategy,
+            (s) => onChanged(unit.copyWith(strategy: s)),
+          ),
         ],
       ),
     );
@@ -893,8 +934,9 @@ class _RentalUnitEditor extends StatelessWidget {
     RentalStrategyKind kind,
     RentalStrategy current,
   ) => switch (kind) {
-    RentalStrategyKind.longTerm =>
-      RentalStrategy.longTerm(monthlyRent: current.monthlyRent ?? 500),
+    RentalStrategyKind.longTerm => RentalStrategy.longTerm(
+      monthlyRent: current.monthlyRent ?? 500,
+    ),
     RentalStrategyKind.shortTerm => RentalStrategy.shortTerm(
       nightlyRate: current.nightlyRate ?? 70,
       occupancyRatePercent: current.occupancyRatePercent ?? 60,
@@ -904,7 +946,8 @@ class _RentalUnitEditor extends StatelessWidget {
       longTermMonthlyRent: current.longTermMonthlyRent ?? 500,
       shortTermMonths: current.shortTermMonths ?? 3,
       shortTermNightlyRate: current.shortTermNightlyRate ?? 80,
-      shortTermOccupancyRatePercent: current.shortTermOccupancyRatePercent ?? 60,
+      shortTermOccupancyRatePercent:
+          current.shortTermOccupancyRatePercent ?? 60,
     ),
     RentalStrategyKind.colocation => RentalStrategy.colocation(
       rooms: current.rooms.isEmpty
@@ -922,7 +965,8 @@ class _RentalUnitEditor extends StatelessWidget {
         return _CompactNumberField(
           label: 'Loyer mensuel (€)',
           value: strategy.monthlyRent ?? 0,
-          onChanged: (v) => onStrategyChanged(RentalStrategy.longTerm(monthlyRent: v)),
+          onChanged: (v) =>
+              onStrategyChanged(RentalStrategy.longTerm(monthlyRent: v)),
         );
       case RentalStrategyKind.shortTerm:
         return Row(
@@ -966,9 +1010,11 @@ class _RentalUnitEditor extends StatelessWidget {
                     onChanged: (v) => onStrategyChanged(
                       RentalStrategy.seasonalMix(
                         longTermMonths: v.round(),
-                        longTermMonthlyRent: strategy.longTermMonthlyRent ?? 500,
+                        longTermMonthlyRent:
+                            strategy.longTermMonthlyRent ?? 500,
                         shortTermMonths: strategy.shortTermMonths ?? 3,
-                        shortTermNightlyRate: strategy.shortTermNightlyRate ?? 80,
+                        shortTermNightlyRate:
+                            strategy.shortTermNightlyRate ?? 80,
                         shortTermOccupancyRatePercent:
                             strategy.shortTermOccupancyRatePercent ?? 60,
                       ),
@@ -985,7 +1031,8 @@ class _RentalUnitEditor extends StatelessWidget {
                         longTermMonths: strategy.longTermMonths ?? 9,
                         longTermMonthlyRent: v,
                         shortTermMonths: strategy.shortTermMonths ?? 3,
-                        shortTermNightlyRate: strategy.shortTermNightlyRate ?? 80,
+                        shortTermNightlyRate:
+                            strategy.shortTermNightlyRate ?? 80,
                         shortTermOccupancyRatePercent:
                             strategy.shortTermOccupancyRatePercent ?? 60,
                       ),
@@ -1004,9 +1051,11 @@ class _RentalUnitEditor extends StatelessWidget {
                     onChanged: (v) => onStrategyChanged(
                       RentalStrategy.seasonalMix(
                         longTermMonths: strategy.longTermMonths ?? 9,
-                        longTermMonthlyRent: strategy.longTermMonthlyRent ?? 500,
+                        longTermMonthlyRent:
+                            strategy.longTermMonthlyRent ?? 500,
                         shortTermMonths: v.round(),
-                        shortTermNightlyRate: strategy.shortTermNightlyRate ?? 80,
+                        shortTermNightlyRate:
+                            strategy.shortTermNightlyRate ?? 80,
                         shortTermOccupancyRatePercent:
                             strategy.shortTermOccupancyRatePercent ?? 60,
                       ),
@@ -1021,7 +1070,8 @@ class _RentalUnitEditor extends StatelessWidget {
                     onChanged: (v) => onStrategyChanged(
                       RentalStrategy.seasonalMix(
                         longTermMonths: strategy.longTermMonths ?? 9,
-                        longTermMonthlyRent: strategy.longTermMonthlyRent ?? 500,
+                        longTermMonthlyRent:
+                            strategy.longTermMonthlyRent ?? 500,
                         shortTermMonths: strategy.shortTermMonths ?? 3,
                         shortTermNightlyRate: v,
                         shortTermOccupancyRatePercent:
@@ -1054,7 +1104,9 @@ class _RentalUnitEditor extends StatelessWidget {
                             label: rooms[i].label,
                             monthlyRent: v,
                           );
-                          onStrategyChanged(RentalStrategy.colocation(rooms: rooms));
+                          onStrategyChanged(
+                            RentalStrategy.colocation(rooms: rooms),
+                          );
                         },
                       ),
                     ),
@@ -1063,7 +1115,9 @@ class _RentalUnitEditor extends StatelessWidget {
                         icon: const Icon(LucideIcons.x, size: 12),
                         onPressed: () {
                           final rooms = [...strategy.rooms]..removeAt(i);
-                          onStrategyChanged(RentalStrategy.colocation(rooms: rooms));
+                          onStrategyChanged(
+                            RentalStrategy.colocation(rooms: rooms),
+                          );
                         },
                       ),
                   ],
@@ -1113,7 +1167,10 @@ class _ProfitabilityStats extends StatelessWidget {
                   children: [
                     TextSpan(
                       text: item.$2,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     TextSpan(text: ' ${item.$3}'),
                   ],
@@ -1130,7 +1187,11 @@ class _StatChip extends StatelessWidget {
   final String label;
   final String value;
   final Color accent;
-  const _StatChip({required this.label, required this.value, required this.accent});
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1177,7 +1238,10 @@ class _SimpleSwitch extends StatelessWidget {
           child: Container(
             width: 18,
             height: 18,
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
           ),
         ),
       ),
@@ -1251,8 +1315,13 @@ class _NumberFieldState extends State<_NumberField> {
                 controller: _controller,
                 focusNode: _focusNode,
                 border: Border.all(color: Colors.transparent),
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 onChanged: (text) {
                   final parsed = parseDecimal(text);
                   if (parsed != null) widget.onChanged(parsed);

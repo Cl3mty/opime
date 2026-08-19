@@ -8,6 +8,7 @@ import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/toggle_button_style.dart';
 
 class TransmissionSimulationScreen extends StatefulWidget {
   final String vaultPath;
@@ -528,18 +529,24 @@ class _DonationTabState extends State<_DonationTab> {
                 value: _relation == DonationRelation.enfant,
                 onChanged: (_) =>
                     _update(() => _relation = DonationRelation.enfant),
+                selectedStyle: const ButtonStyle.primary(),
+                style: toggleUnselectedStyle(context),
                 child: const shadcn.Text('Enfant'),
               ),
               SelectedButton(
                 value: _relation == DonationRelation.petitEnfant,
                 onChanged: (_) =>
                     _update(() => _relation = DonationRelation.petitEnfant),
+                selectedStyle: const ButtonStyle.primary(),
+                style: toggleUnselectedStyle(context),
                 child: const shadcn.Text('Petit-enfant'),
               ),
               SelectedButton(
                 value: _relation == DonationRelation.conjoint,
                 onChanged: (_) =>
                     _update(() => _relation = DonationRelation.conjoint),
+                selectedStyle: const ButtonStyle.primary(),
+                style: toggleUnselectedStyle(context),
                 child: const shadcn.Text('Conjoint/PACS'),
               ),
             ],

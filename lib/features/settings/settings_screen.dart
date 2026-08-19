@@ -8,6 +8,7 @@ import '../../core/shortcuts/keyboard_shortcuts_controller.dart';
 import '../../core/storage/vault_encryption_metadata.dart';
 import '../../core/storage/vault_encryption_repository.dart';
 import '../../core/storage/vault_folder_service.dart';
+import '../../core/ui/toggle_button_style.dart';
 import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/responsive.dart';
@@ -272,6 +273,7 @@ class _ThemeCard extends StatelessWidget {
                           // sur le fond de carte, lui aussi clair. primary()
                           // garantit un contraste net dans les deux thèmes.
                           selectedStyle: const ButtonStyle.primary(),
+                          style: toggleUnselectedStyle(context),
                           onChanged: (_) =>
                               themeController.setMode(ThemeMode.light),
                           child: const Row(
@@ -286,6 +288,7 @@ class _ThemeCard extends StatelessWidget {
                         SelectedButton(
                           value: mode == ThemeMode.dark,
                           selectedStyle: const ButtonStyle.primary(),
+                          style: toggleUnselectedStyle(context),
                           onChanged: (_) =>
                               themeController.setMode(ThemeMode.dark),
                           child: const Row(
@@ -300,6 +303,7 @@ class _ThemeCard extends StatelessWidget {
                         SelectedButton(
                           value: mode == ThemeMode.system,
                           selectedStyle: const ButtonStyle.primary(),
+                          style: toggleUnselectedStyle(context),
                           onChanged: (_) =>
                               themeController.setMode(ThemeMode.system),
                           child: const Row(

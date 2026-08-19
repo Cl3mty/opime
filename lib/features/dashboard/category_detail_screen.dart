@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/date_format.dart';
+import '../../core/ui/toggle_button_style.dart';
 import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/frosted_card.dart';
@@ -530,7 +531,8 @@ class _DistributionCardState extends State<_DistributionCard> {
                             selectedStyle: const ButtonStyle.primary(
                               size: _toggleButtonSize,
                             ),
-                            style: const ButtonStyle.outline(
+                            style: toggleUnselectedStyle(
+                              context,
                               size: _toggleButtonSize,
                             ),
                             onChanged: (_) => setState(
@@ -546,7 +548,8 @@ class _DistributionCardState extends State<_DistributionCard> {
                             selectedStyle: const ButtonStyle.primary(
                               size: _toggleButtonSize,
                             ),
-                            style: const ButtonStyle.outline(
+                            style: toggleUnselectedStyle(
+                              context,
                               size: _toggleButtonSize,
                             ),
                             onChanged: (_) => setState(
@@ -566,7 +569,8 @@ class _DistributionCardState extends State<_DistributionCard> {
                           selectedStyle: const ButtonStyle.primary(
                             size: _toggleButtonSize,
                           ),
-                          style: const ButtonStyle.ghost(
+                          style: toggleUnselectedStyle(
+                            context,
                             size: _toggleButtonSize,
                           ),
                           onChanged: (_) =>
@@ -581,7 +585,8 @@ class _DistributionCardState extends State<_DistributionCard> {
                           selectedStyle: const ButtonStyle.primary(
                             size: _toggleButtonSize,
                           ),
-                          style: const ButtonStyle.ghost(
+                          style: toggleUnselectedStyle(
+                            context,
                             size: _toggleButtonSize,
                           ),
                           onChanged: (_) =>

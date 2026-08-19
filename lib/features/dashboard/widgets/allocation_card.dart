@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/ui/frosted_card.dart';
+import '../../../core/ui/toggle_button_style.dart';
 import '../patrimoine_models.dart';
 import 'allocation_blocks_view.dart';
 import 'allocation_donut_view.dart';
@@ -71,7 +72,10 @@ class _AllocationCardState extends State<AllocationCard> {
                       selectedStyle: const ButtonStyle.primary(
                         size: _toggleButtonSize,
                       ),
-                      style: const ButtonStyle.ghost(size: _toggleButtonSize),
+                      style: toggleUnselectedStyle(
+                        context,
+                        size: _toggleButtonSize,
+                      ),
                       onChanged: (_) => setState(() {
                         _kind = _Kind.actifs;
                         if (_mode == _AllocationViewMode.pyramide) {
@@ -88,7 +92,10 @@ class _AllocationCardState extends State<AllocationCard> {
                       selectedStyle: const ButtonStyle.primary(
                         size: _toggleButtonSize,
                       ),
-                      style: const ButtonStyle.ghost(size: _toggleButtonSize),
+                      style: toggleUnselectedStyle(
+                        context,
+                        size: _toggleButtonSize,
+                      ),
                       onChanged: (_) => setState(() {
                         _kind = _Kind.passifs;
                         if (_mode == _AllocationViewMode.pyramide) {
@@ -153,7 +160,7 @@ class _AllocationCardState extends State<AllocationCard> {
     return SelectedButton(
       value: _mode == value,
       selectedStyle: const ButtonStyle.primary(size: _toggleButtonSize),
-      style: const ButtonStyle.ghost(size: _toggleButtonSize),
+      style: toggleUnselectedStyle(context, size: _toggleButtonSize),
       onChanged: (_) => setState(() => _mode = value),
       child: Icon(icon, size: _toggleIconSize),
     );

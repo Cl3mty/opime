@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/toggle_button_style.dart';
 import '../dashboard/widgets/net_worth_chart.dart';
 import '../investments/confirm_delete_dialog.dart';
 import '../investments/document_storage.dart';
@@ -121,9 +122,7 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
     final prix = parseDecimal(_prixController.text);
     final apport = parseDecimal(_apportController.text) ?? 0;
     final taux = parseDecimal(_tauxController.text);
-    final assuranceMensuelle = parseDecimal(
-      _assuranceMensuelleController.text,
-    );
+    final assuranceMensuelle = parseDecimal(_assuranceMensuelleController.text);
     final nbrEcheances = int.tryParse(_nbrEcheancesController.text.trim());
     final dureeDiffere = int.tryParse(_dureeDiffereController.text.trim()) ?? 0;
     final dateDebut = _dateDebut;
@@ -334,7 +333,10 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
                     selectedStyle: const ButtonStyle.primary(
                       size: _toggleButtonSize,
                     ),
-                    style: const ButtonStyle.ghost(size: _toggleButtonSize),
+                    style: toggleUnselectedStyle(
+                      context,
+                      size: _toggleButtonSize,
+                    ),
                     onChanged: (_) =>
                         setState(() => _chartMode = _ChartMode.capitalRestant),
                     child: shadcn.Text(
@@ -347,7 +349,10 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
                     selectedStyle: const ButtonStyle.primary(
                       size: _toggleButtonSize,
                     ),
-                    style: const ButtonStyle.ghost(size: _toggleButtonSize),
+                    style: toggleUnselectedStyle(
+                      context,
+                      size: _toggleButtonSize,
+                    ),
                     onChanged: (_) => setState(
                       () => _chartMode = _ChartMode.repartitionMensualites,
                     ),
