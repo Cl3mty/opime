@@ -12,11 +12,19 @@ typedef ProjectProgress = ({
   Duration timeRemaining,
 });
 
-/// Calcule l'avancement d'un projet : valeur nette actuelle des actifs et
-/// passifs qui lui sont rattachés (actifs − passifs), rapportée au montant
-/// cible s'il y en a un, et temps restant jusqu'à l'échéance.
+/// Valeur effective d'un compte : cours de marché ou estimation (immobilier)
+/// quand connu, montant net investi sinon — même repli, investissement par
+/// investissement, que `Investment.effectiveMarketValue`.
+double _effectiveAccountValue(InvestmentAccount account) => account.investments
+    .fold(0.0, (sum, i) => sum + (i.effectiveMarketValue ?? i.investedAmount));
+
+/// Calcule l'avancement d'un projet : valeur nette actuelle des comptes et
+/// passifs qui lui sont rattachés (comptes − passifs), rapportée au montant
+/// cible s'il y en a un, et temps restant jusqu'à l'échéance. Un compte
+/// rattaché compte pour sa valeur entière (toutes ses positions), pas une
+/// position précise en son sein — voir [Project.accountLinks].
 ///
-/// Un lien qui ne se résout plus (l'investissement ou le passif visé a été
+/// Un lien qui ne se résout plus (le compte ou le passif visé a été
 /// supprimé ailleurs depuis) est ignoré silencieusement — contribution
 /// nulle, jamais d'exception : c'est le premier endroit du code où une
 /// fonctionnalité référence par id des entités appartenant à d'autres
@@ -28,14 +36,11 @@ ProjectProgress computeProjectProgress({
   required List<Liability> liabilities,
   required DateTime today,
 }) {
-  var assetsValue = 0.0;
-  for (final link in project.assetLinks) {
+  var accountsValue = 0.0;
+  for (final link in project.accountLinks) {
     for (final account in accounts) {
-      if (account.id != link.accountId) continue;
-      for (final investment in account.investments) {
-        if (investment.id == link.investmentId) {
-          assetsValue += investment.effectiveMarketValue ?? investment.investedAmount;
-        }
+      if (account.id == link.accountId) {
+        accountsValue += _effectiveAccountValue(account);
       }
     }
   }
@@ -49,9 +54,11 @@ ProjectProgress computeProjectProgress({
     }
   }
 
-  final netValue = assetsValue - liabilitiesValue;
+  final netValue = accountsValue - liabilitiesValue;
   final target = project.montantCible;
-  final percent = (target == null || target == 0) ? null : netValue / target * 100;
+  final percent = (target == null || target == 0)
+      ? null
+      : netValue / target * 100;
 
   return (
     percent: percent,
@@ -68,10 +75,8 @@ bool hasDanglingLinks({
   required List<InvestmentAccount> accounts,
   required List<Liability> liabilities,
 }) {
-  for (final link in project.assetLinks) {
-    final account = accounts.where((a) => a.id == link.accountId).firstOrNull;
-    if (account == null) return true;
-    final found = account.investments.any((i) => i.id == link.investmentId);
+  for (final link in project.accountLinks) {
+    final found = accounts.any((a) => a.id == link.accountId);
     if (!found) return true;
   }
   for (final link in project.liabilityLinks) {

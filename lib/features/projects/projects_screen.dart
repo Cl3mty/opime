@@ -297,6 +297,7 @@ class _ProjectsListPanel extends StatelessWidget {
                     montantCible: project.montantCible,
                     today: today,
                     echeance: project.echeance,
+                    apportMensuelEur: project.apportMensuel,
                   );
                   final theme = Theme.of(context);
                   return GestureDetector(
@@ -349,7 +350,10 @@ class _ProjectsListPanel extends StatelessWidget {
                                       overflow: TextOverflow.ellipsis,
                                     ).medium(),
                                     shadcn.Text(
-                                      formatEcheanceRelative(project.echeance, today),
+                                      formatEcheanceRelative(
+                                        project.echeance,
+                                        today,
+                                      ),
                                     ).muted().xSmall(),
                                   ],
                                 ),

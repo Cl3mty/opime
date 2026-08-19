@@ -4,8 +4,7 @@ import '../../core/date_format.dart';
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
 import '../dashboard/widgets/net_worth_chart.dart';
-import '../investments/investments_models.dart'
-    show InvestmentAccount;
+import '../investments/investments_models.dart' show InvestmentAccount;
 import '../investments/investments_repository.dart';
 import '../liabilities/liabilities_models.dart' show Liability;
 import '../liabilities/liabilities_repository.dart';
@@ -15,13 +14,10 @@ import 'project_repository.dart';
 import 'project_trajectory.dart';
 import 'widgets/goal_progress_bar.dart';
 
-String _assetKey(String accountId, String investmentId) =>
-    '$accountId|$investmentId';
-
 /// Formulaire de création/édition d'un projet — charge lui-même la liste
-/// des comptes/investissements et des passifs pour ses sélecteurs de liens,
-/// comme `note_editor.dart` charge sa propre note. `project` à `null`
-/// démarre un nouveau projet vierge ; sinon l'édite.
+/// des comptes et des passifs pour ses sélecteurs de liens, comme
+/// `note_editor.dart` charge sa propre note. `project` à `null` démarre un
+/// nouveau projet vierge ; sinon l'édite.
 class ProjectEditor extends StatefulWidget {
   final String vaultPath;
   final Project? project;
@@ -49,9 +45,10 @@ class _ProjectEditorState extends State<ProjectEditor> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _rendementController = TextEditingController();
+  final _apportMensuelController = TextEditingController();
   final _montantCibleController = TextEditingController();
   DateTime? _echeance;
-  late Set<String> _selectedAssetKeys;
+  late Set<String> _selectedAccountIds;
   late Set<String> _selectedLiabilityIds;
 
   @override
@@ -78,6 +75,7 @@ class _ProjectEditorState extends State<ProjectEditor> {
     _nameController.dispose();
     _descriptionController.dispose();
     _rendementController.dispose();
+    _apportMensuelController.dispose();
     _montantCibleController.dispose();
     super.dispose();
   }
@@ -89,15 +87,20 @@ class _ProjectEditorState extends State<ProjectEditor> {
     _rendementController.text = project == null
         ? ''
         : project.rendementAttendu.toString();
+    _apportMensuelController.text =
+        project == null || project.apportMensuel == 0
+        ? ''
+        : project.apportMensuel.toString();
     _montantCibleController.text = project?.montantCible?.toString() ?? '';
-    _echeance = project?.echeance ??
-        DateTime.now().add(const Duration(days: 365));
-    _selectedAssetKeys = {
-      for (final link in project?.assetLinks ?? const <ProjectAssetLink>[])
-        _assetKey(link.accountId, link.investmentId),
+    _echeance =
+        project?.echeance ?? DateTime.now().add(const Duration(days: 365));
+    _selectedAccountIds = {
+      for (final link in project?.accountLinks ?? const <ProjectAccountLink>[])
+        link.accountId,
     };
     _selectedLiabilityIds = {
-      for (final link in project?.liabilityLinks ?? const <ProjectLiabilityLink>[])
+      for (final link
+          in project?.liabilityLinks ?? const <ProjectLiabilityLink>[])
         link.liabilityId,
     };
   }
@@ -119,21 +122,27 @@ class _ProjectEditorState extends State<ProjectEditor> {
     final echeance = _echeance;
     if (name.isEmpty || echeance == null) return;
 
-    final assetLinks = [
-      for (final key in _selectedAssetKeys)
-        ProjectAssetLink(
-          accountId: key.split('|')[0],
-          investmentId: key.split('|')[1],
-        ),
+    final accountLinks = [
+      for (final accountId in _selectedAccountIds)
+        ProjectAccountLink(accountId: accountId),
     ];
     final liabilityLinks = [
-      for (final id in _selectedLiabilityIds) ProjectLiabilityLink(liabilityId: id),
+      for (final id in _selectedLiabilityIds)
+        ProjectLiabilityLink(liabilityId: id),
     ];
     final montantCible = double.tryParse(
       _montantCibleController.text.trim().replaceAll(',', '.'),
     );
     final rendementAttendu =
-        double.tryParse(_rendementController.text.trim().replaceAll(',', '.')) ?? 0;
+        double.tryParse(
+          _rendementController.text.trim().replaceAll(',', '.'),
+        ) ??
+        0;
+    final apportMensuel =
+        double.tryParse(
+          _apportMensuelController.text.trim().replaceAll(',', '.'),
+        ) ??
+        0;
 
     final project = Project(
       id: widget.project?.id,
@@ -141,8 +150,9 @@ class _ProjectEditorState extends State<ProjectEditor> {
       description: _descriptionController.text.trim(),
       echeance: echeance,
       rendementAttendu: rendementAttendu,
+      apportMensuel: apportMensuel,
       montantCible: montantCible,
-      assetLinks: assetLinks,
+      accountLinks: accountLinks,
       liabilityLinks: liabilityLinks,
     );
     await _repo.saveProject(project);
@@ -156,12 +166,12 @@ class _ProjectEditorState extends State<ProjectEditor> {
     widget.onDeleted();
   }
 
-  void _toggleAsset(String key) {
+  void _toggleAccount(String accountId) {
     setState(() {
-      if (_selectedAssetKeys.contains(key)) {
-        _selectedAssetKeys.remove(key);
+      if (_selectedAccountIds.contains(accountId)) {
+        _selectedAccountIds.remove(accountId);
       } else {
-        _selectedAssetKeys.add(key);
+        _selectedAccountIds.add(accountId);
       }
     });
   }
@@ -202,13 +212,15 @@ class _ProjectEditorState extends State<ProjectEditor> {
             ),
             const SizedBox(height: 20),
           ],
-          shadcn.Text(isEditing ? 'Modifier le projet' : 'Nouveau projet')
-              .large()
-              .semiBold(),
+          shadcn.Text(
+            isEditing ? 'Modifier le projet' : 'Nouveau projet',
+          ).large().semiBold(),
           const SizedBox(height: 16),
           TextField(
             controller: _nameController,
-            placeholder: const shadcn.Text('Nom du projet (ex: Achat résidence principale)'),
+            placeholder: const shadcn.Text(
+              'Nom du projet (ex: Achat résidence principale)',
+            ),
           ),
           const SizedBox(height: 8),
           TextField(
@@ -234,19 +246,26 @@ class _ProjectEditorState extends State<ProjectEditor> {
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
-                  controller: _montantCibleController,
-                  placeholder: const shadcn.Text('Montant cible en € (facultatif)'),
+                  controller: _apportMensuelController,
+                  placeholder: const shadcn.Text(
+                    'Apport mensuel en € (facultatif)',
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          shadcn.Text('Actifs liés').semiBold().small(),
           const SizedBox(height: 8),
-          _AssetPicker(
+          TextField(
+            controller: _montantCibleController,
+            placeholder: const shadcn.Text('Montant cible en € (facultatif)'),
+          ),
+          const SizedBox(height: 16),
+          shadcn.Text('Comptes liés').semiBold().small(),
+          const SizedBox(height: 8),
+          _AccountPicker(
             accounts: _accounts,
-            selectedKeys: _selectedAssetKeys,
-            onToggle: _toggleAsset,
+            selectedIds: _selectedAccountIds,
+            onToggle: _toggleAccount,
           ),
           const SizedBox(height: 16),
           shadcn.Text('Passifs liés').semiBold().small(),
@@ -284,39 +303,37 @@ class _ProjectEditorState extends State<ProjectEditor> {
   }
 }
 
-class _AssetPicker extends StatelessWidget {
+/// Sélecteur de comptes liés à un projet — un compte entier (ex : "PEA
+/// Boursorama"), pas une position précise en son sein : les positions d'un
+/// compte changent au fil des arbitrages, alors que le compte qui finance
+/// un projet reste le même (voir `ProjectAccountLink`).
+class _AccountPicker extends StatelessWidget {
   final List<InvestmentAccount> accounts;
-  final Set<String> selectedKeys;
+  final Set<String> selectedIds;
   final ValueChanged<String> onToggle;
 
-  const _AssetPicker({
+  const _AccountPicker({
     required this.accounts,
-    required this.selectedKeys,
+    required this.selectedIds,
     required this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
-    final entries = [
-      for (final account in accounts)
-        for (final investment in account.investments)
-          (
-            key: _assetKey(account.id, investment.id),
-            label: '${investment.label} (${account.name})',
-          ),
-    ];
-    if (entries.isEmpty) {
-      return shadcn.Text('Aucun investissement disponible.').muted().small();
+    if (accounts.isEmpty) {
+      return shadcn.Text('Aucun compte disponible.').muted().small();
     }
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final entry in entries)
+        for (final account in accounts)
           _SelectableChip(
-            label: entry.label,
-            selected: selectedKeys.contains(entry.key),
-            onTap: () => onToggle(entry.key),
+            label: account.bankName != null
+                ? '${account.name} (${account.bankName})'
+                : account.name,
+            selected: selectedIds.contains(account.id),
+            onTap: () => onToggle(account.id),
           ),
       ],
     );
@@ -392,13 +409,11 @@ class _SelectableChip extends StatelessWidget {
 
 /// Vue détail riche d'un projet — barre de progression (montant actuel /
 /// montant cible), badge "En bonne voie"/"En retard", graphique de
-/// trajectoire projetée (croissance composée au rendement attendu, voir
-/// `project_trajectory.dart`), tuiles de statistiques, et détail des
-/// actifs/passifs liés avec leur valeur individuelle. Remplace l'ancien
-/// petit encart "Avancement" — inspirée de la page "Objectifs" de Finary,
-/// adaptée aux champs déjà présents dans le modèle `Project` (pas de champ
-/// de versement récurrent aujourd'hui, donc pas de tuile "Contribution
-/// cible" ni de seconde courbe "Valeur des versements").
+/// trajectoire projetée (croissance composée au rendement attendu, avec
+/// apport mensuel s'il y en a un — voir `project_trajectory.dart`), tuiles
+/// de statistiques, et détail des comptes/passifs liés avec leur valeur.
+/// Remplace l'ancien petit encart "Avancement" — inspirée de la page
+/// "Objectifs" de Finary.
 class _ProjectDetailSection extends StatelessWidget {
   final Project project;
   final List<InvestmentAccount> accounts;
@@ -426,26 +441,29 @@ class _ProjectDetailSection extends StatelessWidget {
       montantCible: project.montantCible,
       today: today,
       echeance: project.echeance,
+      apportMensuelEur: project.apportMensuel,
     );
     final trajectory = computeProjectTrajectory(
       currentValue: progress.currentNetValue,
       rendementAttenduPercent: project.rendementAttendu,
       today: today,
       echeance: project.echeance,
+      apportMensuelEur: project.apportMensuel,
     );
     final days = progress.timeRemaining.inDays;
     final montantCible = project.montantCible;
 
     final linkedAssets = <(String, double)>[
-      for (final link in project.assetLinks)
+      for (final link in project.accountLinks)
         for (final account in accounts)
           if (account.id == link.accountId)
-            for (final investment in account.investments)
-              if (investment.id == link.investmentId)
-                (
-                  '${investment.label} (${account.name})',
-                  investment.effectiveMarketValue ?? investment.investedAmount,
-                ),
+            (
+              account.name,
+              account.investments.fold(
+                0.0,
+                (sum, i) => sum + (i.effectiveMarketValue ?? i.investedAmount),
+              ),
+            ),
     ];
     final linkedLiabilities = <(String, double)>[
       for (final link in project.liabilityLinks)
@@ -501,6 +519,11 @@ class _ProjectDetailSection extends StatelessWidget {
                   label: 'Rendement attendu',
                   value: '${project.rendementAttendu.toStringAsFixed(2)} %/an',
                 ),
+                if (project.apportMensuel != 0)
+                  _StatTile(
+                    label: 'Apport mensuel',
+                    value: formatEuros(project.apportMensuel),
+                  ),
                 _StatTile(
                   label: 'Temps restant',
                   value: days >= 0 ? '$days jours' : 'Échéance dépassée',
@@ -523,7 +546,7 @@ class _ProjectDetailSection extends StatelessWidget {
             ),
             if (linkedAssets.isNotEmpty || linkedLiabilities.isNotEmpty) ...[
               const SizedBox(height: 20),
-              shadcn.Text('Actifs et passifs liés').semiBold().small(),
+              shadcn.Text('Comptes et passifs liés').semiBold().small(),
               const SizedBox(height: 8),
               for (final (label, value) in linkedAssets)
                 _LinkedItemRow(label: label, value: value),
@@ -591,9 +614,7 @@ class _LinkedItemRow extends StatelessWidget {
           ),
           shadcn.Text(
             formatEuros(value.abs()),
-            style: TextStyle(
-              color: negative ? const Color(0xFFEF4444) : null,
-            ),
+            style: TextStyle(color: negative ? const Color(0xFFEF4444) : null),
           ).small(),
         ],
       ),

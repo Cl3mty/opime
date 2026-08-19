@@ -52,17 +52,22 @@ void main() {
         id: 'inv_1',
         lastPrice: 100,
         transactions: [
-          Transaction(date: DateTime.utc(2024, 1, 1), isBuy: true, quantity: 100, unitPrice: 100),
+          Transaction(
+            date: DateTime.utc(2024, 1, 1),
+            isBuy: true,
+            quantity: 100,
+            unitPrice: 100,
+          ),
         ],
       );
-      final accounts = [account(id: 'account_1', investments: [inv])];
+      final accounts = [
+        account(id: 'account_1', investments: [inv]),
+      ];
       final project = Project(
         name: 'Projet',
         echeance: DateTime.utc(2028, 1, 1),
         montantCible: 10000,
-        assetLinks: const [
-          ProjectAssetLink(accountId: 'account_1', investmentId: 'inv_1'),
-        ],
+        accountLinks: const [ProjectAccountLink(accountId: 'account_1')],
       );
 
       final progress = computeProjectProgress(
@@ -82,17 +87,22 @@ void main() {
         id: 'inv_1',
         lastPrice: 200,
         transactions: [
-          Transaction(date: DateTime.utc(2024, 1, 1), isBuy: true, quantity: 100, unitPrice: 100),
+          Transaction(
+            date: DateTime.utc(2024, 1, 1),
+            isBuy: true,
+            quantity: 100,
+            unitPrice: 100,
+          ),
         ],
       );
-      final accounts = [account(id: 'account_1', investments: [inv])];
+      final accounts = [
+        account(id: 'account_1', investments: [inv]),
+      ];
       final project = Project(
         name: 'Projet',
         echeance: DateTime.utc(2028, 1, 1),
         montantCible: 10000,
-        assetLinks: const [
-          ProjectAssetLink(accountId: 'account_1', investmentId: 'inv_1'),
-        ],
+        accountLinks: const [ProjectAccountLink(accountId: 'account_1')],
       );
 
       final progress = computeProjectProgress(
@@ -105,22 +115,31 @@ void main() {
       expect(progress.percent, closeTo(200, 1e-9));
     });
 
-    test('sans montant cible : percent null, temps restant toujours renseigné', () {
-      final project = Project(name: 'Retraite', echeance: DateTime.utc(2050, 1, 1));
+    test(
+      'sans montant cible : percent null, temps restant toujours renseigné',
+      () {
+        final project = Project(
+          name: 'Retraite',
+          echeance: DateTime.utc(2050, 1, 1),
+        );
 
-      final progress = computeProjectProgress(
-        project: project,
-        accounts: const [],
-        liabilities: const [],
-        today: today,
-      );
+        final progress = computeProjectProgress(
+          project: project,
+          accounts: const [],
+          liabilities: const [],
+          today: today,
+        );
 
-      expect(progress.percent, isNull);
-      expect(progress.timeRemaining.inDays, greaterThan(0));
-    });
+        expect(progress.percent, isNull);
+        expect(progress.timeRemaining.inDays, greaterThan(0));
+      },
+    );
 
     test('échéance passée : durée négative', () {
-      final project = Project(name: 'Projet', echeance: DateTime.utc(2020, 1, 1));
+      final project = Project(
+        name: 'Projet',
+        echeance: DateTime.utc(2020, 1, 1),
+      );
 
       final progress = computeProjectProgress(
         project: project,
@@ -132,43 +151,94 @@ void main() {
       expect(progress.timeRemaining.isNegative, isTrue);
     });
 
-    test('lien mort (investissement introuvable) : contribution nulle, pas d\'exception', () {
+    test(
+      'lien mort (compte introuvable) : contribution nulle, pas d\'exception',
+      () {
+        final project = Project(
+          name: 'Projet',
+          echeance: DateTime.utc(2028, 1, 1),
+          montantCible: 1000,
+          accountLinks: const [ProjectAccountLink(accountId: 'account_absent')],
+        );
+
+        final progress = computeProjectProgress(
+          project: project,
+          accounts: const [],
+          liabilities: const [],
+          today: today,
+        );
+
+        expect(progress.currentNetValue, 0);
+        expect(progress.percent, 0);
+      },
+    );
+
+    test('un compte lié compte pour la valeur de toutes ses positions', () {
+      final inv1 = investment(
+        id: 'inv_1',
+        lastPrice: 100,
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2024, 1, 1),
+            isBuy: true,
+            quantity: 100,
+            unitPrice: 100,
+          ),
+        ],
+      );
+      final inv2 = investment(
+        id: 'inv_2',
+        lastPrice: 50,
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2024, 1, 1),
+            isBuy: true,
+            quantity: 20,
+            unitPrice: 50,
+          ),
+        ],
+      );
+      final accounts = [
+        account(id: 'account_1', investments: [inv1, inv2]),
+      ];
       final project = Project(
         name: 'Projet',
         echeance: DateTime.utc(2028, 1, 1),
-        montantCible: 1000,
-        assetLinks: const [
-          ProjectAssetLink(accountId: 'account_absent', investmentId: 'inv_absent'),
-        ],
+        accountLinks: const [ProjectAccountLink(accountId: 'account_1')],
       );
 
       final progress = computeProjectProgress(
         project: project,
-        accounts: const [],
+        accounts: accounts,
         liabilities: const [],
         today: today,
       );
 
-      expect(progress.currentNetValue, 0);
-      expect(progress.percent, 0);
+      // 100 * 100 + 20 * 50 = 11000, toutes positions du compte confondues.
+      expect(progress.currentNetValue, closeTo(11000, 1e-9));
     });
 
-    test('actifs et passifs combinés : valeur nette = actifs - passifs', () {
+    test('comptes et passifs combinés : valeur nette = comptes - passifs', () {
       final inv = investment(
         id: 'inv_1',
         lastPrice: 100,
         transactions: [
-          Transaction(date: DateTime.utc(2024, 1, 1), isBuy: true, quantity: 100, unitPrice: 100),
+          Transaction(
+            date: DateTime.utc(2024, 1, 1),
+            isBuy: true,
+            quantity: 100,
+            unitPrice: 100,
+          ),
         ],
       );
-      final accounts = [account(id: 'account_1', investments: [inv])];
+      final accounts = [
+        account(id: 'account_1', investments: [inv]),
+      ];
       final liab = liability(id: 'liab_1', montantEmprunte: 3000);
       final project = Project(
         name: 'Projet',
         echeance: DateTime.utc(2028, 1, 1),
-        assetLinks: const [
-          ProjectAssetLink(accountId: 'account_1', investmentId: 'inv_1'),
-        ],
+        accountLinks: const [ProjectAccountLink(accountId: 'account_1')],
         liabilityLinks: const [ProjectLiabilityLink(liabilityId: 'liab_1')],
       );
 
@@ -179,41 +249,54 @@ void main() {
         today: today,
       );
 
-      expect(progress.currentNetValue, closeTo(10000 - liab.remainingBalance, 1e-6));
+      expect(
+        progress.currentNetValue,
+        closeTo(10000 - liab.remainingBalance, 1e-6),
+      );
     });
   });
 
   group('hasDanglingLinks', () {
     test('false quand tous les liens se résolvent', () {
-      final inv = investment(id: 'inv_1', lastPrice: 100, transactions: const []);
-      final accounts = [account(id: 'account_1', investments: [inv])];
+      final inv = investment(
+        id: 'inv_1',
+        lastPrice: 100,
+        transactions: const [],
+      );
+      final accounts = [
+        account(id: 'account_1', investments: [inv]),
+      ];
       final liab = liability(id: 'liab_1', montantEmprunte: 1000);
       final project = Project(
         name: 'Projet',
         echeance: DateTime.utc(2028, 1, 1),
-        assetLinks: const [
-          ProjectAssetLink(accountId: 'account_1', investmentId: 'inv_1'),
-        ],
+        accountLinks: const [ProjectAccountLink(accountId: 'account_1')],
         liabilityLinks: const [ProjectLiabilityLink(liabilityId: 'liab_1')],
       );
 
       expect(
-        hasDanglingLinks(project: project, accounts: accounts, liabilities: [liab]),
+        hasDanglingLinks(
+          project: project,
+          accounts: accounts,
+          liabilities: [liab],
+        ),
         isFalse,
       );
     });
 
-    test('true quand un lien d\'actif ne se résout plus', () {
+    test('true quand un lien de compte ne se résout plus', () {
       final project = Project(
         name: 'Projet',
         echeance: DateTime.utc(2028, 1, 1),
-        assetLinks: const [
-          ProjectAssetLink(accountId: 'introuvable', investmentId: 'introuvable'),
-        ],
+        accountLinks: const [ProjectAccountLink(accountId: 'introuvable')],
       );
 
       expect(
-        hasDanglingLinks(project: project, accounts: const [], liabilities: const []),
+        hasDanglingLinks(
+          project: project,
+          accounts: const [],
+          liabilities: const [],
+        ),
         isTrue,
       );
     });
@@ -222,11 +305,17 @@ void main() {
       final project = Project(
         name: 'Projet',
         echeance: DateTime.utc(2028, 1, 1),
-        liabilityLinks: const [ProjectLiabilityLink(liabilityId: 'introuvable')],
+        liabilityLinks: const [
+          ProjectLiabilityLink(liabilityId: 'introuvable'),
+        ],
       );
 
       expect(
-        hasDanglingLinks(project: project, accounts: const [], liabilities: const []),
+        hasDanglingLinks(
+          project: project,
+          accounts: const [],
+          liabilities: const [],
+        ),
         isTrue,
       );
     });
