@@ -2,7 +2,8 @@ import '../budget/budget_tracking_repository.dart';
 import '../investments/investments_models.dart' show InvestmentAccount;
 import '../investments/investments_repository.dart';
 import '../investments/price_history_repository.dart';
-import '../investments/real_patrimoine_adapter.dart' show loadAllPriceHistories;
+import '../investments/real_patrimoine_adapter.dart'
+    show earliestTransactionDateAcrossAccounts, loadAllPriceHistories;
 import '../investments/yahoo_finance_client.dart' show PricePoint;
 import '../liabilities/liabilities_models.dart' show Liability;
 import '../liabilities/liabilities_repository.dart';
@@ -48,9 +49,17 @@ Future<AnalysesSnapshot> loadAnalysesSnapshot(String vaultPath) async {
   var benchmarkHistory = <PricePoint>[];
   final ticker = settings.benchmarkTicker;
   if (ticker != null && ticker.isNotEmpty) {
-    final result = await PriceHistoryRepository(
-      vaultPath,
-    ).syncIfNeeded('$benchmarkCacheKeyPrefix$ticker', ticker);
+    // Sans `neededSince`, `syncIfNeeded` ne redemande que depuis
+    // aujourd'hui (voir sa documentation) : la toute première synchro du
+    // benchmark ne récupérait donc qu'un jour de cours, jamais assez pour
+    // couvrir les dates de transaction réelles — indispensable à la
+    // comparaison pondérée par les flux de trésorerie (voir
+    // `analyses_screen.dart`'s calcul d'alpha).
+    final result = await PriceHistoryRepository(vaultPath).syncIfNeeded(
+      '$benchmarkCacheKeyPrefix$ticker',
+      ticker,
+      neededSince: earliestTransactionDateAcrossAccounts(accounts),
+    );
     benchmarkHistory = result.points;
   }
 

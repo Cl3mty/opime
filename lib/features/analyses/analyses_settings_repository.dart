@@ -5,10 +5,11 @@ import '../../core/storage/vault_file_storage.dart';
 
 /// Paramètres de l'écran Analyses propres à un profil — aujourd'hui
 /// seulement le ticker du benchmark utilisé pour l'alpha (voir
-/// `analyses_calculations.dart`'s `simpleAlpha`). Donnée de domaine liée au
-/// vault, donc un fichier JSON du vault plutôt que `shared_preferences`
-/// (réservé dans ce code à l'état device-local — thème, vault actif — jamais
-/// à une donnée de domaine qui doit voyager avec le vault).
+/// `analyses_screen.dart`'s `_benchmarkEquivalentMwr`). Donnée de domaine
+/// liée au vault, donc un fichier JSON du vault plutôt que
+/// `shared_preferences` (réservé dans ce code à l'état device-local —
+/// thème, vault actif — jamais à une donnée de domaine qui doit voyager
+/// avec le vault).
 class AnalysesSettings {
   final String? benchmarkTicker;
 
