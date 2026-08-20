@@ -245,7 +245,7 @@ pw.Widget _buildAccountTable(
         if (showsQuantite) row.quantite?.toStringAsFixed(2) ?? '—',
         formatEuros(row.valeur),
         if (showsPruColumn) row.pru?.toStringAsFixed(2) ?? '—',
-        '${formatEuros(row.plusValueAbs)} (${displayPercent(row.plusValuePercent)})',
+        '${formatSignedEuros(row.plusValueAbs)} (${displayPercent(row.plusValuePercent)})',
       ],
   ];
 

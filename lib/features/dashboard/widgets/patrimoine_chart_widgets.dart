@@ -330,7 +330,7 @@ class PeriodChangeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final percent = changePercent;
-    final euroText = displayEuros(absoluteChange, hidden);
+    final euroText = displaySignedEuros(absoluteChange, hidden);
     final baseStyle = Theme.of(
       context,
     ).typography.small.copyWith(color: color, fontWeight: FontWeight.w600);

@@ -71,4 +71,41 @@ void main() {
       expect(displayEurosCompact(12500, true), isNot(contains(RegExp(r'\d'))));
     });
   });
+
+  group('formatSignedEuros', () {
+    test(
+      'ajoute un "+" explicite pour une valeur positive (contrairement à '
+      'formatEuros) : une variation (+/- value) doit toujours se '
+      'distinguer au signe d\'une valeur actuelle',
+      () {
+        expect(formatSignedEuros(1500), '+1 500 €');
+        expect(formatSignedEuros(1234.6), '+1 235 €');
+      },
+    );
+
+    test('garde le "-" pour une valeur négative', () {
+      expect(formatSignedEuros(-1500), '-1 500 €');
+    });
+
+    test('montant nul : signe "+"', () {
+      expect(formatSignedEuros(0), '+0 €');
+    });
+  });
+
+  group('displaySignedEuros', () {
+    test('affiche le montant signé réel quand hidden est faux', () {
+      expect(displaySignedEuros(1234, false), formatSignedEuros(1234));
+    });
+
+    test('masque le montant signé quand hidden est vrai', () {
+      expect(
+        displaySignedEuros(1234, true),
+        maskAmount(formatSignedEuros(1234)),
+      );
+      expect(
+        displaySignedEuros(1234, true),
+        isNot(contains(RegExp(r'\d'))),
+      );
+    });
+  });
 }

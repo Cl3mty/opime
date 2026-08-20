@@ -157,15 +157,34 @@ class _AssetCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      shadcn.Text(
-                        change == null
-                            ? '—'
-                            : displayEuros(change!.euros, hidden),
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ).small(),
+                      change == null
+                          ? shadcn.Text(
+                              '—',
+                              style: TextStyle(
+                                color: color,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ).small()
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  positive
+                                      ? LucideIcons.trendingUp
+                                      : LucideIcons.trendingDown,
+                                  size: 11,
+                                  color: color,
+                                ),
+                                const SizedBox(width: 3),
+                                shadcn.Text(
+                                  displaySignedEuros(change!.euros, hidden),
+                                  style: TextStyle(
+                                    color: color,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ).small(),
+                              ],
+                            ),
                       if (percent != null)
                         ExtremePercentLabel(
                           percent: percent,

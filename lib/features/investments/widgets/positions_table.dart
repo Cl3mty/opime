@@ -1,11 +1,10 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
+import '../../../core/ui/performance_amount.dart';
 import '../currency_format.dart';
 import '../investments_models.dart';
 
-const _green = Color(0xFF22C55E);
-const _red = Color(0xFFEF4444);
 const _colWidth = 96.0;
 
 /// Table des positions d'un compte Actions & Fonds — une ligne par
@@ -98,8 +97,6 @@ class _PositionLine extends StatelessWidget {
     final gainPercent = gain != null && investment.investedAmount != 0
         ? gain / investment.investedAmount * 100
         : null;
-    final positive = (gain ?? 0) >= 0;
-    final color = positive ? _green : _red;
     final crossClass =
         investment.assetClass != null &&
         investment.assetClass != account.assetClass;
@@ -175,23 +172,16 @@ class _PositionLine extends StatelessWidget {
               ),
               SizedBox(
                 width: _colWidth,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: gain == null
-                      ? [shadcn.Text('—').small()]
-                      : [
-                          shadcn.Text(
-                            displayEuros(gain, hidden),
-                            style: TextStyle(color: color),
-                          ).xSmall(),
-                          if (gainPercent != null)
-                            shadcn.Text(
-                              displayPercent(gainPercent),
-                              style: TextStyle(color: color),
-                            ).muted().xSmall(),
-                        ],
-                ),
+                child: gain == null
+                    ? Align(
+                        alignment: Alignment.centerRight,
+                        child: shadcn.Text('—').small(),
+                      )
+                    : PerformanceAmount(
+                        euros: gain,
+                        percent: gainPercent,
+                        hidden: hidden,
+                      ),
               ),
               SizedBox(
                 width: 20,

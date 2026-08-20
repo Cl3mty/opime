@@ -2,12 +2,10 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
+import '../../../core/ui/performance_amount.dart';
 import '../../../core/ui/toggle_button_style.dart';
 import '../../navigation/navigation_scope.dart';
 import '../patrimoine_models.dart';
-
-const _green = Color(0xFF22C55E);
-const _red = Color(0xFFEF4444);
 
 const _pruWidth = 76.0;
 const _montantWidth = 96.0;
@@ -229,8 +227,6 @@ class _CategoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final positive = category.plusValueAbs >= 0;
-    final color = positive ? _green : _red;
 
     return Column(
       children: [
@@ -287,19 +283,10 @@ class _CategoryTile extends StatelessWidget {
             ),
             SizedBox(
               width: _evolutionWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  shadcn.Text(
-                    displayEuros(category.plusValueAbs, hidden),
-                    style: TextStyle(color: color),
-                  ).xSmall(),
-                  shadcn.Text(
-                    displayPercent(category.plusValuePercent),
-                    style: TextStyle(color: color),
-                  ).muted().xSmall(),
-                ],
+              child: PerformanceAmount(
+                euros: category.plusValueAbs,
+                percent: category.plusValuePercent,
+                hidden: hidden,
               ),
             ),
           ],
@@ -341,9 +328,6 @@ class _AccountRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final positive = account.plusValueAbs >= 0;
-    final color = positive ? _green : _red;
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -380,19 +364,10 @@ class _AccountRow extends StatelessWidget {
           ),
           SizedBox(
             width: _evolutionWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                shadcn.Text(
-                  displayEuros(account.plusValueAbs, hidden),
-                  style: TextStyle(color: color),
-                ).xSmall(),
-                shadcn.Text(
-                  displayPercent(account.plusValuePercent),
-                  style: TextStyle(color: color),
-                ).muted().xSmall(),
-              ],
+            child: PerformanceAmount(
+              euros: account.plusValueAbs,
+              percent: account.plusValuePercent,
+              hidden: hidden,
             ),
           ),
         ],

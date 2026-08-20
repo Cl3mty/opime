@@ -39,6 +39,23 @@ String displayEurosCompact(double value, bool hidden) {
   return hidden ? maskAmount(formatted) : formatted;
 }
 
+/// Comme [formatEuros], mais avec un signe explicite (`+`/`-`) même pour une
+/// valeur positive — [formatEuros] n'ajoute jamais de `+`, ce qui convient à
+/// une valeur absolue (solde d'un compte, cours...) mais rend un écart
+/// (plus-value, évolution de période) ambigu : sans signe visible, rien ne
+/// distingue à l'œil une valeur actuelle d'un gain. Réservé aux montants qui
+/// représentent un +/- (jamais à [formatEuros]/[displayEuros], toujours
+/// utilisés pour une valeur actuelle).
+String formatSignedEuros(double value) {
+  final formatted = formatEuros(value.abs());
+  return value >= 0 ? '+$formatted' : '-$formatted';
+}
+
+String displaySignedEuros(double value, bool hidden) {
+  final formatted = formatSignedEuros(value);
+  return hidden ? maskAmount(formatted) : formatted;
+}
+
 /// Formatte une variation en pourcentage avec signe explicite :
 /// `1.5` -> `"+1.50 %"`, `-3` -> `"-3.00 %"`.
 String displayPercent(double value) {
