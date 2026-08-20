@@ -234,6 +234,48 @@ void main() {
     });
   });
 
+  group('averageCorrelation', () {
+    test(
+      'moyenne des paires distinctes, diagonale et symétrie exclues — 3 '
+      'actifs parfaitement corrélés entre eux donnent une moyenne de 1',
+      () {
+        final avg = averageCorrelation([
+          [1, 2, 3, 4],
+          [10, 20, 30, 40],
+          [100, 200, 300, 400],
+        ]);
+        expect(avg, closeTo(1.0, 1e-9));
+      },
+    );
+
+    test('mélange de paires corrélées et anti-corrélées : moyenne entre '
+        'les deux, pas dominée par une seule paire', () {
+      final avg = averageCorrelation([
+        [1, 2, 3, 4], // corrélée à la 2e (r=1), anti-corrélée à la 3e (r=-1)
+        [10, 20, 30, 40],
+        [40, 30, 20, 10],
+      ]);
+      // Paires : (0,1)=1, (0,2)=-1, (1,2)=-1 → moyenne = -1/3.
+      expect(avg, closeTo(-1 / 3, 1e-9));
+    });
+
+    test('null avec moins de 2 séries', () {
+      expect(averageCorrelation([]), isNull);
+      expect(averageCorrelation([[1, 2, 3, 4]]), isNull);
+    });
+
+    test('ignore les paires sans corrélation calculable (série plate) '
+        'plutôt que de les compter comme zéro', () {
+      final avg = averageCorrelation([
+        [1, 2, 3, 4],
+        [10, 20, 30, 40],
+        [5, 5, 5, 5], // plate : indéfinie avec les deux autres
+      ]);
+      // Seule la paire (0,1), calculable, doit compter.
+      expect(avg, closeTo(1.0, 1e-9));
+    });
+  });
+
   group('riskReturnRatio', () {
     test('cas standard', () {
       expect(

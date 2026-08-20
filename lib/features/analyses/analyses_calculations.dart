@@ -240,6 +240,29 @@ double? pearsonCorrelation(List<double> a, List<double> b) {
   return covariance / math.sqrt(varianceA * varianceB);
 }
 
+/// Corrélation moyenne d'un groupe d'actifs (catégories, ou investissements
+/// au sein d'une catégorie) — moyenne des corrélations de paires distinctes
+/// (la diagonale, toujours 1, et chaque paire en double par symétrie de la
+/// matrice, sont exclues), ignorant les paires sans corrélation calculable
+/// (voir [pearsonCorrelation]). Un résumé à un seul chiffre de la
+/// diversification du groupe : proche de 0 (ou négatif) = bien diversifié,
+/// proche de 1 = les actifs bougent quasiment tous ensemble, ce qui réduit
+/// l'effet de diversification malgré leur nombre. `null` sans aucune paire
+/// calculable (moins de 2 actifs, ou toutes les paires indéfinies).
+double? averageCorrelation(List<List<double>> series) {
+  var sum = 0.0;
+  var count = 0;
+  for (var i = 0; i < series.length; i++) {
+    for (var j = i + 1; j < series.length; j++) {
+      final correlation = pearsonCorrelation(series[i], series[j]);
+      if (correlation == null) continue;
+      sum += correlation;
+      count++;
+    }
+  }
+  return count == 0 ? null : sum / count;
+}
+
 /// Ratio rendement/risque type Sharpe, **sans taux sans risque soustrait**
 /// (rendement annualisé brut / volatilité annualisée) : l'app n'a aucune
 /// source fiable de taux sans risque (pas d'API macro), et en coder un en

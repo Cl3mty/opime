@@ -153,20 +153,13 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              shadcn.Text(
-                'Sur la période sélectionnée, sauf mention contraire.',
-              ).muted().small(),
               const SizedBox(height: 24),
 
-              // Performance : ce que le patrimoine a rapporté, en absolu
-              // (TRI) puis comparé à un indice (Alpha) — la question la
-              // plus immédiate ("qu'est-ce que j'ai gagné ?"), donc en
-              // premier.
+              // Performance : ce que le patrimoine a rapporté comparé à un
+              // indice (Alpha) puis en absolu (TRI) — la question la plus
+              // immédiate ("qu'est-ce que j'ai gagné ?"), donc en premier.
               const _SectionHeader('Performance'),
               const SizedBox(height: 12),
-              _TriCard(categories: metrics.categories, total: metrics.total),
-              const SizedBox(height: 16),
               _AlphaCard(
                 controller: _benchmarkController,
                 onSave: _saveBenchmark,
@@ -174,6 +167,8 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
                 period: _period,
                 hidden: hidden,
               ),
+              const SizedBox(height: 16),
+              _TriCard(categories: metrics.categories, total: metrics.total),
 
               // Risque : à quel prix (volatilité, drawdown...) cette
               // performance a été obtenue, puis à quel point les
@@ -687,6 +682,44 @@ class _FundStyleCard extends StatelessWidget {
 const _riskReturnLabelWidth = 160.0;
 const _riskReturnColumnWidth = 84.0;
 
+/// Explication de chaque métrique de [_RiskReturnCard], affichée au survol
+/// de son en-tête de colonne — sans ça, "Sortino", "Omega" ou "Skew" ne
+/// disent rien à qui ne les connaît pas déjà, contrairement à "Volatilité"
+/// ou "Max drawdown", plus parlants d'eux-mêmes.
+const _riskReturnExplanations = {
+  'Volatilité':
+      'Écart-type annualisé des rendements journaliers : plus il est '
+          'élevé, plus la valeur a fluctué au jour le jour sur la '
+          'période, dans un sens comme dans l\'autre.',
+  'Max drawdown':
+      'Plus forte baisse subie entre un sommet et le creux suivant sur '
+          'la période — le pire passage traversé, pas la performance '
+          'finale (qui peut être positive malgré un max drawdown élevé).',
+  'Sharpe':
+      'Rendement obtenu par unité de risque total pris (la volatilité) — '
+          'plus il est élevé, meilleur est le rendement pour le risque '
+          'supporté. Pénalise autant les fluctuations à la hausse qu\'à '
+          'la baisse.',
+  'Sortino':
+      'Comme le ratio de Sharpe, mais ne pénalise que les fluctuations à '
+          'la baisse (une hausse forte n\'est pas traitée comme un '
+          'risque) — plus représentatif du risque réellement subi par un '
+          'investisseur.',
+  'Bêta':
+      'Sensibilité aux mouvements du benchmark configuré dans la carte '
+          'Alpha vs benchmark : 1 = évolue comme lui, > 1 = amplifie ses '
+          'mouvements, < 1 = les atténue, négatif = évolue à l\'inverse.',
+  'Omega':
+      'Rapport entre les gains cumulés et les pertes cumulées sur la '
+          'période (au-delà d\'un rendement nul) — au-dessus de 1, les '
+          'gains l\'emportent sur les pertes.',
+  'Skew':
+      'Asymétrie de la distribution des rendements journaliers : positif '
+          '= surtout de petites pertes compensées par quelques gros '
+          'gains ; négatif = surtout des gains modestes exposés à '
+          'quelques grosses pertes rares.',
+};
+
 class _RiskReturnCard extends StatelessWidget {
   final List<_CategoryMetric> categories;
   final _TotalMetric total;
@@ -704,7 +737,8 @@ class _RiskReturnCard extends StatelessWidget {
             const SizedBox(height: 4),
             shadcn.Text(
               'Bêta face au benchmark configuré dans la carte Alpha vs '
-              'benchmark, si renseigné.',
+              'benchmark, si renseigné. Survolez un en-tête de colonne '
+              'pour le détail de chaque métrique.',
             ).muted().xSmall(),
             const SizedBox(height: 12),
             SingleChildScrollView(
@@ -728,7 +762,17 @@ class _RiskReturnCard extends StatelessWidget {
                       ])
                         SizedBox(
                           width: _riskReturnColumnWidth,
-                          child: shadcn.Text(header).muted().xSmall(),
+                          child: Tooltip(
+                            tooltip: (context) => TooltipContainer(
+                              child: SizedBox(
+                                width: 260,
+                                child: shadcn.Text(
+                                  _riskReturnExplanations[header]!,
+                                ),
+                              ),
+                            ),
+                            child: shadcn.Text(header).muted().xSmall(),
+                          ),
                         ),
                     ],
                   ),
@@ -847,42 +891,49 @@ class _CorrelationCardState extends State<_CorrelationCard> {
 
     late final String title;
     late final Widget content;
+    double? avgCorrelation;
+    late final String avgCorrelationLabel;
     if (selected != null) {
       final usableInvestments = [
         for (final entry in selected.investmentReturns)
           if (entry.$2.length >= 3) entry,
       ];
       title = 'Corrélation — ${selected.assetClass.label}';
-      content = usableInvestments.length < 2
-          ? shadcn.Text(
-              'Pas assez d\'investissements avec un historique de cours '
-              'suffisant dans cette catégorie sur cette période pour '
-              'calculer une corrélation.',
-            ).muted().small()
-          : CorrelationMatrix(
-              labels: [for (final entry in usableInvestments) entry.$1],
-              matrix: _matrixFor([
-                for (final entry in usableInvestments) entry.$2,
-              ]),
-            );
+      avgCorrelationLabel =
+          'Corrélation moyenne entre les actifs de cette catégorie';
+      if (usableInvestments.length < 2) {
+        content = shadcn.Text(
+          'Pas assez d\'investissements avec un historique de cours '
+          'suffisant dans cette catégorie sur cette période pour '
+          'calculer une corrélation.',
+        ).muted().small();
+      } else {
+        final series = [for (final entry in usableInvestments) entry.$2];
+        avgCorrelation = averageCorrelation(series);
+        content = CorrelationMatrix(
+          labels: [for (final entry in usableInvestments) entry.$1],
+          matrix: _matrixFor(series),
+        );
+      }
     } else {
       title = 'Corrélation entre catégories';
-      content = usableCategories.length < 2
-          ? shadcn.Text(
-              'Pas assez de catégories avec un historique de cours '
-              'suffisant sur cette période pour calculer une corrélation.',
-            ).muted().small()
-          : CorrelationMatrix(
-              labels: [
-                for (final c in usableCategories) c.assetClass.label,
-              ],
-              matrix: _matrixFor([
-                for (final c in usableCategories) c.returns,
-              ]),
-              onSelectLabel: (i) => setState(
-                () => _drilledInto = usableCategories[i].assetClass,
-              ),
-            );
+      avgCorrelationLabel = 'Corrélation moyenne entre catégories';
+      if (usableCategories.length < 2) {
+        content = shadcn.Text(
+          'Pas assez de catégories avec un historique de cours suffisant '
+          'sur cette période pour calculer une corrélation.',
+        ).muted().small();
+      } else {
+        final series = [for (final c in usableCategories) c.returns];
+        avgCorrelation = averageCorrelation(series);
+        content = CorrelationMatrix(
+          labels: [for (final c in usableCategories) c.assetClass.label],
+          matrix: _matrixFor(series),
+          onSelectLabel: (i) => setState(
+            () => _drilledInto = usableCategories[i].assetClass,
+          ),
+        );
+      }
     }
 
     return FrostedCard(
@@ -901,6 +952,13 @@ class _CorrelationCardState extends State<_CorrelationCard> {
                 _cardTitle(title),
               ],
             ),
+            if (avgCorrelation != null) ...[
+              const SizedBox(height: 8),
+              _StatChip(
+                label: avgCorrelationLabel,
+                value: avgCorrelation.toStringAsFixed(2),
+              ),
+            ],
             const SizedBox(height: 12),
             content,
           ],
