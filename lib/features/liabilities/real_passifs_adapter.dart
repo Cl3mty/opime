@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons, Color;
 import '../dashboard/patrimoine_models.dart';
 import 'liabilities_models.dart';
@@ -103,12 +102,22 @@ PatrimoineAccount _buildLeaf(Liability liability) {
   );
 }
 
-/// Grille de dates commune à [liabilities], de la première date de départ
-/// de prêt jusqu'à l'échéance la plus tardive — factorisée entre
-/// [remainingBalanceHistoryFor] (somme de tous les prêts) et
-/// [perLiabilityHistoryOnGrid] (une courbe par prêt, mêmes abscisses) pour
-/// qu'elles restent comparables/sommables terme à terme.
-List<DateTime> _sharedGrid(List<Liability> liabilities) {
+/// Grille de dates commune à [liabilities], de [periodStart] (ou la
+/// première date de départ de prêt si `null` ou plus ancien qu'elle)
+/// jusqu'à l'échéance la plus tardive, un point par mois calendaire —
+/// factorisée entre [remainingBalanceHistoryFor] (somme de tous les prêts)
+/// et [perLiabilityHistoryOnGrid] (une courbe par prêt, mêmes abscisses)
+/// pour qu'elles restent comparables/sommables terme à terme. Se termine
+/// toujours exactement sur la date d'échéance (voir [dates.add] ci-dessous,
+/// même principe que `real_patrimoine_adapter.dart`'s `evenDateGrid`) —
+/// sans ça, le dernier point tracé tombait jusqu'à ~1/30e de la durée du
+/// prêt avant l'échéance réelle, et le graphique ne montrait jamais le
+/// capital restant dû atteindre 0 €. Un pas mensuel (et non un
+/// échantillonnage en ~30 points sur toute la durée) : le capital restant
+/// dû d'un prêt ne change qu'à chaque échéance mensuelle (voir
+/// [_balanceAt]), c'est la seule granularité qui permette de le lire mois
+/// par mois au survol du graphique.
+List<DateTime> _sharedGrid(List<Liability> liabilities, {DateTime? periodStart}) {
   if (liabilities.isEmpty) return [];
 
   DateTime? earliestStart;
@@ -126,20 +135,30 @@ List<DateTime> _sharedGrid(List<Liability> liabilities) {
     );
     if (latestEnd == null || end.isAfter(latestEnd)) latestEnd = end;
   }
-  final start = DateTime.utc(
+  var start = DateTime.utc(
     earliestStart!.year,
     earliestStart.month,
     earliestStart.day,
   );
+  // Un [periodStart] plus récent que le début du prêt "zoome" la fenêtre
+  // affichée sans jamais raccourcir la projection : l'échéance ([end])
+  // reste toujours la borne de fin, quelle que soit la période choisie.
+  if (periodStart != null && periodStart.isAfter(start)) {
+    start = DateTime.utc(periodStart.year, periodStart.month, periodStart.day);
+  }
   final end = DateTime.utc(latestEnd!.year, latestEnd.month, latestEnd.day);
-  final totalDays = end.difference(start).inDays;
-  if (totalDays <= 0) return [];
+  if (!end.isAfter(start)) return [end];
 
-  final stepDays = math.max(1, (totalDays / 30).ceil());
-  return [
-    for (var offset = 0; offset <= totalDays; offset += stepDays)
-      start.add(Duration(days: offset)),
-  ];
+  final dates = <DateTime>[];
+  var monthOffset = 0;
+  while (true) {
+    final date = DateTime.utc(start.year, start.month + monthOffset, start.day);
+    if (!date.isBefore(end)) break;
+    dates.add(date);
+    monthOffset++;
+  }
+  dates.add(end);
+  return dates;
 }
 
 /// Courbe du capital restant dû cumulé, jour par jour, de la première date
@@ -158,10 +177,16 @@ List<NetWorthPoint> remainingBalanceHistoryFor(List<Liability> liabilities) {
 /// les prêts affichés dans le graphique d'évolution d'une catégorie de
 /// passifs (voir `dashboard/category_detail_screen.dart`'s
 /// `historyByLineId`), en sommant terme à terme les courbes sélectionnées.
+/// [periodStart], s'il est renseigné, borne le début affiché (voir
+/// [_sharedGrid]) sans jamais raccourcir la projection jusqu'à l'échéance —
+/// c'est ce que l'onglet de période (`RealPassifDetailScreen`) fait
+/// réellement varier : combien d'historique est visible avant l'échéance,
+/// pas l'échéance elle-même.
 Map<String, List<NetWorthPoint>> perLiabilityHistoryOnGrid(
-  List<Liability> liabilities,
-) {
-  final grid = _sharedGrid(liabilities);
+  List<Liability> liabilities, {
+  DateTime? periodStart,
+}) {
+  final grid = _sharedGrid(liabilities, periodStart: periodStart);
   return {
     for (final liability in liabilities)
       liability.id: [

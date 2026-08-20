@@ -260,4 +260,16 @@ class PatrimoineCategory {
     }
     return false;
   }
+
+  /// Vrai pour les classes d'actif (jamais pour un passif) : les colonnes
+  /// Quantité et Cours du tableau détaillé n'ont de sens que pour un actif
+  /// (même sans PRU, voir [showsPruColumn], l'immobilier et l'épargne
+  /// gardent une quantité/un cours) — un prêt (passif) n'a ni l'un ni
+  /// l'autre.
+  bool get showsQuantityColumn {
+    for (final assetClass in AssetClass.values) {
+      if (assetClass.categoryId == id) return true;
+    }
+    return false;
+  }
 }

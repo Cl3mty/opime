@@ -41,4 +41,120 @@ void main() {
       expect(points[3].value, liability.amortissement[0].capitalRestantDu);
     });
   });
+
+  group('remainingBalanceHistoryFor / perLiabilityHistoryOnGrid : grille de '
+      'dates jusqu\'à l\'échéance', () {
+    Liability loan({required int nbrEcheances, DateTime? dateDebut}) => Liability(
+      type: LiabilityType.creditAutre,
+      name: 'Test',
+      montantEmprunte: 12000,
+      tauxInteret: 3,
+      nbrEcheances: nbrEcheances,
+      dateDebut: dateDebut ?? DateTime(2024, 1, 15),
+      loanType: LoanType.amortissable,
+    );
+
+    test(
+      'le dernier point tombe exactement à l\'échéance, capital restant dû '
+      'à 0 € (régression : la grille s\'arrêtait jusqu\'à ~1/30e de la '
+      'durée du prêt avant l\'échéance réelle, jamais 0 €)',
+      () {
+        final liability = loan(nbrEcheances: 12);
+        final points = remainingBalanceHistoryFor([liability]);
+        final expectedEnd = DateTime.utc(2025, 1, 15);
+
+        expect(points.last.date, expectedEnd);
+        expect(points.last.value, closeTo(0, 1e-6));
+      },
+    );
+
+    test(
+      'même régression sur un prêt long (20 ans) : le pas de la grille '
+      '(~1/30e de la durée) est alors de plusieurs mois, l\'écart entre '
+      'l\'ancien dernier point et la vraie échéance était le plus visible',
+      () {
+        final liability = loan(nbrEcheances: 240);
+        final points = remainingBalanceHistoryFor([liability]);
+        final expectedEnd = DateTime.utc(2044, 1, 15);
+
+        expect(points.last.date, expectedEnd);
+        expect(points.last.value, closeTo(0, 1e-6));
+      },
+    );
+
+    test(
+      'perLiabilityHistoryOnGrid : periodStart postérieur au début du prêt '
+      'avance le premier point sans jamais raccourcir la projection '
+      'jusqu\'à l\'échéance',
+      () {
+        final liability = loan(nbrEcheances: 240);
+        final periodStart = DateTime.utc(2040, 1, 1);
+        final history = perLiabilityHistoryOnGrid(
+          [liability],
+          periodStart: periodStart,
+        )[liability.id]!;
+
+        expect(history.first.date, periodStart);
+        expect(history.last.date, DateTime.utc(2044, 1, 15));
+        expect(history.last.value, closeTo(0, 1e-6));
+      },
+    );
+
+    test(
+      'perLiabilityHistoryOnGrid : periodStart antérieur au début du prêt '
+      'n\'a aucun effet (la grille ne remonte jamais avant le déblocage)',
+      () {
+        final liability = loan(nbrEcheances: 12);
+        final withEarlyPeriodStart = perLiabilityHistoryOnGrid(
+          [liability],
+          periodStart: DateTime.utc(2000, 1, 1),
+        )[liability.id]!;
+        final withoutPeriodStart = perLiabilityHistoryOnGrid(
+          [liability],
+        )[liability.id]!;
+
+        expect(withEarlyPeriodStart.first.date, withoutPeriodStart.first.date);
+        expect(withEarlyPeriodStart.first.date, DateTime.utc(2024, 1, 15));
+      },
+    );
+
+    test(
+      'la grille a une granularité mensuelle (un point par échéance), pas '
+      'un échantillonnage grossier sur ~30 points quelle que soit la durée '
+      '— nécessaire pour lire le capital restant dû mois par mois au '
+      'survol du graphique',
+      () {
+        final liability = loan(nbrEcheances: 12);
+        final points = remainingBalanceHistoryFor([liability]);
+
+        // Un point de départ (déblocage) + un par échéance mensuelle.
+        expect(points.length, 13);
+        for (var i = 1; i < points.length; i++) {
+          final previous = points[i - 1].date;
+          final expected = DateTime.utc(
+            previous.year,
+            previous.month + 1,
+            previous.day,
+          );
+          expect(
+            points[i].date,
+            expected,
+            reason: 'le point $i devrait être exactement un mois après le '
+                'point ${i - 1}',
+          );
+        }
+      },
+    );
+
+    test(
+      'même granularité mensuelle sur un prêt long (20 ans, 240 '
+      'échéances) : l\'ancien pas grossier (~1/30e de la durée) aurait '
+      'produit environ 30 points au lieu de 241',
+      () {
+        final liability = loan(nbrEcheances: 240);
+        final points = remainingBalanceHistoryFor([liability]);
+        expect(points.length, 241);
+      },
+    );
+  });
 }

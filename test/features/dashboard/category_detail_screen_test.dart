@@ -33,6 +33,24 @@ void main() {
     accounts: [investment()],
   );
 
+  PatrimoineCategory liabilityCategory() => PatrimoineCategory(
+    id: 'passifs_prets_immobiliers',
+    label: 'Prêts immobiliers',
+    icon: LucideIcons.house,
+    color: const Color(0xFF000000),
+    tier: AllocationTier.croissance,
+    description: '',
+    accounts: [
+      const PatrimoineAccount(
+        id: 'loan-1',
+        name: 'Prêt maison',
+        valeur: 150000,
+        plusValueAbs: -5000,
+        plusValuePercent: -3.2,
+      ),
+    ],
+  );
+
   Widget buildScreen({
     ValueChanged<PatrimoineAccount>? onAccountOpen,
     bool defaultExpanded = false,
@@ -146,6 +164,113 @@ void main() {
       await tester.pump();
 
       expect(find.text('Amundi MSCI World'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'le montant affiché en tête est category.montant (la valeur réelle '
+    'aujourd\'hui), pas le dernier point de l\'historique — écart réel pour '
+    'un passif dont la courbe projette jusqu\'à l\'échéance (~0 €), voir '
+    '`RealPassifDetailScreen`',
+    (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryDetailScreen(
+              category: category(),
+              amountVisibility: AmountVisibilityController(),
+              onAccountTap: (_) {},
+              // Historique vide à dessein : `points.last.value` vaudrait 0,
+              // alors que category.montant (via l'unique investissement à
+              // 1000 €) doit rester le montant affiché.
+              historyForPeriod: (_) => const [],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('1 000 €'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'showChangePercent: false masque le "(±X %)" sous le montant, sans '
+    'masquer la variation absolue en euros',
+    (tester) async {
+      final points = [
+        NetWorthPoint(DateTime.utc(2025, 1, 1), 1000),
+        NetWorthPoint(DateTime.utc(2025, 6, 1), 400),
+      ];
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryDetailScreen(
+              category: category(),
+              amountVisibility: AmountVisibilityController(),
+              onAccountTap: (_) {},
+              historyForPeriod: (_) => points,
+              showChangePercent: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Sans showChangePercent: false, ce serait "-600 € (-60.00 %)" —
+      // seul le "-60.00 %" doit disparaître, pas le "-600 €" ni les
+      // pourcentages d'autre nature affichés ailleurs sur l'écran (ex :
+      // plus-value latente d'une position, part de l'allocation).
+      expect(find.textContaining('-60.00'), findsNothing);
+      expect(find.textContaining('-600'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'catégorie de passif (prêt) : pas de colonnes Quantité/Cours, ni en '
+    'en-tête ni sur la ligne de compte — un prêt n\'a ni unité ni cours de '
+    'marché, contrairement à un actif',
+    (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryDetailScreen(
+              category: liabilityCategory(),
+              amountVisibility: AmountVisibilityController(),
+              onAccountTap: (_) {},
+              accountsCardTitle: 'Passifs',
+              showAvatar: false,
+              showChangePercent: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Quantité'), findsNothing);
+      expect(find.text('Cours'), findsNothing);
+      expect(find.text('Valeur'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'catégorie d\'actif : les colonnes Quantité et Cours restent affichées',
+    (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryDetailScreen(
+              category: category(),
+              amountVisibility: AmountVisibilityController(),
+              onAccountTap: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Quantité'), findsOneWidget);
+      expect(find.text('Cours'), findsOneWidget);
     },
   );
 }

@@ -9,6 +9,7 @@ import 'liability_detail_view.dart';
 import 'real_passifs_adapter.dart'
     show
         buildRealPassifCategories,
+        earliestLiabilityStart,
         emptyPassifCategoryFor,
         perLiabilityHistoryOnGrid;
 
@@ -20,11 +21,15 @@ import 'real_passifs_adapter.dart'
 /// `Navigator.push`) le détail du passif : édition, suppression,
 /// documents.
 ///
-/// Le graphique par onglets de période de [CategoryDetailScreen] reste
-/// volontairement non borné par période ici (voir
-/// [_historyByLiabilityId]/[perLiabilityHistoryOnGrid]) : il projette
-/// toujours jusqu'au remboursement final de chaque prêt, cohérent avec la
-/// vue détaillée d'un passif ([LiabilityDetailView]) qui fait de même.
+/// Le graphique par onglets de période de [CategoryDetailScreen] projette
+/// toujours jusqu'au remboursement final de chaque prêt (capital restant dû
+/// à 0 €), quel que soit l'onglet choisi — un passif se raconte par "combien
+/// il reste à rembourser et jusqu'à quand", pas par une fenêtre glissante
+/// qui s'arrêterait aujourd'hui comme pour un actif. L'onglet de période
+/// change en revanche bien la borne de DÉBUT affichée (voir
+/// [_historyForPeriod]/`real_passifs_adapter.dart`'s `perLiabilityHistoryOnGrid`) :
+/// "Tout" montre depuis le déblocage du prêt, "1A" ne montre que la
+/// dernière année avant l'échéance projetée, etc.
 class RealPassifDetailScreen extends StatefulWidget {
   final String vaultPath;
   final String categoryId;
@@ -47,8 +52,8 @@ class _RealPassifDetailScreenState extends State<RealPassifDetailScreen> {
   late LiabilitiesRepository _repo;
   bool _loading = true;
   List<Liability> _liabilities = [];
+  List<Liability> _categoryLiabilities = [];
   PatrimoineCategory? _category;
-  Map<String, List<NetWorthPoint>> _historyByLiabilityId = {};
   String? _selectedLiabilityId;
 
   @override
@@ -110,8 +115,23 @@ class _RealPassifDetailScreenState extends State<RealPassifDetailScreen> {
     setState(() {
       _liabilities = liabilities;
       _category = found ?? emptyPassifCategoryFor(widget.categoryId);
-      _historyByLiabilityId = perLiabilityHistoryOnGrid(categoryLiabilities);
+      _categoryLiabilities = categoryLiabilities;
     });
+  }
+
+  /// Historique par prêt pour [period] — la borne de fin reste toujours
+  /// l'échéance projetée de chaque prêt (voir la doc de classe), seule la
+  /// borne de début varie avec [period] (voir
+  /// `real_passifs_adapter.dart`'s `perLiabilityHistoryOnGrid`).
+  Map<String, List<NetWorthPoint>> _historyForPeriod(DashboardPeriod period) {
+    final today = DateTime.now();
+    final todayUtc = DateTime.utc(today.year, today.month, today.day);
+    final earliest = earliestLiabilityStart(_categoryLiabilities) ?? todayUtc;
+    final periodStart = period.startFor(today: todayUtc, earliest: earliest);
+    return perLiabilityHistoryOnGrid(
+      _categoryLiabilities,
+      periodStart: periodStart,
+    );
   }
 
   Future<void> _refresh() async {
@@ -154,11 +174,15 @@ class _RealPassifDetailScreenState extends State<RealPassifDetailScreen> {
       category: category,
       amountVisibility: widget.amountVisibility,
       onAccountTap: _openLiability,
-      // Toujours la même projection complète, quelle que soit la période
-      // sélectionnée dans l'onglet — voir la doc de classe ci-dessus.
-      historyByLineIdForPeriod: (_) => _historyByLiabilityId,
+      historyByLineIdForPeriod: _historyForPeriod,
       showAvatar: false,
       accountsCardTitle: 'Passifs',
+      // La courbe projette toujours jusqu'à 0 € (voir la doc de classe) :
+      // un "% d'évolution" y serait toujours -100 %, quel que soit
+      // l'onglet — pas une vraie mesure de performance sur la période.
+      // Le montant en euros (combien il reste à rembourser sur la fenêtre
+      // affichée) reste, lui, informatif.
+      showChangePercent: false,
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../core/ui/toggle_button_style.dart';
 import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/performance_amount.dart';
 import '../investments/bank_logo_avatar.dart';
 import '../investments/bank_logo_repository.dart';
 import '../investments/investments_models.dart';
@@ -78,6 +79,14 @@ class CategoryDetailScreen extends StatefulWidget {
   /// `RealPassifDetailScreen`).
   final String accountsCardTitle;
 
+  /// `true` (défaut) affiche le "(±X %)" à côté du montant absolu sous le
+  /// graphique (voir [PeriodChangeRow]). `false` pour `RealPassifDetailScreen`,
+  /// dont la courbe projette toujours jusqu'au remboursement complet (0 €)
+  /// quel que soit l'onglet de période choisi (voir sa doc de classe) — le
+  /// pourcentage y vaudrait donc toujours -100 %, quelle que soit la
+  /// période, une "performance" qui n'en est pas une.
+  final bool showChangePercent;
+
   /// Menu "⋮" (Modifier/Supprimer) affiché au bout de chaque ligne de
   /// *compte* de l'accordéon (voir `_AccountAccordionTile`, uniquement
   /// quand [distributionByAccount] est renseigné) — `null` masque le menu
@@ -119,6 +128,7 @@ class CategoryDetailScreen extends StatefulWidget {
     this.historyForPeriod,
     this.showAvatar = true,
     this.accountsCardTitle = 'Actifs',
+    this.showChangePercent = true,
     this.onAccountEdit,
     this.onAccountDelete,
     this.onAccountOpen,
@@ -207,7 +217,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 historyByLineIdForPeriod(period),
                 _selectedLineIds,
               );
-        final changePercent = changePercentFor(points);
+        final changePercent = widget.showChangePercent
+            ? changePercentFor(points)
+            : null;
         final absoluteChange = points.length < 2
             ? 0.0
             : points.last.value - points.first.value;
@@ -242,8 +254,14 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                       ),
                     ),
                   ),
+                // Le montant réel d'aujourd'hui (category.montant), pas le
+                // dernier point de [points] : pour un passif, ce dernier
+                // point est le solde projeté à l'échéance (~0 €), pas le
+                // capital restant dû actuel (voir la doc de classe de
+                // [showChangePercent]) — les deux ne coïncident que côté
+                // actifs, où l'historique s'arrête toujours à aujourd'hui.
                 shadcn.Text(
-                  displayEuros(points.isEmpty ? 0 : points.last.value, hidden),
+                  displayEuros(category.montant, hidden),
                 ).x2Large().bold(),
                 const SizedBox(height: 4),
                 PeriodChangeRow(
@@ -701,6 +719,7 @@ class _AccountsCardState extends State<_AccountsCard> {
   List<Widget> _buildAccountAccordions(
     List<PatrimoineAccount> byAccount,
     bool showPru,
+    bool showQuantityCours,
   ) {
     final theme = Theme.of(context);
     final quantityAssetClass = assetClassForCategoryId(widget.category.id);
@@ -720,6 +739,7 @@ class _AccountsCardState extends State<_AccountsCard> {
             hidden: widget.hidden,
             showAvatar: widget.showAvatar,
             showPru: showPru,
+            showQuantityCours: showQuantityCours,
             quantityAssetClass: quantityAssetClass,
             expanded: _isExpanded(account.id ?? account.name),
             onToggleExpand: () => _toggleExpanded(account.id ?? account.name),
@@ -744,6 +764,7 @@ class _AccountsCardState extends State<_AccountsCard> {
             hidden: widget.hidden,
             showAvatar: false,
             showPru: showPru,
+            showQuantityCours: showQuantityCours,
             quantityAssetClass: quantityAssetClass,
             expanded: _isExpanded(account.id ?? account.name),
             onToggleExpand: () => _toggleExpanded(account.id ?? account.name),
@@ -762,6 +783,7 @@ class _AccountsCardState extends State<_AccountsCard> {
           onImportLogo: widget.onImportLogo,
           hidden: widget.hidden,
           showPru: showPru,
+          showQuantityCours: showQuantityCours,
           expanded: _isExpanded('bank:$group.key'),
           onToggleExpand: () => _toggleExpanded('bank:$group.key'),
           children: children,
@@ -776,6 +798,7 @@ class _AccountsCardState extends State<_AccountsCard> {
     final theme = Theme.of(context);
     final byAccount = widget.byAccount;
     final showPru = widget.category.showsPruColumn;
+    final showQuantityCours = widget.category.showsQuantityColumn;
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -787,16 +810,18 @@ class _AccountsCardState extends State<_AccountsCard> {
             Row(
               children: [
                 const Expanded(child: SizedBox()),
-                _HeaderCell('Quantité'),
-                if (showPru) _HeaderCell('PRU'),
-                _HeaderCell('Cours'),
+                if (showQuantityCours) ...[
+                  _HeaderCell('Quantité'),
+                  if (showPru) _HeaderCell('PRU'),
+                  _HeaderCell('Cours'),
+                ],
                 _HeaderCell('Valeur'),
                 _HeaderCell('Évolution'),
                 const SizedBox(width: _actionsWidth),
               ],
             ),
             if (byAccount != null) ...[
-              ..._buildAccountAccordions(byAccount, showPru),
+              ..._buildAccountAccordions(byAccount, showPru, showQuantityCours),
             ] else
               for (final account in widget.category.accounts) ...[
                 Container(height: 1, color: theme.colorScheme.border),
@@ -805,6 +830,7 @@ class _AccountsCardState extends State<_AccountsCard> {
                   hidden: widget.hidden,
                   showAvatar: widget.showAvatar,
                   showPru: showPru,
+                  showQuantityCours: showQuantityCours,
                   quantityAssetClass: assetClassForCategoryId(
                     widget.category.id,
                   ),
@@ -845,6 +871,11 @@ class _AccountAccordionTile extends StatelessWidget {
   /// l'accordéon.
   final bool showPru;
 
+  /// Affiche les colonnes Quantité et Cours du tableau, cf.
+  /// [PatrimoineCategory.showsQuantityColumn] — propagée aux deux niveaux
+  /// de l'accordéon.
+  final bool showQuantityCours;
+
   /// Classe d'actif de la catégorie affichée, propagée aux lignes pour
   /// formater la quantité (entière pour les métaux précieux).
   final AssetClass? quantityAssetClass;
@@ -860,6 +891,7 @@ class _AccountAccordionTile extends StatelessWidget {
     this.onAccountOpen,
     this.showAvatar = true,
     this.showPru = false,
+    this.showQuantityCours = true,
     this.quantityAssetClass,
   });
 
@@ -879,6 +911,7 @@ class _AccountAccordionTile extends StatelessWidget {
               account: account,
               hidden: hidden,
               showPru: showPru,
+              showQuantityCours: showQuantityCours,
               quantityAssetClass: quantityAssetClass,
               leading: hasChildren
                   ? SizedBox(
@@ -924,6 +957,7 @@ class _AccountAccordionTile extends StatelessWidget {
                             hidden: hidden,
                             showAvatar: showAvatar,
                             showPru: showPru,
+                            showQuantityCours: showQuantityCours,
                             quantityAssetClass: quantityAssetClass,
                             // Une position ouvre une popup (voir
                             // `onAccountOpen`), pas une page : le chevron de
@@ -967,6 +1001,10 @@ class _BankAccordionTile extends StatelessWidget {
   /// n'y a pas de sens à l'unité).
   final bool showPru;
 
+  /// Affiche les colonnes Quantité et Cours du tableau, cf.
+  /// [PatrimoineCategory.showsQuantityColumn].
+  final bool showQuantityCours;
+
   const _BankAccordionTile({
     required this.bankName,
     required this.accounts,
@@ -977,6 +1015,7 @@ class _BankAccordionTile extends StatelessWidget {
     required this.onToggleExpand,
     required this.children,
     this.showPru = false,
+    this.showQuantityCours = true,
   });
 
   @override
@@ -986,8 +1025,6 @@ class _BankAccordionTile extends StatelessWidget {
     final plusValueAbs = accounts.fold(0.0, (sum, a) => sum + a.plusValueAbs);
     final costBasis = total - plusValueAbs;
     final percent = costBasis == 0 ? 0.0 : plusValueAbs / costBasis * 100;
-    final positive = plusValueAbs >= 0;
-    final color = positive ? _green : _red;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1041,9 +1078,11 @@ class _BankAccordionTile extends StatelessWidget {
                   ),
                   // Cases Quantité/PRU/Cours : une banque n'a pas de sens à
                   // l'unité, on n'affiche que Valeur et Évolution.
-                  const SizedBox(width: _colWidth),
-                  if (showPru) const SizedBox(width: _colWidth),
-                  const SizedBox(width: _colWidth),
+                  if (showQuantityCours) ...[
+                    const SizedBox(width: _colWidth),
+                    if (showPru) const SizedBox(width: _colWidth),
+                    const SizedBox(width: _colWidth),
+                  ],
                   SizedBox(
                     width: _colWidth,
                     child: Align(
@@ -1053,19 +1092,10 @@ class _BankAccordionTile extends StatelessWidget {
                   ),
                   SizedBox(
                     width: _colWidth,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        shadcn.Text(
-                          displayEuros(plusValueAbs, hidden),
-                          style: TextStyle(color: color),
-                        ).xSmall(),
-                        shadcn.Text(
-                          displayPercent(percent),
-                          style: TextStyle(color: color),
-                        ).muted().xSmall(),
-                      ],
+                    child: PerformanceAmount(
+                      euros: plusValueAbs,
+                      percent: percent,
+                      hidden: hidden,
                     ),
                   ),
                   const SizedBox(width: _actionsWidth),
@@ -1172,6 +1202,11 @@ class _AccountLine extends StatelessWidget {
   /// le cours — cf. [PatrimoineCategory.showsPruColumn].
   final bool showPru;
 
+  /// Affiche les colonnes Quantité et Cours — cf.
+  /// [PatrimoineCategory.showsQuantityColumn] : un passif (prêt) n'a ni
+  /// quantité ni cours de marché, contrairement à un actif.
+  final bool showQuantityCours;
+
   /// Classe d'actif de la catégorie affichée : sert à formater la quantité
   /// (entière pour les pièces/lingots de métaux précieux). `null` pour une
   /// catégorie sans classe d'actif (passifs) : formatage par défaut.
@@ -1191,6 +1226,7 @@ class _AccountLine extends StatelessWidget {
     this.leading,
     this.showAvatar = true,
     this.showPru = false,
+    this.showQuantityCours = true,
     this.quantityAssetClass,
     this.showChevron = true,
   });
@@ -1198,8 +1234,6 @@ class _AccountLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final positive = account.plusValueAbs >= 0;
-    final color = positive ? _green : _red;
 
     final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1227,60 +1261,63 @@ class _AccountLine extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(
-            width: _colWidth,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: shadcn.Text(
-                account.quantite != null
-                    ? quantityAssetClass != null
-                          ? formatQuantity(
-                              account.quantite!,
-                              quantityAssetClass!,
-                            )
-                          : account.quantite!.toStringAsFixed(2)
-                    : '—',
-              ).small(),
-            ),
-          ),
-          if (showPru)
+          if (showQuantityCours) ...[
             SizedBox(
               width: _colWidth,
               child: Align(
                 alignment: Alignment.centerRight,
                 child: shadcn.Text(
-                  account.pru != null
-                      ? displayEuros(account.pru!, hidden)
+                  account.quantite != null
+                      ? quantityAssetClass != null
+                            ? formatQuantity(
+                                account.quantite!,
+                                quantityAssetClass!,
+                              )
+                            : account.quantite!.toStringAsFixed(2)
                       : '—',
                 ).small(),
               ),
             ),
-          SizedBox(
-            width: _colWidth,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: account.priceUnavailable == true && account.cours == null
-                  // Un cours a été cherché et n'a pas été trouvé : on le
-                  // signale plutôt que de ne laisser qu'un « — » silencieux
-                  // (voir [PatrimoineAccount.priceUnavailable]).
-                  ? Tooltip(
-                      tooltip: (context) => TooltipContainer(
-                        child: shadcn.Text(
-                          'Cours introuvable sur Yahoo Finance pour cet '
-                          'investissement.',
+            if (showPru)
+              SizedBox(
+                width: _colWidth,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: shadcn.Text(
+                    account.pru != null
+                        ? displayEuros(account.pru!, hidden)
+                        : '—',
+                  ).small(),
+                ),
+              ),
+            SizedBox(
+              width: _colWidth,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child:
+                    account.priceUnavailable == true && account.cours == null
+                    // Un cours a été cherché et n'a pas été trouvé : on le
+                    // signale plutôt que de ne laisser qu'un « — » silencieux
+                    // (voir [PatrimoineAccount.priceUnavailable]).
+                    ? Tooltip(
+                        tooltip: (context) => TooltipContainer(
+                          child: shadcn.Text(
+                            'Cours introuvable sur Yahoo Finance pour cet '
+                            'investissement.',
+                          ),
                         ),
-                      ),
-                      child: Icon(
-                        LucideIcons.triangleAlert,
-                        size: 14,
-                        color: theme.colorScheme.mutedForeground,
-                      ),
-                    )
-                  : account.cours == null
-                  ? shadcn.Text('—').small()
-                  : _CoursCell(account: account, hidden: hidden),
+                        child: Icon(
+                          LucideIcons.triangleAlert,
+                          size: 14,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                      )
+                    : account.cours == null
+                    ? shadcn.Text('—').small()
+                    : _CoursCell(account: account, hidden: hidden),
+              ),
             ),
-          ),
+          ],
           SizedBox(
             width: _colWidth,
             child: Align(
@@ -1290,19 +1327,10 @@ class _AccountLine extends StatelessWidget {
           ),
           SizedBox(
             width: _colWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                shadcn.Text(
-                  displayEuros(account.plusValueAbs, hidden),
-                  style: TextStyle(color: color),
-                ).xSmall(),
-                shadcn.Text(
-                  displayPercent(account.plusValuePercent),
-                  style: TextStyle(color: color),
-                ).muted().xSmall(),
-              ],
+            child: PerformanceAmount(
+              euros: account.plusValueAbs,
+              percent: account.plusValuePercent,
+              hidden: hidden,
             ),
           ),
           SizedBox(
