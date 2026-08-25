@@ -411,4 +411,144 @@ void main() {
       expect(findBudgetField(), findsNothing);
     },
   );
+
+  /// La ligne du menu déroulant de catégorie portant [label] — un
+  /// `MenuButton` dont le texte est [label], utilisé comme ancre pour
+  /// retrouver ses boutons crayon/corbeille (`trailing`).
+  Finder findCategoryMenuRow(String label) =>
+      find.ancestor(of: find.text(label), matching: find.byType(MenuButton)).first;
+
+  /// `showDropdown`/`showOverlay` (menu de catégorie) ne se résolvent pas
+  /// de façon fiable sous un simple `pump()` — même pattern que
+  /// `pumpScreen` : de vraies pauses via `runAsync`, en pompant jusqu'à ce
+  /// que [ready] devienne vrai.
+  Future<void> pumpUntil(WidgetTester tester, bool Function() ready) async {
+    await tester.runAsync(() async {
+      for (var i = 0; i < 40; i++) {
+        if (ready()) return;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await tester.pump();
+      }
+    });
+  }
+
+  /// Le contenu du menu déroulant de catégorie (une fois ouvert) vit dans
+  /// l'`Overlay` racine de l'app, pas dans le `SingleChildScrollView` de
+  /// l'écran — sa position résolue peut déborder du viewport de test selon
+  /// où la ligne éditée se trouve dans la page, ce qu'aucun défilement
+  /// préalable du contenu de la page ne corrige (l'overlay ne fait pas
+  /// partie de ce qui défile). Plutôt que de dépendre d'un tap
+  /// géométriquement valide, on invoque directement les callbacks des
+  /// widgets concernés — la même technique déjà en place ailleurs dans ce
+  /// dépôt pour du contenu difficile à hit-tester dans un overlay (voir
+  /// `test/features/notifications/news_panel_test.dart`).
+  Future<void> tapGestureDetectorNear(WidgetTester tester, String label) async {
+    final gd = tester.widget<GestureDetector>(
+      find.ancestor(of: find.text(label), matching: find.byType(GestureDetector)).first,
+    );
+    gd.onTap!();
+    await tester.pump();
+  }
+
+  /// Un vrai tap sur une `MenuButton` appelle `onPressed` PUIS, si
+  /// `autoClose` (par défaut), `MenuGroupData.closeAll()` (voir
+  /// `_MenuButtonState` dans le package shadcn_flutter — la fermeture n'est
+  /// pas un simple effet de bord de `onPressed`, il faut la déclencher
+  /// explicitement pour reproduire fidèlement ce qu'un tap ferait).
+  Future<void> pressCategoryMenuRow(WidgetTester tester, String label) async {
+    final context = tester.element(find.text(label));
+    final row = tester.widget<MenuButton>(findCategoryMenuRow(label));
+    row.onPressed!(context);
+    Data.maybeOf<MenuGroupData>(context)?.closeAll();
+    // La fermeture est animée : plusieurs pumps sont nécessaires pour que
+    // l'overlay soit effectivement retiré de l'arbre de widgets.
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
+
+  Future<void> pressIconButton(WidgetTester tester, Finder finder) async {
+    tester.widget<IconButton>(finder).onPressed!();
+    await tester.pump();
+  }
+
+  testWidgets(
+    'catégories (Factures/Dépenses) : renommer une catégorie via le crayon '
+    'du picker met aussi à jour l\'étiquette déjà affichée sur les lignes '
+    'qui l\'utilisaient, sans devoir la resélectionner',
+    (tester) async {
+      await pumpScreen(tester);
+
+      // Ajoute une ligne dans FACTURES (2e "Ajouter") et lui assigne la
+      // catégorie par défaut "Assurance".
+      await tester.tap(find.text('Ajouter').at(1));
+      await tester.pump();
+      await tapGestureDetectorNear(tester, 'Catégorie');
+      await pumpUntil(tester, () => find.text('Assurance').evaluate().isNotEmpty);
+      await pressCategoryMenuRow(tester, 'Assurance');
+      await pumpUntil(tester, () => find.text('Catégorie').evaluate().isEmpty);
+      expect(find.text('Assurance'), findsOneWidget);
+
+      // Rouvre le picker (chip affiche maintenant "Assurance") et renomme
+      // la catégorie via le crayon plutôt que de la resélectionner.
+      await tapGestureDetectorNear(tester, 'Assurance');
+      await pumpUntil(
+        tester,
+        () => findIconButton(LucideIcons.pencil).evaluate().isNotEmpty,
+      );
+      final pencil = find.descendant(
+        of: findCategoryMenuRow('Assurance'),
+        matching: findIconButton(LucideIcons.pencil),
+      );
+      await pressIconButton(tester, pencil);
+
+      final editField = find.byWidgetPredicate(
+        (w) => w is TextField && w.controller?.text == 'Assurance',
+      );
+      expect(editField, findsOneWidget);
+      await tester.enterText(editField, 'Assurances');
+      await pressIconButton(tester, findIconButton(LucideIcons.check));
+      await pumpUntil(tester, () => find.text('Assurances').evaluate().isNotEmpty);
+
+      // La liste de catégories a été renommée...
+      expect(find.text('Assurances'), findsOneWidget);
+      // ...et la ligne qui portait "Assurance" affiche maintenant
+      // "Assurances" sans action supplémentaire.
+      expect(find.text('Assurance'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'catégories (Factures/Dépenses) : supprimer une catégorie via la '
+    'corbeille la retire du picker et vide l\'étiquette des lignes qui '
+    'l\'utilisaient (repassent en "non catégorisé")',
+    (tester) async {
+      await pumpScreen(tester);
+
+      await tester.tap(find.text('Ajouter').at(1));
+      await tester.pump();
+      await tapGestureDetectorNear(tester, 'Catégorie');
+      await pumpUntil(tester, () => find.text('Abonnements').evaluate().isNotEmpty);
+      await pressCategoryMenuRow(tester, 'Abonnements');
+      await pumpUntil(tester, () => find.text('Catégorie').evaluate().isEmpty);
+      expect(find.text('Abonnements'), findsOneWidget);
+
+      await tapGestureDetectorNear(tester, 'Abonnements');
+      await pumpUntil(
+        tester,
+        () => findIconButton(LucideIcons.trash2).evaluate().isNotEmpty,
+      );
+      final trash = find.descendant(
+        of: findCategoryMenuRow('Abonnements'),
+        matching: findIconButton(LucideIcons.trash2),
+      );
+      await pressIconButton(tester, trash);
+      await pumpUntil(tester, () => find.text('Catégorie').evaluate().isNotEmpty);
+
+      // La ligne repasse sur le placeholder "Catégorie" : plus aucune
+      // trace d'"Abonnements" nulle part sur l'écran.
+      expect(find.text('Catégorie'), findsOneWidget);
+      expect(find.text('Abonnements'), findsNothing);
+    },
+  );
 }

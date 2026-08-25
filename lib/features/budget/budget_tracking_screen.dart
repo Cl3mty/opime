@@ -174,6 +174,69 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
     });
   }
 
+  Future<void> _renameCategory(
+    BudgetCategoryScope scope,
+    String oldName,
+    String newName,
+  ) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty || trimmed == oldName) return;
+    final updated = await _categoriesRepo.renameCategory(
+      scope,
+      oldName,
+      trimmed,
+    );
+    setState(() {
+      if (scope == BudgetCategoryScope.factures) {
+        _facturesCategories = updated;
+      } else {
+        _depensesCategories = updated;
+      }
+    });
+    _relabelCategoryInCurrentMonth(scope, oldName, trimmed);
+  }
+
+  Future<void> _deleteCategory(BudgetCategoryScope scope, String name) async {
+    final updated = await _categoriesRepo.removeCategory(scope, name);
+    setState(() {
+      if (scope == BudgetCategoryScope.factures) {
+        _facturesCategories = updated;
+      } else {
+        _depensesCategories = updated;
+      }
+    });
+    _relabelCategoryInCurrentMonth(scope, name, '');
+  }
+
+  /// Une catégorie renommée ou supprimée doit se refléter sur les lignes du
+  /// mois affiché qui l'utilisaient encore, sinon leur puce resterait
+  /// figée sur un nom absent de [_facturesCategories]/[_depensesCategories]
+  /// et introuvable en rouvrant le picker. Passe par [_update] (donc
+  /// Annuler/Rétablir + persistance) uniquement si une ligne est
+  /// réellement concernée, pour ne pas polluer l'historique sinon.
+  void _relabelCategoryInCurrentMonth(
+    BudgetCategoryScope scope,
+    String oldName,
+    String newName,
+  ) {
+    final data = _data;
+    if (data == null) return;
+    final items = scope == BudgetCategoryScope.factures
+        ? data.factures
+        : data.depenses;
+    if (!items.any((i) => i.category == oldName)) return;
+
+    List<TrackingItem> relabel(List<TrackingItem> list) => [
+      for (final i in list)
+        if (i.category == oldName) i.copyWith(category: newName) else i,
+    ];
+    _update(
+      (d) => scope == BudgetCategoryScope.factures
+          ? d.copyWith(factures: relabel(d.factures))
+          : d.copyWith(depenses: relabel(d.depenses)),
+    );
+  }
+
   void _changeMonth(int delta) {
     var newMonth = _month + delta;
     var newYear = _year;
@@ -348,6 +411,13 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         categories: _facturesCategories,
                         onCreateCategory: (name) =>
                             _createCategory(BudgetCategoryScope.factures, name),
+                        onRenameCategory: (oldName, newName) => _renameCategory(
+                          BudgetCategoryScope.factures,
+                          oldName,
+                          newName,
+                        ),
+                        onDeleteCategory: (name) =>
+                            _deleteCategory(BudgetCategoryScope.factures, name),
                         hidden: hidden,
                       );
                       final col3 = _CategoryCard(
@@ -360,6 +430,13 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         categories: _depensesCategories,
                         onCreateCategory: (name) =>
                             _createCategory(BudgetCategoryScope.depenses, name),
+                        onRenameCategory: (oldName, newName) => _renameCategory(
+                          BudgetCategoryScope.depenses,
+                          oldName,
+                          newName,
+                        ),
+                        onDeleteCategory: (name) =>
+                            _deleteCategory(BudgetCategoryScope.depenses, name),
                         hidden: hidden,
                       );
                       final col4 = Column(
@@ -1070,6 +1147,8 @@ class _CategoryCard extends StatelessWidget {
   final ValueChanged<List<TrackingItem>> onChanged;
   final List<String>? categories;
   final ValueChanged<String>? onCreateCategory;
+  final void Function(String oldName, String newName)? onRenameCategory;
+  final ValueChanged<String>? onDeleteCategory;
   final bool hidden;
 
   const _CategoryCard({
@@ -1080,6 +1159,8 @@ class _CategoryCard extends StatelessWidget {
     required this.onChanged,
     this.categories,
     this.onCreateCategory,
+    this.onRenameCategory,
+    this.onDeleteCategory,
     required this.hidden,
   });
 
@@ -1227,6 +1308,8 @@ class _CategoryCard extends StatelessWidget {
                                             i,
                                       ]);
                                     },
+                                    onRenameCategory: onRenameCategory,
+                                    onDeleteCategory: onDeleteCategory,
                                   ),
                                   const Spacer(),
                                   SizedBox(
@@ -1599,11 +1682,20 @@ class _CategoryChipPicker extends StatefulWidget {
   final ValueChanged<String> onSelected;
   final ValueChanged<String> onCreateNew;
 
+  /// Édition/suppression d'une catégorie de la liste elle-même (pas de la
+  /// sélection de CETTE ligne) — absents (`null`) pour les colonnes sans
+  /// picker de catégorie ; toujours fournis ensemble par l'écran pour
+  /// Factures/Dépenses, voir `_CategoryCard.onRenameCategory`.
+  final void Function(String oldName, String newName)? onRenameCategory;
+  final ValueChanged<String>? onDeleteCategory;
+
   const _CategoryChipPicker({
     required this.category,
     required this.categories,
     required this.onSelected,
     required this.onCreateNew,
+    this.onRenameCategory,
+    this.onDeleteCategory,
   });
 
   @override
@@ -1620,50 +1712,126 @@ class _CategoryChipPickerState extends State<_CategoryChipPicker> {
   }
 
   void _openPicker(BuildContext anchorContext) {
-    showDropdown(
+    // Éditer ou supprimer une catégorie change la liste que ce picker a
+    // capturée (`widget.categories`) : plutôt que de tenter de refléter ce
+    // changement en direct dans le menu encore ouvert, on referme
+    // simplement le menu après l'action — le rouvrir montre la liste à
+    // jour. `editingCategory` ne gère que le repli local du champ de
+    // renommage, avant confirmation.
+    String? editingCategory;
+    final editController = TextEditingController();
+    late final OverlayCompleter completer;
+
+    completer = showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.bottomStart,
       alignment: AlignmentDirectional.topStart,
       offset: const Offset(0, 4),
       builder: (context) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 200, maxWidth: 260),
-          child: DropdownMenu(
-            children: [
-              for (final cat in widget.categories)
-                MenuButton(
-                  trailing: cat == widget.category
-                      ? const Icon(LucideIcons.check, size: 14)
-                      : null,
-                  child: shadcn.Text(cat),
-                  onPressed: (ctx) => widget.onSelected(cat),
-                ),
-              const MenuDivider(),
-              MenuButton(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _newCategoryController,
-                        placeholder: const shadcn.Text('Nouvelle catégorie'),
-                        border: Border.all(color: Colors.transparent),
-                      ),
+        return StatefulBuilder(
+          builder: (context, setPickerState) {
+            void confirmRename(String cat) {
+              final newName = editController.text.trim();
+              setPickerState(() => editingCategory = null);
+              if (newName.isEmpty || newName == cat) return;
+              widget.onRenameCategory?.call(cat, newName);
+              completer.remove();
+            }
+
+            return ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
+              child: DropdownMenu(
+                children: [
+                  for (final cat in widget.categories)
+                    editingCategory == cat
+                        ? MenuButton(
+                            onPressed: (ctx) {},
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: editController,
+                                    autofocus: true,
+                                    border: Border.all(
+                                      color: Colors.transparent,
+                                    ),
+                                    onSubmitted: (_) => confirmRename(cat),
+                                  ),
+                                ),
+                                IconButton.ghost(
+                                  icon: const Icon(
+                                    LucideIcons.check,
+                                    size: 14,
+                                  ),
+                                  onPressed: () => confirmRename(cat),
+                                ),
+                              ],
+                            ),
+                          )
+                        : MenuButton(
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (cat == widget.category)
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 4),
+                                    child: Icon(LucideIcons.check, size: 14),
+                                  ),
+                                if (widget.onRenameCategory != null)
+                                  IconButton.ghost(
+                                    icon: const Icon(
+                                      LucideIcons.pencil,
+                                      size: 12,
+                                    ),
+                                    onPressed: () => setPickerState(() {
+                                      editingCategory = cat;
+                                      editController.text = cat;
+                                    }),
+                                  ),
+                                if (widget.onDeleteCategory != null)
+                                  IconButton.ghost(
+                                    icon: const Icon(
+                                      LucideIcons.trash2,
+                                      size: 12,
+                                    ),
+                                    onPressed: () {
+                                      widget.onDeleteCategory!(cat);
+                                      completer.remove();
+                                    },
+                                  ),
+                              ],
+                            ),
+                            child: shadcn.Text(cat),
+                            onPressed: (ctx) => widget.onSelected(cat),
+                          ),
+                  const MenuDivider(),
+                  MenuButton(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _newCategoryController,
+                            placeholder: const shadcn.Text('Nouvelle catégorie'),
+                            border: Border.all(color: Colors.transparent),
+                          ),
+                        ),
+                        IconButton.ghost(
+                          icon: const Icon(LucideIcons.plus, size: 14),
+                          onPressed: () {
+                            final name = _newCategoryController.text.trim();
+                            if (name.isEmpty) return;
+                            widget.onCreateNew(name);
+                            _newCategoryController.clear();
+                          },
+                        ),
+                      ],
                     ),
-                    IconButton.ghost(
-                      icon: const Icon(LucideIcons.plus, size: 14),
-                      onPressed: () {
-                        final name = _newCategoryController.text.trim();
-                        if (name.isEmpty) return;
-                        widget.onCreateNew(name);
-                        _newCategoryController.clear();
-                      },
-                    ),
-                  ],
-                ),
-                onPressed: (ctx) {},
+                    onPressed: (ctx) {},
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

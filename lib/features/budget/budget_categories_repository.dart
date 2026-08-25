@@ -128,4 +128,36 @@ class BudgetCategoriesRepository {
     }
     return all;
   }
+
+  /// Si [newName] correspond déjà à une autre catégorie existante,
+  /// [oldName] est simplement retirée plutôt que dupliquée — l'appelant
+  /// (voir `budget_tracking_screen.dart`) est responsable de reclasser les
+  /// lignes qui utilisaient [oldName] vers [newName].
+  Future<List<String>> renameCategory(
+    BudgetCategoryScope scope,
+    String oldName,
+    String newName,
+  ) async {
+    final trimmed = newName.trim();
+    final all = await load(scope);
+    final index = all.indexOf(oldName);
+    if (index == -1 || trimmed.isEmpty) return all;
+    if (trimmed != oldName && all.contains(trimmed)) {
+      all.removeAt(index);
+    } else {
+      all[index] = trimmed;
+    }
+    await save(scope, all);
+    return all;
+  }
+
+  Future<List<String>> removeCategory(
+    BudgetCategoryScope scope,
+    String name,
+  ) async {
+    final all = await load(scope);
+    all.remove(name);
+    await save(scope, all);
+    return all;
+  }
 }

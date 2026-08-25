@@ -94,6 +94,97 @@ void main() {
   );
 
   test(
+    'renameCategory renomme en place, sans changer l\'ordre, et ne touche '
+    'pas l\'autre scope',
+    () async {
+      await repo.load(BudgetCategoryScope.factures);
+      await repo.save(BudgetCategoryScope.factures, [
+        'Loyer',
+        'Assurance',
+        'Abonnements',
+      ]);
+
+      final result = await repo.renameCategory(
+        BudgetCategoryScope.factures,
+        'Assurance',
+        'Assurances',
+      );
+      expect(result, ['Loyer', 'Assurances', 'Abonnements']);
+      expect(await repo.load(BudgetCategoryScope.factures), [
+        'Loyer',
+        'Assurances',
+        'Abonnements',
+      ]);
+      expect(
+        await repo.load(BudgetCategoryScope.depenses),
+        BudgetCategoriesRepository.depensesDefaults,
+      );
+    },
+  );
+
+  test(
+    'renameCategory vers un nom déjà existant fusionne : l\'ancien nom '
+    'disparaît plutôt que de créer un doublon',
+    () async {
+      await repo.load(BudgetCategoryScope.factures);
+      await repo.save(BudgetCategoryScope.factures, [
+        'Assurance',
+        'Assurances',
+      ]);
+
+      final result = await repo.renameCategory(
+        BudgetCategoryScope.factures,
+        'Assurance',
+        'Assurances',
+      );
+      expect(result, ['Assurances']);
+    },
+  );
+
+  test(
+    'renameCategory est un no-op si l\'ancien nom n\'existe pas dans la '
+    'liste',
+    () async {
+      await repo.load(BudgetCategoryScope.factures);
+      await repo.save(BudgetCategoryScope.factures, ['Loyer']);
+
+      final result = await repo.renameCategory(
+        BudgetCategoryScope.factures,
+        'Introuvable',
+        'Peu importe',
+      );
+      expect(result, ['Loyer']);
+    },
+  );
+
+  test(
+    'removeCategory retire la catégorie de la liste, sans affecter '
+    'l\'autre scope',
+    () async {
+      await repo.load(BudgetCategoryScope.factures);
+      await repo.save(BudgetCategoryScope.factures, [
+        'Loyer',
+        'Assurance',
+        'Abonnements',
+      ]);
+
+      final result = await repo.removeCategory(
+        BudgetCategoryScope.factures,
+        'Assurance',
+      );
+      expect(result, ['Loyer', 'Abonnements']);
+      expect(await repo.load(BudgetCategoryScope.factures), [
+        'Loyer',
+        'Abonnements',
+      ]);
+      expect(
+        await repo.load(BudgetCategoryScope.depenses),
+        BudgetCategoriesRepository.depensesDefaults,
+      );
+    },
+  );
+
+  test(
     'un contenu de fichier corrompu retombe sur les valeurs par défaut '
     'du scope concerné',
     () async {
