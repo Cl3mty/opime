@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
+import '../../../core/ui/donut_hover.dart';
 import 'allocation_blocks_view.dart';
 import 'allocation_hover_tooltip.dart';
 
@@ -38,31 +39,18 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
     final center = size.center(Offset.zero);
     final radius = math.min(size.width, size.height) / 2;
     final strokeWidth = radius * 0.34;
-    final innerRadius = radius - strokeWidth;
-    final distance = (localPosition - center).distance;
-    if (distance < innerRadius || distance > radius) {
-      setState(() {
-        _hoveredId = null;
-        _pointer = localPosition;
-      });
-      return;
-    }
-    var angle =
-        math.atan2(localPosition.dy - center.dy, localPosition.dx - center.dx) +
-        math.pi / 2;
-    if (angle < 0) angle += 2 * math.pi;
-    var cursor = 0.0;
-    String? hoveredId;
-    for (final slice in widget.slices) {
-      final sweep = slice.percent / 100 * 2 * math.pi;
-      if (angle >= cursor && angle < cursor + sweep) {
-        hoveredId = slice.id;
-        break;
-      }
-      cursor += sweep;
-    }
+    // Même filtrage que [build]/[_DonutPainter] (une part à 0 % ne
+    // dessine rien, elle ne doit donc pas non plus compter ici).
+    final slices = widget.slices.where((s) => s.percent > 0).toList();
+    final hoveredIndex = hitTestDonutSlice(
+      point: localPosition,
+      center: center,
+      radius: radius,
+      strokeWidth: strokeWidth,
+      values: [for (final s in slices) s.percent],
+    );
     setState(() {
-      _hoveredId = hoveredId;
+      _hoveredId = hoveredIndex == null ? null : slices[hoveredIndex].id;
       _pointer = localPosition;
     });
   }
