@@ -1,4 +1,6 @@
 import '../../features/budget/budget_repository.dart';
+import '../../features/budget/budget_tracking_models.dart';
+import '../../features/budget/budget_tracking_repository.dart';
 import '../../features/investments/investments_models.dart';
 import '../../features/investments/investments_repository.dart';
 import '../../features/investments/performance_calculator.dart';
@@ -40,13 +42,20 @@ class AssistantContextBuilder {
   static const _maxNoteChars = 1500;
   static const _maxSimulationChars = 2500;
 
-  /// Synthèse complète du profil : investissements, budget, notes de
-  /// stratégie et simulations.
+  /// Nombre de mois de Suivi budgétaire remontés (voir
+  /// [_buildBudgetTrackingSection]) — un an, pour couvrir un "résumé
+  /// annuel" typique sans faire exploser la taille du contexte.
+  static const _maxTrackingMonths = 12;
+  static const _maxBudgetTrackingChars = 4000;
+
+  /// Synthèse complète du profil : investissements, budget (prévisionnel
+  /// puis suivi mensuel réel), notes de stratégie et simulations.
   Future<String> buildPatrimoineContext() async {
     final sections = <String>[
       '## Synthèse du patrimoine',
       await _buildInvestmentsSection(),
       await _buildBudgetSection(),
+      await _buildBudgetTrackingSection(),
       await _buildStrategySection(),
       await _buildSimulationsSection(),
     ];
@@ -172,6 +181,79 @@ class AssistantContextBuilder {
       }
     }
     return out.toString().trimRight();
+  }
+
+  /// Suivi budgétaire mensuel réel (Suivi des budgets,
+  /// `budget_tracking_screen.dart`) — distinct de [_buildBudgetSection],
+  /// qui ne couvre que le budget *prévisionnel* (un modèle-type de mois,
+  /// sans historique daté). C'est ici, mois par mois, que vivent les
+  /// postes nommés réellement saisis (ex : une ligne "Amazon" dans
+  /// Factures ou Dépenses avec son montant Réalité) — sans cette section,
+  /// l'assistant ne peut répondre à aucune question portant sur une
+  /// dépense nommée ou son historique dans le temps, alors que
+  /// l'utilisateur les voit bien à l'écran.
+  Future<String> _buildBudgetTrackingSection() async {
+    final repo = BudgetTrackingRepository(vaultPath);
+    final now = DateTime.now();
+    final out = StringBuffer(
+      'Suivi budgétaire mensuel (montants réellement constatés, '
+      'par mois) :\n',
+    );
+    var totalChars = 0;
+    var monthsIncluded = 0;
+
+    for (var i = 0; i < _maxTrackingMonths; i++) {
+      final date = DateTime(now.year, now.month - i);
+      final month = await repo.load(date.year, date.month);
+      if (_isEmptyTrackingMonth(month)) continue;
+
+      final buffer = StringBuffer();
+      buffer.writeln(
+        '### ${date.month.toString().padLeft(2, '0')}/${date.year}',
+      );
+      _writeTrackingItems(buffer, 'Revenus', month.revenues);
+      _writeTrackingItems(buffer, 'Factures', month.factures);
+      _writeTrackingItems(buffer, 'Dépenses', month.depenses);
+      _writeTrackingItems(buffer, 'Invest/Épargne', month.investEpargnes);
+      _writeTrackingItems(buffer, 'Projets', month.projets);
+      _writeTrackingItems(buffer, 'Dettes', month.dettes);
+
+      final text = buffer.toString();
+      if (totalChars + text.length > _maxBudgetTrackingChars) break;
+      out.write(text);
+      totalChars += text.length;
+      monthsIncluded++;
+    }
+
+    if (monthsIncluded == 0) {
+      return 'Aucun suivi budgétaire mensuel n\'a encore été renseigné.';
+    }
+    return out.toString().trimRight();
+  }
+
+  bool _isEmptyTrackingMonth(BudgetTrackingMonth month) =>
+      month.revenues.isEmpty &&
+      month.factures.isEmpty &&
+      month.depenses.isEmpty &&
+      month.investEpargnes.isEmpty &&
+      month.projets.isEmpty &&
+      month.dettes.isEmpty;
+
+  void _writeTrackingItems(
+    StringBuffer buffer,
+    String label,
+    List<TrackingItem> items,
+  ) {
+    final parts = [
+      for (final item in items)
+        if (item.realite != 0 || item.budget != 0)
+          '${item.name.isEmpty ? '(sans nom)' : item.name}'
+          '${item.category.isEmpty ? '' : ' [${item.category}]'}'
+          ' : réalité ${formatEuros(item.realite)}'
+          '${item.budget != 0 ? ', budget ${formatEuros(item.budget)}' : ''}',
+    ];
+    if (parts.isEmpty) return;
+    buffer.writeln('- $label : ${parts.join(' ; ')}');
   }
 
   Future<String> _buildStrategySection() async {
