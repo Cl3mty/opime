@@ -1,13 +1,37 @@
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/material.dart' show Colors;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/expression_calculator.dart';
 import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
+import '../../core/ui/donut_hover.dart';
 import '../../core/ui/frosted_card.dart';
+import '../dashboard/widgets/allocation_hover_tooltip.dart';
 import 'budget_tracking_models.dart';
 import 'budget_tracking_repository.dart';
 import 'budget_categories_repository.dart';
+import 'budget_tracking_sankey.dart';
+
+/// Annuler/Rétablir (⌘Z/⌘⇧Z sur macOS, Ctrl équivalent ailleurs) — propre
+/// à cet écran (pas de la liste globale `AppShortcutAction`, réservée aux
+/// raccourcis valables dans toute l'app) : n'a de sens que sur l'historique
+/// d'édition du mois de Suivi actuellement affiché.
+final _undoActivator = SingleActivator(
+  LogicalKeyboardKey.keyZ,
+  meta: Platform.isMacOS,
+  control: !Platform.isMacOS,
+);
+final _redoActivator = SingleActivator(
+  LogicalKeyboardKey.keyZ,
+  meta: Platform.isMacOS,
+  control: !Platform.isMacOS,
+  shift: true,
+);
+final _undoShortcutLabel = Platform.isMacOS ? '⌘Z' : 'Ctrl+Z';
+final _redoShortcutLabel = Platform.isMacOS ? '⌘⇧Z' : 'Ctrl+Maj+Z';
 
 const _moisNoms = [
   'Janvier',
@@ -27,6 +51,17 @@ const _moisNoms = [
 // Palette alignée sur Ventilation : vert = entrées, rouge = dépenses, or = investissements.
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
+
+// Couleurs distinctes (pas de simples variantes d'opacité d'une même
+// teinte, trop peu contrastées pour se distinguer à l'œil — voir
+// [_DistributionCardState._slices]) pour Dépenses/Projets/Dettes, tout en
+// restant dans la même famille "sorties d'argent" que Factures (_red) —
+// mêmes couleurs déjà utilisées ailleurs dans l'app pour ces catégories
+// (voir `real_passifs_adapter.dart`'s `_categoryMeta` pour Dettes, la
+// palette d'avatars du Dashboard pour Projets).
+const _orange = Color(0xFFF97316);
+const _pink = Color(0xFFF472B6);
+const _maroon = Color(0xFFDC2626);
 
 class BudgetTrackingScreen extends StatefulWidget {
   final String vaultPath;
@@ -50,8 +85,25 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
   late int _year;
   late int _month;
   BudgetTrackingMonth? _data;
-  List<String> _categories = [];
+
+  /// Deux listes distinctes — une facture (loyer, abonnements...) et une
+  /// dépense (courses, loisirs...) n'ont pas vocation à partager le même
+  /// classement, voir [BudgetCategoryScope].
+  List<String> _facturesCategories = [];
+  List<String> _depensesCategories = [];
   bool _loading = true;
+
+  /// Historique d'édition du mois affiché (Annuler/Rétablir, ⌘Z/⌘⇧Z) —
+  /// un instantané complet de [_data] avant chaque modification, de sorte
+  /// qu'annuler une suppression (une ligne, ou n'importe quel autre champ)
+  /// la restitue telle quelle plutôt que de tenter de "réparer" la
+  /// modification a posteriori. Vidé à chaque chargement de mois (voir
+  /// [_load]) : annuler ne doit jamais faire ressurgir l'état d'un autre
+  /// mois. Plafonné pour ne pas accumuler indéfiniment en mémoire pendant
+  /// une longue session d'édition.
+  final List<BudgetTrackingMonth> _undoStack = [];
+  final List<BudgetTrackingMonth> _redoStack = [];
+  static const _maxHistory = 50;
 
   @override
   void initState() {
@@ -65,11 +117,19 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final data = await _repo.load(_year, _month);
-    final categories = await _categoriesRepo.load();
+    final facturesCategories = await _categoriesRepo.load(
+      BudgetCategoryScope.factures,
+    );
+    final depensesCategories = await _categoriesRepo.load(
+      BudgetCategoryScope.depenses,
+    );
     setState(() {
       _data = data;
-      _categories = categories;
+      _facturesCategories = facturesCategories;
+      _depensesCategories = depensesCategories;
       _loading = false;
+      _undoStack.clear();
+      _redoStack.clear();
     });
   }
 
@@ -80,13 +140,38 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
 
   void _update(BudgetTrackingMonth Function(BudgetTrackingMonth) updater) {
     if (_data == null) return;
+    _undoStack.add(_data!);
+    if (_undoStack.length > _maxHistory) _undoStack.removeAt(0);
+    _redoStack.clear();
     setState(() => _data = updater(_data!));
     _save();
   }
 
-  Future<void> _createCategory(String name) async {
-    final updated = await _categoriesRepo.addCategory(name);
-    setState(() => _categories = updated);
+  void _undo() {
+    if (_undoStack.isEmpty || _data == null) return;
+    _redoStack.add(_data!);
+    final previous = _undoStack.removeLast();
+    setState(() => _data = previous);
+    _save();
+  }
+
+  void _redo() {
+    if (_redoStack.isEmpty || _data == null) return;
+    _undoStack.add(_data!);
+    final next = _redoStack.removeLast();
+    setState(() => _data = next);
+    _save();
+  }
+
+  Future<void> _createCategory(BudgetCategoryScope scope, String name) async {
+    final updated = await _categoriesRepo.addCategory(scope, name);
+    setState(() {
+      if (scope == BudgetCategoryScope.factures) {
+        _facturesCategories = updated;
+      } else {
+        _depensesCategories = updated;
+      }
+    });
   }
 
   void _changeMonth(int delta) {
@@ -111,10 +196,28 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
     if (_loading || _data == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    return AnimatedBuilder(
-      animation: widget.amountVisibility,
-      builder: (context, _) =>
-          _buildContent(context, widget.amountVisibility.hidden),
+    // `CallbackShortcuts` n'intercepte les touches que si le nœud
+    // actuellement focus est l'un de SES descendants (les évènements
+    // remontent depuis le focus vers ses ancêtres) : le `Focus(autofocus)`
+    // doit donc être À L'INTÉRIEUR, pas au-dessus — sinon c'est lui qui
+    // tient le focus, et les touches remontent au-delà de
+    // `CallbackShortcuts` sans jamais le traverser. `autofocus` reste
+    // nécessaire malgré tout : sans aucun descendant focus (ex : avant le
+    // premier clic dans une cellule), aucune touche n'aurait de nœud focus
+    // depuis lequel remonter.
+    return CallbackShortcuts(
+      bindings: {
+        _undoActivator: _undo,
+        _redoActivator: _redo,
+      },
+      child: Focus(
+        autofocus: true,
+        child: AnimatedBuilder(
+          animation: widget.amountVisibility,
+          builder: (context, _) =>
+              _buildContent(context, widget.amountVisibility.hidden),
+        ),
+      ),
     );
   }
 
@@ -135,6 +238,32 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // -------------------- Annuler / Rétablir --------------------
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Tooltip(
+                        tooltip: (context) => TooltipContainer(
+                          child: shadcn.Text('Annuler ($_undoShortcutLabel)'),
+                        ),
+                        child: IconButton.ghost(
+                          icon: const Icon(LucideIcons.undo2, size: 18),
+                          onPressed: _undoStack.isEmpty ? null : _undo,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Tooltip(
+                        tooltip: (context) => TooltipContainer(
+                          child: shadcn.Text('Rétablir ($_redoShortcutLabel)'),
+                        ),
+                        child: IconButton.ghost(
+                          icon: const Icon(LucideIcons.redo2, size: 18),
+                          onPressed: _redoStack.isEmpty ? null : _redo,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   // -------------------- Ligne du haut : titre + 3 visuels --------------------
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -216,8 +345,9 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         idPrefix: 'facture',
                         onChanged: (items) =>
                             _update((d) => d.copyWith(factures: items)),
-                        categories: _categories,
-                        onCreateCategory: _createCategory,
+                        categories: _facturesCategories,
+                        onCreateCategory: (name) =>
+                            _createCategory(BudgetCategoryScope.factures, name),
                         hidden: hidden,
                       );
                       final col3 = _CategoryCard(
@@ -227,8 +357,9 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         idPrefix: 'depense',
                         onChanged: (items) =>
                             _update((d) => d.copyWith(depenses: items)),
-                        categories: _categories,
-                        onCreateCategory: _createCategory,
+                        categories: _depensesCategories,
+                        onCreateCategory: (name) =>
+                            _createCategory(BudgetCategoryScope.depenses, name),
                         hidden: hidden,
                       );
                       final col4 = Column(
@@ -294,6 +425,13 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                       );
                     },
                   ),
+                  // -------------------- Flux du mois (Sankey) --------------------
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 20),
+                  shadcn.Text('Flux du mois').muted().small(),
+                  const SizedBox(height: 12),
+                  BudgetTrackingSankeyChart(data: data, hidden: hidden),
                 ],
               ),
             ),
@@ -580,21 +718,62 @@ class _ComparisonPainter extends CustomPainter {
 // Répartition (donut)
 // ---------------------------------------------------------------------
 
-class _DistributionCard extends StatelessWidget {
+/// Répartition Réalité entre Factures/Dépenses/Invest·Épargne/Projets/
+/// Dettes — même transformation au survol qu'`AllocationDonutView` (carte
+/// Allocation du Dashboard) : la section survolée s'isole (les autres
+/// s'estompent, dans l'anneau comme dans la légende) et un libellé + son
+/// pourcentage exact s'affichent près du curseur ([AllocationHoverTooltip],
+/// widget déjà partagé avec le Dashboard). Reste volontairement un
+/// [CustomPainter] compact et propre à cet écran plutôt qu'un remplacement
+/// direct par [AllocationDonutView] : cette dernière repose sur des
+/// `LayoutBuilder` dont la taille intrinsèque n'est pas définie, incompatible
+/// avec l'`IntrinsicHeight` de la rangée des 4 cartes du haut de page.
+class _DistributionCard extends StatefulWidget {
   final BudgetTrackingMonth data;
   final Color accent;
   const _DistributionCard({required this.data, required this.accent});
 
   @override
+  State<_DistributionCard> createState() => _DistributionCardState();
+}
+
+class _DistributionCardState extends State<_DistributionCard> {
+  int? _hoveredIndex;
+  Offset? _pointer;
+
+  List<(String, double, Color)> get _slices =>
+      [
+        ('Factures', widget.data.totalFacturesRealite, _red),
+        ('Dépenses', widget.data.totalDepensesRealite, _orange),
+        ('Invest/Épargne', widget.data.totalInvestRealite, widget.accent),
+        ('Projets', widget.data.totalProjetsRealite, _pink),
+        ('Dettes', widget.data.totalDettesRealite, _maroon),
+      ].where((s) => s.$2 > 0).toList();
+
+  void _updateHover(Offset localPosition, Size size, double total) {
+    final center = size.center(Offset.zero);
+    final radius = math.min(size.width, size.height) / 2 - 4;
+    final hoveredIndex = hitTestDonutSlice(
+      point: localPosition,
+      center: center,
+      radius: radius,
+      strokeWidth: 20.0,
+      values: [for (final s in _slices) s.$2],
+    );
+    setState(() {
+      _hoveredIndex = hoveredIndex;
+      _pointer = localPosition;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final slices = [
-      ('Factures', data.totalFacturesRealite, _red),
-      ('Dépenses', data.totalDepensesRealite, _red.withValues(alpha: 0.6)),
-      ('Invest/Épargne', data.totalInvestRealite, accent),
-      ('Projets', data.totalProjetsRealite, _red.withValues(alpha: 0.8)),
-      ('Dettes', data.totalDettesRealite, _red.withValues(alpha: 0.4)),
-    ].where((s) => s.$2 > 0).toList();
+    final slices = _slices;
     final total = slices.fold<double>(0, (s, e) => s + e.$2);
+    final hoveredIndex = _hoveredIndex;
+    final hovered = hoveredIndex != null && hoveredIndex < slices.length
+        ? slices[hoveredIndex]
+        : null;
 
     return Column(
       children: [
@@ -604,9 +783,50 @@ class _DistributionCard extends StatelessWidget {
           height: 90,
           child: total <= 0
               ? Center(child: shadcn.Text('Aucune donnée').muted())
-              : CustomPaint(
-                  size: Size.infinite,
-                  painter: _DonutPainter(slices: slices, total: total),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final size = Size(
+                      constraints.maxWidth,
+                      constraints.maxHeight,
+                    );
+                    return MouseRegion(
+                      onHover: (event) =>
+                          _updateHover(event.localPosition, size, total),
+                      onExit: (_) => setState(() {
+                        _hoveredIndex = null;
+                        _pointer = null;
+                      }),
+                      child: Stack(
+                        children: [
+                          CustomPaint(
+                            size: size,
+                            painter: _DonutPainter(
+                              slices: slices,
+                              total: total,
+                              hoveredIndex: hoveredIndex,
+                            ),
+                          ),
+                          if (hovered != null && _pointer != null)
+                            Positioned(
+                              left: (_pointer!.dx - 70).clamp(
+                                0.0,
+                                math.max(0.0, size.width - 140),
+                              ),
+                              top: (_pointer!.dy + 8).clamp(
+                                0.0,
+                                math.max(0.0, size.height - 36),
+                              ),
+                              child: IgnorePointer(
+                                child: AllocationHoverTooltip(
+                                  label: hovered.$1,
+                                  percent: hovered.$2 / total * 100,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
         ),
         if (total > 0) ...[
@@ -616,24 +836,31 @@ class _DistributionCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 4,
             children: [
-              for (final (label, value, color) in slices)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
+              for (var i = 0; i < slices.length; i++)
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 150),
+                  opacity: hoveredIndex != null && hoveredIndex != i
+                      ? 0.35
+                      : 1.0,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: slices[i].$3,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    shadcn.Text(
-                      '$label ${(value / total * 100).round()}%',
-                      style: const TextStyle(fontSize: 10),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      shadcn.Text(
+                        '${slices[i].$1} '
+                        '${(slices[i].$2 / total * 100).round()}%',
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
@@ -646,21 +873,29 @@ class _DistributionCard extends StatelessWidget {
 class _DonutPainter extends CustomPainter {
   final List<(String, double, Color)> slices;
   final double total;
-  _DonutPainter({required this.slices, required this.total});
+  final int? hoveredIndex;
+  _DonutPainter({
+    required this.slices,
+    required this.total,
+    required this.hoveredIndex,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - 4;
     const strokeWidth = 20.0;
+    final dimmed = hoveredIndex != null;
     var startAngle = -math.pi / 2;
 
-    for (final (_, value, color) in slices) {
+    for (var i = 0; i < slices.length; i++) {
+      final (_, value, color) = slices[i];
       final sweep = (value / total) * 2 * math.pi;
+      final isHovered = i == hoveredIndex;
       final paint = Paint()
-        ..color = color
+        ..color = color.withValues(alpha: dimmed && !isHovered ? 0.3 : 1.0)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth;
+        ..strokeWidth = dimmed && !isHovered ? strokeWidth * 0.95 : strokeWidth;
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
         startAngle,
@@ -674,7 +909,7 @@ class _DonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
-      oldDelegate.slices != slices;
+      oldDelegate.slices != slices || oldDelegate.hoveredIndex != hoveredIndex;
 }
 
 // ---------------------------------------------------------------------
@@ -893,17 +1128,39 @@ class _CategoryCard extends StatelessWidget {
                       const Spacer(),
                       SizedBox(
                         width: 60,
-                        child: shadcn.Text(
-                          'Budget',
-                          textAlign: TextAlign.end,
-                        ).muted().small(),
+                        child: Tooltip(
+                          tooltip: (context) => const TooltipContainer(
+                            child: SizedBox(
+                              width: 220,
+                              child: shadcn.Text(
+                                'Vous pouvez saisir un calcul directement '
+                                'dans la cellule (ex : 45+12,5).',
+                              ),
+                            ),
+                          ),
+                          child: shadcn.Text(
+                            'Budget',
+                            textAlign: TextAlign.end,
+                          ).muted().small(),
+                        ),
                       ),
                       SizedBox(
                         width: 60,
-                        child: shadcn.Text(
-                          'Réalité',
-                          textAlign: TextAlign.end,
-                        ).muted().small(),
+                        child: Tooltip(
+                          tooltip: (context) => const TooltipContainer(
+                            child: SizedBox(
+                              width: 220,
+                              child: shadcn.Text(
+                                'Vous pouvez saisir un calcul directement '
+                                'dans la cellule (ex : 45+12,5).',
+                              ),
+                            ),
+                          ),
+                          child: shadcn.Text(
+                            'Réalité',
+                            textAlign: TextAlign.end,
+                          ).muted().small(),
+                        ),
                       ),
                       const SizedBox(
                         width: 32,
@@ -974,31 +1231,16 @@ class _CategoryCard extends StatelessWidget {
                                   const Spacer(),
                                   SizedBox(
                                     width: 60,
-                                    child: TextField(
-                                      initialValue: item.budget == 0
-                                          ? ''
-                                          : item.budget.toStringAsFixed(0),
-                                      style: const TextStyle(fontSize: 12),
-                                      placeholder: shadcn.Text(
-                                        'Budget',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.mutedForeground,
-                                        ),
-                                      ),
-                                      textAlign: TextAlign.end,
-                                      border: Border.all(
-                                        color: Colors.transparent,
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (v) => onChanged([
+                                    child: _AmountCell(
+                                      value: item.budget,
+                                      formula: item.budgetFormula,
+                                      placeholder: 'Budget',
+                                      onChanged: (v, formula) => onChanged([
                                         for (final i in items)
                                           if (i.id == item.id)
                                             i.copyWith(
-                                              budget:
-                                                  parseDecimal(v) ?? 0,
+                                              budget: v,
+                                              budgetFormula: () => formula,
                                             )
                                           else
                                             i,
@@ -1007,31 +1249,16 @@ class _CategoryCard extends StatelessWidget {
                                   ),
                                   SizedBox(
                                     width: 60,
-                                    child: TextField(
-                                      initialValue: item.realite == 0
-                                          ? ''
-                                          : item.realite.toStringAsFixed(0),
-                                      style: const TextStyle(fontSize: 12),
-                                      placeholder: shadcn.Text(
-                                        'Réalité',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.mutedForeground,
-                                        ),
-                                      ),
-                                      textAlign: TextAlign.end,
-                                      border: Border.all(
-                                        color: Colors.transparent,
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (v) => onChanged([
+                                    child: _AmountCell(
+                                      value: item.realite,
+                                      formula: item.realiteFormula,
+                                      placeholder: 'Réalité',
+                                      onChanged: (v, formula) => onChanged([
                                         for (final i in items)
                                           if (i.id == item.id)
                                             i.copyWith(
-                                              realite:
-                                                  parseDecimal(v) ?? 0,
+                                              realite: v,
+                                              realiteFormula: () => formula,
                                             )
                                           else
                                             i,
@@ -1081,32 +1308,16 @@ class _CategoryCard extends StatelessWidget {
                               const SizedBox(width: 6),
                               SizedBox(
                                 width: 60,
-                                child: TextField(
-                                  initialValue: item.budget == 0
-                                      ? ''
-                                      : item.budget.toStringAsFixed(0),
-                                  style: const TextStyle(fontSize: 12),
-                                  placeholder: shadcn.Text(
-                                    'Budget',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.mutedForeground,
-                                    ),
-                                  ),
-                                  textAlign: TextAlign.end,
-                                  border: Border.all(color: Colors.transparent),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (v) => onChanged([
+                                child: _AmountCell(
+                                  value: item.budget,
+                                  formula: item.budgetFormula,
+                                  placeholder: 'Budget',
+                                  onChanged: (v, formula) => onChanged([
                                     for (final i in items)
                                       if (i.id == item.id)
                                         i.copyWith(
-                                          budget:
-                                              double.tryParse(
-                                                v.replaceAll(',', '.'),
-                                              ) ??
-                                              0,
+                                          budget: v,
+                                          budgetFormula: () => formula,
                                         )
                                       else
                                         i,
@@ -1115,32 +1326,16 @@ class _CategoryCard extends StatelessWidget {
                               ),
                               SizedBox(
                                 width: 60,
-                                child: TextField(
-                                  initialValue: item.realite == 0
-                                      ? ''
-                                      : item.realite.toStringAsFixed(0),
-                                  style: const TextStyle(fontSize: 12),
-                                  placeholder: shadcn.Text(
-                                    'Réalité',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.mutedForeground,
-                                    ),
-                                  ),
-                                  textAlign: TextAlign.end,
-                                  border: Border.all(color: Colors.transparent),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (v) => onChanged([
+                                child: _AmountCell(
+                                  value: item.realite,
+                                  formula: item.realiteFormula,
+                                  placeholder: 'Réalité',
+                                  onChanged: (v, formula) => onChanged([
                                     for (final i in items)
                                       if (i.id == item.id)
                                         i.copyWith(
-                                          realite:
-                                              double.tryParse(
-                                                v.replaceAll(',', '.'),
-                                              ) ??
-                                              0,
+                                          realite: v,
+                                          realiteFormula: () => formula,
                                         )
                                       else
                                         i,
@@ -1231,6 +1426,165 @@ class _CategoryCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------
+// Cellule Budget/Réalité : accepte un calcul basique
+// ---------------------------------------------------------------------
+
+/// Champ Budget/Réalité d'une ligne de [_CategoryCard] : accepte un simple
+/// nombre comme avant, mais aussi une expression arithmétique basique
+/// (+, -, *, /, parenthèses — voir `evaluateAmountExpression` dans
+/// `core/expression_calculator.dart`), pour calculer un montant directement
+/// dans la cellule (ex : "45+12,5" pour deux courses dans le mois) sans
+/// avoir à faire le calcul de tête ou dans une app séparée. Le résultat est
+/// propagé à [onChanged] dès que l'expression tapée devient valide (une
+/// expression encore incomplète, ex. "45+", n'écrase pas la dernière valeur
+/// valide). Comme un tableur : au repos (champ non sélectionné), le texte
+/// affiché est le résultat calculé, avec 2 décimales ; en cliquant dans la
+/// cellule, elle réaffiche la dernière expression tapée (ex : "45+12,5")
+/// plutôt que ce résultat seul, pour permettre de la corriger sans devoir
+/// tout retaper — y compris après avoir quitté puis rouvert la page ou le
+/// mois, l'expression étant persistée avec le résultat (voir
+/// [TrackingItem.budgetFormula]/[TrackingItem.realiteFormula]), pas juste
+/// gardée en mémoire pour la session en cours.
+class _AmountCell extends StatefulWidget {
+  final double value;
+
+  /// Dernière expression tapée, persistée (ex : "40+30" — voir
+  /// [TrackingItem.budgetFormula]/[TrackingItem.realiteFormula]). `null`
+  /// si la cellule n'a jamais été éditée via une expression (valeur
+  /// importée, saisie d'un simple nombre historique...). Contrairement à
+  /// une valeur transitoire en mémoire, cette formule survit à la
+  /// destruction du widget — en quittant puis en revenant sur ce mois,
+  /// la cellule peut donc encore montrer sa décomposition au lieu du
+  /// seul résultat.
+  final String? formula;
+
+  final String placeholder;
+
+  /// Appelé avec le résultat calculé et l'expression brute qui y a mené
+  /// (`null` si la cellule a été vidée) — les deux doivent être persistés
+  /// ensemble par l'appelant pour que [formula] reste disponible après un
+  /// remontage du widget.
+  final void Function(double value, String? formula) onChanged;
+
+  const _AmountCell({
+    required this.value,
+    this.formula,
+    required this.placeholder,
+    required this.onChanged,
+  });
+
+  @override
+  State<_AmountCell> createState() => _AmountCellState();
+}
+
+class _AmountCellState extends State<_AmountCell> {
+  late final TextEditingController _controller = TextEditingController(
+    text: _format(widget.value),
+  );
+  late final FocusNode _focusNode = FocusNode()
+    ..addListener(_handleFocusChange);
+
+  /// Dernier texte tapé dans le champ (ex : "40+30"), réaffiché quand la
+  /// cellule reprend le focus — voir [_handleFocusChange]. Amorcé depuis
+  /// [_AmountCell.formula] (persisté) plutôt que toujours `null`, pour que
+  /// la décomposition du calcul reste consultable même après un remontage
+  /// du widget (ex : en quittant puis en revenant sur ce mois) — pas
+  /// seulement pendant la session en cours.
+  late String? _lastTypedText = widget.formula;
+
+  /// `true` pendant qu'on modifie [_controller.text] nous-mêmes
+  /// (programmatique, pas une frappe de l'utilisateur) — voir
+  /// [_handleFocusChange]. `TextField` (shadcn_flutter) écoute directement
+  /// le controller et redéclenche [_handleChanged] pour TOUT changement de
+  /// texte, y compris ceux qu'on déclenche nous-mêmes (ex : remplacer
+  /// "40+10" par son résultat "50,00" au moment de quitter la cellule) —
+  /// sans ce garde-fou, ce remplacement se rappelle lui-même comme une
+  /// nouvelle saisie ("50,00", un nombre valide) et écrase silencieusement
+  /// la vraie formule qu'on venait tout juste de persister correctement à
+  /// la ligne suivante.
+  bool _isProgrammaticTextChange = false;
+
+  String _format(double value) => value == 0 ? '' : value.toStringAsFixed(2);
+
+  void _handleChanged(String text) {
+    if (_isProgrammaticTextChange) return;
+    final evaluated = evaluateAmountExpression(text);
+    if (evaluated != null) widget.onChanged(evaluated, text);
+  }
+
+  void _setControllerText(String text, {TextSelection? selection}) {
+    _isProgrammaticTextChange = true;
+    _controller.text = text;
+    if (selection != null) _controller.selection = selection;
+    _isProgrammaticTextChange = false;
+  }
+
+  /// À la prise de focus, réaffiche la dernière expression tapée (ex :
+  /// "40+30") plutôt que le résultat calculé affiché au repos ("70,00") —
+  /// comme un tableur qui montre la formule d'une cellule sélectionnée et
+  /// son résultat une fois qu'on la quitte, pour pouvoir la corriger sans
+  /// devoir la retaper entièrement. Le texte est sélectionné en entier,
+  /// prêt à être remplacé d'un coup si besoin.
+  ///
+  /// À la perte du focus, l'expression tapée est réévaluée une dernière
+  /// fois et le texte affiché est remplacé par le résultat — un champ vidé
+  /// retombe sur 0 (comme avant), mais une expression laissée incomplète
+  /// (ex. l'utilisateur clique ailleurs juste après avoir tapé "45+") ne
+  /// doit pas effacer la dernière valeur valide déjà propagée par
+  /// [_handleChanged] : elle retombe alors sur [widget.value] plutôt que 0.
+  void _handleFocusChange() {
+    if (_focusNode.hasFocus) {
+      final lastTyped = _lastTypedText;
+      if (lastTyped != null) {
+        _setControllerText(
+          lastTyped,
+          selection: TextSelection(
+            baseOffset: 0,
+            extentOffset: lastTyped.length,
+          ),
+        );
+      }
+      return;
+    }
+    final text = _controller.text.trim();
+    final evaluated = text.isEmpty
+        ? 0.0
+        : evaluateAmountExpression(text) ?? widget.value;
+    _lastTypedText = text.isEmpty ? null : text;
+    _setControllerText(_format(evaluated));
+    if (evaluated != widget.value || _lastTypedText != widget.formula) {
+      widget.onChanged(evaluated, _lastTypedText);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      focusNode: _focusNode,
+      style: const TextStyle(fontSize: 12),
+      placeholder: shadcn.Text(
+        widget.placeholder,
+        style: TextStyle(
+          fontSize: 10,
+          color: Theme.of(context).colorScheme.mutedForeground,
+        ),
+      ),
+      textAlign: TextAlign.end,
+      border: Border.all(color: Colors.transparent),
+      onChanged: _handleChanged,
     );
   }
 }

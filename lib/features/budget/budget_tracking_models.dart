@@ -18,6 +18,18 @@ class TrackingItem {
   final bool checked;
   final String category; // vide = non catégorisé
 
+  /// Dernière expression tapée dans la cellule Budget/Réalité (ex :
+  /// "40+10"), si elle diffère du résultat calculé — voir `_AmountCell`
+  /// dans `budget_tracking_screen.dart`. `null` tant que la cellule n'a
+  /// jamais été éditée via une expression (valeur importée, saisie
+  /// initiale...). Persistée pour rester visible en revenant sur la
+  /// cellule après avoir quitté puis rouvert la page/le mois — sans ça,
+  /// seul le résultat calculé survivrait, la décomposition du calcul
+  /// (et la possibilité de la corriger) disparaissant dès que le widget
+  /// de la cellule est reconstruit.
+  final String? budgetFormula;
+  final String? realiteFormula;
+
   TrackingItem({
     String? id,
     required this.name,
@@ -25,6 +37,8 @@ class TrackingItem {
     required this.realite,
     this.checked = false,
     this.category = '',
+    this.budgetFormula,
+    this.realiteFormula,
   }) : id = id ?? generateTrackingItemId('item');
 
   TrackingItem copyWith({
@@ -33,6 +47,8 @@ class TrackingItem {
     double? realite,
     bool? checked,
     String? category,
+    String? Function()? budgetFormula,
+    String? Function()? realiteFormula,
   }) => TrackingItem(
     id: id,
     name: name ?? this.name,
@@ -40,6 +56,10 @@ class TrackingItem {
     realite: realite ?? this.realite,
     checked: checked ?? this.checked,
     category: category ?? this.category,
+    budgetFormula: budgetFormula != null ? budgetFormula() : this.budgetFormula,
+    realiteFormula: realiteFormula != null
+        ? realiteFormula()
+        : this.realiteFormula,
   );
 
   factory TrackingItem.fromJson(Map<String, dynamic> json) => TrackingItem(
@@ -49,6 +69,8 @@ class TrackingItem {
     realite: (json['realite'] as num?)?.toDouble() ?? 0,
     checked: json['checked'] as bool? ?? false,
     category: json['category'] as String? ?? '',
+    budgetFormula: json['budgetFormula'] as String?,
+    realiteFormula: json['realiteFormula'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -58,6 +80,8 @@ class TrackingItem {
     'realite': realite,
     'checked': checked,
     'category': category,
+    if (budgetFormula != null) 'budgetFormula': budgetFormula,
+    if (realiteFormula != null) 'realiteFormula': realiteFormula,
   };
 }
 

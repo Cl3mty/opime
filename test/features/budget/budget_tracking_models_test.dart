@@ -40,6 +40,60 @@ void main() {
       expect(updated.realite, 850);
       expect(updated.checked, true);
     });
+
+    test(
+      'budgetFormula/realiteFormula (décomposition du calcul saisi dans '
+      'une cellule) survivent à un round-trip JSON',
+      () {
+        final item = TrackingItem(
+          id: 'x1',
+          name: 'Amazon',
+          budget: 50,
+          realite: 63.42,
+          budgetFormula: '25+25',
+          realiteFormula: '45,42+18',
+        );
+        final restored = TrackingItem.fromJson(item.toJson());
+        expect(restored.budgetFormula, '25+25');
+        expect(restored.realiteFormula, '45,42+18');
+      },
+    );
+
+    test(
+      'budgetFormula/realiteFormula restent `null` par défaut (valeur '
+      'saisie directement, sans calcul) et sont absents du JSON, pas '
+      'juste `null` dedans',
+      () {
+        final item = TrackingItem(name: 'Loyer', budget: 800, realite: 800);
+        expect(item.budgetFormula, isNull);
+        expect(item.realiteFormula, isNull);
+        expect(item.toJson().containsKey('budgetFormula'), isFalse);
+        expect(item.toJson().containsKey('realiteFormula'), isFalse);
+
+        final restored = TrackingItem.fromJson(item.toJson());
+        expect(restored.budgetFormula, isNull);
+        expect(restored.realiteFormula, isNull);
+      },
+    );
+
+    test(
+      'copyWith peut explicitement remettre budgetFormula/realiteFormula '
+      'à `null` (ex : cellule vidée) via le pattern fonction-retournant-'
+      'null, distinct de "ne pas y toucher"',
+      () {
+        final item = TrackingItem(
+          name: 'Amazon',
+          budget: 50,
+          realite: 50,
+          budgetFormula: '25+25',
+        );
+        final untouched = item.copyWith(realite: 60);
+        expect(untouched.budgetFormula, '25+25');
+
+        final cleared = item.copyWith(budgetFormula: () => null);
+        expect(cleared.budgetFormula, isNull);
+      },
+    );
   });
 
   group('BudgetTrackingMonth — totaux', () {
