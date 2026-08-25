@@ -3,12 +3,13 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import 'real_estate_estimation_screen.dart';
+import 'real_estate_scoring_screen.dart';
 import 'simulations_loan_screen.dart';
 
-/// Onglet "Immobilier" de Simulation : regroupe "Estimation" et "Prêt" sous
-/// un seul item de navigation, avec un `TabList` interne — même
+/// Onglet "Immobilier" de Simulation : regroupe "Estimation", "Scoring" et
+/// "Prêt" sous un seul item de navigation, avec un `TabList` interne — même
 /// fonctionnement que "Fiscalité" (IR/IFI, voir
-/// `simulations_taxation_screen.dart`), plutôt que deux items de sidebar
+/// `simulations_taxation_screen.dart`), plutôt que trois items de sidebar
 /// séparés.
 class RealEstateSimulationScreen extends StatefulWidget {
   final String vaultPath;
@@ -43,9 +44,9 @@ class _RealEstateSimulationScreenState
     setState(() {
       final tabValue = data['tabIndex'];
       if (tabValue is int) {
-        _tabIndex = tabValue.clamp(0, 1);
+        _tabIndex = tabValue.clamp(0, 2);
       } else if (tabValue is num) {
-        _tabIndex = tabValue.round().clamp(0, 1);
+        _tabIndex = tabValue.round().clamp(0, 2);
       }
     });
   }
@@ -61,10 +62,10 @@ class _RealEstateSimulationScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TabList(
+          Align(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: TabList(
                 index: _tabIndex,
                 onChanged: (value) {
                   setState(() => _tabIndex = value);
@@ -72,15 +73,21 @@ class _RealEstateSimulationScreenState
                 },
                 children: const [
                   TabItem(child: shadcn.Text('Estimation')),
+                  TabItem(child: shadcn.Text('Scoring')),
                   TabItem(child: shadcn.Text('Prêt')),
                 ],
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 16),
           Expanded(
             child: _tabIndex == 0
                 ? RealEstateEstimationScreen(
+                    vaultPath: widget.vaultPath,
+                    amountVisibility: widget.amountVisibility,
+                  )
+                : _tabIndex == 1
+                ? RealEstateScoringScreen(
                     vaultPath: widget.vaultPath,
                     amountVisibility: widget.amountVisibility,
                   )
