@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/platform_info.dart';
 import '../../core/profiles/profile_controller.dart';
 import '../../core/profiles/sidebar_prefs_controller.dart';
+import '../../core/storage/vault_folder_service.dart';
 import 'account_switcher_menu.dart';
 import 'nav_models.dart';
 
@@ -14,6 +15,9 @@ class AppSidebar extends StatelessWidget {
   final VoidCallback onToggleCollapse;
   final ProfileController profileController;
   final SidebarPrefsController sidebarPrefsController;
+  final VaultFolderService vaultFolderService;
+  final Future<void> Function(String path) onVaultActivated;
+  final VoidCallback onNoVaultSelected;
 
   /// L'assistant est-il activé dans les Réglages ? Si non, son item est
   /// retiré du groupe Outils sur desktop.
@@ -35,6 +39,9 @@ class AppSidebar extends StatelessWidget {
     required this.sidebarPrefsController,
     required this.assistantEnabled,
     this.assistantUnread,
+    required this.vaultFolderService,
+    required this.onVaultActivated,
+    required this.onNoVaultSelected,
   });
 
   Widget _profileAvatar(BuildContext context, String initials, double size) {
@@ -63,6 +70,9 @@ class AppSidebar extends StatelessWidget {
       anchorContext,
       profileController: profileController,
       onSelect: onSelect,
+      vaultFolderService: vaultFolderService,
+      onVaultActivated: onVaultActivated,
+      onNoVaultSelected: onNoVaultSelected,
     );
   }
 
@@ -161,12 +171,84 @@ class AppSidebar extends StatelessWidget {
         .toList();
     if (visibleChildren.isEmpty) return const SizedBox.shrink();
 
+    // Sidebar réduite : NavigationCollapsible masque entièrement ses
+    // enfants dans ce mode (pas de simple repli visuel), donc les
+    // sous-pages (ex : Budget > Suivi) seraient introuvables sans déplier
+    // toute la sidebar. On ouvre à la place un petit menu flottant listant
+    // les sous-items, accessible en un clic sur l'icône du parent.
+    if (collapsed) {
+      return _buildCollapsedParentFlyout(context, item, visibleChildren);
+    }
+
     return _withTooltip(
       item.label,
       NavigationCollapsible(
         leading: Icon(item.icon),
         label: shadcn.Text(item.label),
         children: [for (final child in visibleChildren) _buildItem(context, child)],
+      ),
+    );
+  }
+
+  void _openChildrenFlyout(
+    BuildContext anchorContext,
+    List<NavItem> children,
+  ) {
+    showOverlay(
+      anchorContext,
+      PopoverConfiguration(
+        alignment: Alignment.topLeft,
+        anchorAlignment: Alignment.topRight,
+        offset: const Offset(8, 0),
+        widthConstraint: PopoverConstraint.flexible,
+        builder: (popoverContext) => SurfaceCard(
+          padding: const EdgeInsets.all(4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final child in children)
+                Tooltip(
+                  // ignore: implicit_call_tearoffs
+                  tooltip: TooltipContainer(child: shadcn.Text(child.label)),
+                  child: IconButton(
+                    key: ValueKey('nav_flyout_item_${child.key}'),
+                    icon: Icon(child.icon),
+                    variance: selectedKey == child.key
+                        ? ButtonVariance.secondary
+                        : ButtonVariance.ghost,
+                    onPressed: () {
+                      closeOverlay(popoverContext);
+                      onSelect(child.key);
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      adaptive: false,
+    );
+  }
+
+  Widget _buildCollapsedParentFlyout(
+    BuildContext context,
+    NavItem item,
+    List<NavItem> visibleChildren,
+  ) {
+    final isChildSelected = visibleChildren.any((c) => c.key == selectedKey);
+    return _withTooltip(
+      item.label,
+      Builder(
+        key: ValueKey('nav_parent_flyout_trigger_${item.key}'),
+        builder: (anchorContext) => NavigationItem(
+          selected: isChildSelected,
+          selectedStyle: const ButtonStyle.primaryIcon(),
+          // Toujours ouvrir le menu au clic, que le parent soit déjà "actif"
+          // (un de ses enfants sélectionné) ou non : ce parent n'a pas de
+          // page propre, seul le menu importe.
+          onChanged: (_) => _openChildrenFlyout(anchorContext, visibleChildren),
+          child: Icon(item.icon),
+        ),
       ),
     );
   }
@@ -274,3 +356,4 @@ class AppSidebar extends StatelessWidget {
     );
   }
 }
+

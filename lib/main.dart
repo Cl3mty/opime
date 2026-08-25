@@ -620,6 +620,9 @@ class _OpimeAppState extends State<OpimeApp> {
           notificationsSettingsController: _notificationsSettingsController,
           notificationsController: _notificationsController,
           sidebarCollapsed: _sidebarCollapsed,
+          vaultFolderService: _vaultFolderService,
+          onVaultActivated: _onVaultReady,
+          onNoVaultSelected: _resetVault,
           pages: {
             'dashboard': (_) => DashboardScreen(
               key: ValueKey(_profileController!.activeDataPath),

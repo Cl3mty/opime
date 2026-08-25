@@ -7,6 +7,7 @@ import '../core/profiles/profile_controller.dart';
 import '../core/ui/app_background.dart';
 import '../core/ui/responsive.dart';
 import '../core/profiles/sidebar_prefs_controller.dart';
+import '../core/storage/vault_folder_service.dart';
 import '../features/navigation/account_switcher_menu.dart';
 import '../features/navigation/app_sidebar.dart';
 import '../features/navigation/mobile_nav_hub.dart';
@@ -66,6 +67,14 @@ class AppShell extends StatefulWidget {
   final NotificationsController notificationsController;
   final Map<String, WidgetBuilder> pages;
 
+  /// Passés jusqu'au sélecteur de compte (bascule/ajout de vault, voir
+  /// `account_switcher_menu.dart`) — la même paire de callbacks que
+  /// `SettingsScreen`/`VaultUnlockScreen` pour recharger tout l'état de
+  /// l'appli après un changement de vault.
+  final VaultFolderService vaultFolderService;
+  final Future<void> Function(String path) onVaultActivated;
+  final VoidCallback onNoVaultSelected;
+
   /// État (replié/déplié) de la sidebar, remonté à `main.dart` pour que le
   /// raccourci clavier ⌘B puisse le basculer depuis la racine de l'app —
   /// voir sa documentation dans `main.dart` pour pourquoi les raccourcis ne
@@ -90,6 +99,9 @@ class AppShell extends StatefulWidget {
     required this.notificationsController,
     required this.pages,
     required this.sidebarCollapsed,
+    required this.vaultFolderService,
+    required this.onVaultActivated,
+    required this.onNoVaultSelected,
   });
 
   @override
@@ -346,6 +358,9 @@ class _AppShellState extends State<AppShell> {
           sidebarPrefsController: widget.sidebarPrefsController,
           assistantEnabled: widget.assistantConfigController.enabled,
           assistantUnread: widget.assistantChatController.unreadResponses,
+          vaultFolderService: widget.vaultFolderService,
+          onVaultActivated: widget.onVaultActivated,
+          onNoVaultSelected: widget.onNoVaultSelected,
         ),
       );
       return Scaffold(
@@ -432,6 +447,9 @@ class _AppShellState extends State<AppShell> {
                   barContext,
                   profileController: widget.profileController,
                   onSelect: _select,
+                  vaultFolderService: widget.vaultFolderService,
+                  onVaultActivated: widget.onVaultActivated,
+                  onNoVaultSelected: widget.onNoVaultSelected,
                 ),
               ),
             ),
