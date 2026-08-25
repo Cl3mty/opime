@@ -130,11 +130,17 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
   /// Basculer de vault dispose puis recrée le `ProfileController` que ce
   /// menu écoute (`AnimatedBuilder` dans [build]) — contrairement à un
   /// changement de profil, un simple champ interne au même controller.
-  /// Le menu doit donc se refermer explicitement AVANT (pas via
-  /// `autoClose`, ces boutons n'en sont pas) pour ne jamais retenter de
-  /// notifier/écouter un controller déjà disposé.
+  /// Le menu doit donc se refermer (pas via `autoClose`, ces boutons n'en
+  /// sont pas) pour ne jamais retenter de notifier/écouter un controller
+  /// déjà disposé. Fermeture différée à la frame suivante plutôt
+  /// qu'immédiate dans le handler de tap : la retirer de l'arbre pendant
+  /// le traitement du pointer par Flutter (elle est là, sous le curseur,
+  /// à l'instant du clic) fait planter `MouseTracker`
+  /// ("!_debugDuringDeviceUpdate").
   Future<void> _switchVault(BuildContext menuContext, SavedVault vault) async {
-    closeOverlay(menuContext);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (menuContext.mounted) closeOverlay(menuContext);
+    });
     try {
       final activeVault = await widget.vaultFolderService.setActiveVault(
         vault.id,

@@ -217,7 +217,16 @@ class AppSidebar extends StatelessWidget {
                         ? ButtonVariance.secondary
                         : ButtonVariance.ghost,
                     onPressed: () {
-                      closeOverlay(popoverContext);
+                      // Différée à la frame suivante plutôt qu'immédiate :
+                      // retirer ce popover de l'arbre pendant le traitement
+                      // du clic (sous le curseur à cet instant) fait
+                      // planter `MouseTracker`
+                      // ("!_debugDuringDeviceUpdate").
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (popoverContext.mounted) {
+                          closeOverlay(popoverContext);
+                        }
+                      });
                       onSelect(child.key);
                     },
                   ),
@@ -309,21 +318,34 @@ class AppSidebar extends StatelessWidget {
             _withTooltip(
               active != null ? '${active.name} — changer de compte' : 'Comptes',
               Builder(
-                builder: (slotContext) => NavigationSlot(
-                  leading: _profileAvatar(
-                    slotContext,
-                    active?.initials ?? '?',
-                    32,
-                  ),
-                  title: shadcn.Text(active?.name ?? 'Compte').medium.small,
-                  subtitle: shadcn.Text(
-                    active?.relationship.isNotEmpty == true
-                        ? active!.relationship
-                        : 'Compte',
-                  ).xSmall.normal,
-                  trailing: const Icon(LucideIcons.chevronsUpDown).iconSmall,
-                  onPressed: () => _openAccountSwitcher(slotContext),
-                ),
+                builder: (slotContext) {
+                  final slot = NavigationSlot(
+                    leading: _profileAvatar(
+                      slotContext,
+                      active?.initials ?? '?',
+                      32,
+                    ),
+                    title: shadcn.Text(active?.name ?? 'Compte').medium.small,
+                    subtitle: shadcn.Text(
+                      active?.relationship.isNotEmpty == true
+                          ? active!.relationship
+                          : 'Compte',
+                    ).xSmall.normal,
+                    trailing: const Icon(LucideIcons.chevronsUpDown).iconSmall,
+                    onPressed: () => _openAccountSwitcher(slotContext),
+                  );
+                  // Réduite, la sidebar ne montre plus que l'avatar (titre/
+                  // sous-titre/trailing repliés à largeur nulle) — mais
+                  // `NavigationSlot` ne centre pas son contenu pour autant
+                  // (son propre paramètre `alignment` n'a aucun effet, voir
+                  // `Button._buildAligned` dans shadcn_flutter : il ignore
+                  // l'alignement du bouton englobant et ne s'applique que si
+                  // `NavigationSlot` le passait lui-même, ce qu'il ne fait
+                  // pas). Sans ce `Center`, l'avatar reste collé au bord
+                  // gauche au lieu d'être aligné avec les icônes de
+                  // navigation au-dessus.
+                  return collapsed ? Center(child: slot) : slot;
+                },
               ),
             ),
           ],

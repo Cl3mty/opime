@@ -1735,7 +1735,13 @@ class _CategoryChipPickerState extends State<_CategoryChipPicker> {
               setPickerState(() => editingCategory = null);
               if (newName.isEmpty || newName == cat) return;
               widget.onRenameCategory?.call(cat, newName);
-              completer.remove();
+              // Différée à la frame suivante : retirer ce menu de l'arbre
+              // pendant le traitement du clic (sous le curseur à cet
+              // instant) fait planter `MouseTracker`
+              // ("!_debugDuringDeviceUpdate").
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => completer.remove(),
+              );
             }
 
             return ConstrainedBox(
@@ -1796,7 +1802,12 @@ class _CategoryChipPickerState extends State<_CategoryChipPicker> {
                                     ),
                                     onPressed: () {
                                       widget.onDeleteCategory!(cat);
-                                      completer.remove();
+                                      // Voir le commentaire équivalent dans
+                                      // confirmRename ci-dessus.
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback(
+                                            (_) => completer.remove(),
+                                          );
                                     },
                                   ),
                               ],
