@@ -128,6 +128,21 @@ class _BudgetScreenState extends State<BudgetScreen> {
     await _refreshHistory();
   }
 
+  /// Duplique un budget existant sous un nouveau nom et le sélectionne
+  /// aussitôt, pour permettre d'en modifier la copie sans repartir de zéro
+  /// ni risquer d'écraser l'original. Le retour laisse chaque mise en page
+  /// décider comment enchaîner (édition inline en desktop, page poussée en
+  /// mobile) — comme pour la sélection d'un budget existant.
+  Future<BudgetSnapshot?> _duplicateSnapshot(BudgetSnapshot snapshot) async {
+    final newId = await _repo.saveNew(
+      snapshot.data,
+      name: '${snapshot.displayName} (copie)',
+    );
+    await _refreshHistory();
+    setState(() => _selectedId = newId);
+    return _snapshotById(newId);
+  }
+
   void _onEditorSaved(String id) {
     setState(() => _selectedId = id);
     _refreshHistory();
@@ -201,6 +216,12 @@ class _BudgetScreenState extends State<BudgetScreen> {
               },
               onDelete: _deleteSnapshot,
               onRename: _renameSnapshot,
+              onDuplicate: (snapshot) async {
+                final copy = await _duplicateSnapshot(snapshot);
+                if (copy != null && context.mounted) {
+                  _openBudgetDetail(context, copy);
+                }
+              },
             );
           },
         ),
@@ -223,6 +244,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
               onNew: () => setState(() => _selectedId = null),
               onDelete: _deleteSnapshot,
               onRename: _renameSnapshot,
+              onDuplicate: (snapshot) => _duplicateSnapshot(snapshot),
             ),
           ),
         ),
@@ -536,6 +558,7 @@ class _BudgetHistoryColumn extends StatefulWidget {
   final VoidCallback onNew;
   final ValueChanged<String> onDelete;
   final void Function(String id, String name) onRename;
+  final Future<void> Function(BudgetSnapshot snapshot) onDuplicate;
   final bool showSearch;
 
   const _BudgetHistoryColumn({
@@ -545,6 +568,7 @@ class _BudgetHistoryColumn extends StatefulWidget {
     required this.onNew,
     required this.onDelete,
     required this.onRename,
+    required this.onDuplicate,
     this.showSearch = false,
   });
 
@@ -676,6 +700,16 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
                                   formatDateDdMmYyyy(snapshot.savedAt),
                                 ).muted().small(),
                               ],
+                            ),
+                          ),
+                          Tooltip(
+                            // ignore: implicit_call_tearoffs
+                            tooltip: TooltipContainer(
+                              child: shadcn.Text('Dupliquer ce budget'),
+                            ),
+                            child: IconButton.ghost(
+                              icon: const Icon(LucideIcons.copyPlus, size: 14),
+                              onPressed: () => widget.onDuplicate(snapshot),
                             ),
                           ),
                           IconButton.ghost(
