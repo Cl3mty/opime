@@ -461,6 +461,11 @@ _AnalysesMetrics _computeMetrics(AnalysesSnapshot snapshot, DashboardPeriod peri
   );
 
   for (final assetClass in AssetClass.values) {
+    // Un investissement exclu du patrimoine global (voir
+    // Investment.excludedFromPatrimoine) continue de compter dans les
+    // métriques d'Analyses — seuls les agrégats globaux du Dashboard
+    // l'ignorent (voir `real_patrimoine_adapter.dart`'s
+    // `investmentsForEffectiveClass`).
     final investments = investmentsForEffectiveClass(
       snapshot.accounts,
       assetClass,

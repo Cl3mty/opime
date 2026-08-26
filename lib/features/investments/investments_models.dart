@@ -448,7 +448,30 @@ class Investment {
   final double? estimatedPricePerSqm;
   final DateTime? estimatedValueAt;
 
+  /// Cours (prix unitaire) estimé à la main par l'utilisateur — ex : un
+  /// objet de collection (montre, voiture, art...) sans cours de marché ni
+  /// estimation automatique possible, voir [_expectsMarketPrice] qui
+  /// n'attend jamais de cours pour `AssetClass.autres` — et la date de
+  /// cette estimation. Alimente [estimatedValue] (multiplié par
+  /// [quantityHeld], comme [marketValue] l'est avec [lastPrice]) au même
+  /// titre que [surfaceM2]/[estimatedPricePerSqm] pour l'immobilier — les
+  /// deux mécanismes ne se recouvrent jamais (l'un ou l'autre est renseigné
+  /// selon la classe d'actif, jamais les deux).
+  final double? manualPrice;
+  final DateTime? manualPriceAt;
+
   final List<VaultDocument> documents;
+
+  /// `true` si l'utilisateur a explicitement choisi d'exclure cet
+  /// investissement du patrimoine global — il reste visible partout où il
+  /// apparaît aujourd'hui (position, transaction, compte, page de
+  /// catégorie...) avec sa vraie valeur, marqué "non comptabilisé" : seuls
+  /// les agrégats globaux du Dashboard (courbe/montant "Patrimoine net/
+  /// brut" et carte Allocation) l'ignorent — voir
+  /// `real_patrimoine_adapter.dart`'s `investmentsForEffectiveClass`/
+  /// `buildRealTopAssets`/`_buildLeaf`. Une exclusion peut aussi porter sur
+  /// le compte entier ([InvestmentAccount.excludedFromPatrimoine]).
+  final bool excludedFromPatrimoine;
 
   Investment({
     String? id,
@@ -472,7 +495,10 @@ class Investment {
     this.addressLon,
     this.estimatedPricePerSqm,
     this.estimatedValueAt,
+    this.manualPrice,
+    this.manualPriceAt,
     this.documents = const [],
+    this.excludedFromPatrimoine = false,
   }) : id = id ?? generateInvestmentId('inv');
 
   Investment copyWith({
@@ -494,7 +520,10 @@ class Investment {
     double? addressLon,
     double? estimatedPricePerSqm,
     DateTime? estimatedValueAt,
+    double? manualPrice,
+    DateTime? manualPriceAt,
     List<VaultDocument>? documents,
+    bool? excludedFromPatrimoine,
   }) => Investment(
     id: id,
     isin: isin,
@@ -517,7 +546,11 @@ class Investment {
     addressLon: addressLon ?? this.addressLon,
     estimatedPricePerSqm: estimatedPricePerSqm ?? this.estimatedPricePerSqm,
     estimatedValueAt: estimatedValueAt ?? this.estimatedValueAt,
+    manualPrice: manualPrice ?? this.manualPrice,
+    manualPriceAt: manualPriceAt ?? this.manualPriceAt,
     documents: documents ?? this.documents,
+    excludedFromPatrimoine:
+        excludedFromPatrimoine ?? this.excludedFromPatrimoine,
   );
 
   double get quantityHeld => transactions.fold(
@@ -572,14 +605,20 @@ class Investment {
         date.day == today.day;
   }
 
-  /// Valeur estimée d'un bien immobilier (surface × dernier prix/m² estimé,
-  /// voir `real_estate_pricing/`) — `null` tant que l'un des deux facteurs
-  /// manque (bien jamais réestimé). Un bien immobilier est toujours détenu
-  /// en une seule unité ([quantityHeld] == 1), donc directement comparable
-  /// à [investedAmount], sans multiplication de quantité.
+  /// Valeur estimée quand aucun cours de marché n'est possible : surface ×
+  /// dernier prix/m² estimé pour l'immobilier (voir
+  /// `real_estate_pricing/`), ou quantité détenue × cours estimé à la main
+  /// par l'utilisateur pour un objet de collection ([manualPrice] — montre,
+  /// voiture, art...), exactement comme [marketValue] avec [lastPrice].
+  /// `null` tant qu'aucune des deux n'est renseignée. Un bien immobilier est
+  /// toujours détenu en une seule unité ([quantityHeld] == 1), donc
+  /// [surfaceM2] × [estimatedPricePerSqm] est déjà directement comparable à
+  /// [investedAmount] sans multiplication de quantité supplémentaire.
   double? get estimatedValue =>
       (surfaceM2 != null && estimatedPricePerSqm != null)
       ? surfaceM2! * estimatedPricePerSqm!
+      : manualPrice != null
+      ? quantityHeld * manualPrice!
       : null;
 
   /// Meilleure valorisation connue hors montant investi : un cours de
@@ -627,9 +666,14 @@ class Investment {
     estimatedValueAt: json['estimatedValueAt'] != null
         ? DateTime.parse(json['estimatedValueAt'] as String)
         : null,
+    manualPrice: (json['manualPrice'] as num?)?.toDouble(),
+    manualPriceAt: json['manualPriceAt'] != null
+        ? DateTime.parse(json['manualPriceAt'] as String)
+        : null,
     documents: (json['documents'] as List? ?? [])
         .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
         .toList(),
+    excludedFromPatrimoine: json['excludedFromPatrimoine'] as bool? ?? false,
   );
 
   /// [round] à `false` pour les cryptomonnaies et les épargnes en devise
@@ -661,8 +705,13 @@ class Investment {
       'estimatedPricePerSqm': estimatedPricePerSqm,
     if (estimatedValueAt != null)
       'estimatedValueAt': estimatedValueAt!.toIso8601String(),
+    if (manualPrice != null)
+      'manualPrice': round ? round2(manualPrice!) : manualPrice,
+    if (manualPriceAt != null)
+      'manualPriceAt': manualPriceAt!.toIso8601String(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
+    if (excludedFromPatrimoine) 'excludedFromPatrimoine': excludedFromPatrimoine,
   };
 }
 
@@ -733,11 +782,13 @@ enum AccountEnvelope {
   residencePrincipale,
   investissementLocatif,
   scpi,
+  crowdfundingImmobilier,
   plateformeEchange,
   walletPersonnel,
   clubDeal,
   fcprFcpi,
   crowdequity,
+  crowdlending,
   coffrePersonnel,
   coffreBancaire,
   art,
@@ -779,6 +830,8 @@ enum AccountEnvelope {
         return 'Investissement locatif';
       case AccountEnvelope.scpi:
         return 'SCPI';
+      case AccountEnvelope.crowdfundingImmobilier:
+        return 'Crowdfunding immobilier';
       case AccountEnvelope.plateformeEchange:
         return 'Plateforme d\'échange';
       case AccountEnvelope.walletPersonnel:
@@ -789,6 +842,8 @@ enum AccountEnvelope {
         return 'FCPR / FCPI';
       case AccountEnvelope.crowdequity:
         return 'Crowdequity';
+      case AccountEnvelope.crowdlending:
+        return 'Crowdlending';
       case AccountEnvelope.coffrePersonnel:
         return 'Coffre personnel';
       case AccountEnvelope.coffreBancaire:
@@ -821,6 +876,7 @@ List<AccountEnvelope> accountEnvelopesFor(AssetClass assetClass) {
         AccountEnvelope.residencePrincipale,
         AccountEnvelope.investissementLocatif,
         AccountEnvelope.scpi,
+        AccountEnvelope.crowdfundingImmobilier,
         AccountEnvelope.autre,
       ];
     case AssetClass.actionsEtFonds:
@@ -862,6 +918,7 @@ List<AccountEnvelope> accountEnvelopesFor(AssetClass assetClass) {
         AccountEnvelope.clubDeal,
         AccountEnvelope.fcprFcpi,
         AccountEnvelope.crowdequity,
+        AccountEnvelope.crowdlending,
         AccountEnvelope.autre,
       ];
     case AssetClass.metauxPrecieux:
@@ -970,37 +1027,40 @@ bool isMetalEtc(InvestmentAccount account) =>
 /// complétion ("Compléter mon patrimoine", `complete_patrimoine_dialog.dart`)
 /// y commence par l'étape "Quel établissement ?" puis "Quel compte ?"
 /// (l'enveloppe fiscale), comme pour l'épargne — plutôt que par le formulaire
-/// de compte avec champ banque libre des autres classes. "Autres" est inclus
-/// (comptes ouverts chez un établissement : produits non classés, droits...),
-/// au même titre que `assetClassSupportsBankName`. L'immobilier, la crypto,
-/// les métaux précieux n'y passent pas : l'établissement n'y concerne qu'une
-/// partie des enveloppes (les métaux en CTO — un ETC), et le choix de
-/// l'enveloppe précède alors l'éventuel établissement (étape compte classique,
-/// champ banque conditionnel).
+/// de compte avec champ banque libre des autres classes. L'immobilier, la
+/// crypto, les métaux précieux et "Autres" n'y passent pas : "Autres" (objets
+/// de collection — montres, voitures, art...) n'a pas de notion
+/// d'établissement financier, chaque objet est nommé librement à l'étape
+/// compte classique, comme la crypto ou l'immobilier.
 bool assetClassRequiresEstablishmentStep(AssetClass assetClass) {
   switch (assetClass) {
     case AssetClass.epargne:
     case AssetClass.actionsEtFonds:
     case AssetClass.privateEquity:
-    case AssetClass.autres:
       return true;
     case AssetClass.immobilier:
     case AssetClass.crypto:
     case AssetClass.metauxPrecieux:
+    case AssetClass.autres:
       return false;
   }
 }
 
 /// Une date d'ouverture a-t-elle un sens pour un compte de [assetClass] ? —
 /// les comptes d'investissement détenus chez un établissement (épargne,
-/// compte-titres, PEA, assurance vie, private equity, "autres") s'ouvrent à
-/// une date précise, à saisir à la création/édition (voir
-/// `complete_patrimoine_dialog.dart` et `account_detail_screen.dart`). La
+/// compte-titres, PEA, assurance vie, private equity) s'ouvrent à une date
+/// précise, à saisir à la création/édition (voir
+/// `complete_patrimoine_dialog.dart` et `account_detail_screen.dart`).
+/// "Autres" (montres, voitures de collection, art...) n'a plus de notion
+/// d'établissement (voir [assetClassRequiresEstablishmentStep]) mais garde
+/// une date d'ouverture pertinente : la date d'acquisition de l'objet. La
 /// crypto (portefeuille auto-détenu), les métaux physiques (pièce ou lingot
 /// en coffre) et le compte technique de l'immobilier n'ont pas de date
 /// d'ouverture.
-bool accountHasOpeningDate(AssetClass assetClass) =>
-    assetClassRequiresEstablishmentStep(assetClass);
+bool accountHasOpeningDate(AssetClass assetClass) {
+  if (assetClass == AssetClass.autres) return true;
+  return assetClassRequiresEstablishmentStep(assetClass);
+}
 
 /// Nature du jalon fiscal associé à une enveloppe, voir
 /// [accountFiscalMilestone] — un avantage fiscal reste accessible en
@@ -1124,13 +1184,13 @@ bool assetClassSupportsBankName(
   switch (assetClass) {
     case AssetClass.immobilier:
     case AssetClass.crypto:
+    case AssetClass.autres:
       return false;
     case AssetClass.metauxPrecieux:
       return envelope == AccountEnvelope.cto;
     case AssetClass.actionsEtFonds:
     case AssetClass.epargne:
     case AssetClass.privateEquity:
-    case AssetClass.autres:
       return true;
   }
 }
@@ -1173,6 +1233,21 @@ class InvestmentAccount {
   final List<Investment> investments;
   final List<VaultDocument> documents;
 
+  /// Libellé personnalisé choisi par l'utilisateur pour un compte "Autres"
+  /// (voir `CustomOtherCategoriesRepository`), quand il ne s'agit d'aucune
+  /// des enveloppes fixes (Art, Voiture, Montre...) — `null` sinon.
+  /// Prioritaire sur [AccountEnvelope.label] partout où le type du compte
+  /// est affiché.
+  final String? customOtherCategory;
+
+  /// `true` si l'utilisateur a explicitement choisi d'exclure le compte
+  /// entier du patrimoine global — même portée et même principe que
+  /// [Investment.excludedFromPatrimoine], mais pour tous ses investissements
+  /// d'un coup plutôt qu'un par un. Le compte et ses positions restent
+  /// visibles partout avec leur vraie valeur ; seuls les agrégats globaux du
+  /// Dashboard l'ignorent.
+  final bool excludedFromPatrimoine;
+
   /// Valeur sentinelle privée de [InvestmentAccount.copyWith] : distingue
   /// "paramètre non fourni" (conserve la valeur existante) de "`null`
   /// explicite" (efface le champ) — `copyWith` ne pouvant pas exprimer
@@ -1180,6 +1255,7 @@ class InvestmentAccount {
   static const Object _unsetBankName = Object();
   static const Object _unsetDescription = Object();
   static const Object _unsetOpeningDate = Object();
+  static const Object _unsetCustomOtherCategory = Object();
 
   InvestmentAccount({
     String? id,
@@ -1191,6 +1267,8 @@ class InvestmentAccount {
     this.openingDate,
     required this.investments,
     this.documents = const [],
+    this.customOtherCategory,
+    this.excludedFromPatrimoine = false,
   }) : id = id ?? generateInvestmentId('account');
 
   InvestmentAccount copyWith({
@@ -1201,6 +1279,8 @@ class InvestmentAccount {
     Object? bankName = _unsetBankName,
     Object? description = _unsetDescription,
     Object? openingDate = _unsetOpeningDate,
+    Object? customOtherCategory = _unsetCustomOtherCategory,
+    bool? excludedFromPatrimoine,
   }) => InvestmentAccount(
     id: id,
     assetClass: assetClass,
@@ -1217,8 +1297,18 @@ class InvestmentAccount {
         : openingDate as DateTime?,
     investments: investments ?? this.investments,
     documents: documents ?? this.documents,
+    customOtherCategory: identical(customOtherCategory, _unsetCustomOtherCategory)
+        ? this.customOtherCategory
+        : customOtherCategory as String?,
+    excludedFromPatrimoine:
+        excludedFromPatrimoine ?? this.excludedFromPatrimoine,
   );
 
+  /// Total réel du compte, tous investissements confondus — n'ignore jamais
+  /// un investissement/compte marqué "exclu du patrimoine" (voir
+  /// [Investment.excludedFromPatrimoine]/[excludedFromPatrimoine]) : cette
+  /// exclusion ne porte que sur les agrégats globaux du Dashboard, pas sur
+  /// le total propre du compte affiché sur sa page.
   double get totalInvested =>
       investments.fold(0.0, (sum, i) => sum + i.investedAmount);
 
@@ -1255,6 +1345,9 @@ class InvestmentAccount {
       documents: (json['documents'] as List? ?? [])
           .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
           .toList(),
+      customOtherCategory: json['customOtherCategory'] as String?,
+      excludedFromPatrimoine:
+          json['excludedFromPatrimoine'] as bool? ?? false,
     );
   }
 
@@ -1286,5 +1379,7 @@ class InvestmentAccount {
     }).toList(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
+    if (customOtherCategory != null) 'customOtherCategory': customOtherCategory,
+    if (excludedFromPatrimoine) 'excludedFromPatrimoine': excludedFromPatrimoine,
   };
 }

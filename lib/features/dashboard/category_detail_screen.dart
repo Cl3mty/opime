@@ -11,6 +11,8 @@ import '../../core/ui/performance_amount.dart';
 import '../investments/bank_logo_avatar.dart';
 import '../investments/bank_logo_repository.dart';
 import '../investments/investments_models.dart';
+import '../investments/widgets/transaction_widgets.dart'
+    show ExcludedFromPatrimoineBadge;
 import '../navigation/navigation_scope.dart';
 import 'patrimoine_models.dart';
 import 'widgets/allocation_blocks_view.dart';
@@ -460,6 +462,9 @@ class _DistributionCardState extends State<_DistributionCard> {
   }
 
   PatrimoineAccount _mergePoches(List<PatrimoineAccount> poches) {
+    // Cette page continue de tout comptabiliser, y compris une poche
+    // exclue du patrimoine global (voir `PatrimoineAccount.
+    // excludedFromPatrimoine`) — seuls les agrégats du Dashboard l'ignorent.
     final valeur = poches.fold(0.0, (sum, a) => sum + a.valeur);
     final plusValueAbs = poches.fold(0.0, (sum, a) => sum + a.plusValueAbs);
     final costBasis = valeur - plusValueAbs;
@@ -512,6 +517,10 @@ class _DistributionCardState extends State<_DistributionCard> {
               : category.id == AssetClass.epargne.categoryId
               ? _epargneLinesByCurrency(category.accounts)
               : category.accounts);
+    // Cette distribution reste celle de la catégorie affichée sur sa
+    // propre page : une ligne exclue du patrimoine global (voir
+    // `PatrimoineAccount.excludedFromPatrimoine`) y garde sa part réelle,
+    // seuls les agrégats du Dashboard l'ignorent.
     final montant = lines.fold(0.0, (sum, a) => sum + a.valeur);
     final slices = [
       for (var i = 0; i < lines.length; i++)
@@ -1021,6 +1030,9 @@ class _BankAccordionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Sous-total réel de la banque — inclut un compte exclu du patrimoine
+    // global (voir `PatrimoineAccount.excludedFromPatrimoine`), comme le
+    // reste de cette page.
     final total = accounts.fold(0.0, (sum, a) => sum + a.valeur);
     final plusValueAbs = accounts.fold(0.0, (sum, a) => sum + a.plusValueAbs);
     final costBasis = total - plusValueAbs;
@@ -1249,13 +1261,24 @@ class _AccountLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Une position en devise (cash tenu dans le compte) se
-                // distingue subtilement des titres — texte atténué plutôt
-                // qu'un badge, cohérent avec le reste de la ligne — voir
-                // [PatrimoineAccount.isCurrency].
-                account.isCurrency
-                    ? shadcn.Text(account.name).muted().small()
-                    : shadcn.Text(account.name).medium().small(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      // Une position en devise (cash tenu dans le compte)
+                      // se distingue subtilement des titres — texte
+                      // atténué plutôt qu'un badge, cohérent avec le reste
+                      // de la ligne — voir [PatrimoineAccount.isCurrency].
+                      child: account.isCurrency
+                          ? shadcn.Text(account.name).muted().small()
+                          : shadcn.Text(account.name).medium().small(),
+                    ),
+                    if (account.excludedFromPatrimoine) ...[
+                      const SizedBox(width: 6),
+                      const ExcludedFromPatrimoineBadge(),
+                    ],
+                  ],
+                ),
                 if (account.subtitle != null)
                   shadcn.Text(account.subtitle!).muted().xSmall(),
               ],

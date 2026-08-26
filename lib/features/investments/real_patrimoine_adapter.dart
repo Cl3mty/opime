@@ -265,6 +265,13 @@ PatrimoineAccount _buildAccountLeaf(
   var plusValueAbs = 0.0;
   var costBasis = 0.0;
   for (final (_, investment) in heldPairs) {
+    // Un investissement exclu du patrimoine (voir
+    // Investment.excludedFromPatrimoine) reste compté ici : cette somme
+    // alimente le total propre du compte/de sa catégorie
+    // ([PatrimoineCategory.montant]), qui continue de tout comptabiliser —
+    // seuls les agrégats globaux du Dashboard l'ignorent (voir
+    // [PatrimoineCategory.montantPatrimoine] et
+    // [investmentsForEffectiveClass]).
     final v = investment.effectiveMarketValue ?? investment.investedAmount;
     final gain = investment.unrealizedGain ?? 0;
     valeur += v;
@@ -299,7 +306,7 @@ PatrimoineAccount _buildAccountLeaf(
         account.assetClass == AssetClass.epargne ||
             account.assetClass == AssetClass.actionsEtFonds
         ? account.description
-        : account.envelope?.label,
+        : account.customOtherCategory ?? account.envelope?.label,
     // L'établissement du compte réel — la clé de groupement "banque" de
     // l'accordéon (`category_detail_screen.dart`), et le nom sous lequel le
     // logo de la banque est importé (`bank_logo_repository.dart`).
@@ -307,6 +314,12 @@ PatrimoineAccount _buildAccountLeaf(
     valeur: valeur,
     plusValueAbs: plusValueAbs,
     plusValuePercent: costBasis == 0 ? 0 : plusValueAbs / costBasis * 100,
+    // Affiche le badge "Hors patrimoine global" sur la ligne compte quand
+    // l'utilisateur a exclu le compte entier du patrimoine — [valeur]
+    // ci-dessus reste la vraie somme, seul l'agrégat global du Dashboard
+    // (jamais construit à partir de cette fonction, voir
+    // [investmentsForEffectiveClass]) en tient compte.
+    excludedFromPatrimoine: account.excludedFromPatrimoine,
     investments: [
       for (final (investmentAccount, investment) in heldPairs)
         _buildLeaf(
@@ -431,6 +444,15 @@ PatrimoineAccount _buildLeaf(
         _currencyAvatarInitials(account, investment) ??
         _metalAvatarInitials(account, investment),
     isCurrency: isCurrencyInvestment(account, investment),
+    // La ligne continue d'afficher la vraie valeur (voir doc de
+    // `PatrimoineAccount.excludedFromPatrimoine`) — seul l'agrégat global du
+    // Dashboard ([PatrimoineCategory.montantPatrimoine], utilisé par la
+    // carte Allocation) l'ignore, jamais le total propre de sa catégorie
+    // ([PatrimoineCategory.montant]). Un compte exclu dans son ensemble
+    // (voir `InvestmentAccount.excludedFromPatrimoine`) marque chacune de
+    // ses lignes, même sans exclusion individuelle.
+    excludedFromPatrimoine:
+        investment.excludedFromPatrimoine || account.excludedFromPatrimoine,
   );
 }
 
@@ -479,14 +501,19 @@ String? _metalAvatarInitials(InvestmentAccount account, Investment investment) {
   return isMetalEtc(account) ? 'ETC' : null;
 }
 
-/// Le cours de marché en euros : le dernier cours brut (dans sa devise de
-/// cotation, voir [Investment.lastPrice]) converti au taux de change
-/// enregistré ([Investment.lastFxRateToEur]) — vaut le cours brut pour un
-/// titre coté en euros, `null` sans cours connu.
+/// Le cours en euros affiché en colonne "Cours" : le dernier cours de
+/// marché (dans sa devise de cotation, voir [Investment.lastPrice])
+/// converti au taux de change enregistré ([Investment.lastFxRateToEur]) —
+/// vaut le cours brut pour un titre coté en euros. Sans cours de marché
+/// (ex : un objet "Autres"), retombe sur le cours estimé à la main par
+/// l'utilisateur ([Investment.manualPrice], toujours en euros) ; `null`
+/// sans aucun des deux.
 double? _lastPriceToEur(Investment investment) {
   final lastPrice = investment.lastPrice;
-  if (lastPrice == null) return null;
-  return lastPrice * (investment.lastFxRateToEur ?? 1.0);
+  if (lastPrice != null) {
+    return lastPrice * (investment.lastFxRateToEur ?? 1.0);
+  }
+  return investment.manualPrice;
 }
 
 /// Cours le plus proche à ou avant [date] dans [history] (triée par date
@@ -578,6 +605,13 @@ List<DashboardAsset> buildRealTopAssets(
   for (final account in accounts) {
     for (final investment in account.investments) {
       if (investment.quantityHeld <= 0) continue;
+      // Un investissement (ou un compte entier) exclu du patrimoine n'a pas
+      // sa place dans un classement de performance — contrairement aux
+      // tableaux de positions "bruts", où il reste toujours visible (juste
+      // marqué).
+      if (investment.excludedFromPatrimoine || account.excludedFromPatrimoine) {
+        continue;
+      }
       final history = priceHistories[investment.isin] ?? const [];
       assets.add(
         DashboardAsset(
@@ -722,9 +756,39 @@ double _valuationAt(
     // antérieure au premier cours au prix de ce premier cours.
     final history = priceHistories[investment.isin] ?? const [];
     final priceAtDate = priceAt(history, date);
-    total += priceAtDate != null ? quantity * priceAtDate : invested;
+    if (priceAtDate != null) {
+      total += quantity * priceAtDate;
+    } else {
+      total += _manualValuationAt(investment, quantity, date) ?? invested;
+    }
   }
   return total;
+}
+
+/// Valorisation manuelle d'un investissement sans cours de marché (voir
+/// [_valuationAt]) : cours estimé à la main × [quantity] détenue à [date]
+/// pour un objet "Autres" ([Investment.manualPrice]), ou surface × prix/m²
+/// estimé pour l'immobilier ([Investment.estimatedPricePerSqm]) — `null`
+/// avant que l'utilisateur n'ait renseigné une estimation (voir
+/// [Investment.manualPriceAt]/[Investment.estimatedValueAt]), auquel cas
+/// [_valuationAt] retombe sur le montant investi comme avant cette date.
+double? _manualValuationAt(Investment investment, double quantity, DateTime date) {
+  final manualPrice = investment.manualPrice;
+  final manualPriceAt = investment.manualPriceAt;
+  if (manualPrice != null &&
+      manualPriceAt != null &&
+      _onOrBeforeDay(manualPriceAt, date)) {
+    return quantity * manualPrice;
+  }
+  final estimatedPricePerSqm = investment.estimatedPricePerSqm;
+  final estimatedValueAt = investment.estimatedValueAt;
+  if (investment.surfaceM2 != null &&
+      estimatedPricePerSqm != null &&
+      estimatedValueAt != null &&
+      _onOrBeforeDay(estimatedValueAt, date)) {
+    return investment.surfaceM2! * estimatedPricePerSqm;
+  }
+  return null;
 }
 
 /// Première date de transaction, tous [accounts] confondus — `null` sans
@@ -749,14 +813,25 @@ DateTime? earliestTransactionDateAcrossAccounts(
 /// est [assetClass], tous comptes confondus — pour isoler la série
 /// d'une seule classe avant de l'évaluer sur une grille commune via
 /// [categoryHistoryOnGrid].
+///
+/// [excludeFlagged] (`false` par défaut) omet les investissements — ou les
+/// comptes entiers — marqués "exclus du patrimoine" (voir
+/// [Investment.excludedFromPatrimoine]/[InvestmentAccount.excludedFromPatrimoine]).
+/// Seule la courbe "Patrimoine net/brut" du Dashboard
+/// (`dashboard_screen.dart`'s `_actifsHistoryFor`) le met à `true` : les
+/// pages de catégorie et Analyses continuent de tout comptabiliser.
 List<Investment> investmentsForEffectiveClass(
   List<InvestmentAccount> accounts,
-  AssetClass assetClass,
-) {
+  AssetClass assetClass, {
+  bool excludeFlagged = false,
+}) {
   return [
     for (final account in accounts)
       for (final investment in account.investments)
-        if ((investment.assetClass ?? account.assetClass) == assetClass)
+        if ((investment.assetClass ?? account.assetClass) == assetClass &&
+            (!excludeFlagged ||
+                (!investment.excludedFromPatrimoine &&
+                    !account.excludedFromPatrimoine)))
           investment,
   ];
 }

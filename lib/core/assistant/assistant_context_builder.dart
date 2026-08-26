@@ -86,6 +86,12 @@ class AssistantContextBuilder {
         final value = investment.effectiveMarketValue ?? investment.investedAmount;
         final gain = investment.unrealizedGain ?? 0;
         final invested = investment.investedAmount;
+        // Un investissement exclu du patrimoine (voir
+        // Investment.excludedFromPatrimoine) compte quand même ici : cette
+        // exclusion ne porte que sur les agrégats globaux du Dashboard
+        // ("Patrimoine net/brut", carte Allocation) — voir l'annotation
+        // `excludedText` plus bas, qui prévient l'assistant de cette nuance
+        // plutôt que de fausser ses propres totaux.
         totalValue += value;
         totalInvested += invested;
         totalGain += gain;
@@ -115,12 +121,16 @@ class AssistantContextBuilder {
             ? ''
             : ', dernier cours '
                   '${formatEuros(lastPrice * (investment.lastFxRateToEur ?? 1.0))}';
+        final excludedText = investment.excludedFromPatrimoine
+            ? ' [exclu par l\'utilisateur du "Patrimoine net/brut" et de '
+                  'l\'allocation affichés sur le tableau de bord]'
+            : '';
         lines.add(
           '- ${investment.label} (${investment.isin}) — ${effectiveClass.label}'
           ', quantité ${_formatQuantity(investment.quantityHeld)}, '
           'PRU ${formatEuros(investment.pru)}'
           '$lastPriceText, '
-          'valeur ${formatEuros(value)}$gainText$mwrText, $txnInfo',
+          'valeur ${formatEuros(value)}$gainText$mwrText, $txnInfo$excludedText',
         );
       }
     }
@@ -312,6 +322,12 @@ class AssistantContextBuilder {
     if (account.description != null &&
         account.description!.trim().isNotEmpty) {
       buffer.write(' — ${account.description!.trim()}');
+    }
+    if (account.excludedFromPatrimoine) {
+      buffer.write(
+        ' [compte exclu par l\'utilisateur du "Patrimoine net/brut" et de '
+        'l\'allocation affichés sur le tableau de bord]',
+      );
     }
     return buffer.toString();
   }

@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
@@ -5,6 +6,7 @@ import '../../../core/money_format.dart' show parseDecimal;
 import '../../../core/ui/frosted_card.dart';
 import '../confirm_delete_dialog.dart';
 import '../document_storage.dart';
+import '../documents_section.dart';
 import '../investments_models.dart';
 import '../investments_repository.dart';
 import '../transaction_price_currency.dart';
@@ -52,6 +54,17 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
     if (oldWidget.vaultPath != widget.vaultPath) {
       _repo = InvestmentsRepository(widget.vaultPath);
     }
+  }
+
+  /// Même règle que `position_detail_dialog.dart`'s
+  /// `_usesTransactionScopedDocuments` : métaux précieux, "Autres" et
+  /// Actions & Fonds peuvent rattacher un document à une transaction
+  /// précise plutôt qu'au compte dans son ensemble.
+  bool _usesTransactionScopedDocuments(Investment investment) {
+    final effectiveClass = investment.assetClass ?? widget.account.assetClass;
+    return effectiveClass == AssetClass.metauxPrecieux ||
+        effectiveClass == AssetClass.autres ||
+        effectiveClass == AssetClass.actionsEtFonds;
   }
 
   List<(Investment, Transaction)> get _allTransactions {
@@ -135,20 +148,17 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
             positionLabel: investment.label,
             onEdit: () => _showEditTransactionDialog(investment, txn),
             onDelete: () => _deleteTransaction(investment, txn),
-            // Un ETC or/argent logé dans ce compte (voir `isMetalEtc`) peut
-            // porter des documents scopés à la transaction, comme sur sa
-            // propre popup de détail — voir `position_detail_dialog.dart`.
-            documents:
-                investment.assetClass == AssetClass.metauxPrecieux ||
-                    investment.assetClass == AssetClass.autres
+            // Métaux précieux, "Autres" et Actions & Fonds peuvent porter
+            // des documents scopés à la transaction, comme sur la popup de
+            // détail de la position — voir `position_detail_dialog.dart`'s
+            // `_usesTransactionScopedDocuments`.
+            documents: _usesTransactionScopedDocuments(investment)
                 ? [
                     for (final d in investment.documents)
                       if (d.transactionId == txn.id) d,
                   ]
                 : const [],
-            vaultPath:
-                investment.assetClass == AssetClass.metauxPrecieux ||
-                    investment.assetClass == AssetClass.autres
+            vaultPath: _usesTransactionScopedDocuments(investment)
                 ? widget.vaultPath
                 : null,
           ),
@@ -206,6 +216,25 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
   late final TextEditingController _priceController;
   late final TransactionPriceCurrencyController _priceCurrencyController;
 
+  /// Copie locale de l'investissement, tenue à jour après chaque ajout/
+  /// suppression de document — [widget.investment] ne change pas tant que
+  /// cette popup reste ouverte (elle n'est pas reconstruite en même temps
+  /// que l'onglet parent), donc relire ses documents à jour nécessite cet
+  /// état propre, comme `position_detail_dialog.dart`'s `_investment`.
+  late Investment _investment;
+
+  /// Même règle que `_AccountTransactionsTabState`'s
+  /// `_usesTransactionScopedDocuments` et
+  /// `position_detail_dialog.dart`'s équivalent : métaux précieux, "Autres"
+  /// et Actions & Fonds peuvent rattacher un document à une transaction
+  /// précise.
+  bool get _usesTransactionScopedDocuments {
+    final effectiveClass = widget.investment.assetClass ?? widget.account.assetClass;
+    return effectiveClass == AssetClass.metauxPrecieux ||
+        effectiveClass == AssetClass.autres ||
+        effectiveClass == AssetClass.actionsEtFonds;
+  }
+
   bool get _isCurrency =>
       isCurrencyInvestment(widget.account, widget.investment);
 
@@ -237,6 +266,7 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
   @override
   void initState() {
     super.initState();
+    _investment = widget.investment;
     _isBuy = widget.transaction.isBuy;
     _date = widget.transaction.date;
     _quantityController = TextEditingController(
@@ -283,16 +313,56 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
       currency: currency,
       fxRateToEur: fxRateToEur,
     );
+    // Repart de `_investment` (pas `widget.investment`) : un document ajouté
+    // ou supprimé pendant cette édition (voir `_addDocument`/
+    // `_deleteDocument`) a déjà mis à jour cet état local, à ne pas perdre
+    // en écrasant `documents` avec sa valeur d'ouverture de la popup.
     await widget.onSave(
-      widget.investment.copyWith(
+      _investment.copyWith(
         transactions: [
-          for (final t in widget.investment.transactions)
+          for (final t in _investment.transactions)
             if (t.id == widget.transaction.id) updatedTransaction else t,
         ],
       ),
     );
     if (!mounted) return;
     Navigator.of(context).pop();
+  }
+
+  /// Ajoute un document rattaché à cette transaction — possible même après
+  /// coup, sans repasser par sa création (voir `TransactionForm`'s
+  /// `documentsSection`).
+  Future<void> _addDocument(
+    String fileName,
+    Uint8List bytes,
+    String? transactionId,
+    String? name,
+  ) async {
+    final document = VaultDocument(
+      fileName: fileName,
+      note: name,
+      transactionId: transactionId,
+    );
+    await DocumentStorage(widget.vaultPath).save(document, bytes);
+    final updated = _investment.copyWith(
+      documents: [..._investment.documents, document],
+    );
+    await widget.onSave(updated);
+    if (!mounted) return;
+    setState(() => _investment = updated);
+  }
+
+  Future<void> _deleteDocument(VaultDocument document) async {
+    await DocumentStorage(widget.vaultPath).delete(document);
+    final updated = _investment.copyWith(
+      documents: [
+        for (final d in _investment.documents)
+          if (d.id != document.id) d,
+      ],
+    );
+    await widget.onSave(updated);
+    if (!mounted) return;
+    setState(() => _investment = updated);
   }
 
   @override
@@ -340,6 +410,20 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
                     onCreate: _commit,
                     onCancel: () => Navigator.of(context).pop(),
                     submitLabel: 'Enregistrer',
+                    documentsSection: _usesTransactionScopedDocuments
+                        ? DocumentsSection(
+                            vaultPath: widget.vaultPath,
+                            documents: [
+                              for (final d in _investment.documents)
+                                if (d.transactionId == widget.transaction.id)
+                                  d,
+                            ],
+                            fixedTransactionId: widget.transaction.id,
+                            quantityAssetClass: widget.investment.assetClass,
+                            onAdd: _addDocument,
+                            onDelete: _deleteDocument,
+                          )
+                        : null,
                   ),
                 ],
               ),

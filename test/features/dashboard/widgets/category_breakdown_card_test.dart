@@ -71,6 +71,46 @@ void main() {
     expect(find.text('PEA Boursorama'), findsNothing);
   });
 
+  testWidgets(
+    'un compte exclu du patrimoine global affiche le badge sous son nom',
+    (tester) async {
+      final excludedCategory = PatrimoineCategory(
+        id: 'actifs_autres',
+        label: 'Autres',
+        icon: LucideIcons.gem,
+        color: const Color(0xFF000000),
+        tier: AllocationTier.opportuniste,
+        description: '',
+        accounts: const [
+          PatrimoineAccount(
+            id: 'acc-1',
+            name: 'Montres',
+            valeur: 1000,
+            plusValueAbs: 50,
+            plusValuePercent: 5,
+            excludedFromPatrimoine: true,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryBreakdownCard(
+              title: 'Actifs',
+              categories: [excludedCategory],
+              hidden: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Montres'), findsOneWidget);
+      expect(find.text('Hors patrimoine global'), findsOneWidget);
+    },
+  );
+
   group('bascule Par compte / Par investissement', () {
     PatrimoineCategory categoryByAccount() => PatrimoineCategory(
       id: 'actifs_actions_fonds',

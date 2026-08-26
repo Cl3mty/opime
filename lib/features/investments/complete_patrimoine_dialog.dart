@@ -13,18 +13,26 @@ import 'bank_logo_avatar.dart';
 import 'bank_logo_repository.dart';
 import 'confirm_delete_dialog.dart';
 import 'currency_data.dart' show kKnownCurrencies;
+import 'custom_other_categories_repository.dart';
 import 'investment_identifier_field.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
 import 'real_patrimoine_adapter.dart' show emptyCategoryFor;
 import 'transaction_price_currency.dart';
 
+/// Valeur sentinelle du sélecteur de type "Autres" personnalisé
+/// (`_AccountStep`) : aucun type précis choisi, l'enveloppe générique
+/// "Autre" reste seule (`InvestmentAccount.customOtherCategory` reste
+/// `null`) — distincte de `null` lui-même, qu'un `Select<String>` ne peut
+/// pas porter comme valeur sélectionnée.
+const _noCustomOtherCategoryValue = '__none__';
+
 enum _Step {
   kind,
   assetClass,
   account,
   // Sous-flux des classes détenues chez un établissement financier
-  // (épargne, actions & fonds, private equity, autres) : l'établissement est
+  // (épargne, actions & fonds, private equity) : l'établissement est
   // choisi avant le type de compte (l'enveloppe fiscale), lui-même avant
   // l'investissement et/ou la devise — voir `_selectAssetClass`.
   establishment,
@@ -106,6 +114,12 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   String? _accountId;
   String? _investmentId;
 
+  /// Type "Autres" personnalisé choisi pour le compte en cours de création
+  /// à l'étape "Quel compte ?" (voir `_AccountStep`), quand [_envelope] vaut
+  /// [AccountEnvelope.autre] — `null` sinon (type fixe, ou pas encore
+  /// choisi). Voir `InvestmentAccount.customOtherCategory`.
+  String? _customOtherCategory;
+
   bool _creatingAccount = false;
   final _accountNameController = TextEditingController();
 
@@ -137,6 +151,12 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   /// Logos des établissements déjà importés (nom d'établissement → chemin
   /// absolu), pour l'avatar cliquable de l'étape "Quel établissement ?".
   Map<String, String> _bankLogos = {};
+
+  /// Types "Autres" personnalisés déjà créés par l'utilisateur (voir
+  /// `CustomOtherCategoriesRepository`), proposés en plus des enveloppes
+  /// fixes (Art, Voiture...) à l'étape "Quel compte ?" pour
+  /// `AssetClass.autres`.
+  List<String> _customOtherCategories = [];
 
   bool _creatingInvestment = false;
 
@@ -239,6 +259,15 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       await _selectImmobilierAccount();
     }
     await _loadBankLogos();
+    await _loadCustomOtherCategories();
+  }
+
+  Future<void> _loadCustomOtherCategories() async {
+    final categories = await CustomOtherCategoriesRepository(
+      widget.vaultPath,
+    ).load();
+    if (!mounted) return;
+    setState(() => _customOtherCategories = categories);
   }
 
   /// Lit les logos déjà importés des établissements (voir
@@ -403,6 +432,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           ? null
           : _accountBankController.text.trim(),
       investments: const [],
+      customOtherCategory: assetClass == AssetClass.autres
+          ? _customOtherCategory
+          : null,
     );
     await _repo.saveAccount(account);
     _accountNameController.clear();
@@ -411,6 +443,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       _accounts = [..._accounts, account];
       _accountId = account.id;
       _creatingAccount = false;
+      _customOtherCategory = null;
       _step = _Step.investment;
     });
   }
@@ -485,7 +518,10 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   /// contrats d'assurance vie...). Ceux-ci restent sélectionnables
   /// directement sur l'étape (voir `_AccountEnvelopeStep`'s existingAccounts)
   /// pour y ajouter un investissement sans en créer un nouveau.
-  Future<void> _selectAccountEnvelope(AccountEnvelope envelope) async {
+  Future<void> _selectAccountEnvelope(
+    AccountEnvelope envelope, {
+    String? customCategory,
+  }) async {
     final name = _pendingEstablishmentName;
     final assetClass = _assetClass;
     if (name == null || assetClass == null) return;
@@ -503,6 +539,12 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     for (final account in _accounts) {
       if (account.assetClass == assetClass &&
           account.envelope == envelope &&
+          // Un type "Autres" personnalisé distingue deux comptes portant
+          // par ailleurs la même enveloppe générique `autre` (ex :
+          // "Vins de collection" vs "Voiture" saisie en texte libre) — sans
+          // ce test, choisir un type personnalisé pourrait réutiliser à
+          // tort un compte créé sous un autre type personnalisé.
+          account.customOtherCategory == customCategory &&
           (account.bankName ?? account.name) == name &&
           accountEnvelopeIsUniquePerEstablishment(assetClass, envelope)) {
         matching = account;
@@ -534,12 +576,15 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         // même établissement se distinguant alors par leur description
         // facultative (voir `_buildAccountLeaf` dans
         // `real_patrimoine_adapter.dart`).
-        name: assetClass == AssetClass.epargne ? name : envelope.label,
+        name: assetClass == AssetClass.epargne
+            ? name
+            : (customCategory ?? envelope.label),
         // L'établissement retenu à l'étape précédente est porté par le compte.
         bankName: name,
         description: description.isEmpty ? null : description,
         openingDate: openingDate,
         investments: const [],
+        customOtherCategory: customCategory,
       );
       await _repo.saveAccount(account);
     }
@@ -567,6 +612,68 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     });
   }
 
+  /// Ouvre une petite popup pour saisir un nouveau type "Autres"
+  /// personnalisé (voir `CustomOtherCategoriesRepository`) : une fois
+  /// validé, il est mémorisé pour être reproposé ensuite. Retourne le nom
+  /// créé, ou `null` si annulé — à l'appelant de décider ce qu'il en fait
+  /// (sélection immédiate pour le compte en cours de création).
+  Future<String?> _createCustomOtherCategory() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: FrostedCard(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const shadcn.Text('Nouveau type').large().semiBold(),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    placeholder: const shadcn.Text(
+                      'Ex : Vins de collection',
+                    ),
+                    autofocus: true,
+                    onSubmitted: (value) =>
+                        Navigator.of(context).pop(value.trim()),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      PrimaryButton(
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).pop(controller.text.trim()),
+                        child: const shadcn.Text('Créer'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlineButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const shadcn.Text('Annuler'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (name == null || name.isEmpty) return null;
+    final categories = await CustomOtherCategoriesRepository(
+      widget.vaultPath,
+    ).addCategory(name);
+    if (!mounted) return null;
+    setState(() => _customOtherCategories = categories);
+    return name;
+  }
+
   Future<void> _commitCreateInvestment() async {
     final account = _account;
     final assetClass = _assetClass;
@@ -585,9 +692,12 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         ? rawIsin
         : rawIsin.toUpperCase();
     final label = _labelController.text.trim();
-    if (account == null ||
-        label.isEmpty ||
-        (assetClass != AssetClass.immobilier && isin.isEmpty)) {
+    // Comme l'immobilier, "Autres" n'a pas de vrai identifiant financier à
+    // exiger : une référence (numéro de série...) reste facultative, voir
+    // `InvestmentIdentifierField`. Un identifiant est généré si laissé vide.
+    final identifierRequired =
+        assetClass != AssetClass.immobilier && assetClass != AssetClass.autres;
+    if (account == null || label.isEmpty || (identifierRequired && isin.isEmpty)) {
       return;
     }
     // Le compte peut être "étranger" à la classe choisie à l'étape 1 (ex :
@@ -597,6 +707,8 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     final investment = Investment(
       isin: assetClass == AssetClass.immobilier
           ? 'immobilier-${generateInvestmentId('bien')}'
+          : assetClass == AssetClass.autres && isin.isEmpty
+          ? 'autre-${generateInvestmentId('bien')}'
           : isin,
       label: label,
       transactions: const [],
@@ -788,7 +900,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   bool get _isEpargneFlow => _assetClass == AssetClass.epargne;
 
   /// Sous-flux des classes détenues chez un établissement financier
-  /// (épargne, actions & fonds, private equity, autres) : l'établissement et
+  /// (épargne, actions & fonds, private equity) : l'établissement et
   /// le compte (l'enveloppe) s'y choisissent en deux étapes avant
   /// l'investissement.
   bool get _isEstablishmentFlow =>
@@ -877,6 +989,19 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           }),
           onSelect: _selectAccountEnvelope,
           onSelectExisting: _selectAccount,
+          customOtherCategories: _customOtherCategories,
+          onSelectCustomOtherCategory: (category) => _selectAccountEnvelope(
+            AccountEnvelope.autre,
+            customCategory: category,
+          ),
+          onAddCustomOtherCategory: () async {
+            final name = await _createCustomOtherCategory();
+            if (name == null) return;
+            await _selectAccountEnvelope(
+              AccountEnvelope.autre,
+              customCategory: name,
+            );
+          },
         );
       case _Step.account:
         return _AccountStep(
@@ -893,16 +1018,33 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           nameController: _accountNameController,
           bankController: _accountBankController,
           envelope: _envelope!,
-          onEnvelopeChanged: (e) => setState(() => _envelope = e),
+          onEnvelopeChanged: (e) => setState(() {
+            _envelope = e;
+            // Un type personnalisé n'a de sens que pour l'enveloppe
+            // générique "Autre" — en changer l'oublie.
+            if (e != AccountEnvelope.autre) _customOtherCategory = null;
+          }),
           onBack: () => setState(() {
             _step = _Step.assetClass;
             _assetClass = null;
             _envelope = null;
+            _customOtherCategory = null;
           }),
           onSelectAccount: _selectAccount,
           onStartCreate: () => setState(() => _creatingAccount = true),
-          onCancelCreate: () => setState(() => _creatingAccount = false),
+          onCancelCreate: () => setState(() {
+            _creatingAccount = false;
+            _customOtherCategory = null;
+          }),
           onCreate: _commitCreateAccount,
+          customOtherCategories: _customOtherCategories,
+          customOtherCategory: _customOtherCategory,
+          onCustomOtherCategoryChanged: (category) =>
+              setState(() => _customOtherCategory = category),
+          onAddCustomOtherCategory: () async {
+            final name = await _createCustomOtherCategory();
+            if (name != null) setState(() => _customOtherCategory = name);
+          },
         );
       case _Step.investment:
         // Pour l'épargne, cette étape choisit la devise dans laquelle
@@ -922,14 +1064,24 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
               ? 'Quelle devise ?'
               : allowsDevises
               ? 'Quel investissement ou devise ?'
+              // "Autres" (montres, voitures de collection, art...) n'a pas
+              // de notion d'investissement financier : "pièce" désigne
+              // l'objet précis à l'intérieur du bien/de la collection
+              // nommée à l'étape précédente.
+              : assetClass == AssetClass.autres
+              ? 'Quelle pièce ?'
               : 'Quel investissement ?',
           addLabel: _isEpargneFlow
               ? 'Nouvelle devise'
               : allowsDevises
               ? 'Nouvel investissement ou devise'
+              : assetClass == AssetClass.autres
+              ? 'Nouvelle pièce'
               : 'Nouvel investissement',
           createLabel: _creatingDevise
               ? 'Créer la devise'
+              : assetClass == AssetClass.autres
+              ? 'Ajouter la pièce'
               : 'Créer l\'investissement',
           allowsDevises: allowsDevises,
           creatingDevise: _creatingDevise,
@@ -1144,8 +1296,18 @@ class _AccountStep extends StatelessWidget {
   /// `_selectAccountEnvelope`), le champ "Banque" est sinon proposé à la
   /// création pour toute classe détenue chez un établissement (compte-
   /// titres, assurance-vie...) — voir `assetClassSupportsBankName`. Il
-  /// reste masqué pour l'immobilier, la crypto et les métaux physiques.
+  /// reste masqué pour l'immobilier, la crypto, les métaux physiques et
+  /// "Autres" (pas de notion d'établissement financier).
   final TextEditingController bankController;
+
+  /// Types "Autres" personnalisés déjà mémorisés (voir
+  /// `CustomOtherCategoriesRepository`), proposés en plus de l'enveloppe
+  /// générique "Autre" uniquement quand [assetClass] est
+  /// `AssetClass.autres` et [envelope] vaut [AccountEnvelope.autre].
+  final List<String> customOtherCategories;
+  final String? customOtherCategory;
+  final ValueChanged<String?> onCustomOtherCategoryChanged;
+  final VoidCallback onAddCustomOtherCategory;
 
   const _AccountStep({
     required this.stepLabel,
@@ -1161,6 +1323,10 @@ class _AccountStep extends StatelessWidget {
     required this.onStartCreate,
     required this.onCancelCreate,
     required this.onCreate,
+    this.customOtherCategories = const [],
+    this.customOtherCategory,
+    required this.onCustomOtherCategoryChanged,
+    required this.onAddCustomOtherCategory,
   });
 
   @override
@@ -1169,14 +1335,27 @@ class _AccountStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _DialogHeader(step: stepLabel, title: 'Quel compte ?', onBack: onBack),
+        _DialogHeader(
+          step: stepLabel,
+          // "Autres" (montres, voitures de collection, art...) n'a pas de
+          // notion de compte financier : "bien" couvre aussi bien un objet
+          // précis qu'une collection (plusieurs pièces regroupées, voir
+          // `customOtherCategory`).
+          title: assetClass == AssetClass.autres ? 'Quel bien ?' : 'Quel compte ?',
+          onBack: onBack,
+        ),
         const SizedBox(height: 16),
         for (final account in accounts) ...[
           _OptionTile(
-            leading: const Icon(LucideIcons.landmark, size: 18),
+            leading: Icon(
+              assetClass == AssetClass.autres
+                  ? LucideIcons.gem
+                  : LucideIcons.landmark,
+              size: 18,
+            ),
             label: account.name,
             sublabel: account.assetClass == assetClass
-                ? account.envelope?.label
+                ? account.customOtherCategory ?? account.envelope?.label
                 // Compte "étranger" (ex : CTO Actions & Fonds proposé pour
                 // un ETC métaux précieux) : on précise sa vraie classe
                 // pour ne pas laisser croire qu'il en a changé.
@@ -1208,11 +1387,53 @@ class _AccountStep extends StatelessWidget {
                   ),
                 ),
               ),
+              // Type "Autres" personnalisé (ex : "Vins de collection"),
+              // uniquement pertinent quand l'enveloppe générique "Autre" est
+              // choisie — les enveloppes fixes (Art, Voiture, Montre...)
+              // portent déjà leur propre catégorie.
+              if (assetClass == AssetClass.autres &&
+                  envelope == AccountEnvelope.autre) ...[
+                const SizedBox(height: 8),
+                Select<String>(
+                  value: customOtherCategory ?? _noCustomOtherCategoryValue,
+                  constraints: const BoxConstraints(minWidth: 220),
+                  onChanged: (v) => onCustomOtherCategoryChanged(
+                    v == null || v == _noCustomOtherCategoryValue ? null : v,
+                  ),
+                  itemBuilder: (context, value) => shadcn.Text(
+                    value == _noCustomOtherCategoryValue
+                        ? 'Aucun type précis'
+                        : value,
+                  ),
+                  popup: (context) => SelectPopup(
+                    items: SelectItemList(
+                      children: [
+                        const SelectItemButton(
+                          value: _noCustomOtherCategoryValue,
+                          child: shadcn.Text('Aucun type précis'),
+                        ),
+                        for (final category in customOtherCategories)
+                          SelectItemButton(
+                            value: category,
+                            child: shadcn.Text(category),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _AddOptionButton(
+                  label: 'Nouveau type',
+                  onTap: onAddCustomOtherCategory,
+                ),
+              ],
               const SizedBox(height: 8),
               TextField(
                 controller: nameController,
-                placeholder: const shadcn.Text(
-                  'Nom du compte (ex: PEA Boursorama)',
+                placeholder: shadcn.Text(
+                  assetClass == AssetClass.autres
+                      ? 'Nom (ex : Montres de collection)'
+                      : 'Nom du compte (ex: PEA Boursorama)',
                 ),
                 autofocus: true,
               ),
@@ -1232,17 +1453,24 @@ class _AccountStep extends StatelessWidget {
             ],
             onCreate: onCreate,
             onCancel: onCancelCreate,
-            createLabel: 'Créer le compte',
+            createLabel: assetClass == AssetClass.autres
+                ? 'Créer'
+                : 'Créer le compte',
           )
         else
-          _AddOptionButton(label: 'Nouveau compte', onTap: onStartCreate),
+          _AddOptionButton(
+            label: assetClass == AssetClass.autres
+                ? 'Nouveau bien'
+                : 'Nouveau compte',
+            onTap: onStartCreate,
+          ),
       ],
     );
   }
 }
 
 /// Première étape du sous-flux des classes à établissement (épargne,
-/// actions & fonds, private equity, autres) : quel établissement financier
+/// actions & fonds, private equity) : quel établissement financier
 /// détient le compte ? On choisit un établissement existant (banque, broker,
 /// assureur, plateforme... — regroupé par nom, une ligne par établissement
 /// même s'il abrite déjà plusieurs comptes, éventuellement de classes
@@ -1356,7 +1584,9 @@ class _EstablishmentStep extends StatelessWidget {
                               // CTO...) identifie le compte — le nom réel
                               // répéterait l'établissement pour l'épargne.
                               shadcn.Text(
-                                account.envelope?.label ?? account.name,
+                                account.customOtherCategory ??
+                                    account.envelope?.label ??
+                                    account.name,
                               ).medium().small(),
                               if (account.description != null)
                                 shadcn.Text(
@@ -1373,7 +1603,7 @@ class _EstablishmentStep extends StatelessWidget {
                                 context,
                                 title:
                                     'Supprimer « '
-                                    '${account.envelope?.label ?? account.name} » ?',
+                                    '${account.customOtherCategory ?? account.envelope?.label ?? account.name} » ?',
                                 message:
                                     'Ce compte et ses investissements '
                                     '(sans transaction) seront '
@@ -1510,6 +1740,13 @@ class _AccountEnvelopeStep extends StatelessWidget {
   final DateTime? openingDate;
   final ValueChanged<DateTime?> onOpeningDateChanged;
 
+  /// Types "Autres" personnalisés déjà mémorisés (voir
+  /// `CustomOtherCategoriesRepository`) — proposés en plus des enveloppes
+  /// fixes uniquement quand [assetClass] est `AssetClass.autres`.
+  final List<String> customOtherCategories;
+  final ValueChanged<String> onSelectCustomOtherCategory;
+  final VoidCallback onAddCustomOtherCategory;
+
   const _AccountEnvelopeStep({
     required this.stepLabel,
     required this.establishmentName,
@@ -1521,6 +1758,9 @@ class _AccountEnvelopeStep extends StatelessWidget {
     required this.onBack,
     required this.onSelect,
     required this.onSelectExisting,
+    this.customOtherCategories = const [],
+    required this.onSelectCustomOtherCategory,
+    required this.onAddCustomOtherCategory,
   });
 
   @override
@@ -1557,7 +1797,10 @@ class _AccountEnvelopeStep extends StatelessWidget {
             _OptionTile(
               leading: const Icon(LucideIcons.wallet, size: 18),
               label: account.name,
-              sublabel: account.description ?? account.envelope?.label,
+              sublabel:
+                  account.description ??
+                  account.customOtherCategory ??
+                  account.envelope?.label,
               onTap: () => onSelectExisting(account.id),
             ),
             const SizedBox(height: 8),
@@ -1574,6 +1817,27 @@ class _AccountEnvelopeStep extends StatelessWidget {
             onTap: () => onSelect(envelope),
           ),
           const SizedBox(height: 8),
+        ],
+        if (assetClass == AssetClass.autres) ...[
+          for (final category in customOtherCategories) ...[
+            _OptionTile(
+              leading: const Icon(LucideIcons.wallet, size: 18),
+              label: category,
+              sublabel: establishmentName,
+              onTap: () => onSelectCustomOtherCategory(category),
+            ),
+            const SizedBox(height: 8),
+          ],
+          _OptionTile(
+            leading: Icon(
+              LucideIcons.plus,
+              size: 18,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            label: '+ Nouveau type',
+            sublabel: null,
+            onTap: onAddCustomOtherCategory,
+          ),
         ],
       ],
     );
@@ -1645,13 +1909,23 @@ class _InvestmentStep extends StatelessWidget {
         const SizedBox(height: 16),
         for (final investment in account.investments) ...[
           _OptionTile(
-            leading: const Icon(LucideIcons.chartCandlestick, size: 18),
+            leading: Icon(
+              assetClass == AssetClass.autres
+                  ? LucideIcons.gem
+                  : LucideIcons.chartCandlestick,
+              size: 18,
+            ),
             label: investment.label,
             // Immobilier : pas d'identifiant. Épargne et toute autre
             // position en devise : l'identifiant est la devise, déjà portée
-            // par le libellé — pas besoin de la répéter en dessous.
+            // par le libellé — pas besoin de la répéter en dessous. "Autres"
+            // sans référence saisie : un identifiant auto-généré (voir
+            // `_commitCreateInvestment`) n'a rien d'utile à montrer.
             sublabel:
                 (assetClass == AssetClass.immobilier || investment.isCurrency)
+                ? null
+                : assetClass == AssetClass.autres &&
+                      investment.isin.startsWith('autre-')
                 ? null
                 : investment.isin,
             onTap: () => onSelectInvestment(investment.id),
@@ -1720,6 +1994,26 @@ class _InvestmentStep extends StatelessWidget {
                   isinController: isinController,
                   labelController: labelController,
                   options: kKnownCurrencies,
+                ),
+              ] else if (assetClass == AssetClass.autres) ...[
+                // Pour "Autres", le nom précède la référence : c'est
+                // l'information principale d'un objet de collection, la
+                // référence n'étant qu'un détail facultatif (numéro de
+                // série...) — voir `InvestmentIdentifierField`.
+                TextField(
+                  controller: labelController,
+                  placeholder: const shadcn.Text(
+                    'Nom (ex : Rolex Submariner)',
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 8),
+                InvestmentIdentifierField(
+                  assetClass: assetClass,
+                  accountEnvelope: account.envelope,
+                  isinController: isinController,
+                  labelController: labelController,
+                  autofocus: false,
                 ),
               ] else ...[
                 InvestmentIdentifierField(

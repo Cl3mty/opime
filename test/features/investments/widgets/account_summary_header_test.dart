@@ -85,4 +85,38 @@ void main() {
       expect(find.text('Métaux précieux · Coffre personnel'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'compte exclu du patrimoine global : le badge apparaît sous le '
+    'sous-titre',
+    (tester) async {
+      await pump(
+        tester,
+        InvestmentAccount(
+          assetClass: AssetClass.autres,
+          name: 'Montres',
+          excludedFromPatrimoine: true,
+          investments: const [],
+        ),
+      );
+
+      expect(find.text('Hors patrimoine global'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'compte non exclu : pas de badge',
+    (tester) async {
+      await pump(
+        tester,
+        InvestmentAccount(
+          assetClass: AssetClass.autres,
+          name: 'Montres',
+          investments: const [],
+        ),
+      );
+
+      expect(find.text('Hors patrimoine global'), findsNothing);
+    },
+  );
 }

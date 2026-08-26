@@ -34,12 +34,13 @@ class AllocationCard extends StatefulWidget {
 
 // Les 3 boutons de mode et le toggle Actifs/Passifs prenaient trop de place
 // sur les très grands écrans (le bouton le plus à droite devenait
-// inaccessible) : on les réduit très légèrement (-5%) par rapport à leur
-// taille normale plutôt que de sauter directement à la densité "compact",
-// beaucoup trop petite.
-const _toggleButtonSize = ButtonSize(0.95);
-const _toggleFontSize = 14.0 * 0.95;
-const _toggleIconSize = 16.0 * 0.95;
+// inaccessible) et restaient écrasés contre le titre "Allocation" même
+// après une première réduction (-5%) : on les réduit un peu plus (-15% au
+// total) plutôt que de sauter directement à la densité "compact", beaucoup
+// trop petite.
+const _toggleButtonSize = ButtonSize(0.85);
+const _toggleFontSize = 14.0 * 0.85;
+const _toggleIconSize = 16.0 * 0.85;
 
 class _AllocationCardState extends State<AllocationCard> {
   _AllocationViewMode _mode = _AllocationViewMode.blocs;
@@ -48,10 +49,13 @@ class _AllocationCardState extends State<AllocationCard> {
   @override
   Widget build(BuildContext context) {
     final categories = _kind == _Kind.actifs ? widget.actifs : widget.passifs;
-    final total = categories.fold(0.0, (sum, c) => sum + c.montant);
+    // `montantPatrimoine` (pas `montant`) : cette carte représente le
+    // patrimoine global, le seul agrégat où un investissement/compte exclu
+    // (voir `PatrimoineAccount.excludedFromPatrimoine`) ne compte pas.
+    final total = categories.fold(0.0, (sum, c) => sum + c.montantPatrimoine);
     final slices = [
       for (final c in categories)
-        (c, total == 0 ? 0.0 : c.montant / total * 100),
+        (c, total == 0 ? 0.0 : c.montantPatrimoine / total * 100),
     ];
 
     return FrostedCard(

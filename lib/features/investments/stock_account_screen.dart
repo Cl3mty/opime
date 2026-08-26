@@ -167,6 +167,17 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
     return _editNameController.text.trim();
   }
 
+  // "Autres" (montres, voitures de collection, art...) a aussi ses
+  // documents par transaction (voir `_usesTransactionScopedDocuments` dans
+  // `position_detail_dialog.dart`/`account_transactions_tab.dart`), mais un
+  // onglet Documents général reste utile pour des pièces qui ne rattachent
+  // à aucune transaction précise (facture globale, certificat
+  // d'authenticité, attestation d'assurance...) — les deux coexistent, comme
+  // pour Actions & Fonds. Seuls les métaux précieux restent exclusivement
+  // scopés à la transaction.
+  bool get _showDocumentsTab =>
+      widget.account.assetClass != AssetClass.metauxPrecieux;
+
   bool get _hasTransactions =>
       widget.account.investments.any((i) => i.transactions.isNotEmpty);
 
@@ -221,6 +232,19 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
     );
   }
 
+  /// "Exclure du patrimoine"/"Réintégrer au patrimoine" du menu "⋮" — comme
+  /// `position_detail_dialog.dart`'s équivalent par investissement, mais
+  /// pour le compte entier d'un coup (voir `InvestmentAccount.
+  /// excludedFromPatrimoine`).
+  Future<void> _toggleExcludedFromPatrimoine() async {
+    await _repo.saveAccount(
+      widget.account.copyWith(
+        excludedFromPatrimoine: !widget.account.excludedFromPatrimoine,
+      ),
+    );
+    widget.onChanged();
+  }
+
   void _openAccountMenu(BuildContext anchorContext) {
     showDropdown(
       context: anchorContext,
@@ -245,9 +269,24 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               child: const shadcn.Text('Supprimer le compte'),
               onPressed: (_) => _deleteAccount(),
             ),
-            // Relevé de courtier (titres/dividendes) : uniquement pertinent
-            // pour un compte Actions & Fonds (CTO, PEA...).
-            if (widget.account.assetClass == AssetClass.actionsEtFonds)
+            MenuButton(
+              leading: Icon(
+                widget.account.excludedFromPatrimoine
+                    ? LucideIcons.eye
+                    : LucideIcons.eyeOff,
+                size: 14,
+              ),
+              child: shadcn.Text(
+                widget.account.excludedFromPatrimoine
+                    ? 'Réintégrer au patrimoine'
+                    : 'Exclure du patrimoine',
+              ),
+              onPressed: (_) => _toggleExcludedFromPatrimoine(),
+            ),
+            // Relevé de courtier (titres/dividendes) : le format IBKR est
+            // celui d'un CTO — un PEA/PEA-PME a une fiscalité et des
+            // mouvements différents, non couverts par ce parseur.
+            if (widget.account.envelope == AccountEnvelope.cto)
               MenuButton(
                 leading: const Icon(LucideIcons.upload, size: 14),
                 child: const shadcn.Text('Importer un relevé (IBKR)'),
@@ -323,9 +362,18 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
           TabList(
             index: _tabIndex,
             onChanged: (value) => setState(() => _tabIndex = value),
-            children: const [
-              TabItem(child: shadcn.Text('Positions')),
-              TabItem(child: shadcn.Text('Transactions')),
+            children: [
+              const TabItem(child: shadcn.Text('Positions')),
+              const TabItem(child: shadcn.Text('Transactions')),
+              // Pour les métaux précieux, chaque document doit être
+              // rattaché à une transaction précise d'une position (voir
+              // `PositionDetailDialog`/`AccountTransactionsTab`) — pas
+              // d'onglet Documents général pour cette classe. Les autres
+              // (dont "Autres", qui a aussi des documents par transaction)
+              // ont les deux : cet onglet pour les documents généraux
+              // (facture globale, certificat...) en plus.
+              if (_showDocumentsTab)
+                const TabItem(child: shadcn.Text('Documents')),
             ],
           ),
           const SizedBox(height: 16),
@@ -335,22 +383,14 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               hidden: widget.hidden,
               onTap: _openPosition,
             )
-          else
+          else if (_tabIndex == 1)
             AccountTransactionsTab(
               vaultPath: widget.vaultPath,
               account: account,
               hidden: widget.hidden,
               onChanged: () async => widget.onChanged(),
-            ),
-          // Pour les métaux précieux et "autres", chaque document doit être
-          // rattaché à une transaction précise d'une position (voir
-          // `PositionDetailDialog`/`AccountTransactionsTab`) — pas de
-          // documents au niveau du compte pour ces deux classes. Pour
-          // toutes les autres, c'est l'inverse : le compte est le seul
-          // niveau où on en attache.
-          if (account.assetClass != AssetClass.metauxPrecieux &&
-              account.assetClass != AssetClass.autres) ...[
-            const SizedBox(height: 24),
+            )
+          else if (_tabIndex == 2 && _showDocumentsTab)
             DocumentsSection(
               vaultPath: widget.vaultPath,
               documents: account.documents,
@@ -358,7 +398,6 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               onAdd: _addDocument,
               onDelete: _deleteDocument,
             ),
-          ],
         ],
       ),
     );

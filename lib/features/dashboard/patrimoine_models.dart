@@ -174,6 +174,17 @@ class PatrimoineAccount {
   /// `category_detail_screen.dart`).
   final bool isCurrency;
 
+  /// `true` quand cette ligne (un investissement individuel, ou un compte
+  /// entier) a été exclue du patrimoine global par l'utilisateur — voir
+  /// `Investment.excludedFromPatrimoine`/`InvestmentAccount.
+  /// excludedFromPatrimoine`. [valeur]/[plusValueAbs] affichent toujours le
+  /// montant réel (la ligne reste lisible ailleurs, juste marquée) :
+  /// [PatrimoineCategory.montant] continue de tout comptabiliser, seul
+  /// [PatrimoineCategory.montantPatrimoine] (utilisé par la carte
+  /// Allocation du Dashboard) l'ignore — voir `real_patrimoine_adapter.dart`'s
+  /// `_buildLeaf`.
+  final bool excludedFromPatrimoine;
+
   const PatrimoineAccount({
     this.id,
     required this.name,
@@ -192,6 +203,7 @@ class PatrimoineAccount {
     this.priceUnavailable,
     this.lastPriceDate,
     this.bankName,
+    this.excludedFromPatrimoine = false,
   });
 
   String get initials => initialsFor(name);
@@ -234,6 +246,13 @@ class PatrimoineCategory {
     required this.accounts,
   });
 
+  /// Total réel de la catégorie, tous comptes/investissements confondus —
+  /// n'ignore jamais une ligne exclue du patrimoine (voir
+  /// [PatrimoineAccount.excludedFromPatrimoine]) : utilisé par la page de
+  /// détail de la catégorie et par la carte "Actifs"/"Passifs" du Dashboard
+  /// (`CategoryBreakdownCard`), qui continuent toutes deux de tout
+  /// comptabiliser. Voir [montantPatrimoine] pour l'agrégat qui, lui,
+  /// l'ignore.
   double get montant => accounts.fold(0.0, (sum, a) => sum + a.valeur);
 
   double get plusValueAbs =>
@@ -244,6 +263,16 @@ class PatrimoineCategory {
     if (costBasis == 0) return 0;
     return plusValueAbs / costBasis * 100;
   }
+
+  /// Comme [montant], mais ignore les lignes exclues du patrimoine (voir
+  /// [PatrimoineAccount.excludedFromPatrimoine]) — le seul total de cette
+  /// catégorie qui compte pour un agrégat global : utilisé exclusivement par
+  /// la carte Allocation du Dashboard (`AllocationCard`), dont le rôle est
+  /// justement de représenter "mon patrimoine total".
+  double get montantPatrimoine => accounts.fold(
+    0.0,
+    (sum, a) => a.excludedFromPatrimoine ? sum : sum + a.valeur,
+  );
 
   /// Vrai pour les classes d'actif "unitaires" — une quantité et un cours
   /// par ligne, où le PRU (Prix de Revient Unitaire, voir

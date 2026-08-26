@@ -25,6 +25,11 @@ class InvestmentIdentifierField extends StatelessWidget {
   /// liste de l'épargne (voir [kKnownCurrencies]) sans changer de classe.
   final List<String>? options;
 
+  /// `false` quand un autre champ du même formulaire doit recevoir le focus
+  /// initial à la place (ex : "Autres", où le nom précède la référence —
+  /// voir `complete_patrimoine_dialog.dart`'s `_InvestmentStep`).
+  final bool autofocus;
+
   const InvestmentIdentifierField({
     super.key,
     required this.assetClass,
@@ -32,6 +37,7 @@ class InvestmentIdentifierField extends StatelessWidget {
     required this.labelController,
     this.accountEnvelope,
     this.options,
+    this.autofocus = true,
   });
 
   @override
@@ -45,10 +51,16 @@ class InvestmentIdentifierField extends StatelessWidget {
     if (options == null) {
       return TextField(
         controller: isinController,
-        placeholder: const shadcn.Text(
-          'Identifiant (ISIN, ou libre : adresse, référence...)',
+        // "Autres" (montres, voitures de collection, art...) n'a pas
+        // d'identifiant financier (ISIN) : "référence" couvre un numéro de
+        // série ou une référence de fabricant, et reste facultatif (voir
+        // `_commitCreateInvestment`, qui en génère un si laissé vide).
+        placeholder: shadcn.Text(
+          assetClass == AssetClass.autres
+              ? 'Référence (optionnelle : numéro de série, référence...)'
+              : 'Identifiant (ISIN, ou libre : adresse, référence...)',
         ),
-        autofocus: true,
+        autofocus: autofocus,
       );
     }
 

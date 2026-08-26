@@ -4,6 +4,7 @@ import '../../../core/money_format.dart';
 import '../../../core/ui/performance_amount.dart';
 import '../currency_format.dart';
 import '../investments_models.dart';
+import 'transaction_widgets.dart' show ExcludedFromPatrimoineBadge;
 
 const _colWidth = 96.0;
 
@@ -114,7 +115,20 @@ class _PositionLine extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    shadcn.Text(investment.label).medium().small(),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: shadcn.Text(
+                            investment.label,
+                          ).medium().small(),
+                        ),
+                        if (investment.excludedFromPatrimoine) ...[
+                          const SizedBox(width: 6),
+                          const ExcludedFromPatrimoineBadge(),
+                        ],
+                      ],
+                    ),
                     if (!investment.isCurrency)
                       shadcn.Text(investment.isin).muted().xSmall(),
                     if (crossClass)
@@ -152,15 +166,22 @@ class _PositionLine extends StatelessWidget {
                 width: _colWidth,
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: investment.lastPrice == null
-                      ? shadcn.Text('—').small()
-                      : shadcn.Text(
+                  child: investment.lastPrice != null
+                      ? shadcn.Text(
                           investmentLastPriceDisplay(
                             account,
                             investment,
                             hidden: hidden,
                           ),
-                        ).small(),
+                        ).small()
+                      // Sans cours de marché (ex : un objet "Autres"), le
+                      // cours estimé à la main par l'utilisateur (voir
+                      // [Investment.manualPrice]) prend le relais.
+                      : investment.manualPrice != null
+                      ? shadcn.Text(
+                          displayEuros(investment.manualPrice!, hidden),
+                        ).small()
+                      : shadcn.Text('—').small(),
                 ),
               ),
               SizedBox(

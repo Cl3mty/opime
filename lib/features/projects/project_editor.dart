@@ -457,13 +457,7 @@ class _ProjectDetailSection extends StatelessWidget {
       for (final link in project.accountLinks)
         for (final account in accounts)
           if (account.id == link.accountId)
-            (
-              account.name,
-              account.investments.fold(
-                0.0,
-                (sum, i) => sum + (i.effectiveMarketValue ?? i.investedAmount),
-              ),
-            ),
+            (account.name, account.totalMarketValue),
     ];
     final linkedLiabilities = <(String, double)>[
       for (final link in project.liabilityLinks)

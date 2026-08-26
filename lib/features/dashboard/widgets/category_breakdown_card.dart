@@ -4,6 +4,8 @@ import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/performance_amount.dart';
 import '../../../core/ui/toggle_button_style.dart';
+import '../../investments/widgets/transaction_widgets.dart'
+    show ExcludedFromPatrimoineBadge;
 import '../../navigation/navigation_scope.dart';
 import '../patrimoine_models.dart';
 
@@ -337,7 +339,16 @@ class _AccountRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                shadcn.Text(account.name).small(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(child: shadcn.Text(account.name).small()),
+                    if (account.excludedFromPatrimoine) ...[
+                      const SizedBox(width: 6),
+                      const ExcludedFromPatrimoineBadge(),
+                    ],
+                  ],
+                ),
                 if (account.subtitle != null)
                   shadcn.Text(account.subtitle!).muted().xSmall(),
               ],

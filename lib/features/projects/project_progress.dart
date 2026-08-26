@@ -13,10 +13,13 @@ typedef ProjectProgress = ({
 });
 
 /// Valeur effective d'un compte : cours de marché ou estimation (immobilier)
-/// quand connu, montant net investi sinon — même repli, investissement par
-/// investissement, que `Investment.effectiveMarketValue`.
-double _effectiveAccountValue(InvestmentAccount account) => account.investments
-    .fold(0.0, (sum, i) => sum + (i.effectiveMarketValue ?? i.investedAmount));
+/// quand connu, montant net investi sinon — délègue à
+/// `InvestmentAccount.totalMarketValue`, qui compte toujours tout, y compris
+/// un investissement marqué `excludedFromPatrimoine` (cette exclusion ne
+/// porte que sur les agrégats globaux du Dashboard, pas sur l'avancement
+/// d'un objectif d'épargne).
+double _effectiveAccountValue(InvestmentAccount account) =>
+    account.totalMarketValue;
 
 /// Calcule l'avancement d'un projet : valeur nette actuelle des comptes et
 /// passifs qui lui sont rattachés (comptes − passifs), rapportée au montant

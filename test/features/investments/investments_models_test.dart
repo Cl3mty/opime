@@ -85,11 +85,144 @@ void main() {
   });
 
   test(
+    '"Autres" n\'a pas de notion d\'établissement financier : pas d\'étape '
+    '"Quel établissement ?", pas de champ banque (comme la crypto, '
+    'l\'immobilier)',
+    () {
+      expect(assetClassRequiresEstablishmentStep(AssetClass.autres), isFalse);
+      expect(assetClassSupportsBankName(AssetClass.autres), isFalse);
+      // Contrairement à l'épargne/aux comptes-titres, qui en ont bien un.
+      expect(assetClassRequiresEstablishmentStep(AssetClass.epargne), isTrue);
+      expect(assetClassSupportsBankName(AssetClass.epargne), isTrue);
+    },
+  );
+
+  test(
     'identifierOptionsFor : l\'épargne propose la liste des devises connues',
     () {
       expect(identifierOptionsFor(AssetClass.epargne), kKnownCurrencies);
     },
   );
+
+  group('excludedFromPatrimoine (Investment)', () {
+    Investment investment({bool excluded = false}) => Investment(
+      isin: 'FR0000131104',
+      label: 'BNP Paribas',
+      transactions: [
+        Transaction(date: DateTime(2024, 1, 1), isBuy: true, quantity: 10, unitPrice: 50),
+      ],
+      excludedFromPatrimoine: excluded,
+    );
+
+    test('faux par défaut', () {
+      expect(investment().excludedFromPatrimoine, isFalse);
+    });
+
+    test('round-trip JSON quand vrai', () {
+      final a = investment(excluded: true);
+      final b = Investment.fromJson(a.toJson());
+      expect(b.excludedFromPatrimoine, isTrue);
+    });
+
+    test('absent du JSON quand faux (ne alourdit pas les comptes existants)', () {
+      expect(investment().toJson().containsKey('excludedFromPatrimoine'), isFalse);
+    });
+
+    test('copyWith bascule le drapeau', () {
+      final a = investment();
+      expect(a.copyWith(excludedFromPatrimoine: true).excludedFromPatrimoine, isTrue);
+      // Paramètre non fourni : conserve la valeur existante.
+      expect(a.copyWith(symbol: 'BNP').excludedFromPatrimoine, isFalse);
+    });
+
+    test(
+      'InvestmentAccount.totalMarketValue/totalInvested continuent de '
+      'compter un investissement marqué (seuls les agrégats globaux du '
+      'Dashboard l\'ignorent, pas le total propre du compte)',
+      () {
+        final acc = InvestmentAccount(
+          assetClass: AssetClass.actionsEtFonds,
+          envelope: AccountEnvelope.cto,
+          name: 'CTO',
+          investments: [
+            investment(), // 10 * 50 = 500 investis
+            investment(excluded: true), // 10 * 50 = 500 investis aussi
+          ],
+        );
+        expect(acc.totalInvested, 1000);
+        expect(acc.totalMarketValue, 1000);
+      },
+    );
+  });
+
+  group('excludedFromPatrimoine (InvestmentAccount)', () {
+    InvestmentAccount account({bool excluded = false}) => InvestmentAccount(
+      assetClass: AssetClass.autres,
+      name: 'Montres',
+      investments: const [],
+      excludedFromPatrimoine: excluded,
+    );
+
+    test('faux par défaut', () {
+      expect(account().excludedFromPatrimoine, isFalse);
+    });
+
+    test('round-trip JSON quand vrai', () {
+      final a = account(excluded: true);
+      final b = InvestmentAccount.fromJson(a.toJson());
+      expect(b.excludedFromPatrimoine, isTrue);
+    });
+
+    test('absent du JSON quand faux (ne alourdit pas les comptes existants)', () {
+      expect(
+        account().toJson().containsKey('excludedFromPatrimoine'),
+        isFalse,
+      );
+    });
+
+    test('copyWith bascule le drapeau', () {
+      final a = account();
+      expect(
+        a.copyWith(excludedFromPatrimoine: true).excludedFromPatrimoine,
+        isTrue,
+      );
+      // Paramètre non fourni : conserve la valeur existante.
+      expect(a.copyWith(name: 'Autre nom').excludedFromPatrimoine, isFalse);
+    });
+  });
+
+  group('customOtherCategory (InvestmentAccount)', () {
+    InvestmentAccount autresAccount({String? customOtherCategory}) =>
+        InvestmentAccount(
+          assetClass: AssetClass.autres,
+          envelope: AccountEnvelope.autre,
+          name: customOtherCategory ?? AccountEnvelope.autre.label,
+          investments: const [],
+          customOtherCategory: customOtherCategory,
+        );
+
+    test('round-trip JSON', () {
+      final a = autresAccount(customOtherCategory: 'Vins de collection');
+      final b = InvestmentAccount.fromJson(a.toJson());
+      expect(b.customOtherCategory, 'Vins de collection');
+    });
+
+    test('absente round-trip vers null', () {
+      final a = autresAccount();
+      final b = InvestmentAccount.fromJson(a.toJson());
+      expect(b.customOtherCategory, isNull);
+    });
+
+    test('copyWith efface le type personnalisé avec null explicite', () {
+      final a = autresAccount(customOtherCategory: 'Vins de collection');
+      expect(a.copyWith(customOtherCategory: null).customOtherCategory, isNull);
+      // Paramètre non fourni : conserve la valeur existante.
+      expect(
+        a.copyWith(name: 'Renommé').customOtherCategory,
+        'Vins de collection',
+      );
+    });
+  });
 
   group('positions en devise (épargne et comptes-titres)', () {
     final cto = InvestmentAccount(
@@ -481,6 +614,104 @@ void main() {
       expect(investment.effectiveMarketValue, isNull);
       expect(investment.unrealizedGain, isNull);
     });
+  });
+
+  group('Cours estimé à la main "Autres" (manualPrice)', () {
+    Investment collectible({
+      double? manualPrice,
+      DateTime? manualPriceAt,
+      double quantity = 1,
+      double buyAmount = 8000,
+    }) => Investment(
+      isin: 'autre-1',
+      label: 'Rolex Submariner',
+      assetClass: AssetClass.autres,
+      transactions: [
+        Transaction(
+          date: DateTime(2022, 1, 1),
+          isBuy: true,
+          quantity: quantity,
+          unitPrice: buyAmount / quantity,
+        ),
+      ],
+      manualPrice: manualPrice,
+      manualPriceAt: manualPriceAt,
+    );
+
+    test('round-trip JSON', () {
+      final original = collectible(
+        manualPrice: 9500,
+        manualPriceAt: DateTime.utc(2026, 8, 15),
+      );
+      final restored = Investment.fromJson(original.toJson());
+
+      expect(restored.manualPrice, 9500);
+      expect(restored.manualPriceAt, DateTime.utc(2026, 8, 15));
+    });
+
+    test('absent : clés omises du JSON, restent null au décodage', () {
+      final json = collectible().toJson();
+      expect(json.containsKey('manualPrice'), isFalse);
+      expect(json.containsKey('manualPriceAt'), isFalse);
+
+      final restored = Investment.fromJson(json);
+      expect(restored.manualPrice, isNull);
+      expect(restored.estimatedValue, isNull);
+    });
+
+    test(
+      'estimatedValue = cours manuel × quantité détenue (une seule unité)',
+      () {
+        final investment = collectible(manualPrice: 9500);
+        expect(investment.estimatedValue, 9500);
+      },
+    );
+
+    test(
+      'estimatedValue multiplie bien le cours manuel par la quantité '
+      'détenue quand elle dépasse 1 (ex : plusieurs objets identiques)',
+      () {
+        final investment = collectible(manualPrice: 100, quantity: 3);
+        expect(investment.quantityHeld, 3);
+        expect(investment.estimatedValue, 300);
+      },
+    );
+
+    test(
+      'effectiveMarketValue retombe sur l\'estimation manuelle sans cours '
+      'de marché',
+      () {
+        final investment = collectible(manualPrice: 9500);
+        expect(investment.marketValue, isNull);
+        expect(investment.effectiveMarketValue, 9500);
+      },
+    );
+
+    test('unrealizedGain calculé à partir de l\'estimation manuelle', () {
+      final investment = collectible(manualPrice: 9500, buyAmount: 8000);
+      expect(investment.unrealizedGain, 9500 - 8000);
+    });
+
+    test('sans estimation : effectiveMarketValue/unrealizedGain restent null', () {
+      final investment = collectible();
+      expect(investment.effectiveMarketValue, isNull);
+      expect(investment.unrealizedGain, isNull);
+    });
+
+    test(
+      'copyWith bascule l\'estimation manuelle sans affecter l\'estimation '
+      'immobilière (les deux mécanismes ne se recouvrent jamais)',
+      () {
+        final investment = collectible();
+        final updated = investment.copyWith(
+          manualPrice: 9500,
+          manualPriceAt: DateTime(2026, 8, 15),
+        );
+        expect(updated.estimatedValue, 9500);
+        expect(updated.surfaceM2, isNull);
+        expect(updated.estimatedPricePerSqm, isNull);
+      },
+    );
   });
 
   group('accountFiscalMilestone', () {

@@ -75,6 +75,29 @@ class FreshPriceBadge extends StatelessWidget {
   }
 }
 
+/// Petit badge affiché à côté d'un investissement ou d'un compte quand
+/// [Investment.excludedFromPatrimoine]/[InvestmentAccount.excludedFromPatrimoine]
+/// — il reste visible partout avec sa vraie valeur (page de catégorie,
+/// compte, Analyses...) ; seuls les agrégats globaux du Dashboard
+/// ("Patrimoine net/brut", carte Allocation) l'ignorent, ce que ce badge
+/// rappelle.
+class ExcludedFromPatrimoineBadge extends StatelessWidget {
+  const ExcludedFromPatrimoineBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return OutlineBadge(
+      leading: Icon(
+        LucideIcons.eyeOff,
+        size: 10,
+        color: theme.colorScheme.mutedForeground,
+      ),
+      child: shadcn.Text('Hors patrimoine global').xSmall().muted(),
+    );
+  }
+}
+
 /// Une ligne de transaction (achat/vente/dividende...) avec menu "⋮"
 /// modifier/supprimer — utilisée par la page d'un investissement
 /// (`investment_detail_screen.dart`) comme par l'onglet "Transactions" d'un

@@ -538,4 +538,318 @@ void main() {
     expect(actions.accounts, hasLength(1));
     expect(actions.accounts.single.id, 'still-held');
   });
+
+  test(
+    'un investissement exclu du patrimoine reste visible et compte '
+    'toujours dans le total propre de sa catégorie, mais pas dans '
+    'montantPatrimoine (le seul agrégat que lit la carte Allocation)',
+    () {
+      final cto = InvestmentAccount(
+        assetClass: AssetClass.actionsEtFonds,
+        envelope: AccountEnvelope.cto,
+        name: 'CTO Bourso',
+        bankName: 'Bourso',
+        investments: [
+          Investment(
+            id: 'excluded',
+            isin: 'FR0000120271',
+            label: 'Exclu du patrimoine',
+            lastPrice: 50,
+            excludedFromPatrimoine: true,
+            transactions: [
+              Transaction(
+                date: DateTime.utc(2024, 1, 1),
+                isBuy: true,
+                quantity: 10,
+                unitPrice: 40,
+              ),
+            ],
+          ),
+          Investment(
+            id: 'counted',
+            isin: 'FR0012345678',
+            label: 'Compté normalement',
+            lastPrice: 50,
+            transactions: [
+              Transaction(
+                date: DateTime.utc(2024, 1, 1),
+                isBuy: true,
+                quantity: 10,
+                unitPrice: 40,
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final categories = buildRealCategories(
+        [cto],
+        const <String, List<PricePoint>>{},
+        '/vault',
+      );
+      final actions = categories.singleWhere(
+        (c) => c.id == AssetClass.actionsEtFonds.categoryId,
+      );
+
+      // Reste visible (positions bien tenues) : les deux lignes sont là.
+      expect(actions.accounts, hasLength(2));
+      expect(
+        actions.accounts.map((a) => a.id),
+        containsAll(['excluded', 'counted']),
+      );
+      // Le total propre de la catégorie compte les deux positions (500 +
+      // 500 = 1000 €) : la page de détail continue de tout comptabiliser.
+      expect(actions.montant, 1000);
+      // Seul l'agrégat dédié à la carte Allocation ignore la position
+      // exclue.
+      expect(actions.montantPatrimoine, 500);
+    },
+  );
+
+  test(
+    'buildRealTopAssets exclut un investissement marqué '
+    'excludedFromPatrimoine (n\'a pas sa place dans un classement de '
+    'performance)',
+    () {
+      final account = InvestmentAccount(
+        assetClass: AssetClass.actionsEtFonds,
+        envelope: AccountEnvelope.cto,
+        name: 'CTO',
+        investments: [
+          Investment(
+            isin: 'FR0012345678',
+            label: 'Exclu',
+            excludedFromPatrimoine: true,
+            transactions: [
+              Transaction(
+                date: DateTime.utc(2025, 1, 1),
+                isBuy: true,
+                quantity: 5,
+                unitPrice: 90,
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final assets = buildRealTopAssets(
+        [account],
+        const <String, List<PricePoint>>{},
+      );
+      expect(assets, isEmpty);
+    },
+  );
+
+  test(
+    'netWorthHistoryFor compte toujours un investissement exclu du '
+    'patrimoine (la page de catégorie garde son vrai historique) — seul '
+    'investmentsForEffectiveClass(excludeFlagged: true) le filtre en amont, '
+    'pour la courbe globale du Dashboard',
+    () {
+      final priceHistory = [
+        PricePoint(DateTime.utc(2025, 1, 1), 100),
+        PricePoint(DateTime.utc(2025, 2, 1), 120),
+      ];
+      final counted = Investment(
+        isin: 'COUNTED',
+        label: 'Compté',
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2025, 1, 1),
+            isBuy: true,
+            quantity: 1,
+            unitPrice: 100,
+          ),
+        ],
+      );
+      final excluded = Investment(
+        isin: 'EXCLUDED',
+        label: 'Exclu',
+        excludedFromPatrimoine: true,
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2025, 1, 1),
+            isBuy: true,
+            quantity: 1,
+            unitPrice: 100,
+          ),
+        ],
+      );
+
+      final withBoth = netWorthHistoryFor(
+        [counted, excluded],
+        {'COUNTED': priceHistory, 'EXCLUDED': priceHistory},
+        start: DateTime.utc(2025, 2, 1),
+        end: DateTime.utc(2025, 2, 1),
+      );
+      final countedOnly = netWorthHistoryFor(
+        [counted],
+        {'COUNTED': priceHistory},
+        start: DateTime.utc(2025, 2, 1),
+        end: DateTime.utc(2025, 2, 1),
+      );
+
+      // 120 (compté) + 120 (exclu, mais netWorthHistoryFor ne filtre plus
+      // rien lui-même) ≠ 120 seul.
+      expect(withBoth.last.value, 2 * countedOnly.last.value);
+    },
+  );
+
+  test(
+    'investmentsForEffectiveClass(excludeFlagged: true) omet un '
+    'investissement individuel exclu et tout un compte marqué exclu — '
+    'c\'est le seul filtre appliqué avant la courbe globale du Dashboard',
+    () {
+      final normalAccount = InvestmentAccount(
+        assetClass: AssetClass.actionsEtFonds,
+        envelope: AccountEnvelope.cto,
+        name: 'CTO compté',
+        investments: [
+          Investment(isin: 'A', label: 'Compté', transactions: const []),
+          Investment(
+            isin: 'B',
+            label: 'Exclu individuellement',
+            excludedFromPatrimoine: true,
+            transactions: const [],
+          ),
+        ],
+      );
+      final excludedAccount = InvestmentAccount(
+        assetClass: AssetClass.actionsEtFonds,
+        envelope: AccountEnvelope.cto,
+        name: 'CTO exclu en entier',
+        excludedFromPatrimoine: true,
+        investments: [
+          Investment(isin: 'C', label: 'Dans un compte exclu', transactions: const []),
+        ],
+      );
+
+      final all = investmentsForEffectiveClass(
+        [normalAccount, excludedAccount],
+        AssetClass.actionsEtFonds,
+      );
+      expect(all.map((i) => i.isin), containsAll(['A', 'B', 'C']));
+
+      final onlyCounted = investmentsForEffectiveClass(
+        [normalAccount, excludedAccount],
+        AssetClass.actionsEtFonds,
+        excludeFlagged: true,
+      );
+      expect(onlyCounted.map((i) => i.isin), ['A']);
+    },
+  );
+
+  test(
+    'netWorthHistoryFor reflète le cours estimé à la main d\'un objet '
+    '"Autres" — pas seulement le montant investi, qui ne bougeait jamais '
+    'quand l\'estimation était mise à jour (régression signalée)',
+    () {
+      final watch = Investment(
+        isin: 'autre-1',
+        label: 'Rolex Submariner',
+        assetClass: AssetClass.autres,
+        manualPrice: 450,
+        manualPriceAt: DateTime.utc(2026, 8, 20),
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2026, 1, 1),
+            isBuy: true,
+            quantity: 1,
+            unitPrice: 1,
+          ),
+        ],
+      );
+
+      final today = DateTime.utc(2026, 8, 27);
+      final points = netWorthHistoryFor(
+        [watch],
+        const <String, List<PricePoint>>{},
+        start: today,
+        end: today,
+      );
+
+      // Aujourd'hui (après manualPriceAt) : le cours estimé (450 €), pas le
+      // montant investi (1 €, resté figé quel que soit le cours saisi).
+      expect(points.last.value, 450);
+    },
+  );
+
+  test(
+    'netWorthHistoryFor retombe sur le montant investi avant la date de '
+    'l\'estimation manuelle (aucun historique de cours antérieur connu)',
+    () {
+      final watch = Investment(
+        isin: 'autre-1',
+        label: 'Rolex Submariner',
+        assetClass: AssetClass.autres,
+        manualPrice: 450,
+        manualPriceAt: DateTime.utc(2026, 8, 20),
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2026, 1, 1),
+            isBuy: true,
+            quantity: 1,
+            unitPrice: 1,
+          ),
+        ],
+      );
+
+      final beforeEstimate = DateTime.utc(2026, 6, 1);
+      final points = netWorthHistoryFor(
+        [watch],
+        const <String, List<PricePoint>>{},
+        start: beforeEstimate,
+        end: beforeEstimate,
+      );
+
+      expect(points.last.value, 1);
+    },
+  );
+
+  test(
+    'netWorthHistoryFor multiplie le cours manuel par la quantité détenue '
+    'à la date évaluée, pas la quantité actuelle',
+    () {
+      final watches = Investment(
+        isin: 'autre-1',
+        label: 'Montres identiques',
+        assetClass: AssetClass.autres,
+        manualPrice: 100,
+        manualPriceAt: DateTime.utc(2026, 1, 1),
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2026, 1, 1),
+            isBuy: true,
+            quantity: 1,
+            unitPrice: 80,
+          ),
+          Transaction(
+            date: DateTime.utc(2026, 6, 1),
+            isBuy: true,
+            quantity: 1,
+            unitPrice: 90,
+          ),
+        ],
+      );
+
+      final beforeSecondBuy = DateTime.utc(2026, 3, 1);
+      final afterSecondBuy = DateTime.utc(2026, 8, 1);
+
+      final before = netWorthHistoryFor(
+        [watches],
+        const <String, List<PricePoint>>{},
+        start: beforeSecondBuy,
+        end: beforeSecondBuy,
+      );
+      final after = netWorthHistoryFor(
+        [watches],
+        const <String, List<PricePoint>>{},
+        start: afterSecondBuy,
+        end: afterSecondBuy,
+      );
+
+      expect(before.last.value, 100);
+      expect(after.last.value, 200);
+    },
+  );
 }

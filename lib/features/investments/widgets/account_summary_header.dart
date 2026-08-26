@@ -6,6 +6,7 @@ import '../investments_models.dart';
 import '../performance_calculator.dart';
 import 'fiscal_milestone_bar.dart';
 import 'peg_pee_unlock_card.dart';
+import 'transaction_widgets.dart' show ExcludedFromPatrimoineBadge;
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
@@ -64,6 +65,10 @@ class AccountSummaryHeader extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         shadcn.Text(_subtitle).muted().small(),
+        if (account.excludedFromPatrimoine) ...[
+          const SizedBox(height: 2),
+          const ExcludedFromPatrimoineBadge(),
+        ],
         if (account.openingDate != null) ...[
           const SizedBox(height: 2),
           shadcn.Text(
@@ -154,14 +159,19 @@ class AccountSummaryHeader extends StatelessWidget {
   String get _subtitle {
     final envelope = account.envelope;
     if (envelope == null) return account.assetClass.label;
-    final nameIsEnvelopeLabel = account.name == envelope.label;
+    // Un type "Autres" personnalisé (voir
+    // `InvestmentAccount.customOtherCategory`) tient lieu de libellé
+    // d'enveloppe pour cette comparaison, exactement comme le libellé
+    // générique de l'enveloppe pour les autres classes.
+    final envelopeDisplay = account.customOtherCategory ?? envelope.label;
+    final nameIsEnvelopeLabel = account.name == envelopeDisplay;
     final bankName = account.bankName;
     if (nameIsEnvelopeLabel) {
       return bankName == null
           ? account.assetClass.label
           : '${account.assetClass.label} · $bankName';
     }
-    return '${account.assetClass.label} · ${envelope.label}';
+    return '${account.assetClass.label} · $envelopeDisplay';
   }
 
   /// Texte du jalon fiscal — voir [accountFiscalMilestone] pour le calcul

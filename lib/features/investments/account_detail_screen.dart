@@ -272,6 +272,19 @@ class _AccountDetailViewState extends State<AccountDetailView> {
     );
   }
 
+  /// "Exclure du patrimoine"/"Réintégrer au patrimoine" du menu "⋮" — comme
+  /// `position_detail_dialog.dart`'s équivalent par investissement, mais
+  /// pour le compte entier d'un coup (voir `InvestmentAccount.
+  /// excludedFromPatrimoine`).
+  Future<void> _toggleExcludedFromPatrimoine() async {
+    await _repo.saveAccount(
+      widget.account.copyWith(
+        excludedFromPatrimoine: !widget.account.excludedFromPatrimoine,
+      ),
+    );
+    widget.onChanged();
+  }
+
   void _openAccountMenu(BuildContext anchorContext) {
     showDropdown(
       context: anchorContext,
@@ -295,6 +308,20 @@ class _AccountDetailViewState extends State<AccountDetailView> {
                   : null,
               child: const shadcn.Text('Supprimer le compte'),
               onPressed: (_) => _deleteAccount(),
+            ),
+            MenuButton(
+              leading: Icon(
+                widget.account.excludedFromPatrimoine
+                    ? LucideIcons.eye
+                    : LucideIcons.eyeOff,
+                size: 14,
+              ),
+              child: shadcn.Text(
+                widget.account.excludedFromPatrimoine
+                    ? 'Réintégrer au patrimoine'
+                    : 'Exclure du patrimoine',
+              ),
+              onPressed: (_) => _toggleExcludedFromPatrimoine(),
             ),
             if (widget.account.assetClass == AssetClass.actionsEtFonds)
               MenuButton(

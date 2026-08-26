@@ -1,8 +1,11 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart' show parseDecimal;
 import '../../../core/ui/frosted_card.dart';
+import '../document_storage.dart';
+import '../documents_section.dart';
 import '../investments_models.dart';
 import '../investments_repository.dart';
 import '../transaction_price_currency.dart';
@@ -52,6 +55,12 @@ class _AddTransactionDialog extends StatefulWidget {
 class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   late InvestmentsRepository _repo;
 
+  /// Copie locale du compte, mise à jour à chaque document ajouté/retiré
+  /// (voir [_addDocument]) — la popup n'est pas reconstruite par le parent
+  /// tant qu'elle est ouverte, contrairement à [widget.account] qui reste
+  /// figé sur l'état au moment de l'ouverture.
+  late InvestmentAccount _account;
+
   /// Id de la position sélectionnée, ou [_newPositionValue] pour créer une
   /// nouvelle position — pas de position existante à sélectionner par
   /// défaut sur un compte encore vide.
@@ -65,10 +74,21 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   final _priceController = TextEditingController();
   late final TransactionPriceCurrencyController _priceCurrencyController;
 
+  /// Id pré-généré de la transaction en cours de création — permet
+  /// d'attacher des documents (voir [_addDocument]) à une position déjà
+  /// existante avant même que la transaction ne soit créée ; il en devient
+  /// l'id réel à la validation ([_commit]). Régénéré à chaque changement de
+  /// position sélectionnée, les documents déjà attachés à l'ancien id étant
+  /// alors nettoyés (voir [_cleanupPendingDocuments]) — pas de notion de
+  /// "transaction en cours" pour une nouvelle position, qui n'existe pas
+  /// encore.
+  String? _pendingTransactionId;
+
   @override
   void initState() {
     super.initState();
     _repo = InvestmentsRepository(widget.vaultPath);
+    _account = widget.account;
     _priceCurrencyController = TransactionPriceCurrencyController(
       vaultPath: widget.vaultPath,
     );
@@ -77,9 +97,12 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       DateTime.now().month,
       DateTime.now().day,
     );
-    _selection = widget.account.investments.isEmpty
+    _selection = _account.investments.isEmpty
         ? _newPositionValue
-        : widget.account.investments.first.id;
+        : _account.investments.first.id;
+    if (_usesTransactionScopedDocuments) {
+      _pendingTransactionId = generateInvestmentId('txn');
+    }
   }
 
   @override
@@ -96,16 +119,127 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
 
   Investment? get _selectedInvestment {
     if (_isNewPosition) return null;
-    for (final investment in widget.account.investments) {
+    for (final investment in _account.investments) {
       if (investment.id == _selection) return investment;
     }
     return null;
   }
 
+  /// Même règle que `position_detail_dialog.dart`'s
+  /// `_usesTransactionScopedDocuments` — inapplicable à une nouvelle
+  /// position, qui n'a pas encore de [Investment.documents] où attacher
+  /// quoi que ce soit avant sa création.
+  bool get _usesTransactionScopedDocuments {
+    final investment = _selectedInvestment;
+    if (investment == null) return false;
+    final effectiveClass = investment.assetClass ?? _account.assetClass;
+    return effectiveClass == AssetClass.metauxPrecieux ||
+        effectiveClass == AssetClass.autres ||
+        effectiveClass == AssetClass.actionsEtFonds;
+  }
+
+  Future<void> _selectPosition(String value) async {
+    await _cleanupPendingDocuments();
+    if (!mounted) return;
+    setState(() => _selection = value);
+    if (_usesTransactionScopedDocuments) {
+      setState(() => _pendingTransactionId = generateInvestmentId('txn'));
+    } else {
+      _pendingTransactionId = null;
+    }
+  }
+
+  Future<void> _addDocument(
+    String fileName,
+    Uint8List bytes,
+    String? transactionId,
+    String? name,
+  ) async {
+    final investment = _selectedInvestment;
+    if (investment == null) return;
+    final document = VaultDocument(
+      fileName: fileName,
+      note: name,
+      transactionId: transactionId,
+    );
+    await DocumentStorage(widget.vaultPath).save(document, bytes);
+    final updatedInvestment = investment.copyWith(
+      documents: [...investment.documents, document],
+    );
+    final updatedAccount = _account.copyWith(
+      investments: [
+        for (final i in _account.investments)
+          if (i.id == updatedInvestment.id) updatedInvestment else i,
+      ],
+    );
+    await _repo.saveAccount(updatedAccount);
+    if (!mounted) return;
+    setState(() => _account = updatedAccount);
+  }
+
+  Future<void> _deleteDocument(VaultDocument document) async {
+    final investment = _selectedInvestment;
+    if (investment == null) return;
+    await DocumentStorage(widget.vaultPath).delete(document);
+    final updatedInvestment = investment.copyWith(
+      documents: [
+        for (final d in investment.documents)
+          if (d.id != document.id) d,
+      ],
+    );
+    final updatedAccount = _account.copyWith(
+      investments: [
+        for (final i in _account.investments)
+          if (i.id == updatedInvestment.id) updatedInvestment else i,
+      ],
+    );
+    await _repo.saveAccount(updatedAccount);
+    if (!mounted) return;
+    setState(() => _account = updatedAccount);
+  }
+
+  /// Retire du disque les documents attachés à [_pendingTransactionId] —
+  /// appelé avant de changer de position sélectionnée ou d'abandonner la
+  /// création, pour ne pas les laisser orphelins d'une transaction qui
+  /// n'existera jamais.
+  Future<void> _cleanupPendingDocuments() async {
+    final investment = _selectedInvestment;
+    final pendingId = _pendingTransactionId;
+    if (investment == null || pendingId == null) return;
+    final orphaned = [
+      for (final d in investment.documents)
+        if (d.transactionId == pendingId) d,
+    ];
+    if (orphaned.isEmpty) return;
+    for (final document in orphaned) {
+      await DocumentStorage(widget.vaultPath).delete(document);
+    }
+    final updatedInvestment = investment.copyWith(
+      documents: [
+        for (final d in investment.documents)
+          if (d.transactionId != pendingId) d,
+      ],
+    );
+    final updatedAccount = _account.copyWith(
+      investments: [
+        for (final i in _account.investments)
+          if (i.id == updatedInvestment.id) updatedInvestment else i,
+      ],
+    );
+    await _repo.saveAccount(updatedAccount);
+    if (!mounted) return;
+    setState(() => _account = updatedAccount);
+  }
+
+  Future<void> _cancel() async {
+    await _cleanupPendingDocuments();
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
   bool get _isCurrency {
     final investment = _selectedInvestment;
-    return investment != null &&
-        isCurrencyInvestment(widget.account, investment);
+    return investment != null && isCurrencyInvestment(_account, investment);
   }
 
   bool get _isEurCurrency =>
@@ -144,6 +278,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       return;
     }
     final transaction = Transaction(
+      id: _usesTransactionScopedDocuments ? _pendingTransactionId : null,
       date: date,
       isBuy: _isBuy,
       quantity: quantity,
@@ -160,8 +295,8 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       final rawIsin = _isinController.text.trim();
       final isin =
           identifierOptionsFor(
-                widget.account.assetClass,
-                accountEnvelope: widget.account.envelope,
+                _account.assetClass,
+                accountEnvelope: _account.envelope,
               ) ==
               null
           ? rawIsin.toUpperCase()
@@ -181,9 +316,9 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       );
     }
 
-    final updatedAccount = widget.account.copyWith(
+    final updatedAccount = _account.copyWith(
       investments: [
-        for (final i in widget.account.investments)
+        for (final i in _account.investments)
           if (i.id == updatedInvestment.id) updatedInvestment else i,
         if (_isNewPosition) updatedInvestment,
       ],
@@ -219,7 +354,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                       ),
                       IconButton.ghost(
                         icon: const Icon(LucideIcons.x, size: 18),
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: _cancel,
                       ),
                     ],
                   ),
@@ -230,19 +365,19 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     value: _selection,
                     constraints: const BoxConstraints(minWidth: 260),
                     onChanged: (v) {
-                      if (v != null) setState(() => _selection = v);
+                      if (v != null) _selectPosition(v);
                     },
                     itemBuilder: (context, value) => shadcn.Text(
                       value == _newPositionValue
                           ? '+ Nouvelle position'
-                          : widget.account.investments
+                          : _account.investments
                                 .firstWhere((i) => i.id == value)
                                 .label,
                     ),
                     popup: (context) => SelectPopup(
                       items: SelectItemList(
                         children: [
-                          for (final investment in widget.account.investments)
+                          for (final investment in _account.investments)
                             SelectItemButton(
                               value: investment.id,
                               child: shadcn.Text(investment.label),
@@ -258,8 +393,8 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                   if (_isNewPosition) ...[
                     const SizedBox(height: 12),
                     InvestmentIdentityFields(
-                      assetClass: widget.account.assetClass,
-                      accountEnvelope: widget.account.envelope,
+                      assetClass: _account.assetClass,
+                      accountEnvelope: _account.envelope,
                       isinController: _isinController,
                       labelController: _labelController,
                     ),
@@ -278,8 +413,23 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     onIsBuyChanged: (v) => setState(() => _isBuy = v),
                     onDateChanged: (d) => setState(() => _date = d),
                     onCreate: _commit,
-                    onCancel: () => Navigator.of(context).pop(),
+                    onCancel: _cancel,
                     submitLabel: 'Ajouter la transaction',
+                    documentsSection: _usesTransactionScopedDocuments
+                        ? DocumentsSection(
+                            vaultPath: widget.vaultPath,
+                            documents: [
+                              for (final d in _selectedInvestment!.documents)
+                                if (d.transactionId == _pendingTransactionId)
+                                  d,
+                            ],
+                            fixedTransactionId: _pendingTransactionId,
+                            quantityAssetClass:
+                                _selectedInvestment!.assetClass,
+                            onAdd: _addDocument,
+                            onDelete: _deleteDocument,
+                          )
+                        : null,
                   ),
                 ],
               ),

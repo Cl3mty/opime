@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../../core/date_format.dart';
 import '../../../core/money_format.dart';
 import '../../../core/ui/copyable_identifier.dart';
 import '../../../core/ui/frosted_card.dart';
@@ -83,6 +84,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   _PerfMode _perfMode = _PerfMode.twr;
 
   bool _creating = false;
+
+  /// Id pré-généré de la transaction en cours de création, quand
+  /// [_usesTransactionScopedDocuments] — permet d'attacher des documents
+  /// (voir [_addDocument]) à une transaction qui n'existe pas encore : ils
+  /// sont rattachés à cet id, qui devient l'id réel de la transaction une
+  /// fois créée ([_commitCreateTransaction]). Si la création est annulée,
+  /// [_cleanupPendingDocuments] retire les documents devenus orphelins.
+  String? _pendingTransactionId;
   String? _editingTransactionId;
   bool _newIsBuy = true;
   DateTime? _newDate;
@@ -139,14 +148,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       (_effectiveClass == AssetClass.actionsEtFonds ||
           _effectiveClass == AssetClass.privateEquity);
 
-  /// Métaux précieux et "Autres" : chaque document doit être rattaché à la
-  /// transaction précise qu'il justifie — seul cas pertinent ici est un ETC
-  /// or/argent logé dans ce compte (voir `investments_models.dart`'s
-  /// `isMetalEtc`), l'immense majorité des positions d'un compte Actions &
-  /// Fonds n'ont pas de documents scopés à la transaction.
+  /// Métaux précieux, "Autres" et Actions & Fonds : chaque document peut
+  /// être rattaché à la transaction précise qu'il justifie (ex : avis
+  /// d'opéré, confirmation de virement) plutôt qu'au compte dans son
+  /// ensemble.
   bool get _usesTransactionScopedDocuments =>
       _effectiveClass == AssetClass.metauxPrecieux ||
-      _effectiveClass == AssetClass.autres;
+      _effectiveClass == AssetClass.autres ||
+      _effectiveClass == AssetClass.actionsEtFonds;
 
   bool get _isCurrency => isCurrencyInvestment(widget.account, _investment);
 
@@ -201,6 +210,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
         transactions: [
           ..._investment.transactions,
           Transaction(
+            id: _usesTransactionScopedDocuments ? _pendingTransactionId : null,
             date: date,
             isBuy: _newIsBuy,
             quantity: quantity,
@@ -213,7 +223,43 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     );
     _quantityController.clear();
     _priceController.clear();
-    setState(() => _creating = false);
+    setState(() {
+      _creating = false;
+      _pendingTransactionId = null;
+    });
+  }
+
+  /// Retire du disque les documents attachés à une création de transaction
+  /// abandonnée ([_pendingTransactionId]) — sans ça, ils resteraient
+  /// rattachés pour toujours à un id de transaction qui n'existera jamais.
+  Future<void> _cleanupPendingDocuments() async {
+    final pendingId = _pendingTransactionId;
+    if (pendingId == null) return;
+    final orphaned = [
+      for (final d in _investment.documents)
+        if (d.transactionId == pendingId) d,
+    ];
+    if (orphaned.isEmpty) return;
+    for (final document in orphaned) {
+      await DocumentStorage(widget.vaultPath).delete(document);
+    }
+    await _saveInvestment(
+      _investment.copyWith(
+        documents: [
+          for (final d in _investment.documents)
+            if (d.transactionId != pendingId) d,
+        ],
+      ),
+    );
+  }
+
+  Future<void> _cancelCreate() async {
+    await _cleanupPendingDocuments();
+    if (!mounted) return;
+    setState(() {
+      _creating = false;
+      _pendingTransactionId = null;
+    });
   }
 
   void _startEdit(Transaction transaction) {
@@ -333,6 +379,90 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     );
   }
 
+  Future<void> _toggleExcludedFromPatrimoine() => _saveInvestment(
+    _investment.copyWith(
+      excludedFromPatrimoine: !_investment.excludedFromPatrimoine,
+    ),
+  );
+
+  /// Ouvre une petite popup pour saisir/mettre à jour le cours (prix
+  /// unitaire) estimé à la main (voir `Investment.manualPrice`) — seul
+  /// moyen de valoriser un objet "Autres" (montre, voiture, art...), qui
+  /// n'a ni cours de marché ni ticker à chercher. La valeur affichée
+  /// ailleurs (`Investment.estimatedValue`) est ce cours multiplié par la
+  /// quantité détenue, exactement comme pour un titre coté.
+  Future<void> _showManualEstimateDialog() async {
+    final controller = TextEditingController(
+      text: _investment.manualPrice == null
+          ? ''
+          : _formatNumber(_investment.manualPrice!),
+    );
+    final quantity = _investment.quantityHeld;
+    final value = await showDialog<double>(
+      context: context,
+      builder: (context) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: FrostedCard(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const shadcn.Text(
+                    'Cours actuel estimé',
+                  ).large().semiBold(),
+                  const SizedBox(height: 8),
+                  shadcn.Text(
+                    quantity > 1
+                        ? 'Prix estimé par unité — à mettre à jour toi-même '
+                              'quand tu le juges utile, aucune source de '
+                              'cours automatique n\'existe pour ce type '
+                              'd\'objet. La valeur affichée sera ce cours × '
+                              '${formatQuantity(quantity, AssetClass.autres)} '
+                              'unités détenues.'
+                        : 'À mettre à jour toi-même quand tu le juges utile '
+                              '— aucune source de cours automatique '
+                              'n\'existe pour ce type d\'objet.',
+                  ).muted().small(),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    placeholder: const shadcn.Text('Cours (€)'),
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      PrimaryButton(
+                        onPressed: () {
+                          final parsed = parseDecimal(controller.text);
+                          Navigator.of(context).pop(parsed);
+                        },
+                        child: const shadcn.Text('Enregistrer'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlineButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const shadcn.Text('Annuler'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (value == null || value <= 0) return;
+    await _saveInvestment(
+      _investment.copyWith(manualPrice: value, manualPriceAt: DateTime.now()),
+    );
+  }
+
   bool get _canDelete => _investment.transactions.isEmpty;
 
   Future<void> _deleteInvestment() async {
@@ -392,6 +522,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
         assetClass: _investment.assetClass,
         fundStyle: _editFundStyle,
         documents: _investment.documents,
+        // Modifier l'identifiant/libellé ne doit pas effacer au passage
+        // l'exclusion du patrimoine ni une estimation manuelle déjà
+        // renseignée — cette reconstruction explicite (plutôt qu'un
+        // copyWith) doit reporter tout champ qui ne dépend pas de l'édition
+        // en cours.
+        excludedFromPatrimoine: _investment.excludedFromPatrimoine,
+        manualPrice: _investment.manualPrice,
+        manualPriceAt: _investment.manualPriceAt,
       ),
     );
     setState(() => _editingInvestment = false);
@@ -411,6 +549,26 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
               leading: const Icon(LucideIcons.pencil, size: 14),
               child: const shadcn.Text('Modifier'),
               onPressed: (_) => _startEditInvestment(),
+            ),
+            if (_effectiveClass == AssetClass.autres)
+              MenuButton(
+                leading: const Icon(LucideIcons.tag, size: 14),
+                child: const shadcn.Text('Réestimer le cours'),
+                onPressed: (_) => _showManualEstimateDialog(),
+              ),
+            MenuButton(
+              leading: Icon(
+                _investment.excludedFromPatrimoine
+                    ? LucideIcons.eye
+                    : LucideIcons.eyeOff,
+                size: 14,
+              ),
+              child: shadcn.Text(
+                _investment.excludedFromPatrimoine
+                    ? 'Réintégrer au patrimoine'
+                    : 'Exclure du patrimoine',
+              ),
+              onPressed: (_) => _toggleExcludedFromPatrimoine(),
             ),
             MenuButton(
               enabled: _canDelete,
@@ -492,6 +650,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       ),
                     ],
                   ),
+                  if (investment.excludedFromPatrimoine) ...[
+                    const SizedBox(height: 4),
+                    const ExcludedFromPatrimoineBadge(),
+                  ],
                   const SizedBox(height: 12),
                   if (_editingInvestment)
                     InvestmentEditForm(
@@ -565,6 +727,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                           trailing: investment.isPriceFresh
                               ? const FreshPriceBadge()
                               : null,
+                        )
+                      else if (investment.manualPrice != null)
+                        InvestmentStatChip(
+                          label: 'Cours estimé',
+                          value: displayEuros(
+                            investment.manualPrice!,
+                            widget.hidden,
+                          ),
                         ),
                     ],
                   ),
@@ -612,7 +782,17 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                           ).muted().xSmall(),
                       ],
                     ),
-                  ] else
+                  ] else if (_effectiveClass == AssetClass.autres)
+                    shadcn.Text(
+                      investment.manualPriceAt != null
+                          ? 'Cours estimé le '
+                                '${formatDateDdMmYyyy(investment.manualPriceAt!)} '
+                                '(menu « ⋮ » pour le mettre à jour).'
+                          : 'Aucun cours renseigné : la valorisation '
+                                'ci-dessus correspond au montant net investi '
+                                '— menu « ⋮ » pour en ajouter un.',
+                    ).muted().xSmall()
+                  else
                     shadcn.Text(
                       investment.priceUnavailable == true
                           ? 'Cours introuvable sur Yahoo Finance pour '
@@ -693,7 +873,21 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
                       onDateChanged: (d) => setState(() => _newDate = d),
                       onCreate: _commitCreateTransaction,
-                      onCancel: () => setState(() => _creating = false),
+                      onCancel: _cancelCreate,
+                      documentsSection: _usesTransactionScopedDocuments
+                          ? DocumentsSection(
+                              vaultPath: widget.vaultPath,
+                              documents: [
+                                for (final d in investment.documents)
+                                  if (d.transactionId == _pendingTransactionId)
+                                    d,
+                              ],
+                              fixedTransactionId: _pendingTransactionId,
+                              quantityAssetClass: investment.assetClass,
+                              onAdd: _addDocument,
+                              onDelete: _deleteDocument,
+                            )
+                          : null,
                     )
                   else
                     AddTransactionButton(
@@ -708,6 +902,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         _quantityController.clear();
                         _priceController.clear();
                         _priceCurrencyController.reset();
+                        _pendingTransactionId = _usesTransactionScopedDocuments
+                            ? generateInvestmentId('txn')
+                            : null;
                         _creating = true;
                       }),
                     ),

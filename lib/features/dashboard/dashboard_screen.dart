@@ -202,7 +202,11 @@ class _RealDashboardState extends State<_RealDashboard> {
   /// Historique "Patrimoine net"/"Patrimoine brut" par classe d'actif pour
   /// une période donnée — voir `RealPatrimoineCard.actifsHistoryFor`.
   /// Recalculé à la demande à partir des données déjà en mémoire (aucune
-  /// E/S), à chaque changement d'onglet de période.
+  /// E/S), à chaque changement d'onglet de période. C'est le seul endroit du
+  /// Dashboard qui exclut les investissements/comptes marqués "exclus du
+  /// patrimoine" (`excludeFlagged: true`, voir
+  /// [investmentsForEffectiveClass]) — les pages de catégorie continuent de
+  /// tout comptabiliser.
   Map<String, List<NetWorthPoint>> _actifsHistoryFor(DashboardPeriod period) {
     final today = DateTime.utc(
       DateTime.now().year,
@@ -215,7 +219,11 @@ class _RealDashboardState extends State<_RealDashboard> {
     return {
       for (final assetClass in AssetClass.values)
         assetClass.categoryId: categoryHistoryOnGrid(
-          investmentsForEffectiveClass(_accounts, assetClass),
+          investmentsForEffectiveClass(
+            _accounts,
+            assetClass,
+            excludeFlagged: true,
+          ),
           _priceHistories,
           grid,
         ),
