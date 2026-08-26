@@ -298,7 +298,6 @@ class _AppShellState extends State<AppShell> {
       return _mobileDrillParent?.label ?? _currentMobileTab.label;
     }
     if (_selectedKey == 'dashboard') return 'Opime';
-    if (_selectedKey == 'account_management') return 'Comptes';
     if (_selectedKey == 'settings') return 'Réglages';
     for (final item in _currentMobileTab.items()) {
       if (item.key == _selectedKey) return item.label;

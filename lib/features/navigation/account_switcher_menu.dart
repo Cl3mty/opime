@@ -267,11 +267,10 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
                   },
                 ),
               const MenuDivider(),
-              MenuButton(
-                leading: const Icon(LucideIcons.userPlus),
-                child: const shadcn.Text('Gérer les comptes'),
-                onPressed: (ctx) => widget.onSelect('account_management'),
-              ),
+              // Un seul point d'entrée « Paramètres » : la gestion des
+              // comptes (créer/éditer/basculer un profil) vit désormais
+              // dans cette même page, à côté de celle des vaults (voir
+              // `settings_screen.dart`'s `_ProfilesCard`/`_VaultCard`).
               MenuButton(
                 leading: const Icon(LucideIcons.settings),
                 child: const shadcn.Text('Paramètres'),

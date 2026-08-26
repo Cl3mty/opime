@@ -313,7 +313,6 @@ List<String> navBreadcrumbForKey(String key) {
     }
   }
   return switch (key) {
-    'account_management' => ['Comptes'],
     'settings' => ['Réglages'],
     _ => [''],
   };
@@ -323,7 +322,7 @@ List<String> navBreadcrumbForKey(String key) {
 /// desktop. Pour un sous-item (ex : « Ventilation » sous « Budget »), c'est
 /// le libellé de l'item parent de la sidebar qui est renvoyé — le titre
 /// reste celui de l'entrée de sidebar, pas du sous-menu. Les pages hors
-/// sidebar (Réglages, Comptes...) retombent sur leur propre libellé.
+/// sidebar (Réglages...) retombent sur leur propre libellé.
 String navLabelForKey(String key) {
   for (final group in [patrimoineGroup, academieGroup, outilsGroup]) {
     for (final item in group.items) {
@@ -334,7 +333,6 @@ String navLabelForKey(String key) {
     }
   }
   return switch (key) {
-    'account_management' => 'Comptes',
     'settings' => 'Réglages',
     _ => '',
   };

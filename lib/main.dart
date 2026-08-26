@@ -22,7 +22,6 @@ import 'features/onboarding/vault_migration_interrupted_screen.dart';
 import 'features/onboarding/vault_recovery_screen.dart';
 import 'features/onboarding/vault_unlock_screen.dart';
 import 'features/settings/settings_screen.dart';
-import 'features/settings/account_management_screen.dart';
 import 'features/assistant/assistant_screen.dart';
 import 'app/theme_controller.dart';
 import 'app/app_shell.dart';
@@ -724,8 +723,6 @@ class _OpimeAppState extends State<OpimeApp> {
               configController: _assistantConfigController,
               chatController: _assistantChatController!,
             ),
-            'account_management': (_) =>
-                AccountManagementScreen(profileController: _profileController!),
             'settings': (_) => SettingsScreen(
               vaultFolderService: _vaultFolderService,
               onVaultActivated: _onVaultReady,
@@ -734,6 +731,7 @@ class _OpimeAppState extends State<OpimeApp> {
               assistantConfigController: _assistantConfigController,
               notificationsSettingsController: _notificationsSettingsController,
               keyboardShortcutsController: _keyboardShortcutsController,
+              profileController: _profileController!,
               vaultPath: _vaultPath!,
               onVaultEncryptionChanged: () => _initProfiles(_vaultPath!),
               githubOwner: _githubOwner,
