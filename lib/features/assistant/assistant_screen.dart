@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -6,6 +7,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../core/assistant/assistant_chat_controller.dart';
 import '../../core/assistant/assistant_config_controller.dart';
 import '../../core/assistant/assistant_models.dart';
+import '../../core/assistant/document_text_extractor.dart';
 import '../../core/assistant/ollama_client.dart';
 import '../navigation/navigation_scope.dart';
 
@@ -74,6 +76,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
   /// Adresse du serveur au moment du dernier chargement de la liste : on ne
   /// relance pas une requête à chaque notification de configuration.
   String? _lastFetchedBaseUrl;
+
+  /// Extraction de texte en cours (le bouton se désactive/affiche un
+  /// indicateur le temps de lire un gros PDF).
+  bool _attachingDocument = false;
 
   @override
   void initState() {
@@ -196,6 +202,60 @@ class _AssistantScreenState extends State<AssistantScreen> {
   void _cancel() => widget.chatController.cancelAll();
 
   void _newConversation() => widget.chatController.clear();
+
+  /// Ouvre le sélecteur de fichier, extrait le texte du document choisi
+  /// (PDF avec couche texte, .txt, .md) et l'épingle à la conversation :
+  /// il sera renvoyé comme contexte à chaque message suivant, jusqu'à son
+  /// retrait via la croix de sa puce (voir [_buildAttachedDocumentsRow]).
+  Future<void> _pickAndAttachDocument() async {
+    final result = await FilePicker.pickFiles(
+      withData: true,
+      type: FileType.custom,
+      allowedExtensions: supportedDocumentExtensions,
+    );
+    final file = result?.files.singleOrNull;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null) return;
+
+    setState(() => _attachingDocument = true);
+    try {
+      final extracted = await extractDocumentText(
+        bytes: bytes,
+        fileName: file.name,
+      );
+      if (!mounted) return;
+      widget.chatController.attachDocument(
+        fileName: file.name,
+        extractedText: extracted.text,
+        truncated: extracted.truncated,
+      );
+      if (extracted.truncated) {
+        _showToast(
+          'Document tronqué',
+          '« ${file.name} » dépasse la taille prise en charge : seul le '
+              'début a été transmis à l\'assistant.',
+        );
+      }
+    } on DocumentExtractionException catch (e) {
+      if (!mounted) return;
+      _showToast('Impossible de lire ce document', e.message);
+    } catch (e) {
+      if (!mounted) return;
+      _showToast('Erreur lors de la lecture du document', '$e');
+    } finally {
+      if (mounted) setState(() => _attachingDocument = false);
+    }
+  }
+
+  void _showToast(String title, String subtitle) {
+    showToast(
+      context: context,
+      location: ToastLocation.bottomRight,
+      builder: (context, overlay) => SurfaceCard(
+        child: Basic(title: Text(title), subtitle: Text(subtitle)),
+      ),
+    );
+  }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -345,6 +405,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     final canSend = config.model != null && !_checkingModel;
     final busy = chat.busy;
     final hasMessages = chat.entries.isNotEmpty;
+    final attachedDocuments = chat.attachedDocuments;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -364,6 +425,11 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 'Plusieurs réponses en cours de génération…',
               ).small().muted(),
             ),
+          if (attachedDocuments.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildAttachedDocumentsRow(context, attachedDocuments),
+            ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -382,6 +448,28 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 ),
                 const SizedBox(width: 8),
               ],
+              Tooltip(
+                // ignore: implicit_call_tearoffs
+                tooltip: TooltipContainer(
+                  child: Text(
+                    'Joindre un document (PDF, TXT, MD)',
+                  ),
+                ),
+                child: _attachingDocument
+                    ? const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : IconButton.ghost(
+                        icon: const Icon(LucideIcons.paperclip),
+                        onPressed: canSend ? _pickAndAttachDocument : null,
+                      ),
+              ),
+              const SizedBox(width: 8),
               _buildModelSelector(context),
               const SizedBox(width: 8),
               Expanded(
@@ -425,6 +513,72 @@ class _AssistantScreenState extends State<AssistantScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Puces des documents épinglés à la conversation : chacune se retire
+  /// individuellement (croix), sans passer par « Nouvelle conversation ».
+  Widget _buildAttachedDocumentsRow(
+    BuildContext context,
+    List<AttachedDocument> documents,
+  ) {
+    final theme = Theme.of(context);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final doc in documents)
+          Container(
+            padding: const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.muted.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: theme.colorScheme.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  LucideIcons.fileText,
+                  size: 13,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  child: Text(
+                    doc.fileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ).small(),
+                ),
+                if (doc.truncated) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    // ignore: implicit_call_tearoffs
+                    tooltip: TooltipContainer(
+                      child: Text(
+                        'Document tronqué : seul le début a été transmis '
+                        'à l\'assistant.',
+                      ),
+                    ),
+                    child: Icon(
+                      LucideIcons.triangleAlert,
+                      size: 12,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
+                  ),
+                ],
+                IconButton.ghost(
+                  size: ButtonSize.xSmall,
+                  icon: const Icon(LucideIcons.x, size: 12),
+                  onPressed: () =>
+                      widget.chatController.removeAttachedDocument(doc.id),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 

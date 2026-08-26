@@ -5,7 +5,31 @@ import 'package:flutter/foundation.dart';
 import 'assistant_config_controller.dart';
 import 'assistant_context_builder.dart';
 import 'assistant_models.dart';
+import 'document_text_extractor.dart';
 import 'ollama_client.dart';
+
+/// Un document joint à la conversation (voir [AssistantChatController.attachDocument]) :
+/// son texte extrait reste épinglé et renvoyé comme contexte à chaque
+/// message tant qu'il n'est pas retiré, pour permettre plusieurs questions
+/// de suite sur le même document (ex : « quels sont les frais ? » puis
+/// « et la durée d'engagement ? ») sans avoir à le rejoindre.
+class AttachedDocument {
+  final String id;
+  final String fileName;
+  final String extractedText;
+
+  /// Le texte extrait a été tronqué à [maxAttachedDocumentChars] : un
+  /// document très long (au-delà de quelques pages) n'est vu que
+  /// partiellement par le modèle.
+  final bool truncated;
+
+  const AttachedDocument({
+    required this.id,
+    required this.fileName,
+    required this.extractedText,
+    required this.truncated,
+  });
+}
 
 /// Statut d'une entrée de conversation, côté affichage.
 enum ChatEntryStatus {
@@ -93,7 +117,37 @@ class AssistantChatController extends ChangeNotifier {
 
   final List<ChatEntry> _entries = [];
   final List<Completer<void>> _pendingCancellations = [];
+  final List<AttachedDocument> _attachedDocuments = [];
   int _idSequence = 0;
+
+  /// Documents actuellement épinglés à la conversation, dans l'ordre
+  /// d'ajout.
+  List<AttachedDocument> get attachedDocuments =>
+      List.unmodifiable(_attachedDocuments);
+
+  /// Épingle un document déjà extrait (voir `extractDocumentText`) à la
+  /// conversation : son texte sera inclus dans le contexte de chaque
+  /// message suivant, jusqu'à son retrait explicite.
+  void attachDocument({
+    required String fileName,
+    required String extractedText,
+    required bool truncated,
+  }) {
+    _attachedDocuments.add(
+      AttachedDocument(
+        id: 'd${_idSequence++}',
+        fileName: fileName,
+        extractedText: extractedText,
+        truncated: truncated,
+      ),
+    );
+    notifyListeners();
+  }
+
+  void removeAttachedDocument(String id) {
+    _attachedDocuments.removeWhere((d) => d.id == id);
+    notifyListeners();
+  }
 
   /// Compteur de réponses terminées pendant que l'écran assistant n'était
   /// pas visible : c'est le « non-lu » affiché en badge sur l'item Assistant
@@ -121,10 +175,12 @@ class AssistantChatController extends ChangeNotifier {
     _pendingCancellations.clear();
   }
 
-  /// Vide la conversation. Les requêtes en cours sont annulées.
+  /// Vide la conversation. Les requêtes en cours sont annulées, ainsi que
+  /// les documents épinglés (une « nouvelle conversation » repart de zéro).
   void clear() {
     cancelAll();
     _entries.clear();
+    _attachedDocuments.clear();
     notifyListeners();
   }
 
@@ -195,6 +251,23 @@ class AssistantChatController extends ChangeNotifier {
       assistantEntry.contextInfo =
           'Contexte patrimoine désactivé (Réglages → Assistant IA).';
     }
+
+    // Les documents épinglés s'ajoutent au contexte patrimoine plutôt que
+    // de le remplacer — l'utilisateur peut vouloir croiser un contrat avec
+    // ses données locales (ex : comparer des frais annoncés à son budget).
+    final documentsSection = _buildDocumentsSection();
+    if (documentsSection.isNotEmpty) {
+      context = [
+        context,
+        documentsSection,
+      ].where((s) => s.isNotEmpty).join('\n\n');
+      final docNames = _attachedDocuments.map((d) => d.fileName).join(', ');
+      assistantEntry.contextInfo = [
+        assistantEntry.contextInfo,
+        'Document(s) joint(s) : $docNames.',
+      ].whereType<String>().join(' ');
+    }
+
     if (cancel.isCompleted) {
       assistantEntry
         ..content = ''
@@ -284,6 +357,26 @@ class AssistantChatController extends ChangeNotifier {
       ),
       ...tail,
     ];
+  }
+
+  /// Section de contexte listant les documents épinglés (voir
+  /// [attachDocument]) — construite à chaque tour comme les autres sections
+  /// (patrimoine, budget...), pas seulement à l'ajout, pour rester cohérente
+  /// avec [_buildSystemPrompt] qui reconstruit tout le prompt à chaque envoi.
+  String _buildDocumentsSection() {
+    if (_attachedDocuments.isEmpty) return '';
+    final out = StringBuffer('## Document(s) joint(s) par l\'utilisateur\n');
+    for (final doc in _attachedDocuments) {
+      out.writeln('### ${doc.fileName}');
+      out.writeln(doc.extractedText);
+      if (doc.truncated) {
+        out.writeln(
+          '(texte tronqué à $maxAttachedDocumentChars caractères — le '
+          'document est plus long que ce qui précède.)',
+        );
+      }
+    }
+    return out.toString().trimRight();
   }
 
   String _newId() => 'c${_idSequence++}';
