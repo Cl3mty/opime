@@ -4,6 +4,7 @@ import '../../core/notifications/notifications_settings_controller.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/profiles/profile_controller.dart';
 import '../dashboard/onboarding_highlight_controller.dart';
+import '../investments/current_account_focus_controller.dart';
 import '../investments/patrimoine_refresh_controller.dart';
 import '../investments/price_sync_status_controller.dart';
 import '../notifications/news_button.dart';
@@ -25,6 +26,7 @@ class TopBar extends StatelessWidget {
   final AmountVisibilityController amountVisibility;
   final ProfileController profileController;
   final PatrimoineRefreshController patrimoineRefreshController;
+  final CurrentAccountFocusController currentAccountFocus;
   final OnboardingHighlightController onboardingHighlight;
   final PriceSyncStatusController priceSyncStatus;
   final NotificationsSettingsController notificationsSettings;
@@ -37,6 +39,7 @@ class TopBar extends StatelessWidget {
     required this.amountVisibility,
     required this.profileController,
     required this.patrimoineRefreshController,
+    required this.currentAccountFocus,
     required this.onboardingHighlight,
     required this.priceSyncStatus,
     required this.notificationsSettings,
@@ -87,6 +90,7 @@ class TopBar extends StatelessWidget {
           AddMenuButton(
             profileController: profileController,
             patrimoineRefreshController: patrimoineRefreshController,
+            currentAccountFocus: currentAccountFocus,
             onboardingHighlight: onboardingHighlight,
             priceSyncStatus: priceSyncStatus,
             currentPageKey: currentPageKey,

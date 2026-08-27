@@ -5,6 +5,7 @@ import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/profiles/profile_controller.dart';
 import '../dashboard/onboarding_highlight_controller.dart';
 import '../investments/complete_patrimoine_dialog.dart';
+import '../investments/current_account_focus_controller.dart';
 import '../investments/investments_models.dart' show assetClassForCategoryId;
 import '../investments/investments_repository.dart';
 import '../investments/patrimoine_refresh_controller.dart';
@@ -78,6 +79,7 @@ class AmountVisibilityToggleButton extends StatelessWidget {
 class AddMenuButton extends StatelessWidget {
   final ProfileController profileController;
   final PatrimoineRefreshController patrimoineRefreshController;
+  final CurrentAccountFocusController currentAccountFocus;
   final OnboardingHighlightController onboardingHighlight;
   final PriceSyncStatusController priceSyncStatus;
   final bool compact;
@@ -92,6 +94,7 @@ class AddMenuButton extends StatelessWidget {
     super.key,
     required this.profileController,
     required this.patrimoineRefreshController,
+    required this.currentAccountFocus,
     required this.onboardingHighlight,
     required this.priceSyncStatus,
     this.compact = false,
@@ -100,6 +103,12 @@ class AddMenuButton extends StatelessWidget {
 
   void _open(BuildContext context) {
     final pageKey = currentPageKey;
+    // Un compte (voire un investissement précis) est déjà affiché en plein
+    // cadre (voir [CurrentAccountFocusController]) : le flux y ajoute
+    // directement, sans faire rechoisir la classe/le compte déjà sous les
+    // yeux de l'utilisateur. Sinon, repli sur l'ancien comportement
+    // (présélection de la classe depuis la page de catégorie courante).
+    final focus = currentAccountFocus.value;
     showCompletePatrimoineDialog(
       context,
       vaultPath: profileController.activeDataPath,
@@ -114,10 +123,14 @@ class AddMenuButton extends StatelessWidget {
         // Dashboard — voir [PatrimoineRefreshController].
         unawaited(_refreshPricesAfterCompletion());
       },
-      initialAssetClass: pageKey == null
+      initialAssetClass: focus != null
+          ? focus.assetClass
+          : pageKey == null
           ? null
           : assetClassForCategoryId(pageKey),
-      initialLiabilityType: pageKey == null
+      initialAccountId: focus?.accountId,
+      initialInvestmentId: focus?.investmentId,
+      initialLiabilityType: focus != null || pageKey == null
           ? null
           : liabilityTypeForCategoryId(pageKey),
     );

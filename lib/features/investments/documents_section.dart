@@ -53,6 +53,13 @@ String _transactionLabel(
 /// la liste affiche à quelle transaction chaque document est rattaché.
 class DocumentsSection extends StatelessWidget {
   final String vaultPath;
+
+  /// Sous-dossier où sont stockés les octets des documents — voir
+  /// [DocumentStorage.dirRelativePath]. `null` garde le dossier historique
+  /// (comptes/investissements) ; un autre appelant (ex : les notes de
+  /// `strategy/`) passe son propre sous-dossier.
+  final String? documentsFolder;
+
   final List<VaultDocument> documents;
   final List<Transaction>? transactions;
   final String? fixedTransactionId;
@@ -73,6 +80,7 @@ class DocumentsSection extends StatelessWidget {
   const DocumentsSection({
     super.key,
     required this.vaultPath,
+    this.documentsFolder,
     required this.documents,
     this.transactions,
     this.fixedTransactionId,
@@ -229,7 +237,10 @@ class DocumentsSection extends StatelessWidget {
   }
 
   Future<void> _open(VaultDocument document) async {
-    final storage = DocumentStorage(vaultPath);
+    final folder = documentsFolder;
+    final storage = folder == null
+        ? DocumentStorage(vaultPath)
+        : DocumentStorage(vaultPath, dirRelativePath: folder);
     if (!await storage.fileFor(document).exists()) return;
     final file = await storage.materializeForExternalOpen(document);
     await launchUrl(Uri.file(file.path));
@@ -308,9 +319,12 @@ Future<void> showDocumentViewDialog(
   BuildContext context, {
   required String vaultPath,
   required List<VaultDocument> documents,
+  String? documentsFolder,
 }) async {
   Future<void> open(VaultDocument document) async {
-    final storage = DocumentStorage(vaultPath);
+    final storage = documentsFolder == null
+        ? DocumentStorage(vaultPath)
+        : DocumentStorage(vaultPath, dirRelativePath: documentsFolder);
     if (!await storage.fileFor(document).exists()) return;
     final file = await storage.materializeForExternalOpen(document);
     await launchUrl(Uri.file(file.path));

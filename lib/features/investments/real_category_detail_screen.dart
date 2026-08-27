@@ -5,6 +5,7 @@ import '../dashboard/category_detail_screen.dart';
 import '../dashboard/patrimoine_models.dart';
 import 'account_detail_screen.dart';
 import 'confirm_delete_dialog.dart';
+import 'current_account_focus_controller.dart';
 import 'investment_detail_screen.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
@@ -34,12 +35,19 @@ class RealCategoryDetailScreen extends StatefulWidget {
   final AmountVisibilityController amountVisibility;
   final PatrimoineRefreshController patrimoineRefreshController;
 
+  /// Tenu à jour à chaque rendu avec le compte/investissement actuellement
+  /// affiché (voir [CurrentAccountFocusController]) — lu par
+  /// [AddMenuButton] pour présélectionner ce contexte à l'ouverture du flux
+  /// "Compléter mon patrimoine" plutôt que de le faire rechoisir.
+  final CurrentAccountFocusController currentAccountFocus;
+
   const RealCategoryDetailScreen({
     super.key,
     required this.vaultPath,
     required this.categoryId,
     required this.amountVisibility,
     required this.patrimoineRefreshController,
+    required this.currentAccountFocus,
   });
 
   @override
@@ -54,6 +62,7 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
   Map<String, List<PricePoint>> _priceHistories = {};
   PatrimoineCategory? _category;
   List<PatrimoineAccount>? _categoryByAccount;
+  List<PatrimoineAccount>? _categoryByInvestment;
 
   String? _selectedAccountId;
   String? _selectedInvestmentId;
@@ -86,6 +95,11 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
   @override
   void dispose() {
     widget.patrimoineRefreshController.removeListener(_reload);
+    // Cette page quitte l'écran (changement de page, ou de vault/catégorie
+    // via [didUpdateWidget], qui recrée l'élément avec une nouvelle clé) :
+    // son focus ne doit pas rester "collé" pour une autre page qui n'a rien
+    // à voir avec le compte affiché ici.
+    widget.currentAccountFocus.value = null;
     super.dispose();
   }
 
@@ -117,6 +131,21 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
       priceHistories,
       widget.vaultPath,
     );
+    // Fusion par ISIN entre comptes (voir `real_patrimoine_adapter.dart`'s
+    // `buildRealCategoriesByInvestment`) : seule "Actions & Fonds" en a
+    // l'usage aujourd'hui (détenir le même titre dans plusieurs comptes est
+    // un cas réel là où les autres classes n'en ont pas besoin) — calculée
+    // pour toutes les classes reste sans effet (une seule catégorie
+    // recherchée juste après) mais reste bon marché, aucune E/S
+    // supplémentaire par rapport aux deux listes déjà construites ci-dessus.
+    final categoriesByInvestment =
+        widget.categoryId == AssetClass.actionsEtFonds.categoryId
+        ? buildRealCategoriesByInvestment(
+            accounts,
+            priceHistories,
+            widget.vaultPath,
+          )
+        : const <PatrimoineCategory>[];
     if (!mounted) return;
     PatrimoineCategory? found;
     for (final category in categories) {
@@ -132,11 +161,19 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
         break;
       }
     }
+    PatrimoineCategory? foundByInvestment;
+    for (final category in categoriesByInvestment) {
+      if (category.id == widget.categoryId) {
+        foundByInvestment = category;
+        break;
+      }
+    }
     setState(() {
       _accounts = accounts;
       _priceHistories = priceHistories;
       _category = found ?? emptyCategoryFor(widget.categoryId);
       _categoryByAccount = foundByAccount?.accounts;
+      _categoryByInvestment = foundByInvestment?.accounts;
     });
   }
 
@@ -285,6 +322,27 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
     final account = _selectedAccount;
     final investment = _selectedInvestment;
 
+    // Reflète à chaque rendu le compte/investissement affiché — source de
+    // vérité unique (les mêmes variables locales pilotent le contenu rendu
+    // juste en dessous), pour ne jamais désynchroniser le focus de ce qui
+    // est réellement à l'écran. Une simple assignation sur un
+    // `ValueNotifier` que rien n'écoute activement (voir sa doc) : aucun
+    // effet de bord, donc sans risque à faire ici plutôt que dans chacun
+    // des nombreux callbacks qui changent `_selectedAccountId`/
+    // `_selectedInvestmentId`. Un investissement précis n'a de page dédiée
+    // que pour l'immobilier (`InvestmentDetailView`) — ailleurs,
+    // `_selectedInvestmentId` ne fait qu'ouvrir une popup ponctuelle sur la
+    // page compte, pas une vue focalisée durable sur cet investissement.
+    widget.currentAccountFocus.value = account == null
+        ? null
+        : (
+            assetClass: account.assetClass,
+            accountId: account.id,
+            investmentId: account.assetClass == AssetClass.immobilier
+                ? investment?.id
+                : null,
+          );
+
     if (account != null && account.assetClass != AssetClass.immobilier) {
       return StockAccountScreen(
         vaultPath: widget.vaultPath,
@@ -335,6 +393,7 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
       amountVisibility: widget.amountVisibility,
       onAccountTap: _openInvestment,
       distributionByAccount: _categoryByAccount,
+      distributionByInvestment: _categoryByInvestment,
       historyForPeriod: _historyForPeriod,
       onAccountEdit: _openAccountForEdit,
       onAccountDelete: _deleteAccountFromAccordion,

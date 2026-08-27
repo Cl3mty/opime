@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
@@ -7,6 +8,8 @@ import '../../../core/money_format.dart';
 import '../../../core/ui/copyable_identifier.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/toggle_button_style.dart';
+import '../autres_photo_avatar.dart';
+import '../autres_photo_repository.dart';
 import '../confirm_delete_dialog.dart';
 import '../currency_format.dart';
 import '../document_storage.dart';
@@ -95,6 +98,15 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   String? _editingTransactionId;
   bool _newIsBuy = true;
   DateTime? _newDate;
+
+  /// Date de déblocage saisie à la main pour la transaction en cours de
+  /// création/édition (voir [_unlockDate]) — `null` tant qu'elle n'a pas été
+  /// modifiée, auquel cas la date par défaut s'applique. Réinitialisée en
+  /// tête de chaque nouvelle création/édition (voir [_startEdit], le bouton
+  /// "Ajouter une transaction") et depuis [Transaction.manualUnlockDate]
+  /// pour reprendre une transaction déjà éditée avec un déblocage anticipé.
+  DateTime? _newUnlockDateOverride;
+
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
   late final TransactionPriceCurrencyController _priceCurrencyController;
@@ -103,6 +115,12 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   final _editIsinController = TextEditingController();
   final _editLabelController = TextEditingController();
   FundStyle? _editFundStyle;
+
+  /// Photo importée par l'utilisateur pour un objet "Autres" (voir
+  /// `autres_photo_repository.dart`) — `null` tant qu'aucune n'a été
+  /// importée, auquel cas l'avatar affiche des initiales. Non chargée pour
+  /// les autres classes d'actif.
+  String? _autresPhotoPath;
 
   @override
   void initState() {
@@ -118,6 +136,27 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       DateTime.now().day,
     );
     _loadPriceHistory();
+    if (_effectiveClass == AssetClass.autres) _loadAutresPhoto();
+  }
+
+  Future<void> _loadAutresPhoto() async {
+    final path = await AutresPhotoRepository(
+      widget.vaultPath,
+    ).photoPathFor(_investment.id);
+    if (!mounted) return;
+    setState(() => _autresPhotoPath = path);
+  }
+
+  Future<void> _importAutresPhoto() async {
+    final result = await FilePicker.pickFiles(withData: true);
+    final file = result?.files.singleOrNull;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null) return;
+    final path = await AutresPhotoRepository(
+      widget.vaultPath,
+    ).importPhoto(_investment.id, bytes, sourceName: file.name);
+    if (path == null || !mounted) return;
+    setState(() => _autresPhotoPath = path);
   }
 
   @override
@@ -143,10 +182,41 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   AssetClass get _effectiveClass =>
       _investment.assetClass ?? widget.account.assetClass;
 
+  /// "Autres" (aucune source de cours automatique), ou "Actions & Fonds"
+  /// détenu en PEE/PEG/PER (fonds interne à l'entreprise ou au contrat sans
+  /// ISIN public — voir [isinOptionalFor]) : ces cas peuvent estimer leur
+  /// cours à la main ([Investment.manualPrice]) faute de cours de marché.
+  bool get _allowsManualCours =>
+      _effectiveClass == AssetClass.autres ||
+      (_effectiveClass == AssetClass.actionsEtFonds &&
+          (widget.account.envelope == AccountEnvelope.peg ||
+              widget.account.envelope == AccountEnvelope.pee ||
+              widget.account.envelope == AccountEnvelope.per));
+
   bool get _isRealIsin =>
       !_isCurrency &&
       (_effectiveClass == AssetClass.actionsEtFonds ||
           _effectiveClass == AssetClass.privateEquity);
+
+  /// Le champ de date de déblocage a-t-il un sens pour cette transaction
+  /// (création comme édition, toutes deux pilotées par `_newDate`/
+  /// `_newIsBuy`) — PEG/PEE et achat uniquement.
+  bool get _unlockDateApplicable {
+    if (!_newIsBuy) return false;
+    final envelope = widget.account.envelope;
+    return envelope == AccountEnvelope.peg || envelope == AccountEnvelope.pee;
+  }
+
+  /// Date de déblocage affichée/éditable : [_newUnlockDateOverride] si
+  /// renseignée, sinon la date par défaut calculée depuis [_newDate] (voir
+  /// [pegPeeUnlockDateFor]). `null` hors PEG/PEE, pour une vente, ou sans
+  /// date choisie.
+  DateTime? get _unlockDate {
+    if (!_unlockDateApplicable) return null;
+    if (_newUnlockDateOverride != null) return _newUnlockDateOverride;
+    final date = _newDate;
+    return date == null ? null : pegPeeUnlockDateFor(date);
+  }
 
   /// Métaux précieux, "Autres" et Actions & Fonds : chaque document peut
   /// être rattaché à la transaction précise qu'il justifie (ex : avis
@@ -196,11 +266,18 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     final price = _isEurCurrency ? 1.0 : parseDecimal(_priceController.text);
     final currency = _txnCurrency;
     final fxRateToEur = _txnFxRateToEur;
+    // Un objet "Autres" peut avoir été reçu en cadeau (prix d'achat 0) —
+    // voir [_allowsManualCours]'s doc et `add_transaction_dialog.dart`'s
+    // équivalent pour le raisonnement complet (sans quoi la plus-value
+    // serait infinie plutôt que masquée par `PerformanceAmount`).
+    final invalidPrice =
+        price == null ||
+        price < 0 ||
+        (price == 0 && _effectiveClass != AssetClass.autres);
     if (date == null ||
         quantity == null ||
         quantity <= 0 ||
-        price == null ||
-        price <= 0 ||
+        invalidPrice ||
         fxRateToEur == null ||
         fxRateToEur <= 0) {
       return;
@@ -217,6 +294,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
             unitPrice: price,
             currency: currency,
             fxRateToEur: fxRateToEur,
+            manualUnlockDate: _newUnlockDateOverride,
           ),
         ],
       ),
@@ -226,6 +304,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     setState(() {
       _creating = false;
       _pendingTransactionId = null;
+      _newUnlockDateOverride = null;
     });
   }
 
@@ -268,6 +347,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       _editingTransactionId = transaction.id;
       _newIsBuy = transaction.isBuy;
       _newDate = transaction.date;
+      _newUnlockDateOverride = transaction.manualUnlockDate;
       _quantityController.text = _formatNumber(transaction.quantity);
       _priceController.text = _formatNumber(transaction.unitPrice);
     });
@@ -278,7 +358,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     _quantityController.clear();
     _priceController.clear();
     _priceCurrencyController.reset();
-    setState(() => _editingTransactionId = null);
+    setState(() {
+      _editingTransactionId = null;
+      _newUnlockDateOverride = null;
+    });
   }
 
   Future<void> _commitEditTransaction() async {
@@ -288,12 +371,17 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     final price = _isEurCurrency ? 1.0 : parseDecimal(_priceController.text);
     final currency = _txnCurrency;
     final fxRateToEur = _txnFxRateToEur;
+    // Voir `_commitCreateTransaction` : un objet "Autres" peut avoir été
+    // reçu en cadeau (prix d'achat 0).
+    final invalidPrice =
+        price == null ||
+        price < 0 ||
+        (price == 0 && _effectiveClass != AssetClass.autres);
     if (id == null ||
         date == null ||
         quantity == null ||
         quantity <= 0 ||
-        price == null ||
-        price <= 0 ||
+        invalidPrice ||
         fxRateToEur == null ||
         fxRateToEur <= 0) {
       return;
@@ -306,6 +394,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       unitPrice: price,
       currency: currency,
       fxRateToEur: fxRateToEur,
+      manualUnlockDate: _newUnlockDateOverride,
     );
     await _saveInvestment(
       _investment.copyWith(
@@ -317,7 +406,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     );
     _quantityController.clear();
     _priceController.clear();
-    setState(() => _editingTransactionId = null);
+    setState(() {
+      _editingTransactionId = null;
+      _newUnlockDateOverride = null;
+    });
   }
 
   Future<void> _deleteTransaction(Transaction transaction) async {
@@ -387,8 +479,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
 
   /// Ouvre une petite popup pour saisir/mettre à jour le cours (prix
   /// unitaire) estimé à la main (voir `Investment.manualPrice`) — seul
-  /// moyen de valoriser un objet "Autres" (montre, voiture, art...), qui
-  /// n'a ni cours de marché ni ticker à chercher. La valeur affichée
+  /// moyen de valoriser un objet "Autres" (montre, voiture, art...) ou un
+  /// fonds PEE/PEG/PER sans ISIN public (voir [_allowsManualCours]), qui
+  /// n'ont ni l'un ni l'autre de cours de marché à chercher. La valeur affichée
   /// ailleurs (`Investment.estimatedValue`) est ce cours multiplié par la
   /// quantité détenue, exactement comme pour un titre coté.
   Future<void> _showManualEstimateDialog() async {
@@ -418,13 +511,13 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                     quantity > 1
                         ? 'Prix estimé par unité — à mettre à jour toi-même '
                               'quand tu le juges utile, aucune source de '
-                              'cours automatique n\'existe pour ce type '
-                              'd\'objet. La valeur affichée sera ce cours × '
-                              '${formatQuantity(quantity, AssetClass.autres)} '
+                              'cours automatique n\'existe pour ce '
+                              'placement. La valeur affichée sera ce cours × '
+                              '${formatQuantity(quantity, _effectiveClass)} '
                               'unités détenues.'
                         : 'À mettre à jour toi-même quand tu le juges utile '
                               '— aucune source de cours automatique '
-                              'n\'existe pour ce type d\'objet.',
+                              'n\'existe pour ce placement.',
                   ).muted().small(),
                   const SizedBox(height: 12),
                   TextField(
@@ -496,7 +589,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
 
   Future<void> _commitEditInvestment() async {
     final rawIsin = _editIsinController.text.trim();
-    final isin =
+    final typedIsin =
         identifierOptionsFor(
               _effectiveClass,
               accountEnvelope: widget.account.envelope,
@@ -505,6 +598,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
         ? rawIsin.toUpperCase()
         : rawIsin;
     final label = _editLabelController.text.trim();
+    // Un identifiant vide reste valide pour "Autres"/un fonds PEE-PEG (voir
+    // [isinOptionalFor]) : on en régénère un plutôt que de bloquer
+    // l'enregistrement, pour permettre de retirer un ISIN saisi par erreur
+    // (auparavant impossible : le champ vide était simplement rejeté).
+    final isin = typedIsin.isEmpty &&
+            isinOptionalFor(_effectiveClass, accountEnvelope: widget.account.envelope)
+        ? placeholderIsinFor(_effectiveClass)
+        : typedIsin;
     if (isin.isEmpty || label.isEmpty) return;
     final isinChanged = isin != _investment.isin;
     await _saveInvestment(
@@ -550,7 +651,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
               child: const shadcn.Text('Modifier'),
               onPressed: (_) => _startEditInvestment(),
             ),
-            if (_effectiveClass == AssetClass.autres)
+            if (_allowsManualCours)
               MenuButton(
                 leading: const Icon(LucideIcons.tag, size: 14),
                 child: const shadcn.Text('Réestimer le cours'),
@@ -632,6 +733,15 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                 children: [
                   Row(
                     children: [
+                      if (_effectiveClass == AssetClass.autres) ...[
+                        AutresPhotoAvatar(
+                          label: investment.label,
+                          photoPath: _autresPhotoPath,
+                          onTap: _importAutresPhoto,
+                          size: 36,
+                        ),
+                        const SizedBox(width: 12),
+                      ],
                       Expanded(
                         child: shadcn.Text(investment.label).large().semiBold(),
                       ),
@@ -669,17 +779,24 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                           setState(() => _editingInvestment = false),
                     )
                   else ...[
-                    if (!_isCurrency) ...[
+                    if (!_isCurrency &&
+                        (!isGeneratedIdentifier(investment.isin) ||
+                            (investment.symbol != null &&
+                                investment.symbol!.isNotEmpty))) ...[
                       Wrap(
                         spacing: 12,
                         runSpacing: 4,
                         children: [
-                          CopyableIdentifier(
-                            value: investment.isin,
-                            toastTitle: _isRealIsin
-                                ? 'ISIN copié'
-                                : 'Identifiant copié',
-                          ),
+                          // Un identifiant auto-généré (voir
+                          // [isGeneratedIdentifier]) n'a rien d'utile à
+                          // montrer — pas de vrai ISIN/ticker à copier.
+                          if (!isGeneratedIdentifier(investment.isin))
+                            CopyableIdentifier(
+                              value: investment.isin,
+                              toastTitle: _isRealIsin
+                                  ? 'ISIN copié'
+                                  : 'Identifiant copié',
+                            ),
                           if (investment.symbol != null &&
                               investment.symbol!.isNotEmpty)
                             CopyableIdentifier(
@@ -782,7 +899,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                           ).muted().xSmall(),
                       ],
                     ),
-                  ] else if (_effectiveClass == AssetClass.autres)
+                  ] else if (_allowsManualCours)
                     shadcn.Text(
                       investment.manualPriceAt != null
                           ? 'Cours estimé le '
@@ -818,6 +935,11 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         priceCurrencyController: _priceCurrencyController,
                         onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
                         onDateChanged: (d) => setState(() => _newDate = d),
+                        unlockDate: _unlockDate,
+                        onUnlockDateChanged: _unlockDateApplicable
+                            ? (d) =>
+                                  setState(() => _newUnlockDateOverride = d)
+                            : null,
                         onCreate: _commitEditTransaction,
                         onCancel: _cancelEdit,
                         submitLabel: 'Enregistrer',
@@ -872,6 +994,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       priceCurrencyController: _priceCurrencyController,
                       onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
                       onDateChanged: (d) => setState(() => _newDate = d),
+                      unlockDate: _unlockDate,
+                      onUnlockDateChanged: _unlockDateApplicable
+                          ? (d) => setState(() => _newUnlockDateOverride = d)
+                          : null,
                       onCreate: _commitCreateTransaction,
                       onCancel: _cancelCreate,
                       documentsSection: _usesTransactionScopedDocuments
@@ -902,6 +1028,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         _quantityController.clear();
                         _priceController.clear();
                         _priceCurrencyController.reset();
+                        _newUnlockDateOverride = null;
                         _pendingTransactionId = _usesTransactionScopedDocuments
                             ? generateInvestmentId('txn')
                             : null;

@@ -109,7 +109,13 @@ class PatrimoineAccount {
   final double valeur;
   final double? pru;
   final double plusValueAbs;
-  final double plusValuePercent;
+
+  /// `null` quand le coût d'acquisition est nul (ex : un objet "Autres"
+  /// reçu en cadeau, voir `Investment`'s prix d'achat à 0) — la plus-value
+  /// relative n'a alors aucun sens à exprimer en pourcentage (ce serait
+  /// infini), seul [plusValueAbs] reste affiché (voir [PerformanceAmount],
+  /// qui masque la ligne pourcentage quand elle vaut `null`).
+  final double? plusValuePercent;
 
   /// Identifiant de l'investissement réel source de cette ligne — permet à
   /// [CategoryDetailScreen] de retrouver l'investissement réel correspondant
@@ -258,9 +264,11 @@ class PatrimoineCategory {
   double get plusValueAbs =>
       accounts.fold(0.0, (sum, a) => sum + a.plusValueAbs);
 
-  double get plusValuePercent {
+  /// `null` sans coût d'acquisition (ex : une catégorie composée uniquement
+  /// d'objets reçus en cadeau) — voir [PatrimoineAccount.plusValuePercent].
+  double? get plusValuePercent {
     final costBasis = montant - plusValueAbs;
-    if (costBasis == 0) return 0;
+    if (costBasis == 0) return null;
     return plusValueAbs / costBasis * 100;
   }
 

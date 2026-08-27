@@ -245,7 +245,13 @@ pw.Widget _buildAccountTable(
         if (showsQuantite) row.quantite?.toStringAsFixed(2) ?? '—',
         formatEuros(row.valeur),
         if (showsPruColumn) row.pru?.toStringAsFixed(2) ?? '—',
-        '${formatSignedEuros(row.plusValueAbs)} (${displayPercent(row.plusValuePercent)})',
+        // Sans coût d'acquisition (ex : un cadeau), le pourcentage est
+        // `null` — voir `PatrimoineAccount.plusValuePercent` — le montant
+        // en euros reste seul, comme dans l'app.
+        row.plusValuePercent == null
+            ? formatSignedEuros(row.plusValueAbs)
+            : '${formatSignedEuros(row.plusValueAbs)} '
+                  '(${displayPercent(row.plusValuePercent!)})',
       ],
   ];
 

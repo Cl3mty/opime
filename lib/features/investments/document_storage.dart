@@ -6,26 +6,35 @@ import '../../core/storage/vault_session.dart';
 import '../../core/storage/vault_file_storage.dart';
 import 'investments_models.dart';
 
-/// Stocke le contenu réel des documents rattachés aux comptes/
-/// investissements — un fichier par document sous
-/// `<vault>/investissements/documents/`, nommé par l'id du document (pas
-/// son nom d'origine, pour éviter toute collision) suivi de son extension.
-/// Les métadonnées (nom d'origine, date, note) voyagent, elles, dans le
-/// JSON du compte via [VaultDocument] — même séparation que les cours
+/// Stocke le contenu réel de documents rattachés à un élément du vault — un
+/// fichier par document sous `<vault>/<dirRelativePath>/`, nommé par l'id du
+/// document (pas son nom d'origine, pour éviter toute collision) suivi de
+/// son extension. Les métadonnées (nom d'origine, date, note) voyagent,
+/// elles, à part via [VaultDocument] — même séparation que les cours
 /// (`price_history_repository.dart`) entre métadonnées légères et données
 /// volumineuses.
+///
+/// [dirRelativePath] par défaut aux documents de comptes/investissements
+/// (usage historique de cette classe) ; un autre appelant (ex : les notes
+/// de `strategy/`, voir `StrategyDocumentsRepository`) passe son propre
+/// sous-dossier pour garder ses fichiers séparés.
 class DocumentStorage {
   final String vaultPath;
+  final String dirRelativePath;
   late final VaultFileStorage _storage;
 
-  DocumentStorage(this.vaultPath, {VaultCipher? cipher}) {
+  DocumentStorage(
+    this.vaultPath, {
+    VaultCipher? cipher,
+    this.dirRelativePath = _defaultDirRelativePath,
+  }) {
     _storage = VaultFileStorage(
       vaultPath: vaultPath,
       cipher: cipher ?? VaultSession.current,
     );
   }
 
-  static const _dirRelativePath = 'investissements/documents';
+  static const _defaultDirRelativePath = 'investissements/documents';
 
   /// Chemin absolu du fichier d'un document — utile pour vérifier son
   /// existence uniquement. **Ne jamais ouvrir ou copier ce fichier tel
@@ -37,11 +46,11 @@ class DocumentStorage {
   /// Utiliser [readBytes] ou [materializeForExternalOpen] selon le besoin.
   File fileFor(VaultDocument document) {
     final ext = p.extension(document.fileName);
-    return File(p.join(vaultPath, _dirRelativePath, '${document.id}$ext'));
+    return File(p.join(vaultPath, dirRelativePath, '${document.id}$ext'));
   }
 
   String _relativePathFor(VaultDocument document) => p.join(
-    _dirRelativePath,
+    dirRelativePath,
     '${document.id}${p.extension(document.fileName)}',
   );
 

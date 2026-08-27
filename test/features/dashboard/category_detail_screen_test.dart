@@ -1,8 +1,20 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/privacy/amount_visibility_controller.dart';
 import 'package:opime/features/dashboard/category_detail_screen.dart';
 import 'package:opime/features/dashboard/patrimoine_models.dart';
+import 'package:opime/features/investments/autres_photo_repository.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+// PNG 1×1 transparent minimal — un `Image.file` a besoin de vrais octets
+// décodables pour ne pas retomber silencieusement sur son `errorBuilder`
+// (les initiales), contrairement à `AutresPhotoRepository`, qui ne valide
+// que l'extension du fichier, pas son contenu.
+final _onePixelPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY'
+  '42YAAAAASUVORK5CYII=',
+);
 
 void main() {
   PatrimoineAccount investment() => const PatrimoineAccount(
@@ -72,7 +84,8 @@ void main() {
   }
 
   testWidgets(
-    'sans onAccountOpen : menu "⋮" et chevrons de position inchangés',
+    'sans onAccountOpen : menu "⋮", ligne inerte au clic (pas de page à '
+    'ouvrir), dépli via le chevron dédié uniquement',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
@@ -84,8 +97,16 @@ void main() {
 
       expect(find.byIcon(LucideIcons.ellipsisVertical), findsOneWidget);
 
+      // Cliquer le titre ne fait plus rien : pas de page à ouvrir, et le
+      // dépli ne passe plus par la ligne complète.
       await tester.tap(find.text('PEA'));
       await tester.pumpAndSettle();
+      expect(find.text('Amundi MSCI World'), findsNothing);
+
+      // Seul le chevron dédié (leading) déplie le compte.
+      await tester.tap(find.byIcon(LucideIcons.chevronRight).first);
+      await tester.pumpAndSettle();
+      expect(find.text('Amundi MSCI World'), findsOneWidget);
 
       // Un chevron par ligne cliquable : le compte (expand) + la position.
       expect(find.byIcon(LucideIcons.chevronRight), findsNWidgets(2));
@@ -93,8 +114,8 @@ void main() {
   );
 
   testWidgets(
-    'avec onAccountOpen : chevron à la place du menu, pas de chevron sur '
-    'la position, tap déclenche le callback',
+    'avec onAccountOpen : pas de menu "⋮", le clic sur la ligne (titre '
+    'compris) déclenche le callback, le dépli reste séparé (chevron dédié)',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
@@ -106,21 +127,86 @@ void main() {
       await tester.pump();
 
       expect(find.byIcon(LucideIcons.ellipsisVertical), findsNothing);
-      // Chevron d'expansion (leading) + chevron d'ouverture (trailing,
-      // dernier dans l'arbre de la ligne) : le dernier est celui qui
-      // déclenche onAccountOpen.
-      expect(find.byIcon(LucideIcons.chevronRight), findsNWidgets(2));
+      // Un seul chevron : plus de chevron d'ouverture dédié en bout de
+      // ligne (voir la doc de `_AccountAccordionTile`), cette action passe
+      // maintenant par le clic sur la ligne elle-même — seul reste le
+      // chevron d'expansion (leading).
+      expect(find.byIcon(LucideIcons.chevronRight), findsOneWidget);
 
-      await tester.tap(find.byIcon(LucideIcons.chevronRight).last);
+      await tester.tap(find.text('PEA'));
       await tester.pump();
 
       expect(opened?.id, 'acc-1');
+      // Le clic sur la ligne n'a pas déplié le compte (action désormais
+      // distincte) : la position ne s'est pas révélée.
+      expect(find.text('Amundi MSCI World'), findsNothing);
 
-      // Déplier le compte : la ligne de position n'a pas de chevron propre
-      // (seuls les 2 de la ligne de compte restent).
-      await tester.tap(find.text('PEA'));
+      // Le chevron dédié, lui, déplie bien le compte.
+      await tester.tap(find.byIcon(LucideIcons.chevronRight));
       await tester.pumpAndSettle();
-      expect(find.byIcon(LucideIcons.chevronRight), findsNWidgets(2));
+      expect(find.text('Amundi MSCI World'), findsOneWidget);
+      // La ligne de position n'a pas de chevron propre (elle ouvre une
+      // popup, pas une page) : toujours un seul chevron dans l'arbre.
+      expect(find.byIcon(LucideIcons.chevronRight), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'accordéon de banque : ligne inerte au clic (pas de page à ouvrir '
+    'pour une banque), dépli via le chevron dédié uniquement',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // Deux comptes à la même banque : seul ce cas affiche l'accordéon de
+      // banque (voir `_buildAccountAccordions`, qui saute ce niveau pour
+      // un compte isolé sans banque distincte).
+      final accounts = [
+        PatrimoineAccount(
+          id: 'acc-1',
+          name: 'PEA',
+          bankName: 'Bourso',
+          valeur: 1000,
+          plusValueAbs: 50,
+          plusValuePercent: 5,
+          investments: [investment()],
+        ),
+        PatrimoineAccount(
+          id: 'acc-2',
+          name: 'CTO',
+          bankName: 'Bourso',
+          valeur: 500,
+          plusValueAbs: 10,
+          plusValuePercent: 2,
+        ),
+      ];
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryDetailScreen(
+              category: category(),
+              amountVisibility: AmountVisibilityController(),
+              distributionByAccount: accounts,
+              onAccountTap: (_) {},
+              defaultExpanded: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Cliquer le nom de la banque ne fait rien : pas de page à ouvrir.
+      await tester.tap(find.text('Bourso'));
+      await tester.pumpAndSettle();
+      expect(find.text('PEA'), findsNothing);
+
+      // Le chevron dédié, lui, déplie la banque (révèle ses comptes).
+      await tester.tap(find.byIcon(LucideIcons.chevronRight).first);
+      await tester.pumpAndSettle();
+      expect(find.text('PEA'), findsOneWidget);
+      expect(find.text('CTO'), findsOneWidget);
     },
   );
 
@@ -273,4 +359,120 @@ void main() {
       expect(find.text('Cours'), findsOneWidget);
     },
   );
+
+  group('photo d\'un objet "Autres"', () {
+    PatrimoineAccount watch() => const PatrimoineAccount(
+      id: 'inv-1',
+      name: 'Rolex Submariner',
+      valeur: 9500,
+      plusValueAbs: 1500,
+      plusValuePercent: 18.75,
+    );
+
+    PatrimoineCategory autresCategory() => PatrimoineCategory(
+      id: 'actifs_autres',
+      label: 'Autres',
+      icon: LucideIcons.gem,
+      color: const Color(0xFF000000),
+      tier: AllocationTier.opportuniste,
+      description: '',
+      accounts: [watch()],
+    );
+
+    late Directory tempDir;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp(
+        'opime_category_detail_photo_test',
+      );
+    });
+
+    tearDown(() async {
+      if (await tempDir.exists()) await tempDir.delete(recursive: true);
+    });
+
+    testWidgets(
+      'sans photo importée : l\'avatar affiche les initiales du libellé',
+      (tester) async {
+        await tester.pumpWidget(
+          ShadcnApp(
+            home: Scaffold(
+              child: CategoryDetailScreen(
+                category: autresCategory(),
+                amountVisibility: AmountVisibilityController(),
+                onAccountTap: (_) {},
+                vaultPath: tempDir.path,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.text('RS'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'une photo déjà importée pour cet investissement s\'affiche à la '
+      'place des initiales',
+      (tester) async {
+        await tester.runAsync(() async {
+          await AutresPhotoRepository(tempDir.path).importPhoto(
+            'inv-1',
+            _onePixelPng,
+            sourceName: 'rolex.jpg',
+          );
+        });
+
+        await tester.pumpWidget(
+          ShadcnApp(
+            home: Scaffold(
+              child: CategoryDetailScreen(
+                category: autresCategory(),
+                amountVisibility: AmountVisibilityController(),
+                onAccountTap: (_) {},
+                vaultPath: tempDir.path,
+              ),
+            ),
+          ),
+        );
+        // Chargement de la photo (E/S disque réelle, lancée dans initState) :
+        // il faut réellement laisser tourner la boucle d'évènements pour
+        // qu'elle avance, `pump()` seul ne suffit pas — voir
+        // `complete_patrimoine_dialog_test.dart`'s pattern équivalent.
+        await tester.runAsync(() async {
+          for (var i = 0; i < 40; i++) {
+            if (find.byType(Image).evaluate().isNotEmpty) return;
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump();
+          }
+        });
+
+        expect(find.text('RS'), findsNothing);
+        expect(find.byType(Image), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'sans vaultPath renseigné : l\'avatar reste aux initiales, pas '
+      'd\'erreur (aucune photo ne peut être chargée)',
+      (tester) async {
+        await tester.pumpWidget(
+          ShadcnApp(
+            home: Scaffold(
+              child: CategoryDetailScreen(
+                category: autresCategory(),
+                amountVisibility: AmountVisibilityController(),
+                onAccountTap: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('RS'), findsOneWidget);
+      },
+    );
+  });
 }

@@ -70,6 +70,14 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
 
   bool _isBuy = true;
   DateTime? _date;
+
+  /// Date de déblocage saisie à la main pour ce versement, en substitution
+  /// de la date par défaut (voir [_unlockDate]) — `null` tant que
+  /// l'utilisateur n'a pas modifié le champ, auquel cas la date par défaut
+  /// s'applique. Une fois renseignée, reste figée indépendamment des
+  /// modifications ultérieures de [_date] (voir [Transaction.manualUnlockDate]).
+  DateTime? _unlockDateOverride;
+
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
   late final TransactionPriceCurrencyController _priceCurrencyController;
@@ -83,6 +91,14 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   /// "transaction en cours" pour une nouvelle position, qui n'existe pas
   /// encore.
   String? _pendingTransactionId;
+
+  /// Documents déjà importés pour une toute nouvelle position, avant même
+  /// que l'[Investment] existe pour les porter (voir [_addDocument]) — les
+  /// octets sont déjà écrits sur disque ([DocumentStorage]), seuls les
+  /// métadonnées ([VaultDocument]) attendent ici la création de
+  /// l'investissement à la validation ([_commit]), qui les y rattache
+  /// d'un coup. Toujours vide hors nouvelle position.
+  List<VaultDocument> _pendingNewPositionDocuments = [];
 
   @override
   void initState() {
@@ -126,16 +142,37 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   }
 
   /// Même règle que `position_detail_dialog.dart`'s
-  /// `_usesTransactionScopedDocuments` — inapplicable à une nouvelle
-  /// position, qui n'a pas encore de [Investment.documents] où attacher
-  /// quoi que ce soit avant sa création.
-  bool get _usesTransactionScopedDocuments {
-    final investment = _selectedInvestment;
-    if (investment == null) return false;
-    final effectiveClass = investment.assetClass ?? _account.assetClass;
-    return effectiveClass == AssetClass.metauxPrecieux ||
-        effectiveClass == AssetClass.autres ||
-        effectiveClass == AssetClass.actionsEtFonds;
+  /// `_usesTransactionScopedDocuments` — s'applique aussi à une toute
+  /// nouvelle position (voir [_pendingNewPositionDocuments], qui prend le
+  /// relais de [Investment.documents] tant qu'elle n'existe pas encore).
+  bool get _usesTransactionScopedDocuments =>
+      _effectiveClass == AssetClass.metauxPrecieux ||
+      _effectiveClass == AssetClass.autres ||
+      _effectiveClass == AssetClass.actionsEtFonds;
+
+  /// Classe effective de la position concernée — la sienne si elle existe
+  /// déjà, sinon celle du compte pour une toute nouvelle position (créée
+  /// dans la classe du compte, sans sélecteur séparé ici).
+  AssetClass get _effectiveClass =>
+      _selectedInvestment?.assetClass ?? _account.assetClass;
+
+  /// Le champ de date de déblocage a-t-il un sens pour ce versement — PEG/PEE
+  /// et achat uniquement (seuls les versements se débloquent).
+  bool get _unlockDateApplicable {
+    if (!_isBuy) return false;
+    final envelope = _account.envelope;
+    return envelope == AccountEnvelope.peg || envelope == AccountEnvelope.pee;
+  }
+
+  /// Date de déblocage affichée/éditable : [_unlockDateOverride] si
+  /// l'utilisateur l'a modifiée, sinon la date par défaut calculée depuis
+  /// [_date] (voir [pegPeeUnlockDateFor]). `null` hors PEG/PEE, pour une
+  /// vente, ou tant qu'aucune date de transaction n'est choisie.
+  DateTime? get _unlockDate {
+    if (!_unlockDateApplicable) return null;
+    if (_unlockDateOverride != null) return _unlockDateOverride;
+    final date = _date;
+    return date == null ? null : pegPeeUnlockDateFor(date);
   }
 
   Future<void> _selectPosition(String value) async {
@@ -155,14 +192,25 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     String? transactionId,
     String? name,
   ) async {
-    final investment = _selectedInvestment;
-    if (investment == null) return;
     final document = VaultDocument(
       fileName: fileName,
       note: name,
       transactionId: transactionId,
     );
     await DocumentStorage(widget.vaultPath).save(document, bytes);
+    // Toute nouvelle position : pas encore d'[Investment] où le rattacher —
+    // les octets sont déjà sur disque, seules les métadonnées patientent
+    // (voir [_pendingNewPositionDocuments]) jusqu'à la création à [_commit].
+    final investment = _selectedInvestment;
+    if (investment == null) {
+      setState(
+        () => _pendingNewPositionDocuments = [
+          ..._pendingNewPositionDocuments,
+          document,
+        ],
+      );
+      return;
+    }
     final updatedInvestment = investment.copyWith(
       documents: [...investment.documents, document],
     );
@@ -178,9 +226,17 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   }
 
   Future<void> _deleteDocument(VaultDocument document) async {
-    final investment = _selectedInvestment;
-    if (investment == null) return;
     await DocumentStorage(widget.vaultPath).delete(document);
+    final investment = _selectedInvestment;
+    if (investment == null) {
+      setState(
+        () => _pendingNewPositionDocuments = [
+          for (final d in _pendingNewPositionDocuments)
+            if (d.id != document.id) d,
+        ],
+      );
+      return;
+    }
     final updatedInvestment = investment.copyWith(
       documents: [
         for (final d in investment.documents)
@@ -203,9 +259,18 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   /// création, pour ne pas les laisser orphelins d'une transaction qui
   /// n'existera jamais.
   Future<void> _cleanupPendingDocuments() async {
-    final investment = _selectedInvestment;
     final pendingId = _pendingTransactionId;
-    if (investment == null || pendingId == null) return;
+    if (pendingId == null) return;
+    final investment = _selectedInvestment;
+    if (investment == null) {
+      if (_pendingNewPositionDocuments.isEmpty) return;
+      for (final document in _pendingNewPositionDocuments) {
+        await DocumentStorage(widget.vaultPath).delete(document);
+      }
+      if (!mounted) return;
+      setState(() => _pendingNewPositionDocuments = []);
+      return;
+    }
     final orphaned = [
       for (final d in investment.documents)
         if (d.transactionId == pendingId) d,
@@ -268,11 +333,16 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     final price = _isEurCurrency ? 1.0 : parseDecimal(_priceController.text);
     final currency = _txnCurrency;
     final fxRateToEur = _txnFxRateToEur;
+    // Un objet "Autres" peut avoir été reçu en cadeau (prix d'achat 0) —
+    // sans quoi la plus-value serait infinie plutôt que simplement non
+    // définie (voir `Investment`'s `pru`/`unrealizedGain`, déjà tolérants à
+    // un montant investi nul, et `PerformanceAmount`, qui masque le
+    // pourcentage plutôt que d'afficher "0 %" trompeur).
+    final invalidPrice = price == null || price < 0 || (price == 0 && _effectiveClass != AssetClass.autres);
     if (date == null ||
         quantity == null ||
         quantity <= 0 ||
-        price == null ||
-        price <= 0 ||
+        invalidPrice ||
         fxRateToEur == null ||
         fxRateToEur <= 0) {
       return;
@@ -285,6 +355,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       unitPrice: price,
       currency: currency,
       fxRateToEur: fxRateToEur,
+      manualUnlockDate: _unlockDateOverride,
     );
 
     Investment updatedInvestment;
@@ -302,11 +373,22 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
           ? rawIsin.toUpperCase()
           : rawIsin;
       final label = _labelController.text.trim();
-      if (isin.isEmpty || label.isEmpty) return;
+      // Comme `complete_patrimoine_dialog.dart`'s `_commitCreateInvestment` :
+      // un objet "Autres" ou un fonds PEE/PEG/PER n'a pas toujours de vrai
+      // identifiant financier à exiger (voir [isinOptionalFor]) — un
+      // identifiant est généré si laissé vide.
+      final identifierRequired = !isinOptionalFor(
+        _account.assetClass,
+        accountEnvelope: _account.envelope,
+      );
+      if ((identifierRequired && isin.isEmpty) || label.isEmpty) return;
       updatedInvestment = Investment(
-        isin: isin,
+        isin: isin.isNotEmpty ? isin : placeholderIsinFor(_account.assetClass),
         label: label,
         transactions: [transaction],
+        // Documents déjà importés avant que cet investissement n'existe —
+        // voir [_pendingNewPositionDocuments].
+        documents: _pendingNewPositionDocuments,
       );
     } else {
       final existing = _selectedInvestment;
@@ -415,17 +497,30 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     onCreate: _commit,
                     onCancel: _cancel,
                     submitLabel: 'Ajouter la transaction',
+                    unlockDate: _unlockDate,
+                    onUnlockDateChanged: _unlockDateApplicable
+                        ? (d) => setState(() => _unlockDateOverride = d)
+                        : null,
                     documentsSection: _usesTransactionScopedDocuments
                         ? DocumentsSection(
                             vaultPath: widget.vaultPath,
-                            documents: [
-                              for (final d in _selectedInvestment!.documents)
-                                if (d.transactionId == _pendingTransactionId)
-                                  d,
-                            ],
+                            // Nouvelle position : rien dans
+                            // `Investment.documents` puisqu'elle n'existe
+                            // pas encore — voir
+                            // [_pendingNewPositionDocuments].
+                            documents: _selectedInvestment == null
+                                ? _pendingNewPositionDocuments
+                                : [
+                                    for (final d
+                                        in _selectedInvestment!.documents)
+                                      if (d.transactionId ==
+                                          _pendingTransactionId)
+                                        d,
+                                  ],
                             fixedTransactionId: _pendingTransactionId,
                             quantityAssetClass:
-                                _selectedInvestment!.assetClass,
+                                _selectedInvestment?.assetClass ??
+                                _account.assetClass,
                             onAdd: _addDocument,
                             onDelete: _deleteDocument,
                           )

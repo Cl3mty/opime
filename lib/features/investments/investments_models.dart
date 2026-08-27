@@ -200,6 +200,52 @@ bool requiresLabelFieldFor(
   return true;
 }
 
+/// À la création d'un investissement, l'identifiant (ISIN) peut-il rester
+/// vide ? Toujours vrai pour l'immobilier et "Autres", qui n'ont pas de
+/// vrai identifiant financier (voir [_commitCreateInvestment] dans
+/// `complete_patrimoine_dialog.dart`, qui en génère un si laissé vide).
+/// Vrai aussi pour "Actions & Fonds" détenu en PEE/PEG/PER : les fonds
+/// internes à l'entreprise ou au contrat (FCPE, unités de compte du PER...)
+/// n'ont souvent pas d'ISIN public — l'estimation manuelle du cours
+/// ([Investment.manualPrice]) prend alors le relais d'un cours de marché
+/// introuvable, comme pour "Autres".
+bool isinOptionalFor(AssetClass assetClass, {AccountEnvelope? accountEnvelope}) {
+  if (assetClass == AssetClass.immobilier || assetClass == AssetClass.autres) {
+    return true;
+  }
+  return assetClass == AssetClass.actionsEtFonds &&
+      (accountEnvelope == AccountEnvelope.peg ||
+          accountEnvelope == AccountEnvelope.pee ||
+          accountEnvelope == AccountEnvelope.per);
+}
+
+/// `true` si [isin] est l'identifiant technique auto-généré à la création
+/// d'un investissement laissé sans identifiant (voir
+/// [isinOptionalFor]/`_commitCreateInvestment` dans
+/// `complete_patrimoine_dialog.dart`, préfixes `'immobilier-'`, `'autre-'`,
+/// `'fcpe-'`) plutôt qu'un vrai ISIN/ticker saisi par l'utilisateur ou
+/// choisi dans une liste connue — un tel identifiant n'a rien d'utile à
+/// montrer à l'écran (voir `positions_table.dart`/
+/// `position_detail_dialog.dart`).
+bool isGeneratedIdentifier(String isin) =>
+    isin.startsWith('immobilier-') ||
+    isin.startsWith('autre-') ||
+    isin.startsWith('fcpe-');
+
+/// Identifiant technique généré pour un investissement "Autres" ou un fonds
+/// PEE/PEG/PER (voir [isinOptionalFor]) laissé sans identifiant — que ce
+/// soit à la création, ou en édition quand un ISIN saisi par erreur est
+/// retiré à nouveau (voir `_commitEditInvestment` dans `position_detail_dialog.dart`/
+/// `investment_detail_screen.dart`, qui rejetaient auparavant tout
+/// enregistrement à identifiant vide au lieu d'y regénérer un placeholder).
+/// Sans branche immobilier : l'immobilier ne propose jamais ce champ à la
+/// saisie, son propre préfixe (`'immobilier-'`) reste généré séparément là
+/// où le compte est créé.
+String placeholderIsinFor(AssetClass assetClass) =>
+    assetClass == AssetClass.autres
+        ? 'autre-${generateInvestmentId('bien')}'
+        : 'fcpe-${generateInvestmentId('bien')}';
+
 /// Une valeur a-t-elle besoin d'une précision au-delà du centime à la
 /// persistance sur disque ? Les cryptomonnaies (quantités et cours ont un
 /// sens en dessous du centime) et les taux de change d'une épargne en
@@ -302,6 +348,14 @@ class Transaction {
   /// `TransactionPriceCurrencyController`.
   final double fxRateToEur;
 
+  /// Date de déblocage saisie à la main pour un versement PEG/PEE, en
+  /// substitution de la règle par défaut (5 ans après [date], voir
+  /// [pegPeeUnlockDateFor]/[pegPeeUnlockTranches]) — pour couvrir un cas de
+  /// déblocage anticipé (achat de la résidence principale, mariage,
+  /// invalidité...) ou tout autre écart avec la règle générale. `null`
+  /// (l'immense majorité des cas) : la date par défaut s'applique.
+  final DateTime? manualUnlockDate;
+
   Transaction({
     String? id,
     required this.date,
@@ -312,6 +366,7 @@ class Transaction {
     this.fxRateToEur = 1.0,
     this.type,
     this.note,
+    this.manualUnlockDate,
   }) : id = id ?? generateInvestmentId('txn');
 
   /// Montant de la transaction en euros (la devise de compte) : quantité ×
@@ -339,6 +394,9 @@ class Transaction {
     fxRateToEur: (json['fxRateToEur'] as num?)?.toDouble() ?? 1.0,
     type: TransactionType.fromName(json['type'] as String?),
     note: json['note'] as String?,
+    manualUnlockDate: json['manualUnlockDate'] != null
+        ? DateTime.parse(json['manualUnlockDate'] as String)
+        : null,
   );
 
   /// [round] à `false` pour les cryptomonnaies (quantité/le cours en
@@ -359,6 +417,8 @@ class Transaction {
     if (type != null) 'type': type!.name,
     if (note != null) 'note': note,
     if (currency != 'EUR') 'fxRateToEur': fxRateToEur,
+    if (manualUnlockDate != null)
+      'manualUnlockDate': manualUnlockDate!.toIso8601String(),
   };
 }
 
@@ -1123,6 +1183,14 @@ FiscalMilestone? accountFiscalMilestone({
   );
 }
 
+/// Date de déblocage PEG/PEE d'un versement fait le [date] : 5 ans après sa
+/// propre date, voir [pegPeeUnlockTranches]. Extrait en fonction pure pour
+/// être réutilisé tel quel dès la saisie d'une transaction (avant même
+/// qu'elle existe), sans avoir besoin d'un [Investment] complet — voir
+/// `TransactionForm`'s `projectedUnlockDate`.
+DateTime pegPeeUnlockDateFor(DateTime date) =>
+    DateTime(date.year + 5, date.month, date.day);
+
 /// Une tranche de déblocage PEG/PEE : un versement (intéressement,
 /// participation, abondement, versement volontaire...) et sa propre date de
 /// déblocage, 5 ans après sa date — voir [pegPeeUnlockTranches].
@@ -1152,11 +1220,7 @@ List<UnlockTranche> pegPeeUnlockTranches({
             for (final tx in investment.transactions)
               if (tx.isBuy) tx,
         ].map((tx) {
-          final unlockDate = DateTime(
-            tx.date.year + 5,
-            tx.date.month,
-            tx.date.day,
-          );
+          final unlockDate = tx.manualUnlockDate ?? pegPeeUnlockDateFor(tx.date);
           return (
             date: tx.date,
             amount: tx.amount,

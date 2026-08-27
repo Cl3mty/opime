@@ -1,4 +1,5 @@
 import 'dart:async' show unawaited;
+import 'package:flutter/material.dart' as material;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/assistant/assistant_chat_controller.dart';
@@ -32,6 +33,7 @@ import 'features/analyses/analyses_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/dashboard/onboarding_highlight_controller.dart';
 import 'features/projects/projects_screen.dart';
+import 'features/investments/current_account_focus_controller.dart';
 import 'features/investments/investments_models.dart' show AssetClass;
 import 'features/investments/patrimoine_refresh_controller.dart';
 import 'features/investments/price_sync_banner.dart';
@@ -104,6 +106,7 @@ class _OpimeAppState extends State<OpimeApp> {
   final _notificationsSettingsController = NotificationsSettingsController();
   final _notificationsController = NotificationsController();
   final _patrimoineRefreshController = PatrimoineRefreshController();
+  final _currentAccountFocusController = CurrentAccountFocusController();
   final _priceSyncStatusController = PriceSyncStatusController();
   final _onboardingHighlightController = OnboardingHighlightController();
   final _vaultFolderService = VaultFolderService();
@@ -455,23 +458,56 @@ class _OpimeAppState extends State<OpimeApp> {
 
   @override
   Widget build(BuildContext context) {
+    final lightTheme = ThemeData(
+      colorScheme: LegacyColorSchemes.lightZinc().recolor(
+        const Color(0xFFF4BE7E),
+      ),
+      radius: 0.6,
+    );
+    final darkTheme = ThemeData(
+      colorScheme: LegacyColorSchemes.darkZinc().recolor(
+        const Color(0xFFF4BE7E),
+      ),
+      radius: 0.6,
+    );
+    // Des widgets tiers non conscients de shadcn (ex. `flutter_quill`, dans
+    // les notes) lisent le thème *Material* de Flutter (`material.Theme.of`)
+    // plutôt que celui de shadcn. Sans `materialTheme` explicite ci-dessous,
+    // `ShadcnApp` en construit un par défaut à partir de `theme` — TOUJOURS
+    // le thème clair, jamais `darkTheme`, quel que soit le mode actif (voir
+    // sa propre implémentation dans `shadcn_app.dart`) : ces widgets
+    // recevaient donc des couleurs pensées pour un fond clair même en thème
+    // sombre, d'où par exemple des titres invisibles dans les notes. On
+    // calcule ici ce thème Material à partir du `ColorScheme` shadcn
+    // réellement affiché (clair ou sombre selon `_themeController.mode` +
+    // le thème système), pour qu'il reste toujours en phase avec l'apparence
+    // effective de l'app.
+    final effectiveBrightness = switch (_themeController.mode) {
+      ThemeMode.light => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.system => material.MediaQuery.platformBrightnessOf(context),
+    };
+    final activeTheme = effectiveBrightness == Brightness.dark
+        ? darkTheme
+        : lightTheme;
+    final materialTheme = material.ThemeData.from(
+      colorScheme: material.ColorScheme.fromSeed(
+        seedColor: activeTheme.colorScheme.primary,
+        brightness: effectiveBrightness,
+        surface: activeTheme.colorScheme.background,
+        primary: activeTheme.colorScheme.primary,
+        secondary: activeTheme.colorScheme.secondary,
+        error: activeTheme.colorScheme.destructive,
+      ),
+    );
     return ShadcnApp(
       navigatorKey: _navigatorKey,
       title: 'Opime',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: LegacyColorSchemes.lightZinc().recolor(
-          const Color(0xFFF4BE7E),
-        ),
-        radius: 0.6,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: LegacyColorSchemes.darkZinc().recolor(
-          const Color(0xFFF4BE7E),
-        ),
-        radius: 0.6,
-      ),
+      theme: lightTheme,
+      darkTheme: darkTheme,
       themeMode: _themeController.mode,
+      materialTheme: materialTheme,
       home: _buildHome(),
       localizationsDelegates: FlutterQuillLocalizations.localizationsDelegates,
       // Ancêtre du Navigator (donc de toute route, y compris une boîte de
@@ -612,6 +648,7 @@ class _OpimeAppState extends State<OpimeApp> {
           sidebarPrefsController: _sidebarPrefsController!,
           amountVisibilityController: _amountVisibilityController,
           patrimoineRefreshController: _patrimoineRefreshController,
+          currentAccountFocusController: _currentAccountFocusController,
           onboardingHighlightController: _onboardingHighlightController,
           priceSyncStatusController: _priceSyncStatusController,
           assistantConfigController: _assistantConfigController,
@@ -649,6 +686,7 @@ class _OpimeAppState extends State<OpimeApp> {
                 categoryId: assetClass.categoryId,
                 amountVisibility: _amountVisibilityController,
                 patrimoineRefreshController: _patrimoineRefreshController,
+                currentAccountFocus: _currentAccountFocusController,
               ),
             for (final liabilityType in LiabilityType.values)
               liabilityType.categoryId: (_) => RealPassifDetailScreen(

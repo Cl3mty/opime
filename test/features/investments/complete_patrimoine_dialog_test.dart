@@ -144,4 +144,216 @@ void main() {
       expect(investment.isin, startsWith('autre-'));
     },
   );
+
+  group('ouverture contextuelle depuis un compte/investissement déjà '
+      'affiché (voir CurrentAccountFocusController)', () {
+    Future<void> pumpDialogWithFocus(
+      WidgetTester tester, {
+      required AssetClass initialAssetClass,
+      String? initialAccountId,
+      String? initialInvestmentId,
+      required String awaitedText,
+    }) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: Builder(
+              builder: (context) => GestureDetector(
+                onTap: () => showCompletePatrimoineDialog(
+                  context,
+                  vaultPath: tempDir.path,
+                  onCompleted: () {},
+                  initialAssetClass: initialAssetClass,
+                  initialAccountId: initialAccountId,
+                  initialInvestmentId: initialInvestmentId,
+                ),
+                child: const Text('OPEN'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('OPEN'));
+      await tester.pump();
+      await tester.runAsync(() async {
+        for (var i = 0; i < 40; i++) {
+          if (find.text(awaitedText).evaluate().isNotEmpty) return;
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+        }
+      });
+    }
+
+    testWidgets(
+      'initialAccountId saute compte ET établissement pour aller '
+      'directement à "Quel investissement ?" de ce compte précis',
+      (tester) async {
+        final account = InvestmentAccount(
+          assetClass: AssetClass.actionsEtFonds,
+          envelope: AccountEnvelope.cto,
+          name: 'CTO Bourso',
+          bankName: 'Bourso',
+          investments: [Investment(
+            isin: 'FR0000131104',
+            label: 'BNP Paribas',
+            transactions: const [],
+          )],
+        );
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(account),
+        );
+
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.actionsEtFonds,
+          initialAccountId: account.id,
+          awaitedText: 'Quel investissement ?',
+        );
+
+        // Ni l'étape établissement, ni le choix du compte (un autre CTO
+        // aurait pu être créé/choisi) : directement la position existante.
+        expect(find.text('Quel établissement ?'), findsNothing);
+        expect(find.text('Quel compte ?'), findsNothing);
+        expect(find.text('BNP Paribas'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'à l\'étape "Quel investissement ou devise ?", créer un nouvel '
+      'investissement propose le libellé avant l\'identifiant (plus '
+      'intuitif : on connaît généralement le nom d\'un titre avant son ISIN)',
+      (tester) async {
+        final account = InvestmentAccount(
+          assetClass: AssetClass.actionsEtFonds,
+          envelope: AccountEnvelope.cto,
+          name: 'CTO Bourso',
+          bankName: 'Bourso',
+          investments: const [],
+        );
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(account),
+        );
+
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.actionsEtFonds,
+          initialAccountId: account.id,
+          awaitedText: 'Quel investissement ?',
+        );
+
+        await tester.tap(find.text('Nouvel investissement ou devise'));
+        await tester.pump();
+
+        // Mode "Investissement" par défaut (pas "Devise") : libellé, puis
+        // identifiant.
+        final textFields = find.byType(TextField);
+        await tester.enterText(textFields.at(0), 'TotalEnergies');
+        await tester.enterText(textFields.at(1), 'FR0000120271');
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Créer l\'investissement'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pump();
+
+        final saved = await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).listAll(),
+        );
+        final investment = saved!.single.investments.single;
+        expect(investment.label, 'TotalEnergies');
+        expect(investment.isin, 'FR0000120271');
+      },
+    );
+
+    testWidgets(
+      'remonter d\'une étape depuis "Quel investissement ?" atteint via '
+      'initialAccountId ne plante pas (régression : null check operator '
+      'used on a null value — _pendingEstablishmentName jamais renseigné '
+      'par ce raccourci, contrairement au parcours normal)',
+      (tester) async {
+        // PER : une enveloppe "Actions & Fonds" à établissement, comme le
+        // signalait l\'utilisateur.
+        final account = InvestmentAccount(
+          assetClass: AssetClass.actionsEtFonds,
+          envelope: AccountEnvelope.per,
+          name: 'PER Linxea',
+          bankName: 'Linxea',
+          investments: [
+            Investment(
+              isin: 'FR0000131104',
+              label: 'BNP Paribas',
+              transactions: const [],
+            ),
+          ],
+        );
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(account),
+        );
+
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.actionsEtFonds,
+          initialAccountId: account.id,
+          awaitedText: 'Quel investissement ?',
+        );
+
+        // "Retour" (chevron gauche) de l'en-tête de l'étape.
+        await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+        await tester.pump();
+
+        // Pas d'exception levée par le tap ci-dessus (voir aussi
+        // `tester.takeException()` implicite en fin de test via
+        // `TestWidgetsFlutterBinding`) : la remontée retombe sur "Quel
+        // compte ?" avec l'établissement "Linxea" correctement renseigné.
+        expect(find.text('Quel compte ?'), findsOneWidget);
+        expect(find.text('Linxea'), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'initialAccountId + initialInvestmentId sautent jusqu\'à l\'étape '
+      '"Ajouter une transaction" de cet investissement précis',
+      (tester) async {
+        final investment = Investment(
+            isin: 'FR0000131104',
+            label: 'BNP Paribas',
+            transactions: const [],
+          );
+        final account = InvestmentAccount(
+          assetClass: AssetClass.actionsEtFonds,
+          envelope: AccountEnvelope.cto,
+          name: 'CTO Bourso',
+          bankName: 'Bourso',
+          investments: [investment],
+        );
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(account),
+        );
+
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.actionsEtFonds,
+          initialAccountId: account.id,
+          initialInvestmentId: investment.id,
+          awaitedText: 'Ajouter une transaction',
+        );
+
+        expect(find.text('Quel investissement ?'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'un initialAccountId introuvable (compte supprimé entre-temps) '
+      'retombe simplement sur le choix du compte, sans planter',
+      (tester) async {
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.actionsEtFonds,
+          initialAccountId: 'inexistant',
+          awaitedText: 'Quel établissement ?',
+        );
+
+        expect(find.text('Quel établissement ?'), findsOneWidget);
+      },
+    );
+  });
 }

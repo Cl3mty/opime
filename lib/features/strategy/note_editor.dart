@@ -1,9 +1,16 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:flutter/material.dart' show showDialog;
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:markdown_quill/markdown_quill.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/ui/frosted_card.dart';
+import '../investments/documents_section.dart';
+import '../investments/investments_models.dart' show VaultDocument;
 import 'note_delta_normalizer.dart';
+import 'strategy_documents_repository.dart';
 import 'strategy_repository.dart';
 
 class NoteEditor extends StatefulWidget {
@@ -28,6 +35,10 @@ class _NoteEditorState extends State<NoteEditor> {
 
   final FocusNode _focusNode = FocusNode();
 
+  late final StrategyDocumentsRepository _documentsRepo =
+      StrategyDocumentsRepository(widget.repository.vaultPath);
+  List<VaultDocument> _documents = [];
+
   // Encode underline en HTML brut (<u>) car le markdown standard n'a pas de
   // syntaxe pour cet attribut.
   final DeltaToMarkdown _deltaToMarkdown = DeltaToMarkdown(
@@ -43,6 +54,7 @@ class _NoteEditorState extends State<NoteEditor> {
   void initState() {
     super.initState();
     _load();
+    _loadDocuments();
   }
 
   Future<void> _load() async {
@@ -69,6 +81,103 @@ class _NoteEditorState extends State<NoteEditor> {
     setState(() => _controller = controller);
   }
 
+  Future<void> _loadDocuments() async {
+    final documents = await _documentsRepo.documentsFor(widget.noteId);
+    if (!mounted) return;
+    setState(() => _documents = documents);
+  }
+
+  Future<void> _addDocument(
+    String fileName,
+    Uint8List bytes,
+    String? transactionId,
+    String? name,
+  ) async {
+    final documents = await _documentsRepo.addDocument(
+      widget.noteId,
+      fileName,
+      bytes,
+      name: name,
+    );
+    if (!mounted) return;
+    setState(() => _documents = documents);
+  }
+
+  Future<void> _deleteDocument(VaultDocument document) async {
+    final documents = await _documentsRepo.removeDocument(
+      widget.noteId,
+      document,
+    );
+    if (!mounted) return;
+    setState(() => _documents = documents);
+  }
+
+  /// [DocumentsSection] est un `StatelessWidget` : sans le `StatefulBuilder`
+  /// ci-dessous, ajouter/retirer un document mettrait bien à jour
+  /// `_documents` (via `_addDocument`/`_deleteDocument`, `setState` sur cet
+  /// état) mais la popup elle-même — un `showDialog` qui capture son
+  /// contenu au moment de l'ouverture — ne se redessinerait pas pour
+  /// autant tant qu'elle reste ouverte.
+  Future<void> _openDocumentsDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          Future<void> addDocument(
+            String fileName,
+            Uint8List bytes,
+            String? transactionId,
+            String? name,
+          ) async {
+            await _addDocument(fileName, bytes, transactionId, name);
+            setDialogState(() {});
+          }
+
+          Future<void> deleteDocument(VaultDocument document) async {
+            await _deleteDocument(document);
+            setDialogState(() {});
+          }
+
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480, maxHeight: 560),
+              child: FrostedCard(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: DocumentsSection(
+                            vaultPath: widget.repository.vaultPath,
+                            documentsFolder: strategyDocumentsFolder,
+                            documents: _documents,
+                            onAdd: addDocument,
+                            onDelete: deleteDocument,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlineButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          child: const shadcn.Text('Fermer'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _scheduleSave() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 800), _save);
@@ -79,9 +188,7 @@ class _NoteEditorState extends State<NoteEditor> {
     if (controller == null) return;
     final delta = controller.document.toDelta();
     final cleanedDelta = rebaseListIndentation(
-      stripDerivedParagraphIndentation(
-        stripDisallowedColorAttributes(delta),
-      ),
+      stripDerivedParagraphIndentation(stripDisallowedColorAttributes(delta)),
     );
     final markdown = _deltaToMarkdown.convert(cleanedDelta);
     await widget.repository.writeNote(widget.noteId, markdown);
@@ -135,37 +242,67 @@ class _NoteEditorState extends State<NoteEditor> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-          child: QuillSimpleToolbar(
-            controller: controller,
-            config: const QuillSimpleToolbarConfig(
-              showFontFamily: false,
-              showFontSize: false,
-              showBoldButton: true,
-              showItalicButton: true,
-              showUnderLineButton: true,
-              showStrikeThrough: false,
-              showColorButton: false,
-              showBackgroundColorButton: false,
-              showClearFormat: false,
-              showAlignmentButtons: true,
-              showLeftAlignment: false,
-              showCenterAlignment: true,
-              showRightAlignment: false,
-              showJustifyAlignment: false,
-              showHeaderStyle: true,
-              showListNumbers: true,
-              showListBullets: true,
-              showListCheck: true,
-              showCodeBlock: false,
-              showQuote: false,
-              showIndent: false,
-              showLink: true,
-              showUndo: true,
-              showRedo: true,
-              showDividers: true,
-              showSearchButton: false,
-            ),
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: QuillSimpleToolbar(
+                  controller: controller,
+                  config: const QuillSimpleToolbarConfig(
+                    showFontFamily: false,
+                    showFontSize: false,
+                    showBoldButton: true,
+                    showItalicButton: true,
+                    showUnderLineButton: true,
+                    showStrikeThrough: false,
+                    showColorButton: false,
+                    showBackgroundColorButton: false,
+                    showClearFormat: false,
+                    showAlignmentButtons: true,
+                    showLeftAlignment: false,
+                    showCenterAlignment: true,
+                    showRightAlignment: false,
+                    showJustifyAlignment: false,
+                    showHeaderStyle: true,
+                    showListNumbers: true,
+                    showListBullets: true,
+                    showListCheck: true,
+                    showCodeBlock: false,
+                    showQuote: false,
+                    showIndent: false,
+                    showLink: true,
+                    showUndo: true,
+                    showRedo: true,
+                    showDividers: true,
+                    showSearchButton: false,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _openDocumentsDialog,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        LucideIcons.paperclip,
+                        size: 14,
+                        color: Theme.of(context).colorScheme.mutedForeground,
+                      ),
+                      const SizedBox(width: 4),
+                      shadcn.Text(
+                        _documents.isEmpty
+                            ? 'Documents'
+                            : 'Documents (${_documents.length})',
+                      ).muted().small(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const Divider(height: 1),

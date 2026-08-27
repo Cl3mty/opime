@@ -30,7 +30,10 @@ class PatrimoineExportRow {
   final double valeur;
   final double? pru;
   final double plusValueAbs;
-  final double plusValuePercent;
+
+  /// `null` sans coût d'acquisition (ex : un objet reçu en cadeau) — voir
+  /// `PatrimoineAccount.plusValuePercent`.
+  final double? plusValuePercent;
 
   const PatrimoineExportRow({
     required this.label,

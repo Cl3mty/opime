@@ -135,7 +135,9 @@ Future<void> refreshAllPrices({
 /// que de retomber silencieusement sur le montant investi. Seules les
 /// classes où un cours de marché est attendu sont concernées
 /// ([_expectsMarketPrice]) : un prêt immobilier ou un objet d'art n'a
-/// jamais de cours Yahoo, ce n'est pas un échec à signaler.
+/// jamais de cours Yahoo, ce n'est pas un échec à signaler — pas plus
+/// qu'un fonds PEE/PEG/PER sans ISIN public, identifié par un id auto-généré
+/// ("fcpe-...") plutôt qu'un vrai ticker.
 Future<Investment?> _resolveInvestmentPrice({
   required String vaultPath,
   required InvestmentAccount account,
@@ -155,7 +157,15 @@ Future<Investment?> _resolveInvestmentPrice({
   final isCurrency = investment.isCurrency;
   // Une devise n'est jamais "introuvable" chez Yahoo : un échec de la paire
   // de change (hors panne réseau) laisse simplement le dernier cours connu.
-  final expectsMarketPrice = !isCurrency && _expectsMarketPrice(effectiveClass);
+  // Un fonds PEE/PEG/PER sans ISIN public (identifiant auto-généré "fcpe-...",
+  // voir [isinOptionalFor]) n'a pas non plus de cours à chercher — comme un
+  // objet "autre-..." ou un bien "immobilier-...", jamais réellement coté
+  // (déjà exclus par [_expectsMarketPrice] via leur classe, voir
+  // [isGeneratedIdentifier]).
+  final expectsMarketPrice =
+      !isCurrency &&
+      !isGeneratedIdentifier(investment.isin) &&
+      _expectsMarketPrice(effectiveClass);
   // Le taux de change (1 JPY ≈ 0,006 €) et le cours d'une devise ont besoin
   // d'une précision au-delà du centime, même logés dans un compte-titres.
   final fullPrecision = isCurrency || requiresFullPricePrecision(effectiveClass);

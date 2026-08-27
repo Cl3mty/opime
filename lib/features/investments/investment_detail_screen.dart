@@ -407,7 +407,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   /// par erreur un cours qui ne correspond plus à l'investissement modifié.
   Future<void> _commitEditInvestment() async {
     final rawIsin = _editIsinController.text.trim();
-    final isin =
+    final typedIsin =
         identifierOptionsFor(
               _effectiveClass,
               accountEnvelope: widget.account.envelope,
@@ -416,6 +416,14 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
         ? rawIsin.toUpperCase()
         : rawIsin;
     final label = _editLabelController.text.trim();
+    // Un identifiant vide reste valide pour "Autres"/un fonds PEE-PEG (voir
+    // [isinOptionalFor]) : on en régénère un plutôt que de bloquer
+    // l'enregistrement, pour permettre de retirer un ISIN saisi par erreur
+    // (auparavant impossible : le champ vide était simplement rejeté).
+    final isin = typedIsin.isEmpty &&
+            isinOptionalFor(_effectiveClass, accountEnvelope: widget.account.envelope)
+        ? placeholderIsinFor(_effectiveClass)
+        : typedIsin;
     if ((!_isImmobilier && isin.isEmpty) || label.isEmpty) return;
     final isinChanged = isin != widget.investment.isin;
     final updatedInvestment = Investment(

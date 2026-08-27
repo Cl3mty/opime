@@ -212,6 +212,12 @@ class _EditTransactionDialog extends StatefulWidget {
 class _EditTransactionDialogState extends State<_EditTransactionDialog> {
   late bool _isBuy;
   late DateTime? _date;
+
+  /// Date de déblocage saisie à la main, initialisée depuis
+  /// [Transaction.manualUnlockDate] (voir [_unlockDate]) — `null` tant
+  /// qu'elle n'a pas été modifiée, auquel cas la date par défaut s'applique.
+  DateTime? _unlockDateOverride;
+
   late final TextEditingController _quantityController;
   late final TextEditingController _priceController;
   late final TransactionPriceCurrencyController _priceCurrencyController;
@@ -233,6 +239,25 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
     return effectiveClass == AssetClass.metauxPrecieux ||
         effectiveClass == AssetClass.autres ||
         effectiveClass == AssetClass.actionsEtFonds;
+  }
+
+  /// Le champ de date de déblocage a-t-il un sens pour cette transaction —
+  /// PEG/PEE et achat uniquement.
+  bool get _unlockDateApplicable {
+    if (!_isBuy) return false;
+    final envelope = widget.account.envelope;
+    return envelope == AccountEnvelope.peg || envelope == AccountEnvelope.pee;
+  }
+
+  /// Date de déblocage affichée/éditable : [_unlockDateOverride] si
+  /// renseignée, sinon la date par défaut calculée depuis [_date] (voir
+  /// [pegPeeUnlockDateFor]). `null` hors PEG/PEE, pour une vente, ou sans
+  /// date choisie.
+  DateTime? get _unlockDate {
+    if (!_unlockDateApplicable) return null;
+    if (_unlockDateOverride != null) return _unlockDateOverride;
+    final date = _date;
+    return date == null ? null : pegPeeUnlockDateFor(date);
   }
 
   bool get _isCurrency =>
@@ -269,6 +294,7 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
     _investment = widget.investment;
     _isBuy = widget.transaction.isBuy;
     _date = widget.transaction.date;
+    _unlockDateOverride = widget.transaction.manualUnlockDate;
     _quantityController = TextEditingController(
       text: _formatNumber(widget.transaction.quantity),
     );
@@ -295,11 +321,18 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
     final price = _isEurCurrency ? 1.0 : parseDecimal(_priceController.text);
     final currency = _txnCurrency;
     final fxRateToEur = _txnFxRateToEur;
+    // Un objet "Autres" peut avoir été reçu en cadeau (prix d'achat 0) —
+    // voir `position_detail_dialog.dart`'s équivalent pour le raisonnement
+    // complet.
+    final effectiveClass = widget.investment.assetClass ?? widget.account.assetClass;
+    final invalidPrice =
+        price == null ||
+        price < 0 ||
+        (price == 0 && effectiveClass != AssetClass.autres);
     if (date == null ||
         quantity == null ||
         quantity <= 0 ||
-        price == null ||
-        price <= 0 ||
+        invalidPrice ||
         fxRateToEur == null ||
         fxRateToEur <= 0) {
       return;
@@ -312,6 +345,7 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
       unitPrice: price,
       currency: currency,
       fxRateToEur: fxRateToEur,
+      manualUnlockDate: _unlockDateOverride,
     );
     // Repart de `_investment` (pas `widget.investment`) : un document ajouté
     // ou supprimé pendant cette édition (voir `_addDocument`/
@@ -407,6 +441,10 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
                     priceCurrencyController: _priceCurrencyController,
                     onIsBuyChanged: (v) => setState(() => _isBuy = v),
                     onDateChanged: (d) => setState(() => _date = d),
+                    unlockDate: _unlockDate,
+                    onUnlockDateChanged: _unlockDateApplicable
+                        ? (d) => setState(() => _unlockDateOverride = d)
+                        : null,
                     onCreate: _commit,
                     onCancel: () => Navigator.of(context).pop(),
                     submitLabel: 'Enregistrer',

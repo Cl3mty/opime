@@ -49,18 +49,23 @@ class InvestmentIdentityFields extends StatelessWidget {
     return Row(
       children: [
         Expanded(
+          child: TextField(
+            controller: labelController,
+            placeholder: const shadcn.Text('Libellé (ex: TotalEnergies)'),
+            // Le libellé d'abord, l'identifiant ensuite : on connaît
+            // généralement le nom d'un titre avant son ISIN, plus intuitif à
+            // saisir dans cet ordre.
+            autofocus: true,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
           child: InvestmentIdentifierField(
             assetClass: assetClass,
             accountEnvelope: accountEnvelope,
             isinController: isinController,
             labelController: labelController,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: TextField(
-            controller: labelController,
-            placeholder: const shadcn.Text('Libellé (ex: TotalEnergies)'),
+            autofocus: false,
           ),
         ),
       ],
@@ -116,20 +121,21 @@ class InvestmentEditForm extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: InvestmentIdentifierField(
-                      assetClass: assetClass,
-                      accountEnvelope: accountEnvelope,
-                      isinController: isinController,
-                      labelController: labelController,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
                     child: TextField(
                       controller: labelController,
                       placeholder: const shadcn.Text(
                         'Libellé (ex: TotalEnergies)',
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: InvestmentIdentifierField(
+                      assetClass: assetClass,
+                      accountEnvelope: accountEnvelope,
+                      isinController: isinController,
+                      labelController: labelController,
+                      autofocus: false,
                     ),
                   ),
                 ],

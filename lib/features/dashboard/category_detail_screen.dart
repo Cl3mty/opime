@@ -8,6 +8,7 @@ import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/performance_amount.dart';
+import '../investments/autres_photo_repository.dart';
 import '../investments/bank_logo_avatar.dart';
 import '../investments/bank_logo_repository.dart';
 import '../investments/investments_models.dart';
@@ -55,6 +56,19 @@ class CategoryDetailScreen extends StatefulWidget {
   /// `real_patrimoine_adapter.dart`.
   final List<PatrimoineAccount>? distributionByAccount;
 
+  /// Regroupement par investissement réel (une ligne par ISIN, fusionnée
+  /// entre tous les comptes qui le détiennent — voir
+  /// `real_patrimoine_adapter.dart`'s `buildRealCategoriesByInvestment`),
+  /// pour la bascule "Par compte / Par investissement" du tableau des
+  /// comptes (voir [_AccountsCard]) : un même titre détenu dans plusieurs
+  /// comptes (PEA et CTO, par exemple) n'y forme plus qu'une seule ligne à
+  /// PRU/quantité/valeur fusionnés, au lieu d'une ligne par compte. `null`
+  /// masque la bascule et garde le tableau tel quel (comportement par
+  /// défaut, celui de [distributionByAccount] seul) — utilisé uniquement
+  /// pour "Actions & Fonds" (voir `RealCategoryDetailScreen`), où détenir le
+  /// même titre dans plusieurs comptes est un cas réel à fusionner.
+  final List<PatrimoineAccount>? distributionByInvestment;
+
   /// Historique individuel de chaque ligne de [category.accounts] (clé :
   /// [PatrimoineAccount.id]) pour une période donnée, toutes sur une même
   /// grille de dates — `null` (comportement par défaut) utilise
@@ -97,15 +111,18 @@ class CategoryDetailScreen extends StatefulWidget {
   final ValueChanged<PatrimoineAccount>? onAccountEdit;
   final Future<void> Function(PatrimoineAccount)? onAccountDelete;
 
-  /// Remplace le menu "⋮" (Modifier/Supprimer) d'une ligne de *compte* par
-  /// un chevron ouvrant directement sa page dédiée — utilisé par
+  /// Remplace le menu "⋮" (Modifier/Supprimer) d'une ligne de *compte* : le
+  /// clic sur la ligne (nom compris) ouvre directement sa page dédiée au
+  /// lieu de (re)plier ses investissements — utilisé par
   /// `RealCategoryDetailScreen` pour toutes les classes d'actif sauf
   /// l'immobilier (voir `StockAccountScreen`, qui expose "Modifier"/
-  /// "Supprimer" dans son propre menu, rendant le raccourci "⋮" du tableau
-  /// redondant). Quand renseigné, masque aussi le chevron des lignes
-  /// d'investissement du second niveau de l'accordéon : cliquer une
-  /// position n'y ouvre plus une page mais une popup, un chevron y serait
-  /// trompeur. `null` (défaut) laisse le comportement "⋮" existant.
+  /// "Supprimer" dans son propre menu, rendant le "⋮" du tableau
+  /// redondant). Le dépli/repli reste possible via le chevron dédié en
+  /// tête de ligne, jamais via le reste de la ligne. Quand renseigné,
+  /// masque aussi le chevron des lignes d'investissement du second niveau
+  /// de l'accordéon : cliquer une position n'y ouvre plus une page mais
+  /// une popup, un chevron y serait trompeur. `null` (défaut) laisse le
+  /// comportement "⋮" existant, ligne inerte au clic hors chevron/menu.
   final ValueChanged<PatrimoineAccount>? onAccountOpen;
 
   /// `true` (défaut) déplie tous les accordéons (banque et compte) — voir
@@ -126,6 +143,7 @@ class CategoryDetailScreen extends StatefulWidget {
     this.onAccountTap,
     this.trailingSection,
     this.distributionByAccount,
+    this.distributionByInvestment,
     this.historyByLineIdForPeriod,
     this.historyForPeriod,
     this.showAvatar = true,
@@ -160,10 +178,24 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
   /// (vide tant que rien n'est importé, ou en cours de lecture).
   Map<String, String> _bankLogos = {};
 
+  /// Repository des photos d'objets "Autres" — `null` sans
+  /// [CategoryDetailScreen.vaultPath] renseigné, auquel cas aucune photo ne
+  /// peut être importée.
+  AutresPhotoRepository? get _photoRepo {
+    final vaultPath = widget.vaultPath;
+    return vaultPath == null ? null : AutresPhotoRepository(vaultPath);
+  }
+
+  /// Photos déjà importées, par id d'investissement → chemin absolu de
+  /// l'image (vide tant que rien n'est importé, ou en cours de lecture, ou
+  /// hors catégorie "Autres" — seule concernée).
+  Map<String, String> _autresPhotos = {};
+
   @override
   void initState() {
     super.initState();
     _loadBankLogos();
+    _loadAutresPhotos();
   }
 
   @override
@@ -173,6 +205,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     // peut faire apparaître de nouvelles banques : on relit les logos.
     if (oldWidget.distributionByAccount != widget.distributionByAccount) {
       _loadBankLogos();
+      _loadAutresPhotos();
     }
   }
 
@@ -202,6 +235,62 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     final path = await repo.importLogo(bankName, bytes, sourceName: file.name);
     if (path == null || !mounted) return;
     setState(() => _bankLogos = {..._bankLogos, bankName: path});
+  }
+
+  /// Tous les id d'investissement individuel apparaissant sur cette page,
+  /// tous modes d'affichage confondus — une ligne de [widget.category.accounts]
+  /// (vue "par actif") est déjà un investissement quand elle n'a pas de
+  /// sous-investissements ; une ligne de [widget.distributionByAccount] (vue
+  /// "par compte") ne l'est que via ses [PatrimoineAccount.investments].
+  Set<String> _autresInvestmentIds() {
+    final ids = <String>{};
+    void collect(PatrimoineAccount a) {
+      if (a.investments.isEmpty) {
+        if (a.id != null) ids.add(a.id!);
+      } else {
+        for (final investment in a.investments) {
+          if (investment.id != null) ids.add(investment.id!);
+        }
+      }
+    }
+
+    for (final a in widget.category.accounts) {
+      collect(a);
+    }
+    for (final a in widget.distributionByAccount ?? const []) {
+      collect(a);
+    }
+    return ids;
+  }
+
+  Future<void> _loadAutresPhotos() async {
+    final repo = _photoRepo;
+    if (repo == null || widget.category.id != AssetClass.autres.categoryId) {
+      return;
+    }
+    final photos = <String, String>{};
+    for (final id in _autresInvestmentIds()) {
+      final path = await repo.photoPathFor(id);
+      if (path != null) photos[id] = path;
+    }
+    if (!mounted) return;
+    setState(() => _autresPhotos = photos);
+  }
+
+  /// L'avatar d'un objet "Autres" est cliquable : l'utilisateur choisit une
+  /// image sur son disque, copiée dans le vault (voir
+  /// `AutresPhotoRepository`) — même geste que [_importBankLogo].
+  Future<void> _importAutresPhoto(PatrimoineAccount investment) async {
+    final repo = _photoRepo;
+    final id = investment.id;
+    if (repo == null || id == null) return;
+    final result = await FilePicker.pickFiles(withData: true);
+    final file = result?.files.singleOrNull;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null) return;
+    final path = await repo.importPhoto(id, bytes, sourceName: file.name);
+    if (path == null || !mounted) return;
+    setState(() => _autresPhotos = {..._autresPhotos, id: path});
   }
 
   @override
@@ -338,6 +427,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
               _AccountsCard(
                 category: category,
                 byAccount: widget.distributionByAccount,
+                byInvestment: widget.distributionByInvestment,
                 hidden: hidden,
                 onAccountTap: widget.onAccountTap,
                 showAvatar: widget.showAvatar,
@@ -348,6 +438,10 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 defaultExpanded: widget.defaultExpanded,
                 bankLogos: _bankLogos,
                 onImportLogo: widget.vaultPath == null ? null : _importBankLogo,
+                autresPhotos: _autresPhotos,
+                onImportPhoto: widget.vaultPath == null
+                    ? null
+                    : _importAutresPhoto,
               ),
               if (widget.trailingSection != null) ...[
                 const SizedBox(height: 24),
@@ -473,7 +567,9 @@ class _DistributionCardState extends State<_DistributionCard> {
       name: poches.first.name,
       valeur: valeur,
       plusValueAbs: plusValueAbs,
-      plusValuePercent: costBasis == 0 ? 0 : plusValueAbs / costBasis * 100,
+      // `null` (pas `0`) sans coût d'acquisition — voir
+      // `PatrimoineAccount.plusValuePercent`.
+      plusValuePercent: costBasis == 0 ? null : plusValueAbs / costBasis * 100,
     );
   }
 
@@ -659,9 +755,16 @@ class _DistributionCardState extends State<_DistributionCard> {
 /// individuels qui le composent ([PatrimoineAccount.investments], voir
 /// `real_patrimoine_adapter.dart`). Sans lui (Passifs), reste la liste
 /// plate de [PatrimoineCategory.accounts] d'origine.
+/// Regroupement affiché par [_AccountsCard] — voir
+/// [CategoryDetailScreen.distributionByInvestment].
+enum _AccountsGroupingMode { parCompte, parInvestissement }
+
 class _AccountsCard extends StatefulWidget {
   final PatrimoineCategory category;
   final List<PatrimoineAccount>? byAccount;
+
+  /// Voir [CategoryDetailScreen.distributionByInvestment].
+  final List<PatrimoineAccount>? byInvestment;
   final bool hidden;
   final ValueChanged<PatrimoineAccount>? onAccountTap;
   final bool showAvatar;
@@ -683,9 +786,20 @@ class _AccountsCard extends StatefulWidget {
   /// `_BankAccordionTile`), `null` quand aucun vault n'est disponible.
   final ValueChanged<String>? onImportLogo;
 
+  /// Photos d'objets "Autres" importées par id d'investissement → chemin
+  /// absolu de l'image — voir `_CategoryDetailScreenState._autresPhotos`.
+  /// Vide (donc sans effet) pour toute catégorie autre qu'"Autres".
+  final Map<String, String> autresPhotos;
+
+  /// Importe/remplace la photo d'un objet "Autres" (avatar cliquable d'une
+  /// ligne d'investissement individuel), `null` quand aucun vault n'est
+  /// disponible.
+  final ValueChanged<PatrimoineAccount>? onImportPhoto;
+
   const _AccountsCard({
     required this.category,
     this.byAccount,
+    this.byInvestment,
     required this.hidden,
     this.onAccountTap,
     required this.showAvatar,
@@ -696,6 +810,8 @@ class _AccountsCard extends StatefulWidget {
     this.defaultExpanded = false,
     this.bankLogos = const {},
     this.onImportLogo,
+    this.autresPhotos = const {},
+    this.onImportPhoto,
   });
 
   @override
@@ -703,6 +819,11 @@ class _AccountsCard extends StatefulWidget {
 }
 
 class _AccountsCardState extends State<_AccountsCard> {
+  /// Regroupement affiché — n'a d'effet que quand [_AccountsCard.byInvestment]
+  /// est renseigné (voir [CategoryDetailScreen.distributionByInvestment]),
+  /// sinon la bascule elle-même reste masquée et ce champ n'est jamais lu.
+  _AccountsGroupingMode _groupingMode = _AccountsGroupingMode.parCompte;
+
   /// Accordéons dont l'état diffère du défaut ([_AccountsCard.defaultExpanded])
   /// — un clic bascule l'état d'un id dedans ou hors de cet ensemble plutôt
   /// que de suivre directement "replié"/"déplié", pour permettre un défaut
@@ -756,6 +877,8 @@ class _AccountsCardState extends State<_AccountsCard> {
             onEdit: widget.onAccountEdit,
             onDelete: widget.onAccountDelete,
             onAccountOpen: widget.onAccountOpen,
+            autresPhotos: widget.autresPhotos,
+            onImportPhoto: widget.onImportPhoto,
           ),
         );
         continue;
@@ -781,6 +904,8 @@ class _AccountsCardState extends State<_AccountsCard> {
             onEdit: widget.onAccountEdit,
             onDelete: widget.onAccountDelete,
             onAccountOpen: widget.onAccountOpen,
+            autresPhotos: widget.autresPhotos,
+            onImportPhoto: widget.onImportPhoto,
           ),
         );
       }
@@ -802,9 +927,56 @@ class _AccountsCardState extends State<_AccountsCard> {
     return tiles;
   }
 
+  /// La vue "Par investissement" (voir
+  /// [CategoryDetailScreen.distributionByInvestment]) : une ligne à plat par
+  /// ISIN — pas de niveau banque, un même titre pouvant être détenu dans des
+  /// banques différentes. Une ligne détenue dans un seul compte se comporte
+  /// comme aujourd'hui (clic direct sur la position, pas de chevron) ; une
+  /// ligne fusionnée entre plusieurs comptes (voir
+  /// `real_patrimoine_adapter.dart`'s `_buildMergedInvestmentLeaf`, qui
+  /// alimente [PatrimoineAccount.investments] dans ce cas) reste inerte au
+  /// clic sur son titre — ambigu, quel compte ouvrir ? — et ne se déplie
+  /// que via son chevron dédié, révélant une ligne par compte porteur,
+  /// chacune cliquable individuellement.
+  List<Widget> _buildInvestmentAccordions(
+    List<PatrimoineAccount> byInvestment,
+    bool showPru,
+    bool showQuantityCours,
+  ) {
+    final theme = Theme.of(context);
+    final quantityAssetClass = assetClassForCategoryId(widget.category.id);
+    final tiles = <Widget>[];
+    for (final leaf in byInvestment) {
+      final merged = leaf.investments.isNotEmpty;
+      tiles.add(Container(height: 1, color: theme.colorScheme.border));
+      tiles.add(
+        _AccountAccordionTile(
+          account: leaf,
+          hidden: widget.hidden,
+          showAvatar: widget.showAvatar,
+          showPru: showPru,
+          showQuantityCours: showQuantityCours,
+          quantityAssetClass: quantityAssetClass,
+          expanded: _isExpanded(leaf.id ?? leaf.name),
+          onToggleExpand: () => _toggleExpanded(leaf.id ?? leaf.name),
+          onInvestmentTap: widget.onAccountTap,
+          // Une ligne fusionnée n'a pas de compte unique à ouvrir : son
+          // titre reste inerte (comme une ligne banque sans page propre),
+          // seul son chevron la déplie. Une ligne à compte unique garde le
+          // comportement direct habituel.
+          onAccountOpen: merged ? null : widget.onAccountTap,
+          autresPhotos: widget.autresPhotos,
+          onImportPhoto: widget.onImportPhoto,
+        ),
+      );
+    }
+    return tiles;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final byInvestment = widget.byInvestment;
     final byAccount = widget.byAccount;
     final showPru = widget.category.showsPruColumn;
     final showQuantityCours = widget.category.showsQuantityColumn;
@@ -814,7 +986,60 @@ class _AccountsCardState extends State<_AccountsCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            shadcn.Text(widget.title).semiBold().large(),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final title = shadcn.Text(widget.title).semiBold().large();
+                if (byInvestment == null) return title;
+                final toggle = ButtonGroup(
+                  children: [
+                    SelectedButton(
+                      value: _groupingMode == _AccountsGroupingMode.parCompte,
+                      selectedStyle: const ButtonStyle.primary(
+                        size: _toggleButtonSize,
+                      ),
+                      style: toggleUnselectedStyle(
+                        context,
+                        size: _toggleButtonSize,
+                      ),
+                      onChanged: (_) => setState(
+                        () => _groupingMode = _AccountsGroupingMode.parCompte,
+                      ),
+                      child: shadcn.Text(
+                        'Par compte',
+                        style: const TextStyle(fontSize: _toggleFontSize),
+                      ),
+                    ),
+                    SelectedButton(
+                      value:
+                          _groupingMode ==
+                          _AccountsGroupingMode.parInvestissement,
+                      selectedStyle: const ButtonStyle.primary(
+                        size: _toggleButtonSize,
+                      ),
+                      style: toggleUnselectedStyle(
+                        context,
+                        size: _toggleButtonSize,
+                      ),
+                      onChanged: (_) => setState(
+                        () => _groupingMode =
+                            _AccountsGroupingMode.parInvestissement,
+                      ),
+                      child: shadcn.Text(
+                        'Par investissement',
+                        style: const TextStyle(fontSize: _toggleFontSize),
+                      ),
+                    ),
+                  ],
+                );
+                if (constraints.maxWidth < 480) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [title, const SizedBox(height: 10), toggle],
+                  );
+                }
+                return Row(children: [title, const Spacer(), toggle]);
+              },
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -829,7 +1054,14 @@ class _AccountsCardState extends State<_AccountsCard> {
                 const SizedBox(width: _actionsWidth),
               ],
             ),
-            if (byAccount != null) ...[
+            if (byInvestment != null &&
+                _groupingMode == _AccountsGroupingMode.parInvestissement) ...[
+              ..._buildInvestmentAccordions(
+                byInvestment,
+                showPru,
+                showQuantityCours,
+              ),
+            ] else if (byAccount != null) ...[
               ..._buildAccountAccordions(byAccount, showPru, showQuantityCours),
             ] else
               for (final account in widget.category.accounts) ...[
@@ -846,6 +1078,12 @@ class _AccountsCardState extends State<_AccountsCard> {
                   onTap: widget.onAccountTap == null
                       ? null
                       : () => widget.onAccountTap!(account),
+                  avatarPhotoPath: account.id == null
+                      ? null
+                      : widget.autresPhotos[account.id],
+                  onAvatarTap: widget.onImportPhoto == null
+                      ? null
+                      : () => widget.onImportPhoto!(account),
                 ),
               ],
           ],
@@ -855,10 +1093,11 @@ class _AccountsCardState extends State<_AccountsCard> {
   }
 }
 
-/// Ligne de compte dépliable de l'accordéon : clic sur la ligne (pas de
-/// navigation à ce niveau) pour révéler ses investissements en dessous,
-/// chacun cliquable via [onInvestmentTap] comme le reste des lignes de ce
-/// tableau.
+/// Ligne de compte dépliable de l'accordéon : le chevron dédié en tête de
+/// ligne révèle ses investissements en dessous (voir [onToggleExpand]),
+/// tandis que le reste de la ligne (nom compris) ouvre la page du compte
+/// (voir [onAccountOpen]) — chaque investissement révélé est lui-même
+/// cliquable via [onInvestmentTap] comme le reste des lignes de ce tableau.
 class _AccountAccordionTile extends StatelessWidget {
   final PatrimoineAccount account;
   final bool hidden;
@@ -889,6 +1128,14 @@ class _AccountAccordionTile extends StatelessWidget {
   /// formater la quantité (entière pour les métaux précieux).
   final AssetClass? quantityAssetClass;
 
+  /// Photos d'objets "Autres" par id d'investissement — voir
+  /// `_AccountsCard.autresPhotos`, propagée uniquement aux lignes
+  /// d'investissement (second niveau), jamais à la ligne de compte elle-même.
+  final Map<String, String> autresPhotos;
+
+  /// Voir `_AccountsCard.onImportPhoto`.
+  final ValueChanged<PatrimoineAccount>? onImportPhoto;
+
   const _AccountAccordionTile({
     required this.account,
     required this.hidden,
@@ -902,6 +1149,8 @@ class _AccountAccordionTile extends StatelessWidget {
     this.showPru = false,
     this.showQuantityCours = true,
     this.quantityAssetClass,
+    this.autresPhotos = const {},
+    this.onImportPhoto,
   });
 
   @override
@@ -913,9 +1162,16 @@ class _AccountAccordionTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         MouseRegion(
-          cursor: hasChildren ? SystemMouseCursors.click : MouseCursor.defer,
+          cursor: onAccountOpen != null
+              ? SystemMouseCursors.click
+              : MouseCursor.defer,
           child: GestureDetector(
-            onTap: hasChildren ? onToggleExpand : null,
+            // Cliquer la ligne (hors chevron/menu, voir plus bas) ouvre la
+            // page du compte — le dépli/repli des investissements en
+            // dessous ne se fait plus que via le chevron dédié. Sans page à
+            // ouvrir (immobilier, voir [CategoryDetailScreen.onAccountOpen]),
+            // la ligne reste inerte au clic, comme une ligne de banque.
+            onTap: onAccountOpen == null ? null : () => onAccountOpen!(account),
             child: _AccountLine(
               account: account,
               hidden: hidden,
@@ -923,26 +1179,24 @@ class _AccountAccordionTile extends StatelessWidget {
               showQuantityCours: showQuantityCours,
               quantityAssetClass: quantityAssetClass,
               leading: hasChildren
-                  ? SizedBox(
-                      width: 28,
-                      child: Center(
-                        child: AnimatedRotation(
-                          turns: expanded ? 0.25 : 0,
-                          duration: const Duration(milliseconds: 150),
-                          child: Icon(
-                            LucideIcons.chevronRight,
-                            size: 16,
-                            color: theme.colorScheme.mutedForeground,
-                          ),
+                  ? IconButton.ghost(
+                      icon: AnimatedRotation(
+                        turns: expanded ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: Icon(
+                          LucideIcons.chevronRight,
+                          size: 16,
+                          color: theme.colorScheme.mutedForeground,
                         ),
                       ),
+                      onPressed: onToggleExpand,
                     )
                   : const SizedBox(width: 28),
+              // Un chevron de navigation ferait double emploi avec le clic
+              // sur la ligne elle-même désormais — seul le menu "⋮" (compte
+              // sans page dédiée) garde sa place ici.
               trailing: onAccountOpen != null
-                  ? _OpenAccountChevron(
-                      account: account,
-                      onOpen: onAccountOpen!,
-                    )
+                  ? null
                   : _AccountActionsMenu(
                       account: account,
                       onEdit: onEdit,
@@ -975,6 +1229,12 @@ class _AccountAccordionTile extends StatelessWidget {
                             onTap: onInvestmentTap == null
                                 ? null
                                 : () => onInvestmentTap!(investment),
+                            avatarPhotoPath: investment.id == null
+                                ? null
+                                : autresPhotos[investment.id],
+                            onAvatarTap: onImportPhoto == null
+                                ? null
+                                : () => onImportPhoto!(investment),
                           ),
                       ],
                     ),
@@ -988,9 +1248,10 @@ class _AccountAccordionTile extends StatelessWidget {
 
 /// Accordéon d'une banque : l'avatar (logo importé ou initiales, cliquable
 /// pour importer/remplacer l'image) + le nom de la banque et la somme de ses
-/// comptes, dépliable pour révéler ces comptes — eux-mêmes des accordéons
-/// vers leurs investissements (voir [_AccountAccordionTile], passé dans
-/// [children]).
+/// comptes, dépliable — via le chevron dédié en tête de ligne uniquement,
+/// une banque n'ayant pas de page propre à ouvrir — pour révéler ces
+/// comptes, eux-mêmes des accordéons vers leurs investissements (voir
+/// [_AccountAccordionTile], passé dans [children]).
 class _BankAccordionTile extends StatelessWidget {
   final String bankName;
   final List<PatrimoineAccount> accounts;
@@ -1036,84 +1297,78 @@ class _BankAccordionTile extends StatelessWidget {
     final total = accounts.fold(0.0, (sum, a) => sum + a.valeur);
     final plusValueAbs = accounts.fold(0.0, (sum, a) => sum + a.plusValueAbs);
     final costBasis = total - plusValueAbs;
-    final percent = costBasis == 0 ? 0.0 : plusValueAbs / costBasis * 100;
+    // `null` (pas `0`) sans coût d'acquisition — voir
+    // `PatrimoineAccount.plusValuePercent`.
+    final percent = costBasis == 0 ? null : plusValueAbs / costBasis * 100;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: onToggleExpand,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  // Le chevron d'expansion occupe la même case que l'avatar
-                  // des lignes de compte, la banque étant décalée d'un
-                  // niveau d'imbrication.
-                  SizedBox(
-                    width: 28,
-                    child: Center(
-                      child: AnimatedRotation(
-                        turns: expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 150),
-                        child: Icon(
-                          LucideIcons.chevronRight,
-                          size: 16,
-                          color: theme.colorScheme.mutedForeground,
-                        ),
-                      ),
-                    ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              // Seul déclencheur du dépli/repli (voir la doc de classe) —
+              // une banque n'a pas de page propre à ouvrir, le reste de la
+              // ligne (nom, avatar mis à part) n'a donc aucune action au clic.
+              IconButton.ghost(
+                icon: AnimatedRotation(
+                  turns: expanded ? 0.25 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: Icon(
+                    LucideIcons.chevronRight,
+                    size: 16,
+                    color: theme.colorScheme.mutedForeground,
                   ),
-                  BankLogoAvatar(
-                    bankName: bankName,
-                    logoPath: logoPath,
-                    onTap: onImportLogo == null
-                        ? null
-                        : () => onImportLogo!(bankName),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        shadcn.Text(bankName).medium().small(),
-                        shadcn.Text(
-                          accounts.length == 1
-                              ? '1 compte'
-                              : '${accounts.length} comptes',
-                        ).muted().xSmall(),
-                      ],
-                    ),
-                  ),
-                  // Cases Quantité/PRU/Cours : une banque n'a pas de sens à
-                  // l'unité, on n'affiche que Valeur et Évolution.
-                  if (showQuantityCours) ...[
-                    const SizedBox(width: _colWidth),
-                    if (showPru) const SizedBox(width: _colWidth),
-                    const SizedBox(width: _colWidth),
-                  ],
-                  SizedBox(
-                    width: _colWidth,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: shadcn.Text(displayEuros(total, hidden)).small(),
-                    ),
-                  ),
-                  SizedBox(
-                    width: _colWidth,
-                    child: PerformanceAmount(
-                      euros: plusValueAbs,
-                      percent: percent,
-                      hidden: hidden,
-                    ),
-                  ),
-                  const SizedBox(width: _actionsWidth),
-                ],
+                ),
+                onPressed: onToggleExpand,
               ),
-            ),
+              BankLogoAvatar(
+                bankName: bankName,
+                logoPath: logoPath,
+                onTap: onImportLogo == null
+                    ? null
+                    : () => onImportLogo!(bankName),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    shadcn.Text(bankName).medium().small(),
+                    shadcn.Text(
+                      accounts.length == 1
+                          ? '1 compte'
+                          : '${accounts.length} comptes',
+                    ).muted().xSmall(),
+                  ],
+                ),
+              ),
+              // Cases Quantité/PRU/Cours : une banque n'a pas de sens à
+              // l'unité, on n'affiche que Valeur et Évolution.
+              if (showQuantityCours) ...[
+                const SizedBox(width: _colWidth),
+                if (showPru) const SizedBox(width: _colWidth),
+                const SizedBox(width: _colWidth),
+              ],
+              SizedBox(
+                width: _colWidth,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: shadcn.Text(displayEuros(total, hidden)).small(),
+                ),
+              ),
+              SizedBox(
+                width: _colWidth,
+                child: PerformanceAmount(
+                  euros: plusValueAbs,
+                  percent: percent,
+                  hidden: hidden,
+                ),
+              ),
+              const SizedBox(width: _actionsWidth),
+            ],
           ),
         ),
         AnimatedSize(
@@ -1167,13 +1422,28 @@ class _HeaderCell extends StatelessWidget {
 class _AccountAvatar extends StatelessWidget {
   final PatrimoineAccount account;
 
-  const _AccountAvatar({required this.account});
+  /// Photo d'un objet "Autres" importée par l'utilisateur (voir
+  /// `AutresPhotoRepository`), prioritaire sur [PatrimoineAccount
+  /// .avatarImagePath] — cette dernière ne concerne que les métaux précieux
+  /// physiques, qui n'ont jamais aussi de photo personnalisée.
+  final String? overridePhotoPath;
+
+  /// Rend l'avatar cliquable pour importer/remplacer [overridePhotoPath] —
+  /// `null` (défaut) le laisse non cliquable.
+  final VoidCallback? onTap;
+
+  const _AccountAvatar({
+    required this.account,
+    this.overridePhotoPath,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final imagePath = account.avatarImagePath;
+    final imagePath = overridePhotoPath ?? account.avatarImagePath;
+    final Widget avatar;
     if (imagePath != null) {
-      return ClipRRect(
+      avatar = ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: Image.file(
           File(imagePath),
@@ -1183,8 +1453,14 @@ class _AccountAvatar extends StatelessWidget {
           errorBuilder: (_, _, _) => _initials(),
         ),
       );
+    } else {
+      avatar = _initials();
     }
-    return _initials();
+    if (onTap == null) return avatar;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(onTap: onTap, child: avatar),
+    );
   }
 
   Widget _initials() =>
@@ -1230,6 +1506,16 @@ class _AccountLine extends StatelessWidget {
   /// popup, pas une page, le chevron y serait trompeur.
   final bool showChevron;
 
+  /// Photo d'un objet "Autres" importée par l'utilisateur, remplaçant les
+  /// initiales de l'avatar par défaut — voir `AutresPhotoAvatar`. `null`
+  /// (défaut) pour toute ligne qui n'a pas de photo, ou hors catégorie
+  /// "Autres".
+  final String? avatarPhotoPath;
+
+  /// Rend l'avatar cliquable pour importer/remplacer cette photo — `null`
+  /// (défaut) le laisse non cliquable, comme pour toute autre catégorie.
+  final VoidCallback? onAvatarTap;
+
   const _AccountLine({
     required this.account,
     required this.hidden,
@@ -1241,6 +1527,8 @@ class _AccountLine extends StatelessWidget {
     this.showQuantityCours = true,
     this.quantityAssetClass,
     this.showChevron = true,
+    this.avatarPhotoPath,
+    this.onAvatarTap,
   });
 
   @override
@@ -1252,7 +1540,12 @@ class _AccountLine extends StatelessWidget {
       child: Row(
         children: [
           if (showAvatar)
-            leading ?? _AccountAvatar(account: account)
+            leading ??
+                _AccountAvatar(
+                  account: account,
+                  overridePhotoPath: avatarPhotoPath,
+                  onTap: onAvatarTap,
+                )
           else
             const SizedBox(width: 28),
           const SizedBox(width: 10),
@@ -1317,8 +1610,7 @@ class _AccountLine extends StatelessWidget {
               width: _colWidth,
               child: Align(
                 alignment: Alignment.centerRight,
-                child:
-                    account.priceUnavailable == true && account.cours == null
+                child: account.priceUnavailable == true && account.cours == null
                     // Un cours a été cherché et n'a pas été trouvé : on le
                     // signale plutôt que de ne laisser qu'un « — » silencieux
                     // (voir [PatrimoineAccount.priceUnavailable]).
@@ -1415,32 +1707,6 @@ class _CoursCell extends StatelessWidget {
         ),
       ),
       child: content,
-    );
-  }
-}
-
-/// Chevron cliquable en bout de ligne de compte — voir
-/// [CategoryDetailScreen.onAccountOpen]. Remplace [_AccountActionsMenu]
-/// pour les classes d'actif dont la page compte expose déjà son propre
-/// menu "Modifier"/"Supprimer" (Actions & Fonds, voir `StockAccountScreen`).
-class _OpenAccountChevron extends StatelessWidget {
-  final PatrimoineAccount account;
-  final ValueChanged<PatrimoineAccount> onOpen;
-
-  const _OpenAccountChevron({required this.account, required this.onOpen});
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () => onOpen(account),
-        child: Icon(
-          LucideIcons.chevronRight,
-          size: 18,
-          color: Theme.of(context).colorScheme.mutedForeground,
-        ),
-      ),
     );
   }
 }

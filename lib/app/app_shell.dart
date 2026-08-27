@@ -16,6 +16,7 @@ import '../features/navigation/navigation_scope.dart';
 import '../features/navigation/top_bar.dart';
 import '../features/navigation/top_bar_actions.dart';
 import '../features/dashboard/onboarding_highlight_controller.dart';
+import '../features/investments/current_account_focus_controller.dart';
 import '../features/investments/patrimoine_refresh_controller.dart';
 import '../features/investments/price_sync_status_controller.dart';
 import '../features/notifications/news_button.dart';
@@ -59,6 +60,7 @@ class AppShell extends StatefulWidget {
   final SidebarPrefsController sidebarPrefsController;
   final AmountVisibilityController amountVisibilityController;
   final PatrimoineRefreshController patrimoineRefreshController;
+  final CurrentAccountFocusController currentAccountFocusController;
   final OnboardingHighlightController onboardingHighlightController;
   final PriceSyncStatusController priceSyncStatusController;
   final AssistantConfigController assistantConfigController;
@@ -91,6 +93,7 @@ class AppShell extends StatefulWidget {
     required this.sidebarPrefsController,
     required this.amountVisibilityController,
     required this.patrimoineRefreshController,
+    required this.currentAccountFocusController,
     required this.onboardingHighlightController,
     required this.priceSyncStatusController,
     required this.assistantConfigController,
@@ -382,6 +385,8 @@ class _AppShellState extends State<AppShell> {
                         profileController: widget.profileController,
                         patrimoineRefreshController:
                             widget.patrimoineRefreshController,
+                        currentAccountFocus:
+                            widget.currentAccountFocusController,
                         onboardingHighlight:
                             widget.onboardingHighlightController,
                         priceSyncStatus: widget.priceSyncStatusController,
@@ -434,6 +439,7 @@ class _AppShellState extends State<AppShell> {
             AddMenuButton(
               profileController: widget.profileController,
               patrimoineRefreshController: widget.patrimoineRefreshController,
+              currentAccountFocus: widget.currentAccountFocusController,
               onboardingHighlight: widget.onboardingHighlightController,
               priceSyncStatus: widget.priceSyncStatusController,
               compact: true,

@@ -129,7 +129,8 @@ class _PositionLine extends StatelessWidget {
                         ],
                       ],
                     ),
-                    if (!investment.isCurrency)
+                    if (!investment.isCurrency &&
+                        !isGeneratedIdentifier(investment.isin))
                       shadcn.Text(investment.isin).muted().xSmall(),
                     if (crossClass)
                       shadcn.Text(

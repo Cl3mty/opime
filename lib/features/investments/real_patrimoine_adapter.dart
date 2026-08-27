@@ -313,7 +313,10 @@ PatrimoineAccount _buildAccountLeaf(
     bankName: account.bankName,
     valeur: valeur,
     plusValueAbs: plusValueAbs,
-    plusValuePercent: costBasis == 0 ? 0 : plusValueAbs / costBasis * 100,
+    // `null` (pas `0`) sans coût d'acquisition (ex : un objet "Autres" reçu
+    // en cadeau) — une plus-value relative à 0 € investi est infinie, pas
+    // nulle : voir `PatrimoineAccount.plusValuePercent`.
+    plusValuePercent: costBasis == 0 ? null : plusValueAbs / costBasis * 100,
     // Affiche le badge "Hors patrimoine global" sur la ligne compte quand
     // l'utilisateur a exclu le compte entier du patrimoine — [valeur]
     // ci-dessus reste la vraie somme, seul l'agrégat global du Dashboard
@@ -337,6 +340,142 @@ PatrimoineAccount _buildAccountLeaf(
     // dans une autre classe (cross-class) ne doit pas non plus être
     // supprimable depuis ici.
     canDelete: account.investments.every((i) => i.transactions.isEmpty),
+  );
+}
+
+/// Comme [buildRealCategoriesByAccount], mais chaque *investissement réel*
+/// (identifié par son ISIN) devient une ligne [PatrimoineAccount] fusionnée
+/// entre tous les comptes qui le détiennent — quantité/coût/valeur/plus-
+/// value sommés, PRU recalculé sur l'ensemble (moyenne pondérée par la
+/// quantité, la même formule que [Investment.pru] à l'échelle d'un seul
+/// investissement). Sert la bascule "Par compte / Par investissement" des
+/// comptes-titres (`category_detail_screen.dart`'s `_AccountsCard`) : un
+/// même titre détenu dans plusieurs comptes (PEA et CTO, par exemple) n'y
+/// forme plus qu'une seule ligne, le détail par compte restant disponible
+/// en dépliant son chevron (voir [_buildMergedInvestmentLeaf]) plutôt que
+/// dupliqué en plusieurs lignes à PRU différents.
+List<PatrimoineCategory> buildRealCategoriesByInvestment(
+  List<InvestmentAccount> accounts,
+  Map<String, List<PricePoint>> priceHistories,
+  String vaultPath,
+) {
+  final byClass = <AssetClass, List<(InvestmentAccount, Investment)>>{};
+  for (final account in accounts) {
+    for (final investment in account.investments) {
+      // Même filtre que [buildRealCategories] : une position entièrement
+      // soldée est un historique, pas une détention actuelle.
+      if (investment.quantityHeld <= 0) continue;
+      final effectiveClass = investment.assetClass ?? account.assetClass;
+      byClass.putIfAbsent(effectiveClass, () => []).add((account, investment));
+    }
+  }
+  return [
+    for (final entry in byClass.entries)
+      _buildCategoryByInvestment(entry.key, entry.value, vaultPath),
+  ];
+}
+
+PatrimoineCategory _buildCategoryByInvestment(
+  AssetClass assetClass,
+  List<(InvestmentAccount, Investment)> pairs,
+  String vaultPath,
+) {
+  final meta = _categoryMeta[assetClass]!;
+  final byIsin = <String, List<(InvestmentAccount, Investment)>>{};
+  for (final pair in pairs) {
+    byIsin.putIfAbsent(pair.$2.isin, () => []).add(pair);
+  }
+  final leaves = <PatrimoineAccount>[
+    for (final group in byIsin.values)
+      _buildMergedInvestmentLeaf(group, vaultPath),
+  ];
+  return PatrimoineCategory(
+    id: assetClass.categoryId,
+    label: assetClass.label,
+    icon: meta.$1,
+    color: meta.$2,
+    tier: meta.$3,
+    description: meta.$4,
+    accounts: leaves,
+  );
+}
+
+/// Une ligne pour [group], un même ISIN détenu dans un ou plusieurs comptes.
+/// Un seul compte : identique à [_buildLeaf] (rien à fusionner, le sous-
+/// titre affiche déjà le compte porteur). Plusieurs comptes : quantité/
+/// valeur/plus-value sommées et PRU recalculé en moyenne pondérée (coût
+/// total investi ÷ quantité totale détenue), avec le détail par compte
+/// porté par [PatrimoineAccount.investments] pour le second niveau de
+/// l'accordéon — [_AccountAccordionTile] de `category_detail_screen.dart`
+/// sait déjà déplier ce champ (utilisé jusqu'ici pour les investissements
+/// d'un compte, réutilisé tel quel ici pour les comptes d'un investissement).
+PatrimoineAccount _buildMergedInvestmentLeaf(
+  List<(InvestmentAccount, Investment)> group,
+  String vaultPath,
+) {
+  if (group.length == 1) {
+    final (account, investment) = group.single;
+    return _buildLeaf(
+      account,
+      investment,
+      vaultPath,
+      showAccountSubtitle: true,
+    );
+  }
+  final first = group.first.$2;
+  var quantite = 0.0;
+  var investedAmount = 0.0;
+  var valeur = 0.0;
+  var plusValueAbs = 0.0;
+  DateTime? lastPriceDate;
+  for (final (_, investment) in group) {
+    quantite += investment.quantityHeld;
+    investedAmount += investment.investedAmount;
+    valeur += investment.effectiveMarketValue ?? investment.investedAmount;
+    plusValueAbs += investment.unrealizedGain ?? 0;
+    final date = investment.lastPriceDate;
+    if (date != null &&
+        (lastPriceDate == null || date.isAfter(lastPriceDate))) {
+      lastPriceDate = date;
+    }
+  }
+  final costBasis = valeur - plusValueAbs;
+  // Le cours de marché est le même quel que soit le compte porteur (même
+  // titre réel) : on prend celui du premier investissement du groupe qui en
+  // connaît un, plutôt que d'en faire une moyenne qui n'aurait pas de sens
+  // pour un cours coté.
+  var priced = first;
+  for (final (_, investment) in group) {
+    if (investment.lastPrice != null) {
+      priced = investment;
+      break;
+    }
+  }
+  return PatrimoineAccount(
+    id: 'merged_${first.isin}',
+    name: first.label,
+    subtitle: '${group.length} comptes',
+    quantite: quantite == 0 ? null : quantite,
+    cours: _lastPriceToEur(priced),
+    valeur: valeur,
+    pru: quantite == 0 ? 0 : investedAmount / quantite,
+    priceUnavailable: priced.priceUnavailable,
+    lastPriceDate: lastPriceDate,
+    plusValueAbs: plusValueAbs,
+    // `null` (pas `0`) sans coût d'acquisition — voir
+    // `PatrimoineAccount.plusValuePercent`.
+    plusValuePercent: costBasis == 0 ? null : plusValueAbs / costBasis * 100,
+    isCurrency: isCurrencyInvestment(group.first.$1, first),
+    // Fusionnée uniquement si *toutes* les positions sources le sont : une
+    // fusion partiellement exclue continue de compter partiellement dans les
+    // agrégats réels, pas la peine d'induire en erreur avec un badge sur
+    // l'ensemble de la ligne — voir `Investment.excludedFromPatrimoine`.
+    excludedFromPatrimoine: group.every((p) => p.$2.excludedFromPatrimoine),
+    investments: [
+      for (final (account, investment) in group)
+        _buildLeaf(account, investment, vaultPath, showAccountSubtitle: true),
+    ],
+    canDelete: false,
   );
 }
 
@@ -433,7 +572,10 @@ PatrimoineAccount _buildLeaf(
     priceUnavailable: investment.priceUnavailable,
     lastPriceDate: investment.lastPriceDate,
     plusValueAbs: plusValueAbs,
-    plusValuePercent: costBasis == 0 ? 0 : plusValueAbs / costBasis * 100,
+    // `null` (pas `0`) sans coût d'acquisition (ex : un objet "Autres" reçu
+    // en cadeau) — une plus-value relative à 0 € investi est infinie, pas
+    // nulle : voir `PatrimoineAccount.plusValuePercent`.
+    plusValuePercent: costBasis == 0 ? null : plusValueAbs / costBasis * 100,
     // Métaux précieux : l'avatar affiche la photo du produit (pièce/lingot)
     // téléchargée localement quand elle existe — sauf ETC logé dans un CTO,
     // sans produit physique associé, où l'avatar affiche "ETC". Position en
@@ -757,12 +899,38 @@ double _valuationAt(
     final history = priceHistories[investment.isin] ?? const [];
     final priceAtDate = priceAt(history, date);
     if (priceAtDate != null) {
-      total += quantity * priceAtDate;
+      total +=
+          quantity * priceAtDate * _fxRateAt(investment, priceHistories, date);
     } else {
       total += _manualValuationAt(investment, quantity, date) ?? invested;
     }
   }
   return total;
+}
+
+/// Taux de change (1 [Investment.quoteCurrency] = X €) à appliquer à un
+/// cours coté en devise étrangère pour l'exprimer en euros, à [date] —
+/// cherché dans le même historique synchronisé que le cours du titre
+/// (`price_refresh_service.dart` met en cache la paire `<devise>EUR=X` sous
+/// ce même nom dans [priceHistories]) plutôt que de se limiter à
+/// [Investment.lastFxRateToEur] (le taux du jour), pour que les points
+/// passés de la courbe reflètent le taux de change de l'époque plutôt que
+/// celui d'aujourd'hui. `1.0` pour un titre coté en euros (rien à
+/// convertir) — sans quoi un titre en devise (ex : AAPL en USD) était
+/// valorisé comme si son cours brut était déjà en euros, faisant décrocher
+/// la courbe de la vraie valeur actuelle du compte.
+double _fxRateAt(
+  Investment investment,
+  Map<String, List<PricePoint>> priceHistories,
+  DateTime date,
+) {
+  final quoteCurrency = investment.quoteCurrency;
+  if (quoteCurrency == null || quoteCurrency.toUpperCase() == 'EUR') {
+    return 1.0;
+  }
+  final pair = '${quoteCurrency.toUpperCase()}EUR=X';
+  final rateAtDate = priceAt(priceHistories[pair] ?? const [], date);
+  return rateAtDate ?? investment.lastFxRateToEur ?? 1.0;
 }
 
 /// Valorisation manuelle d'un investissement sans cours de marché (voir
@@ -772,7 +940,11 @@ double _valuationAt(
 /// avant que l'utilisateur n'ait renseigné une estimation (voir
 /// [Investment.manualPriceAt]/[Investment.estimatedValueAt]), auquel cas
 /// [_valuationAt] retombe sur le montant investi comme avant cette date.
-double? _manualValuationAt(Investment investment, double quantity, DateTime date) {
+double? _manualValuationAt(
+  Investment investment,
+  double quantity,
+  DateTime date,
+) {
   final manualPrice = investment.manualPrice;
   final manualPriceAt = investment.manualPriceAt;
   if (manualPrice != null &&

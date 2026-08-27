@@ -104,6 +104,87 @@ void main() {
     },
   );
 
+  group('isinOptionalFor (fonds PEE/PEG/PER sans ISIN public)', () {
+    test('immobilier et "Autres" : toujours facultatif, sans enveloppe', () {
+      expect(isinOptionalFor(AssetClass.immobilier), isTrue);
+      expect(isinOptionalFor(AssetClass.autres), isTrue);
+    });
+
+    test(
+      'Actions & Fonds en PEE/PEG/PER : facultatif (fonds interne à '
+      'l\'entreprise ou au contrat, souvent sans ISIN public)',
+      () {
+        expect(
+          isinOptionalFor(
+            AssetClass.actionsEtFonds,
+            accountEnvelope: AccountEnvelope.peg,
+          ),
+          isTrue,
+        );
+        expect(
+          isinOptionalFor(
+            AssetClass.actionsEtFonds,
+            accountEnvelope: AccountEnvelope.pee,
+          ),
+          isTrue,
+        );
+        expect(
+          isinOptionalFor(
+            AssetClass.actionsEtFonds,
+            accountEnvelope: AccountEnvelope.per,
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'Actions & Fonds hors PEE/PEG/PER (CTO, PEA...) : ISIN toujours requis',
+      () {
+        expect(
+          isinOptionalFor(
+            AssetClass.actionsEtFonds,
+            accountEnvelope: AccountEnvelope.cto,
+          ),
+          isFalse,
+        );
+        expect(
+          isinOptionalFor(
+            AssetClass.actionsEtFonds,
+            accountEnvelope: AccountEnvelope.pea,
+          ),
+          isFalse,
+        );
+        expect(isinOptionalFor(AssetClass.actionsEtFonds), isFalse);
+      },
+    );
+
+    test('autres classes : ISIN toujours requis', () {
+      expect(isinOptionalFor(AssetClass.crypto), isFalse);
+      expect(isinOptionalFor(AssetClass.metauxPrecieux), isFalse);
+      expect(isinOptionalFor(AssetClass.privateEquity), isFalse);
+    });
+  });
+
+  group('isGeneratedIdentifier (identifiant auto-généré, rien à afficher)', () {
+    test('reconnaît les trois préfixes générés à la création', () {
+      expect(isGeneratedIdentifier('immobilier-abc123'), isTrue);
+      expect(isGeneratedIdentifier('autre-abc123'), isTrue);
+      expect(isGeneratedIdentifier('fcpe-abc123'), isTrue);
+    });
+
+    test('un vrai ISIN, ticker ou référence saisie n\'est pas confondu', () {
+      expect(isGeneratedIdentifier('FR0000131104'), isFalse);
+      expect(isGeneratedIdentifier('US0378331005'), isFalse);
+      expect(isGeneratedIdentifier('BTC'), isFalse);
+      // Une référence saisie à la main qui contiendrait ces mots ne doit
+      // matcher que si elle commence bien par le préfixe technique complet
+      // suivi d'un tiret, pas juste "au hasard".
+      expect(isGeneratedIdentifier('Autres infos'), isFalse);
+      expect(isGeneratedIdentifier(''), isFalse);
+    });
+  });
+
   group('excludedFromPatrimoine (Investment)', () {
     Investment investment({bool excluded = false}) => Investment(
       isin: 'FR0000131104',
@@ -401,6 +482,30 @@ void main() {
       expect(roundTripped.fxRateToEur, 0.9204);
       expect(roundTripped.amount, closeTo(txn.amount, 1e-9));
     });
+
+    test('round-trip JSON de manualUnlockDate (déblocage anticipé PEG/PEE)', () {
+      final txn = Transaction(
+        id: 'txn_1',
+        date: DateTime(2023, 1, 1),
+        isBuy: true,
+        quantity: 1000,
+        unitPrice: 1,
+        manualUnlockDate: DateTime(2024, 3, 1),
+      );
+      final roundTripped = Transaction.fromJson(txn.toJson());
+      expect(roundTripped.manualUnlockDate, DateTime(2024, 3, 1));
+    });
+
+    test('manualUnlockDate absente round-trip vers null (pas sérialisée)', () {
+      final txn = Transaction(
+        date: DateTime(2023, 1, 1),
+        isBuy: true,
+        quantity: 1000,
+        unitPrice: 1,
+      );
+      expect(txn.toJson().containsKey('manualUnlockDate'), isFalse);
+      expect(Transaction.fromJson(txn.toJson()).manualUnlockDate, isNull);
+    });
   });
 
   group('investissement coté en devise étrangère', () {
@@ -616,6 +721,59 @@ void main() {
     });
   });
 
+  group('"Autres" reçu en cadeau (prix d\'achat 0)', () {
+    Investment gift({double manualPrice = 500}) => Investment(
+      isin: 'autre-1',
+      label: 'Montre offerte',
+      assetClass: AssetClass.autres,
+      manualPrice: manualPrice,
+      transactions: [
+        Transaction(date: DateTime(2024, 1, 1), isBuy: true, quantity: 1, unitPrice: 0),
+      ],
+    );
+
+    test('investedAmount et pru valent 0, sans erreur', () {
+      final investment = gift();
+      expect(investment.investedAmount, 0);
+      expect(investment.pru, 0);
+    });
+
+    test(
+      'unrealizedGain reste défini (montant absolu), pas de division '
+      'par zéro',
+      () {
+        final investment = gift(manualPrice: 500);
+        expect(investment.effectiveMarketValue, 500);
+        expect(investment.unrealizedGain, 500);
+      },
+    );
+
+    test(
+      'une vente ultérieure (donné à quelqu\'un d\'autre) reste calculable '
+      'normalement',
+      () {
+        final investment = gift().copyWith(
+          transactions: [
+            Transaction(
+              date: DateTime(2024, 1, 1),
+              isBuy: true,
+              quantity: 1,
+              unitPrice: 0,
+            ),
+            Transaction(
+              date: DateTime(2025, 1, 1),
+              isBuy: false,
+              quantity: 1,
+              unitPrice: 0,
+            ),
+          ],
+        );
+        expect(investment.quantityHeld, 0);
+        expect(investment.investedAmount, 0);
+      },
+    );
+  });
+
   group('Cours estimé à la main "Autres" (manualPrice)', () {
     Investment collectible({
       double? manualPrice,
@@ -710,6 +868,32 @@ void main() {
         expect(updated.estimatedValue, 9500);
         expect(updated.surfaceM2, isNull);
         expect(updated.estimatedPricePerSqm, isNull);
+      },
+    );
+
+    test(
+      'fonctionne aussi pour un fonds PEE/PEG sans ISIN (Actions & Fonds) : '
+      'manualPrice n\'est pas réservé à "Autres"',
+      () {
+        final fcpeFund = Investment(
+          isin: 'fcpe-1',
+          label: 'FCPE Diversifié Entreprise',
+          assetClass: AssetClass.actionsEtFonds,
+          manualPrice: 42,
+          manualPriceAt: DateTime(2026, 8, 27),
+          transactions: [
+            Transaction(
+              date: DateTime(2024, 1, 1),
+              isBuy: true,
+              quantity: 10,
+              unitPrice: 35,
+            ),
+          ],
+        );
+        expect(fcpeFund.marketValue, isNull);
+        expect(fcpeFund.estimatedValue, 420);
+        expect(fcpeFund.effectiveMarketValue, 420);
+        expect(fcpeFund.unrealizedGain, 420 - 350);
       },
     );
   });
@@ -827,6 +1011,28 @@ void main() {
     });
   });
 
+  group('pegPeeUnlockDateFor', () {
+    test('5 ans après la date du versement', () {
+      expect(pegPeeUnlockDateFor(DateTime(2026, 3, 15)), DateTime(2031, 3, 15));
+    });
+
+    test('reste cohérent avec pegPeeUnlockTranches pour la même date', () {
+      final date = DateTime(2024, 1, 1);
+      final tranches = pegPeeUnlockTranches(
+        investments: [
+          Investment(
+            isin: 'fcpe-1',
+            label: 'FCPE',
+            transactions: [
+              Transaction(date: date, isBuy: true, quantity: 1, unitPrice: 100),
+            ],
+          ),
+        ],
+      );
+      expect(tranches.single.unlockDate, pegPeeUnlockDateFor(date));
+    });
+  });
+
   group('pegPeeUnlockTranches', () {
     Transaction buy(DateTime date, double amount) =>
         Transaction(date: date, isBuy: true, quantity: amount, unitPrice: 1);
@@ -907,5 +1113,37 @@ void main() {
       expect(tranches[0].amount, 1000);
       expect(tranches[1].amount, 500);
     });
+
+    test(
+      'une date de déblocage saisie à la main (manualUnlockDate) prend le '
+      'pas sur la règle des 5 ans, pour un déblocage anticipé',
+      () {
+        final today = DateTime(2026, 6, 15);
+        // Achat de la résidence principale : déblocage anticipé, bien avant
+        // les 5 ans par défaut.
+        final manualUnlockDate = DateTime(2024, 3, 1);
+        final investment = Investment(
+          isin: 'FR0000000001',
+          label: 'Fonds actions',
+          transactions: [
+            Transaction(
+              date: DateTime(2023, 1, 1),
+              isBuy: true,
+              quantity: 1000,
+              unitPrice: 1,
+              manualUnlockDate: manualUnlockDate,
+            ),
+          ],
+        );
+
+        final tranches = pegPeeUnlockTranches(
+          investments: [investment],
+          today: today,
+        );
+
+        expect(tranches.single.unlockDate, manualUnlockDate);
+        expect(tranches.single.unlocked, isTrue);
+      },
+    );
   });
 }

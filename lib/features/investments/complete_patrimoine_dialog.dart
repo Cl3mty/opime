@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
@@ -14,6 +15,8 @@ import 'bank_logo_repository.dart';
 import 'confirm_delete_dialog.dart';
 import 'currency_data.dart' show kKnownCurrencies;
 import 'custom_other_categories_repository.dart';
+import 'document_storage.dart';
+import 'documents_section.dart';
 import 'investment_identifier_field.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
@@ -62,11 +65,24 @@ enum _Step {
 /// compte ?" — le choix Actif/Passif puis la classe n'apporteraient rien,
 /// le contexte les connaît déjà. [initialLiabilityType] fait de même côté
 /// passif : démarre directement sur le formulaire de création.
+///
+/// [initialAccountId], quand fourni (le flux a été ouvert depuis la page
+/// d'un compte précis — `StockAccountScreen`/`AccountDetailView`), va plus
+/// loin : saute aussi l'étape "quel compte ?" (et l'établissement/
+/// l'enveloppe pour les classes qui en ont un) pour démarrer directement
+/// sur "quel investissement ?" de ce compte. [initialInvestmentId], quand
+/// fourni en plus (page d'un investissement précis —
+/// `InvestmentDetailView`), saute une étape de plus et démarre directement
+/// sur l'ajout d'une transaction pour cet investissement. Les deux sont
+/// ignorés si l'id ne correspond à rien trouvé sur disque (compte/
+/// investissement supprimé entre-temps).
 Future<void> showCompletePatrimoineDialog(
   BuildContext context, {
   required String vaultPath,
   required VoidCallback onCompleted,
   AssetClass? initialAssetClass,
+  String? initialAccountId,
+  String? initialInvestmentId,
   LiabilityType? initialLiabilityType,
 }) {
   return showDialog<void>(
@@ -75,6 +91,8 @@ Future<void> showCompletePatrimoineDialog(
       vaultPath: vaultPath,
       onCompleted: onCompleted,
       initialAssetClass: initialAssetClass,
+      initialAccountId: initialAccountId,
+      initialInvestmentId: initialInvestmentId,
       initialLiabilityType: initialLiabilityType,
     ),
   );
@@ -84,12 +102,16 @@ class _CompletePatrimoineDialog extends StatefulWidget {
   final String vaultPath;
   final VoidCallback onCompleted;
   final AssetClass? initialAssetClass;
+  final String? initialAccountId;
+  final String? initialInvestmentId;
   final LiabilityType? initialLiabilityType;
 
   const _CompletePatrimoineDialog({
     required this.vaultPath,
     required this.onCompleted,
     this.initialAssetClass,
+    this.initialAccountId,
+    this.initialInvestmentId,
     this.initialLiabilityType,
   });
 
@@ -171,8 +193,24 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
 
   bool _newIsBuy = true;
   DateTime? _txnDate;
+
+  /// Date de déblocage saisie à la main pour la transaction en cours de
+  /// création (voir [_unlockDate]) — `null` tant qu'elle n'a pas été
+  /// modifiée, auquel cas la date par défaut s'applique.
+  DateTime? _txnUnlockDateOverride;
+
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
+
+  /// Id pré-généré de la transaction en cours de saisie à l'étape
+  /// "Transaction" — permet d'attacher des documents (voir [_addDocument])
+  /// avant même que la transaction existe, comme dans les autres dialogues
+  /// de transaction de l'app (voir `add_transaction_dialog.dart`,
+  /// `position_detail_dialog.dart`). L'investissement, lui, existe déjà à
+  /// ce stade (créé et persisté par [_commitCreateInvestment] avant de
+  /// passer à cette étape) : son id devient celui de la transaction réelle
+  /// une fois créée ([_commitCreateTransaction]).
+  String? _pendingTransactionId;
 
   /// Devise et taux de change de la transaction en cours de saisie (voir
   /// `transaction_price_currency.dart`) — à l'euro par défaut, résolus puis
@@ -257,6 +295,38 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     });
     if (_assetClass == AssetClass.immobilier && _step == _Step.account) {
       await _selectImmobilierAccount();
+    } else {
+      final accountId = widget.initialAccountId;
+      final account = accountId == null
+          ? null
+          : accounts.where((a) => a.id == accountId).firstOrNull;
+      if (account != null) {
+        setState(() {
+          _assetClass = account.assetClass;
+          _envelope = account.envelope;
+          _accountId = account.id;
+          _step = _Step.investment;
+          // Pour une classe à établissement (voir
+          // assetClassRequiresEstablishmentStep), remonter d'une étape
+          // depuis "Quel investissement ?" retombe sur "Quel compte ?" (voir
+          // le `case _Step.accountEnvelope` plus bas), qui exige cette
+          // valeur — jamais renseignée par ce raccourci sinon, contrairement
+          // au parcours normal (choix de l'établissement puis du compte).
+          if (assetClassRequiresEstablishmentStep(account.assetClass)) {
+            _pendingEstablishmentName = account.bankName ?? account.name;
+          }
+        });
+      }
+    }
+    // Un investissement précis (page dédiée — immobilier uniquement) va
+    // encore plus loin que le compte seul : direction directe l'étape
+    // "transaction", voir la doc de [showCompletePatrimoineDialog].
+    final investmentId = widget.initialInvestmentId;
+    final account = _account;
+    if (investmentId != null &&
+        account != null &&
+        account.investments.any((inv) => inv.id == investmentId)) {
+      _selectInvestment(investmentId);
     }
     await _loadBankLogos();
     await _loadCustomOtherCategories();
@@ -342,6 +412,136 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     final investment = _investment;
     if (investment == null || !_investmentIsCurrency) return false;
     return investment.isin.trim().toUpperCase() == 'EUR';
+  }
+
+  /// Métaux précieux, "Autres" et Actions & Fonds peuvent rattacher un
+  /// document à la transaction en cours de saisie — même règle que
+  /// `add_transaction_dialog.dart`'s équivalent.
+  bool get _usesTransactionScopedDocuments =>
+      _assetClass == AssetClass.metauxPrecieux ||
+      _assetClass == AssetClass.autres ||
+      _assetClass == AssetClass.actionsEtFonds;
+
+  /// Le champ de date de déblocage a-t-il un sens pour cette transaction —
+  /// PEG/PEE et achat uniquement.
+  bool get _unlockDateApplicable {
+    if (!_newIsBuy) return false;
+    return _envelope == AccountEnvelope.peg || _envelope == AccountEnvelope.pee;
+  }
+
+  /// Date de déblocage affichée/éditable : [_txnUnlockDateOverride] si
+  /// renseignée, sinon la date par défaut calculée depuis [_txnDate] (voir
+  /// [pegPeeUnlockDateFor]). `null` hors PEG/PEE, pour une vente, ou sans
+  /// date choisie.
+  DateTime? get _unlockDate {
+    if (!_unlockDateApplicable) return null;
+    if (_txnUnlockDateOverride != null) return _txnUnlockDateOverride;
+    final date = _txnDate;
+    return date == null ? null : pegPeeUnlockDateFor(date);
+  }
+
+  /// Ajoute un document rattaché à la transaction en cours de saisie —
+  /// possible dès cette étape, avant même que la transaction n'existe (voir
+  /// [_pendingTransactionId]) : l'investissement porteur, lui, existe déjà.
+  Future<void> _addDocument(
+    String fileName,
+    Uint8List bytes,
+    String? transactionId,
+    String? name,
+  ) async {
+    final account = _account;
+    final investment = _investment;
+    if (account == null || investment == null) return;
+    final document = VaultDocument(
+      fileName: fileName,
+      note: name,
+      transactionId: transactionId,
+    );
+    await DocumentStorage(widget.vaultPath).save(document, bytes);
+    final updatedInvestment = investment.copyWith(
+      documents: [...investment.documents, document],
+    );
+    final updatedAccount = account.copyWith(
+      investments: [
+        for (final i in account.investments)
+          if (i.id == updatedInvestment.id) updatedInvestment else i,
+      ],
+    );
+    await _repo.saveAccount(updatedAccount);
+    if (!mounted) return;
+    setState(() {
+      _accounts = [
+        for (final a in _accounts)
+          if (a.id == updatedAccount.id) updatedAccount else a,
+      ];
+    });
+  }
+
+  Future<void> _deleteDocument(VaultDocument document) async {
+    final account = _account;
+    final investment = _investment;
+    if (account == null || investment == null) return;
+    await DocumentStorage(widget.vaultPath).delete(document);
+    final updatedInvestment = investment.copyWith(
+      documents: [
+        for (final d in investment.documents)
+          if (d.id != document.id) d,
+      ],
+    );
+    final updatedAccount = account.copyWith(
+      investments: [
+        for (final i in account.investments)
+          if (i.id == updatedInvestment.id) updatedInvestment else i,
+      ],
+    );
+    await _repo.saveAccount(updatedAccount);
+    if (!mounted) return;
+    setState(() {
+      _accounts = [
+        for (final a in _accounts)
+          if (a.id == updatedAccount.id) updatedAccount else a,
+      ];
+    });
+  }
+
+  /// Retire du disque les documents attachés à [_pendingTransactionId] —
+  /// appelé en quittant l'étape "Transaction" sans avoir créé la
+  /// transaction (retour en arrière, ou passer directement à "Terminer"),
+  /// pour ne pas les laisser orphelins d'une transaction qui n'existera
+  /// jamais.
+  Future<void> _cleanupPendingDocuments() async {
+    final account = _account;
+    final investment = _investment;
+    final pendingId = _pendingTransactionId;
+    if (account == null || investment == null || pendingId == null) return;
+    final orphaned = [
+      for (final d in investment.documents)
+        if (d.transactionId == pendingId) d,
+    ];
+    if (orphaned.isEmpty) return;
+    for (final document in orphaned) {
+      await DocumentStorage(widget.vaultPath).delete(document);
+    }
+    final updatedInvestment = investment.copyWith(
+      documents: [
+        for (final d in investment.documents)
+          if (d.transactionId != pendingId) d,
+      ],
+    );
+    final updatedAccount = account.copyWith(
+      investments: [
+        for (final i in account.investments)
+          if (i.id == updatedInvestment.id) updatedInvestment else i,
+      ],
+    );
+    await _repo.saveAccount(updatedAccount);
+    if (!mounted) return;
+    setState(() {
+      _accounts = [
+        for (final a in _accounts)
+          if (a.id == updatedAccount.id) updatedAccount else a,
+      ];
+    });
   }
 
   String get _quantityFieldLabel {
@@ -692,11 +892,15 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         ? rawIsin
         : rawIsin.toUpperCase();
     final label = _labelController.text.trim();
-    // Comme l'immobilier, "Autres" n'a pas de vrai identifiant financier à
-    // exiger : une référence (numéro de série...) reste facultative, voir
-    // `InvestmentIdentifierField`. Un identifiant est généré si laissé vide.
+    // Comme l'immobilier et "Autres", un fonds PEE/PEG/PER n'a souvent pas
+    // de vrai identifiant financier à exiger (voir [isinOptionalFor]) — sauf en
+    // mode "Devise" (bascule d'un compte-titres), où le code choisi dans la
+    // liste déroulante reste requis quelle que soit la classe. Un
+    // identifiant est généré si laissé vide (voir plus bas).
     final identifierRequired =
-        assetClass != AssetClass.immobilier && assetClass != AssetClass.autres;
+        _creatingDevise ||
+        assetClass == null ||
+        !isinOptionalFor(assetClass, accountEnvelope: account?.envelope);
     if (account == null || label.isEmpty || (identifierRequired && isin.isEmpty)) {
       return;
     }
@@ -707,8 +911,10 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     final investment = Investment(
       isin: assetClass == AssetClass.immobilier
           ? 'immobilier-${generateInvestmentId('bien')}'
-          : assetClass == AssetClass.autres && isin.isEmpty
-          ? 'autre-${generateInvestmentId('bien')}'
+          : isin.isEmpty &&
+                assetClass != null &&
+                isinOptionalFor(assetClass, accountEnvelope: account.envelope)
+          ? placeholderIsinFor(assetClass)
           : isin,
       label: label,
       transactions: const [],
@@ -736,6 +942,10 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       _creatingDevise = false;
       _fundStyle = null;
       _step = _Step.transaction;
+      _pendingTransactionId = _usesTransactionScopedDocuments
+          ? generateInvestmentId('txn')
+          : null;
+      _txnUnlockDateOverride = null;
     });
     // Nouvelle transaction : devise et taux remis à l'euro.
     _priceCurrencyController.reset();
@@ -745,6 +955,10 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     setState(() {
       _investmentId = id;
       _step = _Step.transaction;
+      _pendingTransactionId = _usesTransactionScopedDocuments
+          ? generateInvestmentId('txn')
+          : null;
+      _txnUnlockDateOverride = null;
     });
     // Nouvelle transaction : devise et taux remis à l'euro.
     _priceCurrencyController.reset();
@@ -774,14 +988,20 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         ? 1.0
         : _priceCurrencyController.resolvedRate;
     // Devise étrangère sans taux de change (auto et manuel indisponibles) :
-    // impossible de convertir en euros, on ne sauvegarde pas.
+    // impossible de convertir en euros, on ne sauvegarde pas. Un objet
+    // "Autres" peut avoir été reçu en cadeau (prix d'achat 0) — voir
+    // `position_detail_dialog.dart`'s équivalent pour le raisonnement
+    // complet.
+    final invalidPrice =
+        price == null ||
+        price < 0 ||
+        (price == 0 && _assetClass != AssetClass.autres);
     if (account == null ||
         investment == null ||
         date == null ||
         quantity == null ||
         quantity <= 0 ||
-        price == null ||
-        price <= 0 ||
+        invalidPrice ||
         fxRateToEur == null ||
         fxRateToEur <= 0) {
       return;
@@ -790,12 +1010,14 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       transactions: [
         ...investment.transactions,
         Transaction(
+          id: _usesTransactionScopedDocuments ? _pendingTransactionId : null,
           date: date,
           isBuy: _newIsBuy,
           quantity: quantity,
           unitPrice: price,
           currency: currency,
           fxRateToEur: fxRateToEur,
+          manualUnlockDate: _txnUnlockDateOverride,
         ),
       ],
     );
@@ -806,6 +1028,27 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       ],
     );
     await _repo.saveAccount(updatedAccount);
+    _finish();
+  }
+
+  /// Retour à l'étape "Investissement" sans avoir créé la transaction — les
+  /// documents déjà attachés à [_pendingTransactionId] (voir
+  /// [_addDocument]) sont nettoyés en même temps, pour ne pas les laisser
+  /// orphelins d'une transaction qui n'existera jamais.
+  Future<void> _backFromTransactionStep() async {
+    await _cleanupPendingDocuments();
+    if (!mounted) return;
+    setState(() {
+      _step = _Step.investment;
+      _investmentId = null;
+    });
+  }
+
+  /// "Terminer" sans créer de transaction — même nettoyage que
+  /// [_backFromTransactionStep].
+  Future<void> _skipTransaction() async {
+    await _cleanupPendingDocuments();
+    if (!mounted) return;
     _finish();
   }
 
@@ -1128,14 +1371,28 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
               !_isEurCurrency && _assetClass != AssetClass.immobilier,
           showCurrencySelector: _showCurrencySelector,
           priceCurrencyController: _priceCurrencyController,
-          onBack: () => setState(() {
-            _step = _Step.investment;
-            _investmentId = null;
-          }),
+          onBack: _backFromTransactionStep,
           onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
           onDateChanged: (d) => setState(() => _txnDate = d),
           onCreate: _commitCreateTransaction,
-          onSkip: _finish,
+          onSkip: _skipTransaction,
+          unlockDate: _unlockDate,
+          onUnlockDateChanged: _unlockDateApplicable
+              ? (d) => setState(() => _txnUnlockDateOverride = d)
+              : null,
+          documentsSection: _usesTransactionScopedDocuments
+              ? DocumentsSection(
+                  vaultPath: widget.vaultPath,
+                  documents: [
+                    for (final d in _investment!.documents)
+                      if (d.transactionId == _pendingTransactionId) d,
+                  ],
+                  fixedTransactionId: _pendingTransactionId,
+                  quantityAssetClass: _investment!.assetClass,
+                  onAdd: _addDocument,
+                  onDelete: _deleteDocument,
+                )
+              : null,
         );
       case _Step.liabilityType:
         return _LiabilityTypeStep(
@@ -1919,13 +2176,13 @@ class _InvestmentStep extends StatelessWidget {
             // Immobilier : pas d'identifiant. Épargne et toute autre
             // position en devise : l'identifiant est la devise, déjà portée
             // par le libellé — pas besoin de la répéter en dessous. "Autres"
-            // sans référence saisie : un identifiant auto-généré (voir
-            // `_commitCreateInvestment`) n'a rien d'utile à montrer.
+            // sans référence saisie, ou fonds PEE/PEG/PER sans ISIN : un
+            // identifiant auto-généré (voir `_commitCreateInvestment`) n'a
+            // rien d'utile à montrer.
             sublabel:
-                (assetClass == AssetClass.immobilier || investment.isCurrency)
-                ? null
-                : assetClass == AssetClass.autres &&
-                      investment.isin.startsWith('autre-')
+                (assetClass == AssetClass.immobilier ||
+                    investment.isCurrency ||
+                    isGeneratedIdentifier(investment.isin))
                 ? null
                 : investment.isin,
             onTap: () => onSelectInvestment(investment.id),
@@ -2016,26 +2273,32 @@ class _InvestmentStep extends StatelessWidget {
                   autofocus: false,
                 ),
               ] else ...[
-                InvestmentIdentifierField(
-                  assetClass: assetClass,
-                  accountEnvelope: account.envelope,
-                  isinController: isinController,
-                  labelController: labelController,
-                ),
-                const SizedBox(height: 8),
                 // Métaux physiques : le libellé est le produit choisi dans
                 // la liste déroulante (pré-rempli automatiquement), inutile
                 // de demander un libellé séparé.
                 if (requiresLabelFieldFor(
                   assetClass,
                   accountEnvelope: account.envelope,
-                ))
+                )) ...[
                   TextField(
                     controller: labelController,
                     placeholder: const shadcn.Text(
                       'Libellé (ex: TotalEnergies)',
                     ),
+                    autofocus: true,
                   ),
+                  const SizedBox(height: 8),
+                ],
+                InvestmentIdentifierField(
+                  assetClass: assetClass,
+                  accountEnvelope: account.envelope,
+                  isinController: isinController,
+                  labelController: labelController,
+                  autofocus: !requiresLabelFieldFor(
+                    assetClass,
+                    accountEnvelope: account.envelope,
+                  ),
+                ),
                 if (assetClass == AssetClass.actionsEtFonds) ...[
                   const SizedBox(height: 8),
                   Row(
@@ -2112,6 +2375,19 @@ class _TransactionStep extends StatelessWidget {
   final VoidCallback onCreate;
   final VoidCallback onSkip;
 
+  /// Section "Documents" scopée à la transaction en cours de saisie — voir
+  /// `TransactionForm`'s équivalent. `null` hors métaux précieux/"Autres"/
+  /// Actions & Fonds.
+  final Widget? documentsSection;
+
+  /// Date de déblocage d'un versement PEG/PEE, éditable — voir
+  /// `TransactionForm`'s équivalent.
+  final DateTime? unlockDate;
+
+  /// Renseigné uniquement quand [unlockDate] a un sens à afficher — voir
+  /// `TransactionForm`'s équivalent.
+  final ValueChanged<DateTime?>? onUnlockDateChanged;
+
   const _TransactionStep({
     required this.stepLabel,
     required this.investment,
@@ -2129,6 +2405,9 @@ class _TransactionStep extends StatelessWidget {
     required this.onDateChanged,
     required this.onCreate,
     required this.onSkip,
+    this.documentsSection,
+    this.unlockDate,
+    this.onUnlockDateChanged,
   });
 
   @override
@@ -2173,6 +2452,20 @@ class _TransactionStep extends StatelessWidget {
             ),
           ],
         ),
+        if (onUnlockDateChanged != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              shadcn.Text('Débloqué le').muted().xSmall(),
+              const SizedBox(width: 8),
+              DatePicker(
+                value: unlockDate,
+                onChanged: onUnlockDateChanged,
+                placeholder: const shadcn.Text('Date de déblocage'),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         Row(
           children: [
@@ -2211,6 +2504,10 @@ class _TransactionStep extends StatelessWidget {
             quantityController: quantityController,
             priceController: priceController,
           ),
+        if (documentsSection != null) ...[
+          const SizedBox(height: 16),
+          documentsSection!,
+        ],
         const SizedBox(height: 16),
         Row(
           children: [

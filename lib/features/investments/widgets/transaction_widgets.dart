@@ -11,6 +11,51 @@ import '../transaction_price_currency.dart';
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
 
+/// Largeur réservée à l'étiquette de type de transaction ("Achat", "Vente",
+/// "Dividende", "Conversion de devise"...) dans [TransactionRow] — sans
+/// largeur fixe, la date qui suit (voir [Transaction.displayLabel]) se
+/// décale d'une ligne à l'autre selon la longueur du libellé, empêchant les
+/// dates de tout le tableau de s'aligner verticalement. Dimensionnée pour
+/// le plus long libellé existant ("Conversion de devise", voir
+/// [TransactionType.label]).
+const _kindBadgeWidth = 156.0;
+
+/// Largeur réservée au groupe étiquette de type + nom de la position
+/// (`positionLabel`), quand la liste mélange plusieurs positions (onglet
+/// "Transactions" d'un compte) — même raison que [_kindBadgeWidth] pris
+/// seul, appliquée cette fois au groupe entier (les deux sont collés l'un
+/// à l'autre, voir [TransactionRow.build]). Un nom trop long est
+/// simplement tronqué (`overflow: TextOverflow.ellipsis`) plutôt que de
+/// décaler la suite de la ligne.
+const _leftGroupWidth = 320.0;
+
+/// Étiquette de type de transaction ("Achat", "Vente", "Dividende"...) —
+/// extraite en widget partagé entre les deux mises en page de
+/// [TransactionRow.build] (seule dans sa case, ou collée au nom de la
+/// position).
+class _TransactionKindBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _TransactionKindBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: shadcn.Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        overflow: TextOverflow.ellipsis,
+      ).xSmall(),
+    );
+  }
+}
+
 /// Petite étiquette "libellé + valeur" (ex : "Quantité détenue" / "12
 /// unités") — utilisée pour les statistiques d'un investissement, sur sa
 /// propre page (`investment_detail_screen.dart`) comme dans la popup de
@@ -178,22 +223,47 @@ class TransactionRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(999),
+            if (positionLabel == null)
+              SizedBox(
+                width: _kindBadgeWidth,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _TransactionKindBadge(
+                    label: transaction.displayLabel,
+                    color: color,
+                  ),
+                ),
+              )
+            else
+              // Étiquette de type et nom de la position collés l'un à
+              // l'autre (pas chacun dans sa propre case à largeur fixe,
+              // sans quoi un libellé court comme "Achat" laisserait un
+              // grand vide avant le nom) — mais le GROUPE des deux garde
+              // une largeur totale fixe, comme [_kindBadgeWidth] seul dans
+              // l'autre branche : sans ça, la date qui suit (alignée à
+              // gauche dans son propre `Expanded`, donc dépendante
+              // uniquement de ce qui la précède) se décalerait d'une ligne
+              // à l'autre selon la longueur combinée des deux.
+              SizedBox(
+                width: _leftGroupWidth,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _TransactionKindBadge(
+                      label: transaction.displayLabel,
+                      color: color,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: shadcn.Text(
+                        positionLabel!,
+                        overflow: TextOverflow.ellipsis,
+                      ).small().medium(),
+                    ),
+                  ],
+                ),
               ),
-              child: shadcn.Text(
-                transaction.displayLabel,
-                style: TextStyle(color: color, fontWeight: FontWeight.w600),
-              ).xSmall(),
-            ),
             const SizedBox(width: 12),
-            if (positionLabel != null) ...[
-              Expanded(child: shadcn.Text(positionLabel!).small().medium()),
-              const SizedBox(width: 12),
-            ],
             Expanded(child: shadcn.Text(_formatDate(transaction.date)).small()),
             if (!displayTotalOnly) ...[
               shadcn.Text(
@@ -325,6 +395,19 @@ class TransactionForm extends StatelessWidget {
   /// rattacher un document) ou hors métaux précieux.
   final Widget? documentsSection;
 
+  /// Date de déblocage d'un versement PEG/PEE, calculée par défaut (voir
+  /// [pegPeeUnlockDateFor]) dès la saisie de la date de transaction, mais
+  /// modifiable pour couvrir un déblocage anticipé (voir
+  /// [Transaction.manualUnlockDate]). `null` hors PEG/PEE, pour une vente
+  /// (seuls les versements se débloquent), ou tant qu'aucune date de
+  /// transaction n'est choisie.
+  final DateTime? unlockDate;
+
+  /// Renseigné uniquement quand [unlockDate] a un sens à afficher — sa
+  /// présence conditionne l'affichage du champ (voir [unlockDate]).
+  /// Appelé à chaque modification manuelle de la date de déblocage.
+  final ValueChanged<DateTime?>? onUnlockDateChanged;
+
   const TransactionForm({
     super.key,
     required this.isBuy,
@@ -342,6 +425,8 @@ class TransactionForm extends StatelessWidget {
     required this.onCreate,
     required this.onCancel,
     this.documentsSection,
+    this.unlockDate,
+    this.onUnlockDateChanged,
   });
 
   @override
@@ -382,6 +467,20 @@ class TransactionForm extends StatelessWidget {
                 ),
               ],
             ),
+            if (onUnlockDateChanged != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  shadcn.Text('Débloqué le').muted().xSmall(),
+                  const SizedBox(width: 8),
+                  DatePicker(
+                    value: unlockDate,
+                    onChanged: onUnlockDateChanged,
+                    placeholder: const shadcn.Text('Date de déblocage'),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               children: [
