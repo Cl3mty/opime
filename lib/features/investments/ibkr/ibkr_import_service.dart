@@ -272,7 +272,11 @@ IbkrImportPlan buildIbkrImportPlan(
     final currencyKey = row.currency.trim().toUpperCase();
     findOrCreate(
       currencyKey,
-      () => Investment(isin: currencyKey, label: currencyKey, transactions: const []),
+      () => Investment(
+        isin: currencyKey,
+        label: currencyKey,
+        transactions: const [],
+      ),
     );
     final cashImpact = row.netCashImpact;
     addTransaction(
@@ -348,8 +352,8 @@ IbkrImportPlan buildIbkrImportPlan(
     // Taux dérivé directement du cours de cette ligne (plus précis que la
     // recherche par proximité de date, réservée aux lignes qui n'ont pas
     // leur propre cours).
-    final quoteRate = row.baseCurrency.trim().toUpperCase() == 'EUR' &&
-            row.tradePrice != 0
+    final quoteRate =
+        row.baseCurrency.trim().toUpperCase() == 'EUR' && row.tradePrice != 0
         ? 1 / row.tradePrice
         : fx.rateToEur(row.quoteCurrency, row.date, warnings);
     addTransaction(
@@ -379,7 +383,11 @@ IbkrImportPlan buildIbkrImportPlan(
     final currencyKey = row.currency.trim().toUpperCase();
     findOrCreate(
       currencyKey,
-      () => Investment(isin: currencyKey, label: currencyKey, transactions: const []),
+      () => Investment(
+        isin: currencyKey,
+        label: currencyKey,
+        transactions: const [],
+      ),
     );
     final added = addTransaction(
       currencyKey,
@@ -428,6 +436,10 @@ IbkrImportPlan buildIbkrImportPlan(
         break;
       case TransactionType.fxConversion:
         break; // Jamais produit ici — seule la section conversions le fait.
+      case TransactionType.transfer:
+      case TransactionType.arbitrage:
+        break; // Jamais produit par l'import IBKR — saisi manuellement
+      // uniquement, voir `transfer_arbitrage_dialog.dart`.
     }
   }
 

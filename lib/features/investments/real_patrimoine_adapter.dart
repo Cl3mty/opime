@@ -272,7 +272,7 @@ PatrimoineAccount _buildAccountLeaf(
     // seuls les agrégats globaux du Dashboard l'ignorent (voir
     // [PatrimoineCategory.montantPatrimoine] et
     // [investmentsForEffectiveClass]).
-    final v = investment.effectiveMarketValue ?? investment.investedAmount;
+    final v = investment.displayValue;
     final gain = investment.unrealizedGain ?? 0;
     valeur += v;
     plusValueAbs += gain;
@@ -431,7 +431,7 @@ PatrimoineAccount _buildMergedInvestmentLeaf(
   for (final (_, investment) in group) {
     quantite += investment.quantityHeld;
     investedAmount += investment.investedAmount;
-    valeur += investment.effectiveMarketValue ?? investment.investedAmount;
+    valeur += investment.displayValue;
     plusValueAbs += investment.unrealizedGain ?? 0;
     final date = investment.lastPriceDate;
     if (date != null &&
@@ -461,6 +461,7 @@ PatrimoineAccount _buildMergedInvestmentLeaf(
     pru: quantite == 0 ? 0 : investedAmount / quantite,
     priceUnavailable: priced.priceUnavailable,
     lastPriceDate: lastPriceDate,
+    manualPriceAt: priced.lastPrice == null ? priced.manualPriceAt : null,
     plusValueAbs: plusValueAbs,
     // `null` (pas `0`) sans coût d'acquisition — voir
     // `PatrimoineAccount.plusValuePercent`.
@@ -555,7 +556,7 @@ PatrimoineAccount _buildLeaf(
   String vaultPath, {
   bool showAccountSubtitle = true,
 }) {
-  final valeur = investment.effectiveMarketValue ?? investment.investedAmount;
+  final valeur = investment.displayValue;
   final plusValueAbs = investment.unrealizedGain ?? 0;
   final costBasis = valeur - plusValueAbs;
   return PatrimoineAccount(
@@ -571,6 +572,12 @@ PatrimoineAccount _buildLeaf(
     pru: investment.pru,
     priceUnavailable: investment.priceUnavailable,
     lastPriceDate: investment.lastPriceDate,
+    // Seulement quand le cours vient bien de cette estimation (pas d'un
+    // cours de marché récupéré depuis) — voir `_lastPriceToEur`, qui ne se
+    // rabat sur `manualPrice` que si `lastPrice` est `null`.
+    manualPriceAt: investment.lastPrice == null
+        ? investment.manualPriceAt
+        : null,
     plusValueAbs: plusValueAbs,
     // `null` (pas `0`) sans coût d'acquisition (ex : un objet "Autres" reçu
     // en cadeau) — une plus-value relative à 0 € investi est infinie, pas

@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../../core/date_format.dart';
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/opime_date_picker.dart';
@@ -11,6 +12,7 @@ import '../transaction_price_currency.dart';
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
+const _orange = Color(0xFFF97316);
 
 /// Part de l'espace flexible de la ligne (voir [TransactionRow.build])
 /// allouée au groupe étiquette de type + nom de la position + commentaire,
@@ -40,8 +42,12 @@ const _positionLabelMaxWidth = 260.0;
 /// variable d'une transaction à l'autre (des chiffres différents), qui doit
 /// rester `Expanded`-neutre pour ne pas décaler le partage de l'espace
 /// flexible entre le groupe de gauche et la date d'une ligne à l'autre (voir
-/// [TransactionRow.build]).
-const _amountsGroupWidth = 270.0;
+/// [TransactionRow.build]). PARTAGÉE avec [ArbitrageTransactionRow] à
+/// dessein — une valeur différente entre les deux types de ligne décale la
+/// colonne de date de l'un par rapport à l'autre dans une même liste (ex :
+/// `account_transactions_tab.dart`, qui les mélange), même si chacun garde
+/// individuellement ses colonnes alignées ligne à ligne.
+const _amountsGroupWidth = 320.0;
 const _documentsIconWidth = 32.0;
 
 /// Étiquette de type de transaction ("Achat", "Vente", "Dividende"...) —
@@ -135,6 +141,34 @@ class FreshPriceBadge extends StatelessWidget {
   }
 }
 
+/// Pendant de [FreshPriceBadge] pour un "Cours estimé" saisi à la main
+/// ([Investment.manualPrice]) plutôt que récupéré automatiquement — même
+/// forme de badge, mais sans connotation "à jour" (une estimation manuelle
+/// n'a pas de fraîcheur attendue) : au survol, indique simplement depuis
+/// quand cette valeur date ([Investment.manualPriceAt]).
+class ManualPriceBadge extends StatelessWidget {
+  final DateTime updatedAt;
+
+  const ManualPriceBadge({super.key, required this.updatedAt});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      tooltip: (context) => TooltipContainer(
+        child: shadcn.Text('Estimé le ${formatDateDdMmYyyy(updatedAt)}'),
+      ),
+      child: OutlineBadge(
+        leading: Icon(
+          LucideIcons.pencilLine,
+          size: 10,
+          color: Theme.of(context).colorScheme.mutedForeground,
+        ),
+        child: shadcn.Text('manuel').xSmall(),
+      ),
+    );
+  }
+}
+
 /// Petit badge affiché à côté d'un investissement ou d'un compte quand
 /// [Investment.excludedFromPatrimoine]/[InvestmentAccount.excludedFromPatrimoine]
 /// — il reste visible partout avec sa vraie valeur (page de catégorie,
@@ -204,6 +238,17 @@ class TransactionRow extends StatelessWidget {
   /// gauche, comme avant l'introduction des commentaires.
   final bool centerDate;
 
+  /// Largeur réservée à la case "quantité × prix / montant", par défaut
+  /// [_amountsGroupWidth] — partagée avec [ArbitrageTransactionRow] pour
+  /// garder les dates alignées quand les deux se mélangent dans une même
+  /// liste (`account_transactions_tab.dart`). Un appelant qui n'affiche
+  /// JAMAIS de ligne fusionnée à côté (ex : `position_detail_dialog.dart`,
+  /// une popup nettement plus étroite qu'une page pleine largeur) peut
+  /// réduire cette valeur : l'alignement inter-lignes n'a alors de sens
+  /// qu'au sein de sa propre liste, pas besoin de réserver la même largeur
+  /// que le calcul à deux jambes d'un arbitrage.
+  final double amountsGroupWidth;
+
   const TransactionRow({
     super.key,
     required this.transaction,
@@ -216,6 +261,7 @@ class TransactionRow extends StatelessWidget {
     this.documents = const [],
     this.vaultPath,
     this.centerDate = true,
+    this.amountsGroupWidth = _amountsGroupWidth,
   });
 
   void _openMenu(BuildContext anchorContext) {
@@ -246,7 +292,15 @@ class TransactionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = transaction.isBuy ? _green : _red;
+    // Un arbitrage n'est ni un simple achat ni une simple vente — sa vente
+    // comme son achat forment une seule opération de bascule d'un titre à
+    // l'autre, colorée à part (orange) pour ne pas se lire comme une perte
+    // (rouge) sur sa jambe de vente.
+    final color = transaction.type == TransactionType.arbitrage
+        ? _orange
+        : transaction.isBuy
+        ? _green
+        : _red;
     final note = transaction.note?.trim();
     final hasNote = note != null && note.isNotEmpty;
     return FrostedCard(
@@ -304,7 +358,15 @@ class TransactionRow extends StatelessWidget {
               flex: _dateFlex,
               child: Align(
                 alignment: centerDate ? Alignment.center : Alignment.centerLeft,
-                child: shadcn.Text(_formatDate(transaction.date)).small(),
+                // `maxLines`/`overflow` : une date ne doit jamais passer à
+                // la ligne (casserait la hauteur de toute la ligne) même si
+                // sa colonne venait à manquer de place — tronquer est un
+                // dégât moindre, voir [amountsGroupWidth].
+                child: shadcn.Text(
+                  _formatDate(transaction.date),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ).small(),
               ),
             ),
             // Calcul (quantité × prix) et montant collés l'un à l'autre,
@@ -315,7 +377,7 @@ class TransactionRow extends StatelessWidget {
             // d'une case trop large pour son contenu s'intercalerait entre
             // les deux au lieu de rester group à gauche de l'ensemble.
             SizedBox(
-              width: _amountsGroupWidth,
+              width: amountsGroupWidth,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -379,6 +441,176 @@ class TransactionRow extends StatelessWidget {
 
   String _formatDate(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+}
+
+/// Une ligne FUSIONNÉE pour un arbitrage — remplace les deux
+/// [TransactionRow] (vente source, achat destination) qu'on obtiendrait
+/// sinon dans une liste mélangeant plusieurs positions du même compte
+/// (`account_transactions_tab.dart` : un arbitrage reste toujours au sein
+/// d'un compte, voir `transfer_arbitrage_dialog.dart`, donc ses deux jambes
+/// y apparaissent forcément ensemble). Un transfert, lui, déplace un titre
+/// vers un AUTRE compte : ses deux jambes ne cohabitent jamais dans la même
+/// liste, pas de fusion possible ni utile pour lui. Sur la page d'une seule
+/// position (`investment_detail_screen.dart`), on ne voit de toute façon
+/// qu'une seule jambe à la fois : pas de fusion là non plus.
+class ArbitrageTransactionRow extends StatelessWidget {
+  final Investment sellInvestment;
+  final Transaction sellTransaction;
+  final AssetClass sellAssetClass;
+  final Investment buyInvestment;
+  final Transaction buyTransaction;
+  final AssetClass buyAssetClass;
+  final bool hidden;
+
+  /// Modifie les DEUX transactions ensemble (voir `edit_arbitrage_dialog.dart`)
+  /// — jamais chacune séparément : un formulaire d'édition générique ignore
+  /// `type`/`linkedTransactionId` de l'autre jambe et détacherait
+  /// silencieusement la paire à l'enregistrement.
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  /// Documents rattachés à la jambe de vente — seule jambe où
+  /// `transfer_arbitrage_dialog.dart` permet d'en attacher (voir sa doc de
+  /// tête).
+  final List<VaultDocument> documents;
+  final String? vaultPath;
+  final bool centerDate;
+
+  const ArbitrageTransactionRow({
+    super.key,
+    required this.sellInvestment,
+    required this.sellTransaction,
+    required this.sellAssetClass,
+    required this.buyInvestment,
+    required this.buyTransaction,
+    required this.buyAssetClass,
+    required this.hidden,
+    required this.onEdit,
+    required this.onDelete,
+    this.documents = const [],
+    this.vaultPath,
+    this.centerDate = true,
+  });
+
+  void _openMenu(BuildContext anchorContext) {
+    showDropdown(
+      context: anchorContext,
+      anchorAlignment: AlignmentDirectional.topEnd,
+      alignment: AlignmentDirectional.topStart,
+      offset: const Offset(0, 4),
+      builder: (context) => ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 200),
+        child: DropdownMenu(
+          children: [
+            MenuButton(
+              leading: const Icon(LucideIcons.pencil, size: 14),
+              child: const shadcn.Text('Modifier l\'arbitrage'),
+              onPressed: (_) => onEdit(),
+            ),
+            MenuButton(
+              leading: const Icon(LucideIcons.trash2, size: 14),
+              child: const shadcn.Text('Supprimer'),
+              onPressed: (_) => onDelete(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    // Égaux par construction (voir `transfer_arbitrage_dialog.dart`'s
+    // `_commitArbitrage` : la quantité achetée est dérivée du produit de la
+    // vente) — un seul montant à afficher plutôt que deux.
+    final amount = sellTransaction.amount;
+    return FrostedCard(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              flex: _leftGroupFlex,
+              child: Row(
+                children: [
+                  const _TransactionKindBadge(label: 'Arbitrage', color: _orange),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: shadcn.Text(
+                      '${sellInvestment.label} → ${buyInvestment.label}',
+                      overflow: TextOverflow.ellipsis,
+                    ).small().medium(),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: _dateFlex,
+              child: Align(
+                alignment: centerDate ? Alignment.center : Alignment.centerLeft,
+                child: shadcn.Text(
+                  _formatDate(sellTransaction.date),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ).small(),
+              ),
+            ),
+            SizedBox(
+              width: _amountsGroupWidth,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Flexible(
+                    child: shadcn.Text(
+                      'Vendu ${formatQuantity(sellTransaction.quantity, sellAssetClass)} × '
+                      '${displayEuros(sellTransaction.unitPrice, hidden)} → '
+                      'Acheté ${formatQuantity(buyTransaction.quantity, buyAssetClass)} × '
+                      '${displayEuros(buyTransaction.unitPrice, hidden)}',
+                      overflow: TextOverflow.ellipsis,
+                    ).muted().xSmall(),
+                  ),
+                  const SizedBox(width: 12),
+                  shadcn.Text(displayEuros(amount, hidden)).medium(),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: _documentsIconWidth,
+              child: documents.isEmpty || vaultPath == null
+                  ? null
+                  : Tooltip(
+                      tooltip: (context) => TooltipContainer(
+                        child: shadcn.Text(
+                          '${documents.length} document'
+                          '${documents.length > 1 ? 's' : ''} rattaché'
+                          '${documents.length > 1 ? 's' : ''} — consulter',
+                        ),
+                      ),
+                      child: IconButton.ghost(
+                        icon: Icon(LucideIcons.paperclip, size: 15),
+                        onPressed: () => showDocumentViewDialog(
+                          context,
+                          vaultPath: vaultPath!,
+                          documents: documents,
+                        ),
+                      ),
+                    ),
+            ),
+            Builder(
+              builder: (context) => IconButton.ghost(
+                icon: const Icon(LucideIcons.ellipsisVertical, size: 16),
+                onPressed: () => _openMenu(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Lien "+ Ajouter une transaction" — utilisé sur la page d'un

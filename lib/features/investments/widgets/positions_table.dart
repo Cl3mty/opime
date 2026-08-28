@@ -13,7 +13,9 @@ const _colWidth = 96.0;
 /// les mêmes colonnes que le tableau générique de catégorie
 /// (`category_detail_screen.dart`'s `_AccountLine`) pour une cohérence
 /// visuelle avec le reste de l'app. Cliquer une ligne ouvre le détail de la
-/// position — voir `stock_account/position_detail_dialog.dart`.
+/// position — voir `stock_account/position_detail_dialog.dart`. Les
+/// positions à quantité nulle (soldées) s'affichent séparément, dans un
+/// second tableau "Anciennes positions" sous les positions ouvertes.
 class PositionsTable extends StatelessWidget {
   final InvestmentAccount account;
   final bool hidden;
@@ -26,12 +28,78 @@ class PositionsTable extends StatelessWidget {
     required this.onTap,
   });
 
+  /// Une position à quantité nulle (entièrement vendue, transférée ou
+  /// arbitrée vers un autre titre) n'a plus de détention actuelle — même
+  /// seuil que `real_patrimoine_adapter.dart` (`quantityHeld <= 0`), avec
+  /// une petite marge contre les résidus de virgule flottante d'une somme
+  /// de transactions qui devrait s'annuler exactement (voir
+  /// `Transaction.toJson`, qui ne les arrondit plus à la sauvegarde).
+  static const _closedThreshold = 1e-9;
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     if (account.investments.isEmpty) {
       return shadcn.Text('Aucune position pour l\'instant.').muted().small();
     }
+    final active = [
+      for (final i in account.investments)
+        if (i.quantityHeld > _closedThreshold) i,
+    ];
+    final closed = [
+      for (final i in account.investments)
+        if (i.quantityHeld <= _closedThreshold) i,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (active.isNotEmpty)
+          _PositionsSubTable(
+            investments: active,
+            account: account,
+            hidden: hidden,
+            onTap: onTap,
+          )
+        else
+          shadcn.Text('Aucune position ouverte pour l\'instant.').muted().small(),
+        // Historique des positions soldées (vente totale, transfert ou
+        // arbitrage vers un autre titre) — gardé visible mais nettement
+        // séparé des positions réellement détenues aujourd'hui, pour ne pas
+        // les confondre dans les totaux affichés au-dessus de ce tableau.
+        if (closed.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          shadcn.Text('Anciennes positions').muted().xSmall(),
+          const SizedBox(height: 8),
+          _PositionsSubTable(
+            investments: closed,
+            account: account,
+            hidden: hidden,
+            onTap: onTap,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Un tableau positions (en-tête + lignes) — [PositionsTable] en affiche
+/// deux instances : les positions ouvertes, puis (si non vide) les
+/// anciennes positions soldées.
+class _PositionsSubTable extends StatelessWidget {
+  final List<Investment> investments;
+  final InvestmentAccount account;
+  final bool hidden;
+  final ValueChanged<Investment> onTap;
+
+  const _PositionsSubTable({
+    required this.investments,
+    required this.account,
+    required this.hidden,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -43,10 +111,9 @@ class PositionsTable extends StatelessWidget {
             const _HeaderCell('Cours'),
             const _HeaderCell('Valeur'),
             const _HeaderCell('+/- value'),
-            const SizedBox(width: 20),
           ],
         ),
-        for (final investment in account.investments) ...[
+        for (final investment in investments) ...[
           Container(height: 1, color: theme.colorScheme.border),
           _PositionLine(
             investment: investment,
@@ -93,7 +160,7 @@ class _PositionLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final value = investment.effectiveMarketValue ?? investment.investedAmount;
+    final value = investment.displayValue;
     final gain = investment.unrealizedGain;
     final gainPercent = gain != null && investment.investedAmount != 0
         ? gain / investment.investedAmount * 100
@@ -204,14 +271,6 @@ class _PositionLine extends StatelessWidget {
                         percent: gainPercent,
                         hidden: hidden,
                       ),
-              ),
-              SizedBox(
-                width: 20,
-                child: Icon(
-                  LucideIcons.chevronRight,
-                  size: 16,
-                  color: theme.colorScheme.mutedForeground,
-                ),
               ),
             ],
           ),

@@ -11,7 +11,17 @@ import '../investments_models.dart';
 import '../investments_repository.dart';
 import '../transaction_price_currency.dart';
 import 'add_transaction_dialog.dart';
+import 'edit_arbitrage_dialog.dart';
 import 'transaction_widgets.dart';
+
+/// Une paire vente/achat d'arbitrage regroupée — voir
+/// `_AccountTransactionsTabState`'s `_rows`.
+class _ArbitragePair {
+  final (Investment, Transaction) sell;
+  final (Investment, Transaction) buy;
+
+  const _ArbitragePair({required this.sell, required this.buy});
+}
 
 /// Onglet "Transactions" d'un compte Actions & Fonds : historique
 /// chronologique (plus récent en premier) de toutes les transactions du
@@ -75,6 +85,42 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
     return list;
   }
 
+  /// [_allTransactions], mais avec chaque paire d'arbitrage (vente +
+  /// achat liés — voir [Transaction.linkedTransactionId]) regroupée en un
+  /// seul [_ArbitragePair] plutôt que deux entrées séparées : un arbitrage
+  /// reste toujours au sein d'un même compte (voir `transfer_arbitrage_dialog.dart`),
+  /// ses deux jambes apparaissent donc forcément toutes les deux dans cette
+  /// liste — inutile de les afficher comme deux lignes distinctes, voir
+  /// [ArbitrageTransactionRow]. Un transfert, lui, a sa contrepartie dans un
+  /// AUTRE compte : jamais les deux dans cette même liste, jamais fusionné.
+  List<Object> get _rows {
+    final all = _allTransactions;
+    final byTransactionId = {for (final pair in all) pair.$2.id: pair};
+    final consumed = <String>{};
+    final rows = <Object>[];
+    for (final pair in all) {
+      final (_, txn) = pair;
+      if (consumed.contains(txn.id)) continue;
+      final linkedId = txn.linkedTransactionId;
+      final linked = txn.type == TransactionType.arbitrage && linkedId != null
+          ? byTransactionId[linkedId]
+          : null;
+      if (linked != null) {
+        consumed.add(txn.id);
+        consumed.add(linked.$2.id);
+        rows.add(
+          _ArbitragePair(
+            sell: txn.isBuy ? linked : pair,
+            buy: txn.isBuy ? pair : linked,
+          ),
+        );
+      } else {
+        rows.add(pair);
+      }
+    }
+    return rows;
+  }
+
   Future<void> _saveInvestment(Investment updated) async {
     final updatedAccount = widget.account.copyWith(
       investments: [
@@ -90,12 +136,21 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
     Investment investment,
     Transaction transaction,
   ) async {
+    // Une moitié de transfert/arbitrage (voir `Transaction.linkedTransactionId`)
+    // n'a de sens qu'en paire : la supprimer sans sa contrepartie laisserait
+    // une position déséquilibrée (ex : un titre "arrivé" nulle part) sur
+    // l'autre compte/position, une erreur silencieuse difficile à repérer.
+    final linkedId = transaction.linkedTransactionId;
     final confirmed = await confirmDelete(
       context,
       title: 'Supprimer cette transaction ?',
-      message:
-          'Cette action est irréversible et modifiera la quantité détenue '
-          'et le PRU de "${investment.label}".',
+      message: linkedId == null
+          ? 'Cette action est irréversible et modifiera la quantité '
+                'détenue et le PRU de "${investment.label}".'
+          : 'Cette transaction fait partie d\'un transfert/arbitrage : sa '
+                'contrepartie sera aussi supprimée. Cette action est '
+                'irréversible et modifiera la quantité détenue et le PRU '
+                'des deux positions concernées.',
     );
     if (!confirmed) return;
     final orphanedDocuments = [
@@ -117,11 +172,13 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
         ],
       ),
     );
+    if (linkedId != null) await _repo.deleteTransaction(linkedId);
   }
 
   @override
   Widget build(BuildContext context) {
     final all = _allTransactions;
+    final rows = _rows;
     // Voir `TransactionRow.centerDate` : la date ne reste centrée que tant
     // qu'aucune transaction affichée (toutes positions confondues, cet
     // onglet les mélange) ne porte de commentaire.
@@ -141,31 +198,58 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
           ),
         ),
         const SizedBox(height: 12),
-        if (all.isEmpty)
+        if (rows.isEmpty)
           shadcn.Text('Aucune transaction pour l\'instant.').muted().small(),
-        for (final (investment, txn) in all) ...[
-          TransactionRow(
-            transaction: txn,
-            hidden: widget.hidden,
-            assetClass: investment.assetClass ?? widget.account.assetClass,
-            positionLabel: investment.label,
-            onEdit: () => _showEditTransactionDialog(investment, txn),
-            onDelete: () => _deleteTransaction(investment, txn),
-            // Métaux précieux, "Autres" et Actions & Fonds peuvent porter
-            // des documents scopés à la transaction, comme sur la popup de
-            // détail de la position — voir `position_detail_dialog.dart`'s
-            // `_usesTransactionScopedDocuments`.
-            documents: _usesTransactionScopedDocuments(investment)
-                ? [
-                    for (final d in investment.documents)
-                      if (d.transactionId == txn.id) d,
-                  ]
-                : const [],
-            vaultPath: _usesTransactionScopedDocuments(investment)
-                ? widget.vaultPath
-                : null,
-            centerDate: centerDate,
-          ),
+        for (final row in rows) ...[
+          if (row is _ArbitragePair)
+            ArbitrageTransactionRow(
+              sellInvestment: row.sell.$1,
+              sellTransaction: row.sell.$2,
+              sellAssetClass: row.sell.$1.assetClass ?? widget.account.assetClass,
+              buyInvestment: row.buy.$1,
+              buyTransaction: row.buy.$2,
+              buyAssetClass: row.buy.$1.assetClass ?? widget.account.assetClass,
+              hidden: widget.hidden,
+              onEdit: () => _showEditArbitrageDialog(row),
+              // Une seule confirmation/cascade pour la paire, peu importe la
+              // jambe passée : voir `_deleteTransaction`'s `linkedId`.
+              onDelete: () => _deleteTransaction(row.sell.$1, row.sell.$2),
+              // Documents rattachés uniquement à la jambe de vente — voir
+              // `ArbitrageTransactionRow`'s doc de tête.
+              documents: _usesTransactionScopedDocuments(row.sell.$1)
+                  ? [
+                      for (final d in row.sell.$1.documents)
+                        if (d.transactionId == row.sell.$2.id) d,
+                    ]
+                  : const [],
+              vaultPath: _usesTransactionScopedDocuments(row.sell.$1)
+                  ? widget.vaultPath
+                  : null,
+              centerDate: centerDate,
+            )
+          else if (row case (Investment investment, Transaction txn))
+            TransactionRow(
+              transaction: txn,
+              hidden: widget.hidden,
+              assetClass: investment.assetClass ?? widget.account.assetClass,
+              positionLabel: investment.label,
+              onEdit: () => _showEditTransactionDialog(investment, txn),
+              onDelete: () => _deleteTransaction(investment, txn),
+              // Métaux précieux, "Autres" et Actions & Fonds peuvent porter
+              // des documents scopés à la transaction, comme sur la popup de
+              // détail de la position — voir `position_detail_dialog.dart`'s
+              // `_usesTransactionScopedDocuments`.
+              documents: _usesTransactionScopedDocuments(investment)
+                  ? [
+                      for (final d in investment.documents)
+                        if (d.transactionId == txn.id) d,
+                    ]
+                  : const [],
+              vaultPath: _usesTransactionScopedDocuments(investment)
+                  ? widget.vaultPath
+                  : null,
+              centerDate: centerDate,
+            ),
           const SizedBox(height: 8),
         ],
       ],
@@ -185,6 +269,19 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
         transaction: transaction,
         onSave: _saveInvestment,
       ),
+    );
+  }
+
+  Future<void> _showEditArbitrageDialog(_ArbitragePair pair) {
+    return showEditArbitrageDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      account: widget.account,
+      sellInvestment: pair.sell.$1,
+      sellTransaction: pair.sell.$2,
+      buyInvestment: pair.buy.$1,
+      buyTransaction: pair.buy.$2,
+      onChanged: widget.onChanged,
     );
   }
 }
@@ -366,6 +463,12 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
       fxRateToEur: fxRateToEur,
       manualUnlockDate: _unlockDateOverride,
       note: _noteOrNull,
+      // Ni l'un ni l'autre n'est éditable depuis ce formulaire générique —
+      // les omettre les réinitialiserait à `null` silencieusement,
+      // détachant une transaction de dépôt/dividende/transfert/arbitrage de
+      // sa nature ou de sa contrepartie sans aucun avertissement.
+      type: widget.transaction.type,
+      linkedTransactionId: widget.transaction.linkedTransactionId,
     );
     // Repart de `_investment` (pas `widget.investment`) : un document ajouté
     // ou supprimé pendant cette édition (voir `_addDocument`/

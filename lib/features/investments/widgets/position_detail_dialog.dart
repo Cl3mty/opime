@@ -21,7 +21,9 @@ import '../price_history_repository.dart';
 import '../transaction_price_currency.dart';
 import '../yahoo_finance_client.dart' show PricePoint;
 import 'investment_edit_form.dart';
+import 'merge_investment_dialog.dart';
 import 'transaction_widgets.dart';
+import 'transfer_arbitrage_dialog.dart';
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
@@ -399,6 +401,11 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
         fxRateToEur <= 0) {
       return;
     }
+    // Ni l'un ni l'autre n'est éditable depuis ce formulaire : les omettre
+    // les réinitialiserait à `null` silencieusement, détachant une
+    // transaction de dépôt/dividende/transfert/arbitrage de sa nature ou de
+    // sa contrepartie sans aucun avertissement.
+    final original = _investment.transactions.firstWhere((t) => t.id == id);
     final updatedTransaction = Transaction(
       id: id,
       date: date,
@@ -409,6 +416,8 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       fxRateToEur: fxRateToEur,
       manualUnlockDate: _newUnlockDateOverride,
       note: _noteOrNull,
+      type: original.type,
+      linkedTransactionId: original.linkedTransactionId,
     );
     await _saveInvestment(
       _investment.copyWith(
@@ -428,12 +437,21 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   }
 
   Future<void> _deleteTransaction(Transaction transaction) async {
+    // Une moitié de transfert/arbitrage (voir `Transaction.linkedTransactionId`)
+    // n'a de sens qu'en paire : la supprimer sans sa contrepartie laisserait
+    // une position déséquilibrée (ex : un titre "arrivé" nulle part) sur
+    // l'autre compte/position, une erreur silencieuse difficile à repérer.
+    final linkedId = transaction.linkedTransactionId;
     final confirmed = await confirmDelete(
       context,
       title: 'Supprimer cette transaction ?',
-      message:
-          'Cette action est irréversible et modifiera la quantité détenue '
-          'et le PRU de cette position.',
+      message: linkedId == null
+          ? 'Cette action est irréversible et modifiera la quantité '
+                'détenue et le PRU de cette position.'
+          : 'Cette transaction fait partie d\'un transfert/arbitrage : sa '
+                'contrepartie sera aussi supprimée. Cette action est '
+                'irréversible et modifiera la quantité détenue et le PRU '
+                'des deux positions concernées.',
     );
     if (!confirmed) return;
     final orphanedDocuments = [
@@ -455,6 +473,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
         ],
       ),
     );
+    if (linkedId != null) await _repo.deleteTransaction(linkedId);
   }
 
   Future<void> _addDocument(
@@ -689,6 +708,24 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
               onPressed: (_) => _toggleExcludedFromPatrimoine(),
             ),
             MenuButton(
+              enabled: _investment.quantityHeld > 0,
+              leading: const Icon(LucideIcons.arrowRightLeft, size: 14),
+              child: const shadcn.Text('Transférer vers un autre compte'),
+              onPressed: (_) => _openTransferDialog(),
+            ),
+            MenuButton(
+              enabled: _investment.quantityHeld > 0,
+              leading: const Icon(LucideIcons.shuffle, size: 14),
+              child: const shadcn.Text('Arbitrer vers un autre titre'),
+              onPressed: (_) => _openArbitrageDialog(),
+            ),
+            MenuButton(
+              enabled: widget.account.investments.length > 1,
+              leading: const Icon(LucideIcons.combine, size: 14),
+              child: const shadcn.Text('Fusionner avec une autre position'),
+              onPressed: (_) => _openMergeDialog(),
+            ),
+            MenuButton(
               enabled: _canDelete,
               leading: const Icon(LucideIcons.trash2, size: 14),
               trailing: _canDelete
@@ -705,6 +742,70 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     );
   }
 
+  Future<void> _openTransferDialog() async {
+    await showTransferDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      sourceAccount: widget.account,
+      sourceInvestment: _investment,
+      onChanged: widget.onChanged,
+    );
+    await _refreshInvestmentAfterExternalChange();
+  }
+
+  Future<void> _openArbitrageDialog() async {
+    await showArbitrageDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      sourceAccount: widget.account,
+      sourceInvestment: _investment,
+      onChanged: widget.onChanged,
+    );
+    await _refreshInvestmentAfterExternalChange();
+  }
+
+  Future<void> _openMergeDialog() async {
+    // Contrairement au transfert/arbitrage, une fusion réussie fait
+    // disparaître _investment elle-même (voir `merge_investment_dialog.dart`)
+    // : `onChanged` ne se déclenche que sur succès, donc son passage ici
+    // signale qu'il n'y a plus rien à afficher — cette popup se ferme
+    // plutôt que de tenter un rafraîchissement voué à échouer.
+    var merged = false;
+    await showMergeInvestmentDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      account: widget.account,
+      sourceInvestment: _investment,
+      onChanged: () async {
+        merged = true;
+        await widget.onChanged();
+      },
+    );
+    if (merged) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } else {
+      await _refreshInvestmentAfterExternalChange();
+    }
+  }
+
+  /// Recharge la position depuis le disque après un transfert/arbitrage —
+  /// contrairement à [_saveInvestment], celui-ci est persisté par
+  /// `transfer_arbitrage_dialog.dart` avec son propre
+  /// `InvestmentsRepository` (potentiellement sur un autre compte), qui ne
+  /// peut donc pas mettre à jour [_investment] lui-même.
+  Future<void> _refreshInvestmentAfterExternalChange() async {
+    if (!mounted) return;
+    final updatedAccount = await _repo.find(widget.account.id);
+    if (updatedAccount == null || !mounted) return;
+    for (final investment in updatedAccount.investments) {
+      if (investment.id == _investment.id) {
+        setState(() => _investment = investment);
+        return;
+      }
+    }
+  }
+
   static String _formatNumber(double value) {
     return value == value.roundToDouble()
         ? value.toStringAsFixed(0)
@@ -718,8 +819,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     // qu'aucune transaction affichée ne porte de commentaire.
     final centerDate = !investment.transactions.any((t) => t.hasNote);
     final hasPrice = investment.marketValue != null;
-    final displayValue =
-        investment.effectiveMarketValue ?? investment.investedAmount;
+    final displayValue = investment.displayValue;
 
     PerformanceResult? performance;
     if (hasPrice) {
@@ -872,6 +972,11 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                             investment.manualPrice!,
                             widget.hidden,
                           ),
+                          trailing: investment.manualPriceAt != null
+                              ? ManualPriceBadge(
+                                  updatedAt: investment.manualPriceAt!,
+                                )
+                              : null,
                         ),
                     ],
                   ),
@@ -994,6 +1099,15 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                             ? widget.vaultPath
                             : null,
                         centerDate: centerDate,
+                        // Cette popup est bien plus étroite (560px) qu'une
+                        // page pleine largeur — le détail "quantité × prix"
+                        // fait déjà doublon avec les chips "Quantité
+                        // détenue"/"PRU" affichées juste au-dessus, autant
+                        // le masquer ici pour laisser à la date et au
+                        // commentaire la place de tenir sur une ligne (voir
+                        // [TransactionRow.amountsGroupWidth]).
+                        displayTotalOnly: true,
+                        amountsGroupWidth: 110,
                       ),
                     const SizedBox(height: 8),
                   ],

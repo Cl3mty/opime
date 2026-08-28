@@ -83,7 +83,7 @@ class AssistantContextBuilder {
       }
       for (final investment in account.investments) {
         final effectiveClass = investment.assetClass ?? account.assetClass;
-        final value = investment.effectiveMarketValue ?? investment.investedAmount;
+        final value = investment.displayValue;
         final gain = investment.unrealizedGain ?? 0;
         final invested = investment.investedAmount;
         // Un investissement exclu du patrimoine (voir

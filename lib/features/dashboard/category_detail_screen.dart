@@ -1676,8 +1676,12 @@ class _AccountLine extends StatelessWidget {
 
 /// Cellule "Cours" d'une ligne d'investissement : le prix, suivi d'un petit
 /// badge quand [PatrimoineAccount.isPriceFresh] (cours récupéré aujourd'hui,
-/// voir `Investment.isPriceFresh`). Survoler la cellule affiche la date de
-/// dernière récupération, connue ou non fraîche.
+/// voir `Investment.isPriceFresh`) ou, à défaut, quand
+/// [PatrimoineAccount.manualPriceAt] indique un cours estimé à la main —
+/// même paire d'indicateurs que `ManualPriceBadge`/`FreshPriceBadge` sur la
+/// popup de détail d'une position, mais sous forme d'icône compacte pour
+/// tenir dans une cellule de tableau. Survoler la cellule affiche la date
+/// correspondante.
 class _CoursCell extends StatelessWidget {
   final PatrimoineAccount account;
   final bool hidden;
@@ -1686,6 +1690,7 @@ class _CoursCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isManual = account.manualPriceAt != null;
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1693,17 +1698,26 @@ class _CoursCell extends StatelessWidget {
         if (account.isPriceFresh) ...[
           const SizedBox(width: 4),
           Icon(LucideIcons.badgeCheck, size: 12, color: Colors.green),
+        ] else if (isManual) ...[
+          const SizedBox(width: 4),
+          Icon(
+            LucideIcons.pencilLine,
+            size: 12,
+            color: Theme.of(context).colorScheme.mutedForeground,
+          ),
         ],
       ],
     );
-    final lastPriceDate = account.lastPriceDate;
-    if (lastPriceDate == null) return content;
+    final tooltipDate = account.lastPriceDate ?? account.manualPriceAt;
+    if (tooltipDate == null) return content;
     return Tooltip(
       tooltip: (context) => TooltipContainer(
         child: shadcn.Text(
           account.isPriceFresh
-              ? 'Cours à jour, récupéré le ${formatDateDdMmYyyy(lastPriceDate)}.'
-              : 'Dernière mise à jour du cours : ${formatDateDdMmYyyy(lastPriceDate)}.',
+              ? 'Cours à jour, récupéré le ${formatDateDdMmYyyy(tooltipDate)}.'
+              : isManual
+              ? 'Cours estimé à la main le ${formatDateDdMmYyyy(tooltipDate)}.'
+              : 'Dernière mise à jour du cours : ${formatDateDdMmYyyy(tooltipDate)}.',
         ),
       ),
       child: content,

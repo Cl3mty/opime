@@ -360,6 +360,96 @@ void main() {
     },
   );
 
+  group('indicateur de fraîcheur du cours (colonne Cours)', () {
+    Future<void> pumpCategory(
+      WidgetTester tester,
+      PatrimoineAccount investment,
+    ) {
+      return tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryDetailScreen(
+              category: PatrimoineCategory(
+                id: 'actifs_actions_fonds',
+                label: 'Actions & Fonds',
+                icon: LucideIcons.trendingUp,
+                color: const Color(0xFF000000),
+                tier: AllocationTier.fondation,
+                description: '',
+                accounts: [investment],
+              ),
+              amountVisibility: AmountVisibilityController(),
+              onAccountTap: (_) {},
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets(
+      'cours estimé à la main (manualPriceAt) : icône crayon, pas la '
+      'coche verte "à jour"',
+      (tester) async {
+        await pumpCategory(
+          tester,
+          PatrimoineAccount(
+            id: 'inv-1',
+            name: 'Montre de collection',
+            valeur: 1000,
+            cours: 950,
+            manualPriceAt: DateTime(2026, 1, 15),
+            plusValueAbs: 50,
+            plusValuePercent: 5,
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byIcon(LucideIcons.pencilLine), findsOneWidget);
+        expect(find.byIcon(LucideIcons.badgeCheck), findsNothing);
+
+        final tooltipFinder = find.ancestor(
+          of: find.byIcon(LucideIcons.pencilLine),
+          matching: find.byType(Tooltip),
+        );
+        final tooltipWidget = tester.widget<Tooltip>(tooltipFinder);
+        final tooltipContent = tooltipWidget.tooltip(
+          tester.element(tooltipFinder),
+        );
+        await tester.pumpWidget(
+          ShadcnApp(home: Scaffold(child: tooltipContent)),
+        );
+        expect(
+          find.text('Cours estimé à la main le 15/01/2026.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'cours récupéré aujourd\'hui (lastPriceDate) : coche verte "à jour", '
+      'jamais l\'icône crayon même si manualPriceAt est aussi renseigné',
+      (tester) async {
+        final today = DateTime.now();
+        await pumpCategory(
+          tester,
+          PatrimoineAccount(
+            id: 'inv-1',
+            name: 'Amundi MSCI World',
+            valeur: 1000,
+            cours: 100,
+            lastPriceDate: DateTime(today.year, today.month, today.day),
+            plusValueAbs: 50,
+            plusValuePercent: 5,
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byIcon(LucideIcons.badgeCheck), findsOneWidget);
+        expect(find.byIcon(LucideIcons.pencilLine), findsNothing);
+      },
+    );
+  });
+
   group('photo d\'un objet "Autres"', () {
     PatrimoineAccount watch() => const PatrimoineAccount(
       id: 'inv-1',

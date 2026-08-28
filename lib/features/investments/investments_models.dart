@@ -1,5 +1,4 @@
 import 'dart:math';
-import '../../core/money_format.dart' show round2;
 import 'currency_data.dart' show kKnownCurrencies;
 import 'metal_price_client.dart' show kKnownGoldProducts, kKnownSilverProducts;
 import 'yahoo_finance_client.dart' show kKnownCryptoTickers;
@@ -249,14 +248,14 @@ String placeholderIsinFor(AssetClass assetClass) =>
     ? 'autre-${generateInvestmentId('bien')}'
     : 'fcpe-${generateInvestmentId('bien')}';
 
-/// Une valeur a-t-elle besoin d'une précision au-delà du centime à la
-/// persistance sur disque ? Les cryptomonnaies (quantités et cours ont un
-/// sens en dessous du centime) et les taux de change d'une épargne en
-/// devise étrangère (1 JPY ≈ 0,006 € — un arrondi à 2 décimales le
-/// fausserait d'un ordre de grandeur) échappent à [round2] ; toutes les
-/// autres classes se satisfont d'une précision au centime. Voir [round2] et
-/// ses appelants (`InvestmentAccount.toJson`, `price_refresh_service`'s
-/// `_resolveInvestmentPrice`).
+/// Une valeur a-t-elle besoin d'une précision au-delà du centime ? Les
+/// cryptomonnaies (quantités et cours ont un sens en dessous du centime) et
+/// les taux de change d'une épargne en devise étrangère (1 JPY ≈ 0,006 € —
+/// un arrondi à 2 décimales le fausserait d'un ordre de grandeur) en ont
+/// toujours besoin ; les autres classes se satisfont généralement d'une
+/// précision au centime pour l'AFFICHAGE (voir `price_refresh_service`'s
+/// `_resolveInvestmentPrice`) — la persistance sur disque, elle, garde
+/// systématiquement la pleine précision saisie, voir `Transaction.toJson`.
 bool requiresFullPricePrecision(AssetClass assetClass) =>
     assetClass == AssetClass.crypto || assetClass == AssetClass.epargne;
 
@@ -287,7 +286,18 @@ enum TransactionType {
   deposit,
   withdrawal,
   fxConversion,
-  other;
+  other,
+  // Un même titre déplacé d'un compte vers un autre (voir
+  // `transfer_arbitrage_dialog.dart`) — la vente sur le compte source et
+  // l'achat sur le compte destination portent tous deux ce type, avec un
+  // PRU identique (conservé, pas recalculé au cours du marché) et
+  // `Transaction.linkedTransactionId` pointant l'un vers l'autre.
+  transfer,
+  // Vente d'un titre au cours du marché suivie de l'achat d'un autre titre
+  // avec le produit, au sein d'un même compte (assurance vie, PER...) —
+  // même mécanique de paire liée que [transfer], mais entre deux titres
+  // différents plutôt qu'un même titre entre deux comptes.
+  arbitrage;
 
   String get label {
     switch (this) {
@@ -305,6 +315,10 @@ enum TransactionType {
         return 'Conversion de devise';
       case TransactionType.other:
         return 'Autre';
+      case TransactionType.transfer:
+        return 'Transfert';
+      case TransactionType.arbitrage:
+        return 'Arbitrage';
     }
   }
 
@@ -359,6 +373,15 @@ class Transaction {
   /// (l'immense majorité des cas) : la date par défaut s'applique.
   final DateTime? manualUnlockDate;
 
+  /// Id de la transaction contrepartie d'un transfert/arbitrage (voir
+  /// [TransactionType.transfer]/[TransactionType.arbitrage]) — la vente
+  /// d'un côté pointe vers l'achat de l'autre et réciproquement. `null`
+  /// pour toute transaction normale (l'immense majorité des cas). Sert
+  /// uniquement à retrouver et supprimer la contrepartie ensemble (voir
+  /// `InvestmentsRepository.deleteTransaction`) — aucun calcul de
+  /// valorisation/performance n'a besoin de le lire.
+  final String? linkedTransactionId;
+
   Transaction({
     String? id,
     required this.date,
@@ -370,6 +393,7 @@ class Transaction {
     this.type,
     this.note,
     this.manualUnlockDate,
+    this.linkedTransactionId,
   }) : id = id ?? generateInvestmentId('txn');
 
   /// Montant de la transaction en euros (la devise de compte) : quantité ×
@@ -406,21 +430,22 @@ class Transaction {
     manualUnlockDate: json['manualUnlockDate'] != null
         ? DateTime.parse(json['manualUnlockDate'] as String)
         : null,
+    linkedTransactionId: json['linkedTransactionId'] as String?,
   );
 
-  /// [round] à `false` pour les cryptomonnaies (quantité/le cours en
-  /// dessous du centime) et les épargnes en devise étrangère (taux de
-  /// change — voir [requiresFullPricePrecision]) — voir [round2] et
-  /// `InvestmentAccount.toJson`, seul appelant qui connaît la classe
-  /// d'actif effective de l'investissement porteur. Le taux de change, lui,
-  /// est toujours écrit en pleine précision (un taux JPY ≈ 0,006 € ne
-  /// survivrait pas à [round2]).
-  Map<String, dynamic> toJson({bool round = true}) => {
+  /// Quantité et prix toujours écrits en pleine précision — jamais arrondis
+  /// à la sauvegarde, quelle que soit la classe d'actif : une part de fonds
+  /// (PEG/PER...) achetée par prélèvements réguliers accumule couramment
+  /// plus de deux décimales (ex : 3,2557 parts), et arrondir à chaque
+  /// écriture fait dériver silencieusement la quantité réellement détenue
+  /// au fil des sauvegardes successives. Seul l'AFFICHAGE arrondit (voir
+  /// [formatQuantity], `displayEuros`) — jamais la donnée persistée.
+  Map<String, dynamic> toJson() => {
     'id': id,
     'date': date.toIso8601String(),
     'isBuy': isBuy,
-    'quantity': round ? round2(quantity) : quantity,
-    'unitPrice': round ? round2(unitPrice) : unitPrice,
+    'quantity': quantity,
+    'unitPrice': unitPrice,
     // Seule une transaction hors euros porte sa devise et son taux.
     if (currency != 'EUR') 'currency': currency,
     if (type != null) 'type': type!.name,
@@ -428,6 +453,7 @@ class Transaction {
     if (currency != 'EUR') 'fxRateToEur': fxRateToEur,
     if (manualUnlockDate != null)
       'manualUnlockDate': manualUnlockDate!.toIso8601String(),
+    if (linkedTransactionId != null) 'linkedTransactionId': linkedTransactionId,
   };
 }
 
@@ -705,6 +731,22 @@ class Investment {
       ? null
       : effectiveMarketValue! - investedAmount;
 
+  /// Valeur à afficher/agréger pour cette position — [effectiveMarketValue]
+  /// si connue, sinon [investedAmount] à défaut. Une position SOLDÉE
+  /// (quantityHeld ~ 0, ex : entièrement vendue, transférée ou arbitrée
+  /// ailleurs — voir [PositionsTable]'s même seuil) vaut TOUJOURS 0 ici,
+  /// jamais son [investedAmount] : celui-ci est un simple résidu algébrique
+  /// (somme signée achats moins ventes, chacun à son propre prix) qui ne
+  /// s'annule pas forcément à 0 une fois la position vidée — une vente à un
+  /// cours différent du PRU moyen y laisse un écart qui n'a plus aucun sens
+  /// une fois qu'il ne reste plus rien à valoriser. Utilisé partout où une
+  /// valeur de position doit être sommée/affichée (totaux de compte,
+  /// Dashboard, Analyses...) plutôt que de dupliquer ce garde-fou.
+  double get displayValue {
+    if (quantityHeld <= 1e-9) return 0;
+    return effectiveMarketValue ?? investedAmount;
+  }
+
   factory Investment.fromJson(Map<String, dynamic> json) => Investment(
     id: json['id'] as String? ?? generateInvestmentId('inv'),
     isin: json['isin'] as String? ?? '',
@@ -745,15 +787,15 @@ class Investment {
     excludedFromPatrimoine: json['excludedFromPatrimoine'] as bool? ?? false,
   );
 
-  /// [round] à `false` pour les cryptomonnaies et les épargnes en devise
-  /// étrangère — voir [requiresFullPricePrecision] et [round2].
-  Map<String, dynamic> toJson({bool round = true}) => {
+  /// Voir [Transaction.toJson] : quantité/prix jamais arrondis à la
+  /// sauvegarde, seulement à l'affichage.
+  Map<String, dynamic> toJson() => {
     'id': id,
     'isin': isin,
     'label': label,
-    'transactions': transactions.map((t) => t.toJson(round: round)).toList(),
+    'transactions': transactions.map((t) => t.toJson()).toList(),
     if (symbol != null) 'symbol': symbol,
-    if (lastPrice != null) 'lastPrice': round ? round2(lastPrice!) : lastPrice,
+    if (lastPrice != null) 'lastPrice': lastPrice,
     if (lastPriceDate != null)
       'lastPriceDate': lastPriceDate!.toIso8601String(),
     // La devise de cotation et le taux de change ne s'écrivent qu'une fois
@@ -774,8 +816,7 @@ class Investment {
       'estimatedPricePerSqm': estimatedPricePerSqm,
     if (estimatedValueAt != null)
       'estimatedValueAt': estimatedValueAt!.toIso8601String(),
-    if (manualPrice != null)
-      'manualPrice': round ? round2(manualPrice!) : manualPrice,
+    if (manualPrice != null) 'manualPrice': manualPrice,
     if (manualPriceAt != null)
       'manualPriceAt': manualPriceAt!.toIso8601String(),
     if (documents.isNotEmpty)
@@ -1389,12 +1430,11 @@ class InvestmentAccount {
       investments.fold(0.0, (sum, i) => sum + i.investedAmount);
 
   /// Somme des valorisations de marché connues, avec repli sur le montant
-  /// investi pour les investissements sans cours connu — cohérent avec le
-  /// comportement de chaque [Investment] pris individuellement.
-  double get totalMarketValue => investments.fold(
-    0.0,
-    (sum, i) => sum + (i.marketValue ?? i.investedAmount),
-  );
+  /// investi pour les investissements sans cours connu — voir
+  /// [Investment.displayValue] (jamais l'invested amount résiduel d'une
+  /// position soldée).
+  double get totalMarketValue =>
+      investments.fold(0.0, (sum, i) => sum + i.displayValue);
 
   factory InvestmentAccount.fromJson(Map<String, dynamic> json) {
     // Champ banque normalisé : une chaîne vide (effacement saisi en tant
@@ -1438,20 +1478,9 @@ class InvestmentAccount {
     // Promotion d'un champ public impossible dans l'élément d'un
     // collection-if : le `!` est explicite, comme `envelope!.name`.
     if (openingDate != null) 'openingDate': openingDate!.toIso8601String(),
-    // Un investissement crypto (le sien ou, à défaut, celui hérité de ce
-    // compte), une épargne en devise étrangère ou toute autre position en
-    // devise (ex : des dollars tenus dans un CTO — voir
-    // `isCurrencyInvestment`) gardent leur précision d'origine — quantité/
-    // cours en dessous du centime, taux de change — voir
-    // [requiresFullPricePrecision].
-    'investments': investments.map((i) {
-      final effectiveClass = i.assetClass ?? assetClass;
-      return i.toJson(
-        round:
-            !(requiresFullPricePrecision(effectiveClass) ||
-                isCurrencyInvestment(this, i)),
-      );
-    }).toList(),
+    // Voir `Transaction.toJson` : quantité/prix jamais arrondis à la
+    // sauvegarde, pour toute classe d'actif.
+    'investments': investments.map((i) => i.toJson()).toList(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
     if (customOtherCategory != null) 'customOtherCategory': customOtherCategory,

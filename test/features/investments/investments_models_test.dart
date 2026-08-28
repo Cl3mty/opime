@@ -84,18 +84,15 @@ void main() {
     expect(requiresLabelFieldFor(AssetClass.actionsEtFonds), isTrue);
   });
 
-  test(
-    '"Autres" n\'a pas de notion d\'établissement financier : pas d\'étape '
-    '"Quel établissement ?", pas de champ banque (comme la crypto, '
-    'l\'immobilier)',
-    () {
-      expect(assetClassRequiresEstablishmentStep(AssetClass.autres), isFalse);
-      expect(assetClassSupportsBankName(AssetClass.autres), isFalse);
-      // Contrairement à l'épargne/aux comptes-titres, qui en ont bien un.
-      expect(assetClassRequiresEstablishmentStep(AssetClass.epargne), isTrue);
-      expect(assetClassSupportsBankName(AssetClass.epargne), isTrue);
-    },
-  );
+  test('"Autres" n\'a pas de notion d\'établissement financier : pas d\'étape '
+      '"Quel établissement ?", pas de champ banque (comme la crypto, '
+      'l\'immobilier)', () {
+    expect(assetClassRequiresEstablishmentStep(AssetClass.autres), isFalse);
+    expect(assetClassSupportsBankName(AssetClass.autres), isFalse);
+    // Contrairement à l'épargne/aux comptes-titres, qui en ont bien un.
+    expect(assetClassRequiresEstablishmentStep(AssetClass.epargne), isTrue);
+    expect(assetClassSupportsBankName(AssetClass.epargne), isTrue);
+  });
 
   test(
     'identifierOptionsFor : l\'épargne propose la liste des devises connues',
@@ -110,33 +107,30 @@ void main() {
       expect(isinOptionalFor(AssetClass.autres), isTrue);
     });
 
-    test(
-      'Actions & Fonds en PEE/PEG/PER : facultatif (fonds interne à '
-      'l\'entreprise ou au contrat, souvent sans ISIN public)',
-      () {
-        expect(
-          isinOptionalFor(
-            AssetClass.actionsEtFonds,
-            accountEnvelope: AccountEnvelope.peg,
-          ),
-          isTrue,
-        );
-        expect(
-          isinOptionalFor(
-            AssetClass.actionsEtFonds,
-            accountEnvelope: AccountEnvelope.pee,
-          ),
-          isTrue,
-        );
-        expect(
-          isinOptionalFor(
-            AssetClass.actionsEtFonds,
-            accountEnvelope: AccountEnvelope.per,
-          ),
-          isTrue,
-        );
-      },
-    );
+    test('Actions & Fonds en PEE/PEG/PER : facultatif (fonds interne à '
+        'l\'entreprise ou au contrat, souvent sans ISIN public)', () {
+      expect(
+        isinOptionalFor(
+          AssetClass.actionsEtFonds,
+          accountEnvelope: AccountEnvelope.peg,
+        ),
+        isTrue,
+      );
+      expect(
+        isinOptionalFor(
+          AssetClass.actionsEtFonds,
+          accountEnvelope: AccountEnvelope.pee,
+        ),
+        isTrue,
+      );
+      expect(
+        isinOptionalFor(
+          AssetClass.actionsEtFonds,
+          accountEnvelope: AccountEnvelope.per,
+        ),
+        isTrue,
+      );
+    });
 
     test(
       'Actions & Fonds hors PEE/PEG/PER (CTO, PEA...) : ISIN toujours requis',
@@ -190,7 +184,12 @@ void main() {
       isin: 'FR0000131104',
       label: 'BNP Paribas',
       transactions: [
-        Transaction(date: DateTime(2024, 1, 1), isBuy: true, quantity: 10, unitPrice: 50),
+        Transaction(
+          date: DateTime(2024, 1, 1),
+          isBuy: true,
+          quantity: 10,
+          unitPrice: 50,
+        ),
       ],
       excludedFromPatrimoine: excluded,
     );
@@ -205,35 +204,41 @@ void main() {
       expect(b.excludedFromPatrimoine, isTrue);
     });
 
-    test('absent du JSON quand faux (ne alourdit pas les comptes existants)', () {
-      expect(investment().toJson().containsKey('excludedFromPatrimoine'), isFalse);
-    });
+    test(
+      'absent du JSON quand faux (ne alourdit pas les comptes existants)',
+      () {
+        expect(
+          investment().toJson().containsKey('excludedFromPatrimoine'),
+          isFalse,
+        );
+      },
+    );
 
     test('copyWith bascule le drapeau', () {
       final a = investment();
-      expect(a.copyWith(excludedFromPatrimoine: true).excludedFromPatrimoine, isTrue);
+      expect(
+        a.copyWith(excludedFromPatrimoine: true).excludedFromPatrimoine,
+        isTrue,
+      );
       // Paramètre non fourni : conserve la valeur existante.
       expect(a.copyWith(symbol: 'BNP').excludedFromPatrimoine, isFalse);
     });
 
-    test(
-      'InvestmentAccount.totalMarketValue/totalInvested continuent de '
-      'compter un investissement marqué (seuls les agrégats globaux du '
-      'Dashboard l\'ignorent, pas le total propre du compte)',
-      () {
-        final acc = InvestmentAccount(
-          assetClass: AssetClass.actionsEtFonds,
-          envelope: AccountEnvelope.cto,
-          name: 'CTO',
-          investments: [
-            investment(), // 10 * 50 = 500 investis
-            investment(excluded: true), // 10 * 50 = 500 investis aussi
-          ],
-        );
-        expect(acc.totalInvested, 1000);
-        expect(acc.totalMarketValue, 1000);
-      },
-    );
+    test('InvestmentAccount.totalMarketValue/totalInvested continuent de '
+        'compter un investissement marqué (seuls les agrégats globaux du '
+        'Dashboard l\'ignorent, pas le total propre du compte)', () {
+      final acc = InvestmentAccount(
+        assetClass: AssetClass.actionsEtFonds,
+        envelope: AccountEnvelope.cto,
+        name: 'CTO',
+        investments: [
+          investment(), // 10 * 50 = 500 investis
+          investment(excluded: true), // 10 * 50 = 500 investis aussi
+        ],
+      );
+      expect(acc.totalInvested, 1000);
+      expect(acc.totalMarketValue, 1000);
+    });
   });
 
   group('excludedFromPatrimoine (InvestmentAccount)', () {
@@ -254,12 +259,15 @@ void main() {
       expect(b.excludedFromPatrimoine, isTrue);
     });
 
-    test('absent du JSON quand faux (ne alourdit pas les comptes existants)', () {
-      expect(
-        account().toJson().containsKey('excludedFromPatrimoine'),
-        isFalse,
-      );
-    });
+    test(
+      'absent du JSON quand faux (ne alourdit pas les comptes existants)',
+      () {
+        expect(
+          account().toJson().containsKey('excludedFromPatrimoine'),
+          isFalse,
+        );
+      },
+    );
 
     test('copyWith bascule le drapeau', () {
       final a = account();
@@ -483,18 +491,21 @@ void main() {
       expect(roundTripped.amount, closeTo(txn.amount, 1e-9));
     });
 
-    test('round-trip JSON de manualUnlockDate (déblocage anticipé PEG/PEE)', () {
-      final txn = Transaction(
-        id: 'txn_1',
-        date: DateTime(2023, 1, 1),
-        isBuy: true,
-        quantity: 1000,
-        unitPrice: 1,
-        manualUnlockDate: DateTime(2024, 3, 1),
-      );
-      final roundTripped = Transaction.fromJson(txn.toJson());
-      expect(roundTripped.manualUnlockDate, DateTime(2024, 3, 1));
-    });
+    test(
+      'round-trip JSON de manualUnlockDate (déblocage anticipé PEG/PEE)',
+      () {
+        final txn = Transaction(
+          id: 'txn_1',
+          date: DateTime(2023, 1, 1),
+          isBuy: true,
+          quantity: 1000,
+          unitPrice: 1,
+          manualUnlockDate: DateTime(2024, 3, 1),
+        );
+        final roundTripped = Transaction.fromJson(txn.toJson());
+        expect(roundTripped.manualUnlockDate, DateTime(2024, 3, 1));
+      },
+    );
 
     test('manualUnlockDate absente round-trip vers null (pas sérialisée)', () {
       final txn = Transaction(
@@ -505,6 +516,61 @@ void main() {
       );
       expect(txn.toJson().containsKey('manualUnlockDate'), isFalse);
       expect(Transaction.fromJson(txn.toJson()).manualUnlockDate, isNull);
+    });
+
+    test(
+      'round-trip JSON de linkedTransactionId (paire transfert/arbitrage)',
+      () {
+        final txn = Transaction(
+          id: 'txn_1',
+          date: DateTime(2026, 1, 1),
+          isBuy: false,
+          quantity: 10,
+          unitPrice: 100,
+          type: TransactionType.transfer,
+          linkedTransactionId: 'txn_2',
+        );
+        final roundTripped = Transaction.fromJson(txn.toJson());
+        expect(roundTripped.linkedTransactionId, 'txn_2');
+        expect(roundTripped.type, TransactionType.transfer);
+      },
+    );
+
+    test(
+      'linkedTransactionId absente round-trip vers null (pas sérialisée)',
+      () {
+        final txn = Transaction(
+          date: DateTime(2023, 1, 1),
+          isBuy: true,
+          quantity: 1000,
+          unitPrice: 1,
+        );
+        expect(txn.toJson().containsKey('linkedTransactionId'), isFalse);
+        expect(Transaction.fromJson(txn.toJson()).linkedTransactionId, isNull);
+      },
+    );
+
+    test('TransactionType.transfer/.arbitrage ont leurs propres libellés, '
+        'affichés via displayLabel des deux côtés de la paire (achat comme '
+        'vente) plutôt que "Achat"/"Vente"', () {
+      expect(TransactionType.transfer.label, 'Transfert');
+      expect(TransactionType.arbitrage.label, 'Arbitrage');
+      final sell = Transaction(
+        date: DateTime(2026, 1, 1),
+        isBuy: false,
+        quantity: 1,
+        unitPrice: 1,
+        type: TransactionType.transfer,
+      );
+      final buy = Transaction(
+        date: DateTime(2026, 1, 1),
+        isBuy: true,
+        quantity: 1,
+        unitPrice: 1,
+        type: TransactionType.transfer,
+      );
+      expect(sell.displayLabel, 'Transfert');
+      expect(buy.displayLabel, 'Transfert');
     });
   });
 
@@ -728,7 +794,12 @@ void main() {
       assetClass: AssetClass.autres,
       manualPrice: manualPrice,
       transactions: [
-        Transaction(date: DateTime(2024, 1, 1), isBuy: true, quantity: 1, unitPrice: 0),
+        Transaction(
+          date: DateTime(2024, 1, 1),
+          isBuy: true,
+          quantity: 1,
+          unitPrice: 0,
+        ),
       ],
     );
 
@@ -738,40 +809,34 @@ void main() {
       expect(investment.pru, 0);
     });
 
-    test(
-      'unrealizedGain reste défini (montant absolu), pas de division '
-      'par zéro',
-      () {
-        final investment = gift(manualPrice: 500);
-        expect(investment.effectiveMarketValue, 500);
-        expect(investment.unrealizedGain, 500);
-      },
-    );
+    test('unrealizedGain reste défini (montant absolu), pas de division '
+        'par zéro', () {
+      final investment = gift(manualPrice: 500);
+      expect(investment.effectiveMarketValue, 500);
+      expect(investment.unrealizedGain, 500);
+    });
 
-    test(
-      'une vente ultérieure (donné à quelqu\'un d\'autre) reste calculable '
-      'normalement',
-      () {
-        final investment = gift().copyWith(
-          transactions: [
-            Transaction(
-              date: DateTime(2024, 1, 1),
-              isBuy: true,
-              quantity: 1,
-              unitPrice: 0,
-            ),
-            Transaction(
-              date: DateTime(2025, 1, 1),
-              isBuy: false,
-              quantity: 1,
-              unitPrice: 0,
-            ),
-          ],
-        );
-        expect(investment.quantityHeld, 0);
-        expect(investment.investedAmount, 0);
-      },
-    );
+    test('une vente ultérieure (donné à quelqu\'un d\'autre) reste calculable '
+        'normalement', () {
+      final investment = gift().copyWith(
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 1,
+            unitPrice: 0,
+          ),
+          Transaction(
+            date: DateTime(2025, 1, 1),
+            isBuy: false,
+            quantity: 1,
+            unitPrice: 0,
+          ),
+        ],
+      );
+      expect(investment.quantityHeld, 0);
+      expect(investment.investedAmount, 0);
+    });
   });
 
   group('Cours estimé à la main "Autres" (manualPrice)', () {
@@ -825,77 +890,68 @@ void main() {
       },
     );
 
-    test(
-      'estimatedValue multiplie bien le cours manuel par la quantité '
-      'détenue quand elle dépasse 1 (ex : plusieurs objets identiques)',
-      () {
-        final investment = collectible(manualPrice: 100, quantity: 3);
-        expect(investment.quantityHeld, 3);
-        expect(investment.estimatedValue, 300);
-      },
-    );
+    test('estimatedValue multiplie bien le cours manuel par la quantité '
+        'détenue quand elle dépasse 1 (ex : plusieurs objets identiques)', () {
+      final investment = collectible(manualPrice: 100, quantity: 3);
+      expect(investment.quantityHeld, 3);
+      expect(investment.estimatedValue, 300);
+    });
 
-    test(
-      'effectiveMarketValue retombe sur l\'estimation manuelle sans cours '
-      'de marché',
-      () {
-        final investment = collectible(manualPrice: 9500);
-        expect(investment.marketValue, isNull);
-        expect(investment.effectiveMarketValue, 9500);
-      },
-    );
+    test('effectiveMarketValue retombe sur l\'estimation manuelle sans cours '
+        'de marché', () {
+      final investment = collectible(manualPrice: 9500);
+      expect(investment.marketValue, isNull);
+      expect(investment.effectiveMarketValue, 9500);
+    });
 
     test('unrealizedGain calculé à partir de l\'estimation manuelle', () {
       final investment = collectible(manualPrice: 9500, buyAmount: 8000);
       expect(investment.unrealizedGain, 9500 - 8000);
     });
 
-    test('sans estimation : effectiveMarketValue/unrealizedGain restent null', () {
-      final investment = collectible();
-      expect(investment.effectiveMarketValue, isNull);
-      expect(investment.unrealizedGain, isNull);
-    });
-
     test(
-      'copyWith bascule l\'estimation manuelle sans affecter l\'estimation '
-      'immobilière (les deux mécanismes ne se recouvrent jamais)',
+      'sans estimation : effectiveMarketValue/unrealizedGain restent null',
       () {
         final investment = collectible();
-        final updated = investment.copyWith(
-          manualPrice: 9500,
-          manualPriceAt: DateTime(2026, 8, 15),
-        );
-        expect(updated.estimatedValue, 9500);
-        expect(updated.surfaceM2, isNull);
-        expect(updated.estimatedPricePerSqm, isNull);
+        expect(investment.effectiveMarketValue, isNull);
+        expect(investment.unrealizedGain, isNull);
       },
     );
 
-    test(
-      'fonctionne aussi pour un fonds PEE/PEG sans ISIN (Actions & Fonds) : '
-      'manualPrice n\'est pas réservé à "Autres"',
-      () {
-        final fcpeFund = Investment(
-          isin: 'fcpe-1',
-          label: 'FCPE Diversifié Entreprise',
-          assetClass: AssetClass.actionsEtFonds,
-          manualPrice: 42,
-          manualPriceAt: DateTime(2026, 8, 27),
-          transactions: [
-            Transaction(
-              date: DateTime(2024, 1, 1),
-              isBuy: true,
-              quantity: 10,
-              unitPrice: 35,
-            ),
-          ],
-        );
-        expect(fcpeFund.marketValue, isNull);
-        expect(fcpeFund.estimatedValue, 420);
-        expect(fcpeFund.effectiveMarketValue, 420);
-        expect(fcpeFund.unrealizedGain, 420 - 350);
-      },
-    );
+    test('copyWith bascule l\'estimation manuelle sans affecter l\'estimation '
+        'immobilière (les deux mécanismes ne se recouvrent jamais)', () {
+      final investment = collectible();
+      final updated = investment.copyWith(
+        manualPrice: 9500,
+        manualPriceAt: DateTime(2026, 8, 15),
+      );
+      expect(updated.estimatedValue, 9500);
+      expect(updated.surfaceM2, isNull);
+      expect(updated.estimatedPricePerSqm, isNull);
+    });
+
+    test('fonctionne aussi pour un fonds PEE/PEG sans ISIN (Actions & Fonds) : '
+        'manualPrice n\'est pas réservé à "Autres"', () {
+      final fcpeFund = Investment(
+        isin: 'fcpe-1',
+        label: 'FCPE Diversifié Entreprise',
+        assetClass: AssetClass.actionsEtFonds,
+        manualPrice: 42,
+        manualPriceAt: DateTime(2026, 8, 27),
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 10,
+            unitPrice: 35,
+          ),
+        ],
+      );
+      expect(fcpeFund.marketValue, isNull);
+      expect(fcpeFund.estimatedValue, 420);
+      expect(fcpeFund.effectiveMarketValue, 420);
+      expect(fcpeFund.unrealizedGain, 420 - 350);
+    });
   });
 
   group('accountFiscalMilestone', () {
@@ -1114,36 +1170,139 @@ void main() {
       expect(tranches[1].amount, 500);
     });
 
-    test(
-      'une date de déblocage saisie à la main (manualUnlockDate) prend le '
-      'pas sur la règle des 5 ans, pour un déblocage anticipé',
-      () {
-        final today = DateTime(2026, 6, 15);
-        // Achat de la résidence principale : déblocage anticipé, bien avant
-        // les 5 ans par défaut.
-        final manualUnlockDate = DateTime(2024, 3, 1);
-        final investment = Investment(
-          isin: 'FR0000000001',
-          label: 'Fonds actions',
-          transactions: [
-            Transaction(
-              date: DateTime(2023, 1, 1),
-              isBuy: true,
-              quantity: 1000,
-              unitPrice: 1,
-              manualUnlockDate: manualUnlockDate,
-            ),
-          ],
-        );
+    test('une date de déblocage saisie à la main (manualUnlockDate) prend le '
+        'pas sur la règle des 5 ans, pour un déblocage anticipé', () {
+      final today = DateTime(2026, 6, 15);
+      // Achat de la résidence principale : déblocage anticipé, bien avant
+      // les 5 ans par défaut.
+      final manualUnlockDate = DateTime(2024, 3, 1);
+      final investment = Investment(
+        isin: 'FR0000000001',
+        label: 'Fonds actions',
+        transactions: [
+          Transaction(
+            date: DateTime(2023, 1, 1),
+            isBuy: true,
+            quantity: 1000,
+            unitPrice: 1,
+            manualUnlockDate: manualUnlockDate,
+          ),
+        ],
+      );
 
-        final tranches = pegPeeUnlockTranches(
-          investments: [investment],
-          today: today,
-        );
+      final tranches = pegPeeUnlockTranches(
+        investments: [investment],
+        today: today,
+      );
 
-        expect(tranches.single.unlockDate, manualUnlockDate);
-        expect(tranches.single.unlocked, isTrue);
-      },
-    );
+      expect(tranches.single.unlockDate, manualUnlockDate);
+      expect(tranches.single.unlocked, isTrue);
+    });
   });
+
+  group(
+    'displayValue (position soldée : jamais l\'investedAmount résiduel)',
+    () {
+      test(
+        'position ouverte avec cours connu : la valeur de marché habituelle',
+        () {
+          final investment = Investment(
+            isin: 'FR0000131104',
+            label: 'TotalEnergies',
+            lastPrice: 60,
+            transactions: [
+              Transaction(
+                date: DateTime(2024, 1, 1),
+                isBuy: true,
+                quantity: 10,
+                unitPrice: 50,
+              ),
+            ],
+          );
+          expect(investment.displayValue, 600);
+        },
+      );
+
+      test(
+        'position soldée (arbitrage à un cours différent du PRU moyen) : '
+        'displayValue vaut 0, pas le résidu algébrique de investedAmount',
+        () {
+          final investment = Investment(
+            isin: 'FR0000131104',
+            label: 'TotalEnergies',
+            transactions: [
+              Transaction(
+                date: DateTime(2024, 1, 1),
+                isBuy: true,
+                quantity: 10,
+                unitPrice: 50,
+              ),
+              // Vendue au cours du marché (60), différent du PRU (50) — un
+              // arbitrage réalise sa plus-value, laissant un investedAmount
+              // net non nul même quantité tombée à 0.
+              Transaction(
+                date: DateTime(2024, 6, 1),
+                isBuy: false,
+                quantity: 10,
+                unitPrice: 60,
+                type: TransactionType.arbitrage,
+              ),
+            ],
+          );
+          expect(investment.quantityHeld, 0);
+          expect(investment.investedAmount, -100); // résidu non nul
+          expect(investment.displayValue, 0);
+        },
+      );
+
+      test(
+        'InvestmentAccount.totalMarketValue ignore le résidu d\'une '
+        'position soldée sans cours connu',
+        () {
+          final open = Investment(
+            isin: 'FR0000131104',
+            label: 'TotalEnergies',
+            lastPrice: 60,
+            transactions: [
+              Transaction(
+                date: DateTime(2024, 1, 1),
+                isBuy: true,
+                quantity: 10,
+                unitPrice: 50,
+              ),
+            ],
+          );
+          final closed = Investment(
+            isin: 'FR0000120271',
+            label: 'Fonds soldé',
+            transactions: [
+              Transaction(
+                date: DateTime(2022, 1, 1),
+                isBuy: true,
+                quantity: 5,
+                unitPrice: 20,
+              ),
+              Transaction(
+                date: DateTime(2024, 9, 1),
+                isBuy: false,
+                quantity: 5,
+                unitPrice: 30,
+                type: TransactionType.arbitrage,
+              ),
+            ],
+          );
+          final acc = InvestmentAccount(
+            assetClass: AssetClass.actionsEtFonds,
+            envelope: AccountEnvelope.cto,
+            name: 'CTO',
+            investments: [open, closed],
+          );
+          expect(closed.investedAmount, -50); // résidu non nul
+          // 600 (position ouverte) seulement — le -50 de la position soldée
+          // n'est jamais compté.
+          expect(acc.totalMarketValue, 600);
+        },
+      );
+    },
+  );
 }

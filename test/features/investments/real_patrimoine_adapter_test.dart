@@ -133,6 +133,47 @@ void main() {
     expect(leaf.valeur, closeTo(1591.6, 1e-9));
   });
 
+  test(
+    'manualPriceAt propagé au PatrimoineAccount seulement quand le cours '
+    'vient bien de l\'estimation manuelle (pas d\'un cours de marché connu) '
+    '— voir `category_detail_screen.dart`\'s `_CoursCell`',
+    () {
+      final cto = InvestmentAccount(
+        assetClass: AssetClass.autres,
+        envelope: AccountEnvelope.montre,
+        name: 'Montres',
+        investments: [
+          Investment(
+            isin: 'autre-1',
+            label: 'Rolex Submariner',
+            manualPrice: 9500,
+            manualPriceAt: DateTime(2026, 1, 15),
+            transactions: [
+              Transaction(
+                date: DateTime(2022, 1, 1),
+                isBuy: true,
+                quantity: 1,
+                unitPrice: 8000,
+              ),
+            ],
+          ),
+        ],
+      );
+      final categories = buildRealCategories(
+        [cto],
+        const <String, List<PricePoint>>{},
+        '/vault',
+      );
+      final autres = categories.singleWhere(
+        (c) => c.id == AssetClass.autres.categoryId,
+      );
+      final leaf = autres.accounts.single;
+      expect(leaf.cours, 9500);
+      expect(leaf.manualPriceAt, DateTime(2026, 1, 15));
+      expect(leaf.lastPriceDate, isNull);
+    },
+  );
+
   test('Actions & Fonds : sous-titre = description facultative, pas une '
       'répétition du nom (comme l\'épargne)', () {
     final pea = InvestmentAccount(

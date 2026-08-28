@@ -165,6 +165,14 @@ class PatrimoineAccount {
   /// investissement unique) ou dont le cours n'a jamais été récupéré.
   final DateTime? lastPriceDate;
 
+  /// Date de la dernière ESTIMATION manuelle de [cours] — voir
+  /// `Investment.manualPriceAt` côté réel. Non nul seulement quand [cours]
+  /// vient de cette estimation plutôt que d'un cours de marché récupéré
+  /// automatiquement (donc jamais en même temps que [lastPriceDate]) —
+  /// utilisé par `category_detail_screen.dart`'s `_CoursCell` pour
+  /// distinguer "cours à jour" (vert) de "cours estimé à la main".
+  final DateTime? manualPriceAt;
+
   /// Établissement (banque) de ce compte réel — la clé qui regroupe les
   /// comptes d'une même banque sous un accordéon avec logo sur les pages de
   /// catégorie (voir `category_detail_screen.dart`'s `_BankAccordionTile`).
@@ -208,6 +216,7 @@ class PatrimoineAccount {
     this.isCurrency = false,
     this.priceUnavailable,
     this.lastPriceDate,
+    this.manualPriceAt,
     this.bankName,
     this.excludedFromPatrimoine = false,
   });
@@ -280,6 +289,17 @@ class PatrimoineCategory {
   double get montantPatrimoine => accounts.fold(
     0.0,
     (sum, a) => a.excludedFromPatrimoine ? sum : sum + a.valeur,
+  );
+
+  /// Comme [plusValueAbs], mais ignore les lignes exclues du patrimoine —
+  /// même filtre que [montantPatrimoine], pour rester cohérent avec le
+  /// total affiché à côté (la plus-value latente globale du graphique
+  /// principal du Dashboard, `real_patrimoine_card.dart`, dont la courbe
+  /// exclut déjà ces lignes — voir `investmentsForEffectiveClass`'s
+  /// `excludeFlagged`).
+  double get plusValueAbsPatrimoine => accounts.fold(
+    0.0,
+    (sum, a) => a.excludedFromPatrimoine ? sum : sum + a.plusValueAbs,
   );
 
   /// Vrai pour les classes d'actif "unitaires" — une quantité et un cours

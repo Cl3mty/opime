@@ -18,7 +18,9 @@ import 'performance_calculator.dart';
 import 'price_history_repository.dart';
 import 'transaction_price_currency.dart';
 import 'widgets/investment_edit_form.dart';
+import 'widgets/merge_investment_dialog.dart';
 import 'widgets/transaction_widgets.dart';
+import 'widgets/transfer_arbitrage_dialog.dart';
 import 'yahoo_finance_client.dart' show PricePoint;
 
 const _green = Color(0xFF22C55E);
@@ -351,6 +353,13 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
         fxRateToEur <= 0) {
       return;
     }
+    // Aucun des trois n'est éditable depuis ce formulaire : les omettre les
+    // réinitialiserait à `null` silencieusement, détachant une transaction
+    // de dépôt/dividende/transfert/arbitrage de sa nature, de sa
+    // contrepartie, ou perdant une date de déblocage saisie à la main.
+    final original = widget.investment.transactions.firstWhere(
+      (t) => t.id == id,
+    );
     final updatedTransaction = Transaction(
       id: id,
       date: date,
@@ -360,6 +369,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       currency: currency,
       fxRateToEur: fxRateToEur,
       note: _noteOrNull,
+      type: original.type,
+      linkedTransactionId: original.linkedTransactionId,
+      manualUnlockDate: original.manualUnlockDate,
     );
     final updatedInvestment = widget.investment.copyWith(
       transactions: [
@@ -404,6 +416,25 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     await _repo.saveAccount(updatedAccount);
     widget.onBack();
     widget.onChanged();
+  }
+
+  /// Voir `merge_investment_dialog.dart` : une fusion réussie fait
+  /// disparaître `widget.investment` — cette page navigue en arrière plutôt
+  /// que de tenter d'afficher une position qui n'existe plus, même
+  /// principe que [_deleteInvestment].
+  Future<void> _openMergeDialog() async {
+    var merged = false;
+    await showMergeInvestmentDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      account: widget.account,
+      sourceInvestment: widget.investment,
+      onChanged: () async {
+        merged = true;
+        await widget.onChanged();
+      },
+    );
+    if (merged) widget.onBack();
   }
 
   void _startEditInvestment() {
@@ -490,6 +521,36 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 onPressed: (_) => _openReestimateDialog(),
               ),
             MenuButton(
+              enabled: widget.investment.quantityHeld > 0,
+              leading: const Icon(LucideIcons.arrowRightLeft, size: 14),
+              child: const shadcn.Text('Transférer vers un autre compte'),
+              onPressed: (_) => showTransferDialog(
+                context,
+                vaultPath: widget.vaultPath,
+                sourceAccount: widget.account,
+                sourceInvestment: widget.investment,
+                onChanged: widget.onChanged,
+              ),
+            ),
+            MenuButton(
+              enabled: widget.investment.quantityHeld > 0,
+              leading: const Icon(LucideIcons.shuffle, size: 14),
+              child: const shadcn.Text('Arbitrer vers un autre titre'),
+              onPressed: (_) => showArbitrageDialog(
+                context,
+                vaultPath: widget.vaultPath,
+                sourceAccount: widget.account,
+                sourceInvestment: widget.investment,
+                onChanged: widget.onChanged,
+              ),
+            ),
+            MenuButton(
+              enabled: widget.account.investments.length > 1,
+              leading: const Icon(LucideIcons.combine, size: 14),
+              child: const shadcn.Text('Fusionner avec une autre position'),
+              onPressed: (_) => _openMergeDialog(),
+            ),
+            MenuButton(
               enabled: _canDelete,
               leading: const Icon(LucideIcons.trash2, size: 14),
               trailing: _canDelete
@@ -519,12 +580,21 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   }
 
   Future<void> _deleteTransaction(Transaction transaction) async {
+    // Une moitié de transfert/arbitrage (voir `Transaction.linkedTransactionId`)
+    // n'a de sens qu'en paire : la supprimer sans sa contrepartie laisserait
+    // une position déséquilibrée (ex : un titre "arrivé" nulle part) sur
+    // l'autre compte/position, une erreur silencieuse difficile à repérer.
+    final linkedId = transaction.linkedTransactionId;
     final confirmed = await confirmDelete(
       context,
       title: 'Supprimer cette transaction ?',
-      message:
-          'Cette action est irréversible et modifiera la quantité détenue '
-          'et le PRU de cet investissement.',
+      message: linkedId == null
+          ? 'Cette action est irréversible et modifiera la quantité '
+                'détenue et le PRU de cet investissement.'
+          : 'Cette transaction fait partie d\'un transfert/arbitrage : sa '
+                'contrepartie sera aussi supprimée. Cette action est '
+                'irréversible et modifiera la quantité détenue et le PRU '
+                'des deux positions concernées.',
     );
     if (!confirmed) return;
     // Un document rattaché à cette transaction (voir `DocumentsSection`'s
@@ -550,6 +620,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
         ],
       ),
     );
+    if (linkedId != null) await _repo.deleteTransaction(linkedId);
     widget.onChanged();
   }
 
@@ -614,8 +685,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     // qu'aucune transaction affichée ne porte de commentaire.
     final centerDate = !investment.transactions.any((t) => t.hasNote);
     final hasPrice = investment.marketValue != null;
-    final displayValue =
-        investment.effectiveMarketValue ?? investment.investedAmount;
+    final displayValue = investment.displayValue;
 
     PerformanceResult? performance;
     if (hasPrice) {

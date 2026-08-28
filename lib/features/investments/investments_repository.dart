@@ -78,4 +78,36 @@ class InvestmentsRepository {
     all.removeWhere((a) => a.id == id);
     await _writeAll(all);
   }
+
+  /// Retire une transaction par id, où qu'elle vive dans le vault (tous les
+  /// comptes/investissements) — utilisée pour supprimer la contrepartie
+  /// d'un transfert/arbitrage (voir `Transaction.linkedTransactionId`), qui
+  /// peut se trouver dans un compte différent de celui affiché à l'écran.
+  /// Sans effet si aucune transaction ne porte cet id (déjà supprimée, ou
+  /// id invalide).
+  Future<void> deleteTransaction(String transactionId) async {
+    final all = await _readAll();
+    for (var accountIndex = 0; accountIndex < all.length; accountIndex++) {
+      final account = all[accountIndex];
+      for (final investment in account.investments) {
+        if (!investment.transactions.any((t) => t.id == transactionId)) {
+          continue;
+        }
+        final updatedInvestment = investment.copyWith(
+          transactions: [
+            for (final t in investment.transactions)
+              if (t.id != transactionId) t,
+          ],
+        );
+        all[accountIndex] = account.copyWith(
+          investments: [
+            for (final i in account.investments)
+              if (i.id == updatedInvestment.id) updatedInvestment else i,
+          ],
+        );
+        await _writeAll(all);
+        return;
+      }
+    }
+  }
 }

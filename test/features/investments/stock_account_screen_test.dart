@@ -664,7 +664,11 @@ void main() {
 
       // Cours : le cours manuel tel quel. Valeur : 9 500 × 2 = 19 000 €.
       expect(find.text('9 500 €'), findsOneWidget);
-      expect(find.text('19 000 €'), findsOneWidget);
+      // Le compte n'a qu'une seule position : le total du compte
+      // (`AccountSummaryHeader`, qui inclut désormais l'estimation
+      // manuelle — voir `Investment.displayValue`) coïncide avec la valeur
+      // de cette position, d'où les deux occurrences.
+      expect(find.text('19 000 €'), findsNWidgets(2));
     },
   );
 
@@ -705,7 +709,9 @@ void main() {
 
     // Cours : le cours manuel tel quel. Valeur : 42 × 10 = 420 €.
     expect(find.text('42 €'), findsOneWidget);
-    expect(find.text('420 €'), findsOneWidget);
+    // Voir le test "Autres" ci-dessus : le total du compte coïncide avec
+    // cette unique position.
+    expect(find.text('420 €'), findsNWidgets(2));
   });
 
   testWidgets('créer une transaction depuis la popup d\'une position Actions & '
