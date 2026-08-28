@@ -109,6 +109,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
 
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
+  final _noteController = TextEditingController();
   late final TransactionPriceCurrencyController _priceCurrencyController;
 
   bool _editingInvestment = false;
@@ -163,6 +164,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   void dispose() {
     _quantityController.dispose();
     _priceController.dispose();
+    _noteController.dispose();
     _priceCurrencyController.dispose();
     _editIsinController.dispose();
     _editLabelController.dispose();
@@ -295,17 +297,26 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
             currency: currency,
             fxRateToEur: fxRateToEur,
             manualUnlockDate: _newUnlockDateOverride,
+            note: _noteOrNull,
           ),
         ],
       ),
     );
     _quantityController.clear();
     _priceController.clear();
+    _noteController.clear();
     setState(() {
       _creating = false;
       _pendingTransactionId = null;
       _newUnlockDateOverride = null;
     });
+  }
+
+  /// [_noteController]'s text, ou `null` s'il est vide (voir
+  /// [Transaction.note] — jamais une chaîne vide persistée).
+  String? get _noteOrNull {
+    final text = _noteController.text.trim();
+    return text.isEmpty ? null : text;
   }
 
   /// Retire du disque les documents attachés à une création de transaction
@@ -350,6 +361,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       _newUnlockDateOverride = transaction.manualUnlockDate;
       _quantityController.text = _formatNumber(transaction.quantity);
       _priceController.text = _formatNumber(transaction.unitPrice);
+      _noteController.text = transaction.note ?? '';
     });
     _priceCurrencyController.loadFrom(transaction);
   }
@@ -357,6 +369,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   void _cancelEdit() {
     _quantityController.clear();
     _priceController.clear();
+    _noteController.clear();
     _priceCurrencyController.reset();
     setState(() {
       _editingTransactionId = null;
@@ -395,6 +408,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       currency: currency,
       fxRateToEur: fxRateToEur,
       manualUnlockDate: _newUnlockDateOverride,
+      note: _noteOrNull,
     );
     await _saveInvestment(
       _investment.copyWith(
@@ -406,6 +420,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     );
     _quantityController.clear();
     _priceController.clear();
+    _noteController.clear();
     setState(() {
       _editingTransactionId = null;
       _newUnlockDateOverride = null;
@@ -503,9 +518,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const shadcn.Text(
-                    'Cours actuel estimé',
-                  ).large().semiBold(),
+                  const shadcn.Text('Cours actuel estimé').large().semiBold(),
                   const SizedBox(height: 8),
                   shadcn.Text(
                     quantity > 1
@@ -602,8 +615,12 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     // [isinOptionalFor]) : on en régénère un plutôt que de bloquer
     // l'enregistrement, pour permettre de retirer un ISIN saisi par erreur
     // (auparavant impossible : le champ vide était simplement rejeté).
-    final isin = typedIsin.isEmpty &&
-            isinOptionalFor(_effectiveClass, accountEnvelope: widget.account.envelope)
+    final isin =
+        typedIsin.isEmpty &&
+            isinOptionalFor(
+              _effectiveClass,
+              accountEnvelope: widget.account.envelope,
+            )
         ? placeholderIsinFor(_effectiveClass)
         : typedIsin;
     if (isin.isEmpty || label.isEmpty) return;
@@ -697,6 +714,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   @override
   Widget build(BuildContext context) {
     final investment = _investment;
+    // Voir `TransactionRow.centerDate` : la date ne reste centrée que tant
+    // qu'aucune transaction affichée ne porte de commentaire.
+    final centerDate = !investment.transactions.any((t) => t.hasNote);
     final hasPrice = investment.marketValue != null;
     final displayValue =
         investment.effectiveMarketValue ?? investment.investedAmount;
@@ -928,6 +948,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         date: _newDate,
                         quantityController: _quantityController,
                         priceController: _priceController,
+                        noteController: _noteController,
                         quantityLabel: _quantityFieldLabel,
                         priceLabel: _priceFieldLabel,
                         showPriceField: !_isEurCurrency,
@@ -937,8 +958,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         onDateChanged: (d) => setState(() => _newDate = d),
                         unlockDate: _unlockDate,
                         onUnlockDateChanged: _unlockDateApplicable
-                            ? (d) =>
-                                  setState(() => _newUnlockDateOverride = d)
+                            ? (d) => setState(() => _newUnlockDateOverride = d)
                             : null,
                         onCreate: _commitEditTransaction,
                         onCancel: _cancelEdit,
@@ -973,6 +993,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         vaultPath: _usesTransactionScopedDocuments
                             ? widget.vaultPath
                             : null,
+                        centerDate: centerDate,
                       ),
                     const SizedBox(height: 8),
                   ],
@@ -987,6 +1008,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       date: _newDate,
                       quantityController: _quantityController,
                       priceController: _priceController,
+                      noteController: _noteController,
                       quantityLabel: _quantityFieldLabel,
                       priceLabel: _priceFieldLabel,
                       showPriceField: !_isEurCurrency,
@@ -1027,6 +1049,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         );
                         _quantityController.clear();
                         _priceController.clear();
+                        _noteController.clear();
                         _priceCurrencyController.reset();
                         _newUnlockDateOverride = null;
                         _pendingTransactionId = _usesTransactionScopedDocuments

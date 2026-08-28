@@ -35,8 +35,7 @@ class AccountTransactionsTab extends StatefulWidget {
   });
 
   @override
-  State<AccountTransactionsTab> createState() =>
-      _AccountTransactionsTabState();
+  State<AccountTransactionsTab> createState() => _AccountTransactionsTabState();
 }
 
 class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
@@ -123,6 +122,10 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
   @override
   Widget build(BuildContext context) {
     final all = _allTransactions;
+    // Voir `TransactionRow.centerDate` : la date ne reste centrée que tant
+    // qu'aucune transaction affichée (toutes positions confondues, cet
+    // onglet les mélange) ne porte de commentaire.
+    final centerDate = !all.any((pair) => pair.$2.hasNote);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -161,6 +164,7 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
             vaultPath: _usesTransactionScopedDocuments(investment)
                 ? widget.vaultPath
                 : null,
+            centerDate: centerDate,
           ),
           const SizedBox(height: 8),
         ],
@@ -205,8 +209,7 @@ class _EditTransactionDialog extends StatefulWidget {
   });
 
   @override
-  State<_EditTransactionDialog> createState() =>
-      _EditTransactionDialogState();
+  State<_EditTransactionDialog> createState() => _EditTransactionDialogState();
 }
 
 class _EditTransactionDialogState extends State<_EditTransactionDialog> {
@@ -220,6 +223,7 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
 
   late final TextEditingController _quantityController;
   late final TextEditingController _priceController;
+  late final TextEditingController _noteController;
   late final TransactionPriceCurrencyController _priceCurrencyController;
 
   /// Copie locale de l'investissement, tenue à jour après chaque ajout/
@@ -235,7 +239,8 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
   /// et Actions & Fonds peuvent rattacher un document à une transaction
   /// précise.
   bool get _usesTransactionScopedDocuments {
-    final effectiveClass = widget.investment.assetClass ?? widget.account.assetClass;
+    final effectiveClass =
+        widget.investment.assetClass ?? widget.account.assetClass;
     return effectiveClass == AssetClass.metauxPrecieux ||
         effectiveClass == AssetClass.autres ||
         effectiveClass == AssetClass.actionsEtFonds;
@@ -270,7 +275,9 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
 
   String get _quantityFieldLabel {
     if (!_isCurrency) return 'Quantité';
-    return _isEurCurrency ? 'Montant (€)' : 'Montant (${widget.investment.isin})';
+    return _isEurCurrency
+        ? 'Montant (€)'
+        : 'Montant (${widget.investment.isin})';
   }
 
   String get _priceFieldLabel =>
@@ -301,6 +308,9 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
     _priceController = TextEditingController(
       text: _formatNumber(widget.transaction.unitPrice),
     );
+    _noteController = TextEditingController(
+      text: widget.transaction.note ?? '',
+    );
     _priceCurrencyController = TransactionPriceCurrencyController(
       vaultPath: widget.vaultPath,
     );
@@ -311,8 +321,16 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
   void dispose() {
     _quantityController.dispose();
     _priceController.dispose();
+    _noteController.dispose();
     _priceCurrencyController.dispose();
     super.dispose();
+  }
+
+  /// [_noteController]'s text, ou `null` s'il est vide (voir
+  /// [Transaction.note] — jamais une chaîne vide persistée).
+  String? get _noteOrNull {
+    final text = _noteController.text.trim();
+    return text.isEmpty ? null : text;
   }
 
   Future<void> _commit() async {
@@ -324,7 +342,8 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
     // Un objet "Autres" peut avoir été reçu en cadeau (prix d'achat 0) —
     // voir `position_detail_dialog.dart`'s équivalent pour le raisonnement
     // complet.
-    final effectiveClass = widget.investment.assetClass ?? widget.account.assetClass;
+    final effectiveClass =
+        widget.investment.assetClass ?? widget.account.assetClass;
     final invalidPrice =
         price == null ||
         price < 0 ||
@@ -346,6 +365,7 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
       currency: currency,
       fxRateToEur: fxRateToEur,
       manualUnlockDate: _unlockDateOverride,
+      note: _noteOrNull,
     );
     // Repart de `_investment` (pas `widget.investment`) : un document ajouté
     // ou supprimé pendant cette édition (voir `_addDocument`/
@@ -434,6 +454,7 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
                     date: _date,
                     quantityController: _quantityController,
                     priceController: _priceController,
+                    noteController: _noteController,
                     quantityLabel: _quantityFieldLabel,
                     priceLabel: _priceFieldLabel,
                     showPriceField: !_isEurCurrency,
@@ -453,8 +474,7 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
                             vaultPath: widget.vaultPath,
                             documents: [
                               for (final d in _investment.documents)
-                                if (d.transactionId == widget.transaction.id)
-                                  d,
+                                if (d.transactionId == widget.transaction.id) d,
                             ],
                             fixedTransactionId: widget.transaction.id,
                             quantityAssetClass: widget.investment.assetClass,

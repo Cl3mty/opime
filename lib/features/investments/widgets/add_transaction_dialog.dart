@@ -80,6 +80,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
 
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
+  final _noteController = TextEditingController();
   late final TransactionPriceCurrencyController _priceCurrencyController;
 
   /// Id pré-généré de la transaction en cours de création — permet
@@ -127,6 +128,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     _labelController.dispose();
     _quantityController.dispose();
     _priceController.dispose();
+    _noteController.dispose();
     _priceCurrencyController.dispose();
     super.dispose();
   }
@@ -327,6 +329,13 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   double? get _txnFxRateToEur =>
       _txnCurrency == 'EUR' ? 1.0 : _priceCurrencyController.resolvedRate;
 
+  /// [_noteController]'s text, ou `null` s'il est vide (voir
+  /// [Transaction.note] — jamais une chaîne vide persistée).
+  String? get _noteOrNull {
+    final text = _noteController.text.trim();
+    return text.isEmpty ? null : text;
+  }
+
   Future<void> _commit() async {
     final date = _date;
     final quantity = parseDecimal(_quantityController.text);
@@ -338,7 +347,10 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     // définie (voir `Investment`'s `pru`/`unrealizedGain`, déjà tolérants à
     // un montant investi nul, et `PerformanceAmount`, qui masque le
     // pourcentage plutôt que d'afficher "0 %" trompeur).
-    final invalidPrice = price == null || price < 0 || (price == 0 && _effectiveClass != AssetClass.autres);
+    final invalidPrice =
+        price == null ||
+        price < 0 ||
+        (price == 0 && _effectiveClass != AssetClass.autres);
     if (date == null ||
         quantity == null ||
         quantity <= 0 ||
@@ -356,6 +368,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       currency: currency,
       fxRateToEur: fxRateToEur,
       manualUnlockDate: _unlockDateOverride,
+      note: _noteOrNull,
     );
 
     Investment updatedInvestment;
@@ -487,6 +500,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     date: _date,
                     quantityController: _quantityController,
                     priceController: _priceController,
+                    noteController: _noteController,
                     quantityLabel: _quantityFieldLabel,
                     priceLabel: _priceFieldLabel,
                     showPriceField: !_isEurCurrency,

@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../core/ui/opime_date_picker.dart';
 import '../../core/ui/toggle_button_style.dart';
 import '../simulations/loan_calculator.dart';
 
@@ -164,7 +165,7 @@ class LiabilityFormFields extends StatelessWidget {
                 ),
               ],
             ),
-            DatePicker(
+            OpimeDatePicker(
               value: dateDebut,
               onChanged: onDateChanged,
               placeholder: const shadcn.Text('Date de début'),

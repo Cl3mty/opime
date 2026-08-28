@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/features/investments/investment_detail_screen.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
+import 'package:opime/features/investments/widgets/transaction_widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -81,4 +82,118 @@ void main() {
       expect(isGeneratedIdentifier(savedInvestment.isin), isTrue);
     },
   );
+
+  testWidgets(
+    'la date d\'une transaction reste centrée tant qu\'aucune transaction '
+    'de la position n\'a de commentaire, et repasse à gauche dès qu\'une '
+    'seule en a un (voir TransactionRow.centerDate)',
+    (tester) async {
+      final investment = Investment(
+        isin: 'FR0012345678',
+        label: 'TotalEnergies',
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 10),
+            isBuy: true,
+            quantity: 5,
+            unitPrice: 50,
+          ),
+          Transaction(
+            date: DateTime(2024, 2, 20),
+            isBuy: true,
+            quantity: 3,
+            unitPrice: 55,
+            note: 'Renforcement position',
+          ),
+        ],
+      );
+      final account = InvestmentAccount(
+        assetClass: AssetClass.actionsEtFonds,
+        envelope: AccountEnvelope.cto,
+        name: 'CTO',
+        bankName: 'Bourse Direct',
+        investments: [investment],
+      );
+      await tester.runAsync(() async {
+        tempDir = await Directory.systemTemp.createTemp(
+          'opime_investment_detail_test',
+        );
+        await InvestmentsRepository(tempDir.path).saveAccount(account);
+      });
+
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: InvestmentDetailView(
+              vaultPath: tempDir.path,
+              account: account,
+              investment: investment,
+              hidden: false,
+              onBack: () {},
+              onChanged: () async {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Une des deux transactions porte un commentaire : les deux lignes
+      // basculent sur une date alignée à gauche, pas seulement celle qui
+      // porte le commentaire.
+      final rows = tester.widgetList<TransactionRow>(
+        find.byType(TransactionRow),
+      );
+      expect(rows, hasLength(2));
+      expect(rows.every((r) => r.centerDate == false), isTrue);
+    },
+  );
+
+  testWidgets('sans aucun commentaire sur la position, la date reste centrée', (
+    tester,
+  ) async {
+    final investment = Investment(
+      isin: 'FR0012345678',
+      label: 'TotalEnergies',
+      transactions: [
+        Transaction(
+          date: DateTime(2024, 1, 10),
+          isBuy: true,
+          quantity: 5,
+          unitPrice: 50,
+        ),
+      ],
+    );
+    final account = InvestmentAccount(
+      assetClass: AssetClass.actionsEtFonds,
+      envelope: AccountEnvelope.cto,
+      name: 'CTO',
+      bankName: 'Bourse Direct',
+      investments: [investment],
+    );
+    await tester.runAsync(() async {
+      tempDir = await Directory.systemTemp.createTemp(
+        'opime_investment_detail_test',
+      );
+      await InvestmentsRepository(tempDir.path).saveAccount(account);
+    });
+
+    await tester.pumpWidget(
+      ShadcnApp(
+        home: Scaffold(
+          child: InvestmentDetailView(
+            vaultPath: tempDir.path,
+            account: account,
+            investment: investment,
+            hidden: false,
+            onBack: () {},
+            onChanged: () async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final row = tester.widget<TransactionRow>(find.byType(TransactionRow));
+    expect(row.centerDate, isTrue);
+  });
 }

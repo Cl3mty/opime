@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
+import 'package:flutter_localizations/flutter_localizations.dart' as fl;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/assistant/assistant_chat_controller.dart';
@@ -8,6 +9,7 @@ import 'core/notifications/notifications_settings_controller.dart';
 import 'core/privacy/amount_visibility_controller.dart';
 import 'core/shortcuts/app_shortcuts.dart';
 import 'core/shortcuts/keyboard_shortcuts_controller.dart';
+import 'core/ui/shadcn_localizations_fr.dart';
 import 'core/storage/vault_crypto.dart' show VaultCipher;
 import 'core/storage/vault_encryption_metadata.dart';
 import 'core/storage/vault_encryption_repository.dart';
@@ -509,7 +511,26 @@ class _OpimeAppState extends State<OpimeApp> {
       themeMode: _themeController.mode,
       materialTheme: materialTheme,
       home: _buildHome(),
-      localizationsDelegates: FlutterQuillLocalizations.localizationsDelegates,
+      // Sans ça, shadcn_flutter (boutons Annuler/Enregistrer de la boîte de
+      // dialogue d'[OpimeDatePicker]...) reste bloqué sur sa locale par
+      // défaut (`Locale('en', 'US')`, voir `ShadcnApp`'s propre valeur par
+      // défaut de `supportedLocales`) quel que soit le système — l'app est
+      // toujours en français (voir CLAUDE.md), pas seulement selon la
+      // locale de l'appareil.
+      locale: const Locale('fr'),
+      supportedLocales: const [Locale('fr')],
+      localizationsDelegates: [
+        ...FlutterQuillLocalizations.localizationsDelegates,
+        shadcnLocalizationsFrDelegate,
+        // Sans ces trois-là, `ShadcnApp` retombe sur ses propres délégués
+        // Material/Cupertino/Widgets internes (`m.DefaultMaterialLocalizations`...),
+        // qui ne prennent en charge que l'anglais — Flutter avertirait alors
+        // (et `flutter_test` lèverait une erreur) que la locale française
+        // n'est pas prise en charge par tous les délégués déclarés.
+        fl.GlobalMaterialLocalizations.delegate,
+        fl.GlobalCupertinoLocalizations.delegate,
+        fl.GlobalWidgetsLocalizations.delegate,
+      ],
       // Ancêtre du Navigator (donc de toute route, y compris une boîte de
       // dialogue) plutôt que posés à l'intérieur de la route "accueil" —
       // voir la documentation de [_sidebarCollapsed] pour pourquoi c'est le

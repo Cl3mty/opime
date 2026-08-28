@@ -209,7 +209,10 @@ bool requiresLabelFieldFor(
 /// n'ont souvent pas d'ISIN public — l'estimation manuelle du cours
 /// ([Investment.manualPrice]) prend alors le relais d'un cours de marché
 /// introuvable, comme pour "Autres".
-bool isinOptionalFor(AssetClass assetClass, {AccountEnvelope? accountEnvelope}) {
+bool isinOptionalFor(
+  AssetClass assetClass, {
+  AccountEnvelope? accountEnvelope,
+}) {
   if (assetClass == AssetClass.immobilier || assetClass == AssetClass.autres) {
     return true;
   }
@@ -243,8 +246,8 @@ bool isGeneratedIdentifier(String isin) =>
 /// où le compte est créé.
 String placeholderIsinFor(AssetClass assetClass) =>
     assetClass == AssetClass.autres
-        ? 'autre-${generateInvestmentId('bien')}'
-        : 'fcpe-${generateInvestmentId('bien')}';
+    ? 'autre-${generateInvestmentId('bien')}'
+    : 'fcpe-${generateInvestmentId('bien')}';
 
 /// Une valeur a-t-elle besoin d'une précision au-delà du centime à la
 /// persistance sur disque ? Les cryptomonnaies (quantités et cours ont un
@@ -381,6 +384,12 @@ class Transaction {
   /// Libellé affiché pour cette transaction — celui de [type] s'il est
   /// renseigné (dividende, frais...), sinon le "Achat"/"Vente" habituel.
   String get displayLabel => type?.label ?? (isBuy ? 'Achat' : 'Vente');
+
+  /// `true` si [note] est renseigné avec autre chose que des espaces — voir
+  /// `TransactionRow.centerDate` dans `widgets/transaction_widgets.dart`,
+  /// seul appelant : la date d'une liste de transactions n'est centrée que
+  /// tant qu'aucune de ses lignes ne porte de commentaire.
+  bool get hasNote => note != null && note!.trim().isNotEmpty;
 
   factory Transaction.fromJson(Map<String, dynamic> json) => Transaction(
     id: json['id'] as String? ?? generateInvestmentId('txn'),
@@ -771,7 +780,8 @@ class Investment {
       'manualPriceAt': manualPriceAt!.toIso8601String(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
-    if (excludedFromPatrimoine) 'excludedFromPatrimoine': excludedFromPatrimoine,
+    if (excludedFromPatrimoine)
+      'excludedFromPatrimoine': excludedFromPatrimoine,
   };
 }
 
@@ -1220,7 +1230,8 @@ List<UnlockTranche> pegPeeUnlockTranches({
             for (final tx in investment.transactions)
               if (tx.isBuy) tx,
         ].map((tx) {
-          final unlockDate = tx.manualUnlockDate ?? pegPeeUnlockDateFor(tx.date);
+          final unlockDate =
+              tx.manualUnlockDate ?? pegPeeUnlockDateFor(tx.date);
           return (
             date: tx.date,
             amount: tx.amount,
@@ -1361,7 +1372,8 @@ class InvestmentAccount {
         : openingDate as DateTime?,
     investments: investments ?? this.investments,
     documents: documents ?? this.documents,
-    customOtherCategory: identical(customOtherCategory, _unsetCustomOtherCategory)
+    customOtherCategory:
+        identical(customOtherCategory, _unsetCustomOtherCategory)
         ? this.customOtherCategory
         : customOtherCategory as String?,
     excludedFromPatrimoine:
@@ -1410,8 +1422,7 @@ class InvestmentAccount {
           .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
           .toList(),
       customOtherCategory: json['customOtherCategory'] as String?,
-      excludedFromPatrimoine:
-          json['excludedFromPatrimoine'] as bool? ?? false,
+      excludedFromPatrimoine: json['excludedFromPatrimoine'] as bool? ?? false,
     );
   }
 
@@ -1444,6 +1455,7 @@ class InvestmentAccount {
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
     if (customOtherCategory != null) 'customOtherCategory': customOtherCategory,
-    if (excludedFromPatrimoine) 'excludedFromPatrimoine': excludedFromPatrimoine,
+    if (excludedFromPatrimoine)
+      'excludedFromPatrimoine': excludedFromPatrimoine,
   };
 }

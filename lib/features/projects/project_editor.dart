@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/date_format.dart';
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/opime_date_picker.dart';
 import '../dashboard/widgets/net_worth_chart.dart';
 import '../investments/investments_models.dart' show InvestmentAccount;
 import '../investments/investments_repository.dart';
@@ -229,7 +230,7 @@ class _ProjectEditorState extends State<ProjectEditor> {
             maxLines: 3,
           ),
           const SizedBox(height: 8),
-          DatePicker(
+          OpimeDatePicker(
             value: _echeance,
             onChanged: (date) => setState(() => _echeance = date),
             placeholder: const shadcn.Text('Échéance'),

@@ -5,6 +5,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/opime_date_picker.dart';
 import '../../core/ui/toggle_button_style.dart';
 import '../liabilities/liabilities_models.dart';
 import '../liabilities/liabilities_repository.dart';
@@ -201,6 +202,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
 
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
+  final _noteController = TextEditingController();
 
   /// Id pré-généré de la transaction en cours de saisie à l'étape
   /// "Transaction" — permet d'attacher des documents (voir [_addDocument])
@@ -275,6 +277,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     _labelController.dispose();
     _quantityController.dispose();
     _priceController.dispose();
+    _noteController.dispose();
     _priceCurrencyController.dispose();
     _liabNameController.dispose();
     _liabPrixController.dispose();
@@ -835,9 +838,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: controller,
-                    placeholder: const shadcn.Text(
-                      'Ex : Vins de collection',
-                    ),
+                    placeholder: const shadcn.Text('Ex : Vins de collection'),
                     autofocus: true,
                     onSubmitted: (value) =>
                         Navigator.of(context).pop(value.trim()),
@@ -846,9 +847,8 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
                   Row(
                     children: [
                       PrimaryButton(
-                        onPressed: () => Navigator.of(
-                          context,
-                        ).pop(controller.text.trim()),
+                        onPressed: () =>
+                            Navigator.of(context).pop(controller.text.trim()),
                         child: const shadcn.Text('Créer'),
                       ),
                       const SizedBox(width: 8),
@@ -901,7 +901,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         _creatingDevise ||
         assetClass == null ||
         !isinOptionalFor(assetClass, accountEnvelope: account?.envelope);
-    if (account == null || label.isEmpty || (identifierRequired && isin.isEmpty)) {
+    if (account == null ||
+        label.isEmpty ||
+        (identifierRequired && isin.isEmpty)) {
       return;
     }
     // Le compte peut être "étranger" à la classe choisie à l'étape 1 (ex :
@@ -964,6 +966,13 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     _priceCurrencyController.reset();
   }
 
+  /// [_noteController]'s text, ou `null` s'il est vide (voir
+  /// [Transaction.note] — jamais une chaîne vide persistée).
+  String? get _noteOrNull {
+    final text = _noteController.text.trim();
+    return text.isEmpty ? null : text;
+  }
+
   Future<void> _commitCreateTransaction() async {
     final account = _account;
     final investment = _investment;
@@ -1018,6 +1027,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           currency: currency,
           fxRateToEur: fxRateToEur,
           manualUnlockDate: _txnUnlockDateOverride,
+          note: _noteOrNull,
         ),
       ],
     );
@@ -1365,6 +1375,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           date: _txnDate,
           quantityController: _quantityController,
           priceController: _priceController,
+          noteController: _noteController,
           quantityLabel: _quantityFieldLabel,
           priceLabel: _priceFieldLabel,
           showPriceField:
@@ -1598,7 +1609,9 @@ class _AccountStep extends StatelessWidget {
           // notion de compte financier : "bien" couvre aussi bien un objet
           // précis qu'une collection (plusieurs pièces regroupées, voir
           // `customOtherCategory`).
-          title: assetClass == AssetClass.autres ? 'Quel bien ?' : 'Quel compte ?',
+          title: assetClass == AssetClass.autres
+              ? 'Quel bien ?'
+              : 'Quel compte ?',
           onBack: onBack,
         ),
         const SizedBox(height: 16),
@@ -2035,7 +2048,7 @@ class _AccountEnvelopeStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        DatePicker(
+        OpimeDatePicker(
           value: openingDate,
           onChanged: (date) => onOpeningDateChanged(
             date == null
@@ -2259,9 +2272,7 @@ class _InvestmentStep extends StatelessWidget {
                 // série...) — voir `InvestmentIdentifierField`.
                 TextField(
                   controller: labelController,
-                  placeholder: const shadcn.Text(
-                    'Nom (ex : Rolex Submariner)',
-                  ),
+                  placeholder: const shadcn.Text('Nom (ex : Rolex Submariner)'),
                   autofocus: true,
                 ),
                 const SizedBox(height: 8),
@@ -2355,6 +2366,10 @@ class _TransactionStep extends StatelessWidget {
   final DateTime? date;
   final TextEditingController quantityController;
   final TextEditingController priceController;
+
+  /// Commentaire libre et facultatif — voir `TransactionForm`'s équivalent.
+  final TextEditingController noteController;
+
   final String quantityLabel;
   final String priceLabel;
   final bool showPriceField;
@@ -2395,6 +2410,7 @@ class _TransactionStep extends StatelessWidget {
     required this.date,
     required this.quantityController,
     required this.priceController,
+    required this.noteController,
     this.quantityLabel = 'Quantité',
     this.priceLabel = 'Prix unitaire',
     this.showPriceField = true,
@@ -2445,7 +2461,7 @@ class _TransactionStep extends StatelessWidget {
                 ),
               ],
             ),
-            DatePicker(
+            OpimeDatePicker(
               value: date,
               onChanged: onDateChanged,
               placeholder: const shadcn.Text('Date'),
@@ -2458,7 +2474,7 @@ class _TransactionStep extends StatelessWidget {
             children: [
               shadcn.Text('Débloqué le').muted().xSmall(),
               const SizedBox(width: 8),
-              DatePicker(
+              OpimeDatePicker(
                 value: unlockDate,
                 onChanged: onUnlockDateChanged,
                 placeholder: const shadcn.Text('Date de déblocage'),
@@ -2504,6 +2520,11 @@ class _TransactionStep extends StatelessWidget {
             quantityController: quantityController,
             priceController: priceController,
           ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: noteController,
+          placeholder: const shadcn.Text('Commentaire (facultatif)'),
+        ),
         if (documentsSection != null) ...[
           const SizedBox(height: 16),
           documentsSection!,

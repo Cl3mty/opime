@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/ui/copyable_identifier.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../core/ui/opime_date_picker.dart';
 import 'confirm_delete_dialog.dart';
 import 'document_storage.dart';
 import 'documents_section.dart';
@@ -799,7 +800,7 @@ class AccountEditForm extends StatelessWidget {
             if (showOpeningDateField) ...[
               Row(
                 children: [
-                  DatePicker(
+                  OpimeDatePicker(
                     value: openingDate,
                     onChanged: onOpeningDateChanged,
                     placeholder: const shadcn.Text('Date d\'ouverture'),

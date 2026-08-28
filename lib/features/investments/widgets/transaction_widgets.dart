@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
+import '../../../core/ui/opime_date_picker.dart';
 import '../../../core/ui/toggle_button_style.dart';
 import '../currency_format.dart';
 import '../documents_section.dart';
@@ -11,23 +12,37 @@ import '../transaction_price_currency.dart';
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
 
-/// Largeur réservée à l'étiquette de type de transaction ("Achat", "Vente",
-/// "Dividende", "Conversion de devise"...) dans [TransactionRow] — sans
-/// largeur fixe, la date qui suit (voir [Transaction.displayLabel]) se
-/// décale d'une ligne à l'autre selon la longueur du libellé, empêchant les
-/// dates de tout le tableau de s'aligner verticalement. Dimensionnée pour
-/// le plus long libellé existant ("Conversion de devise", voir
-/// [TransactionType.label]).
-const _kindBadgeWidth = 156.0;
+/// Part de l'espace flexible de la ligne (voir [TransactionRow.build])
+/// allouée au groupe étiquette de type + nom de la position + commentaire,
+/// contre [_dateFlex] pour la date centrée qui suit — proportions plutôt que
+/// des largeurs fixes en pixels : les colonnes restent alignées d'une ligne
+/// à l'autre quel que soit le contenu, un `Expanded` prenant toujours la
+/// même part de l'espace disponible indépendamment de la longueur de son
+/// contenu.
+const _leftGroupFlex = 5;
+const _dateFlex = 2;
 
-/// Largeur réservée au groupe étiquette de type + nom de la position
-/// (`positionLabel`), quand la liste mélange plusieurs positions (onglet
-/// "Transactions" d'un compte) — même raison que [_kindBadgeWidth] pris
-/// seul, appliquée cette fois au groupe entier (les deux sont collés l'un
-/// à l'autre, voir [TransactionRow.build]). Un nom trop long est
-/// simplement tronqué (`overflow: TextOverflow.ellipsis`) plutôt que de
-/// décaler la suite de la ligne.
-const _leftGroupWidth = 320.0;
+/// Largeur maximale (mais pas fixe : le nom garde sa largeur naturelle en
+/// dessous) du nom de la position au sein du groupe de gauche
+/// ([_leftGroupFlex]) — un plafond généreux, jamais atteint en pratique,
+/// simple garde-fou contre un libellé extrême. Le nom n'est volontairement
+/// PAS un `Flexible`/`Expanded` : seul le commentaire qui le suit
+/// ([Transaction.note], dans un `Expanded`) absorbe l'espace restant et se
+/// réduit (`overflow: TextOverflow.ellipsis`) si besoin — jamais le nom, et
+/// jamais le commentaire non plus quand la ligne a assez de place pour les
+/// deux (voir [TransactionRow.build]).
+const _positionLabelMaxWidth = 260.0;
+
+/// Largeurs fixes des colonnes de fin de ligne (calcul quantité × prix +
+/// montant collés ensemble, bouton documents) — comme
+/// [_leftGroupFlex]/[_dateFlex] ci-dessus, mais en pixels plutôt qu'en part
+/// de l'espace flexible : ces colonnes affichent un contenu de longueur
+/// variable d'une transaction à l'autre (des chiffres différents), qui doit
+/// rester `Expanded`-neutre pour ne pas décaler le partage de l'espace
+/// flexible entre le groupe de gauche et la date d'une ligne à l'autre (voir
+/// [TransactionRow.build]).
+const _amountsGroupWidth = 270.0;
+const _documentsIconWidth = 32.0;
 
 /// Étiquette de type de transaction ("Achat", "Vente", "Dividende"...) —
 /// extraite en widget partagé entre les deux mises en page de
@@ -176,6 +191,19 @@ class TransactionRow extends StatelessWidget {
   /// — inutilisé (et `null`) quand [documents] est vide.
   final String? vaultPath;
 
+  /// `true` (défaut) centre la date dans sa colonne — proprement, tant
+  /// qu'aucune ligne de la liste n'a de commentaire (voir [Transaction.note])
+  /// à côté de son actif : le groupe de gauche reste alors compact et
+  /// prévisible, la date au centre du reste de la ligne a un sens visuel.
+  /// Dès qu'au moins une ligne de la liste porte un commentaire, ce groupe
+  /// de gauche s'élargit de façon variable d'une ligne à l'autre — centrer
+  /// la date dans l'espace restant donnerait alors une colonne qui semble
+  /// mal alignée plutôt que centrée. L'appelant, seul à connaître
+  /// l'ensemble des transactions affichées (pas seulement celle-ci), doit
+  /// passer `false` dans ce cas — la date retombe alors sur un alignement à
+  /// gauche, comme avant l'introduction des commentaires.
+  final bool centerDate;
+
   const TransactionRow({
     super.key,
     required this.transaction,
@@ -187,6 +215,7 @@ class TransactionRow extends StatelessWidget {
     required this.onDelete,
     this.documents = const [],
     this.vaultPath,
+    this.centerDate = true,
   });
 
   void _openMenu(BuildContext anchorContext) {
@@ -218,85 +247,124 @@ class TransactionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = transaction.isBuy ? _green : _red;
+    final note = transaction.note?.trim();
+    final hasNote = note != null && note.isNotEmpty;
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            if (positionLabel == null)
-              SizedBox(
-                width: _kindBadgeWidth,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _TransactionKindBadge(
+            // Étiquette de type + nom de la position (si la liste mélange
+            // plusieurs positions) + commentaire (si renseigné, voir
+            // [Transaction.note]) collés les uns aux autres (pas chacun
+            // dans sa propre case à largeur fixe, sans quoi un libellé
+            // court comme "Achat" laisserait un grand vide avant le
+            // suivant) — le GROUPE entier occupe une part fixe de l'espace
+            // disponible ([_leftGroupFlex], contre [_dateFlex] pour la date
+            // qui suit) plutôt qu'une largeur fixe en pixels : les colonnes
+            // restent alignées d'une ligne à l'autre quel que soit le
+            // contenu. À l'intérieur, seul le commentaire est un `Expanded` :
+            // il absorbe l'espace qui reste une fois le nom affiché à sa
+            // largeur naturelle (plafonnée par prudence, voir
+            // [_positionLabelMaxWidth]), et ne se réduit donc que si la
+            // ligne n'a vraiment plus la place pour les deux — jamais avant.
+            Expanded(
+              flex: _leftGroupFlex,
+              child: Row(
+                children: [
+                  _TransactionKindBadge(
                     label: transaction.displayLabel,
                     color: color,
                   ),
-                ),
-              )
-            else
-              // Étiquette de type et nom de la position collés l'un à
-              // l'autre (pas chacun dans sa propre case à largeur fixe,
-              // sans quoi un libellé court comme "Achat" laisserait un
-              // grand vide avant le nom) — mais le GROUPE des deux garde
-              // une largeur totale fixe, comme [_kindBadgeWidth] seul dans
-              // l'autre branche : sans ça, la date qui suit (alignée à
-              // gauche dans son propre `Expanded`, donc dépendante
-              // uniquement de ce qui la précède) se décalerait d'une ligne
-              // à l'autre selon la longueur combinée des deux.
-              SizedBox(
-                width: _leftGroupWidth,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _TransactionKindBadge(
-                      label: transaction.displayLabel,
-                      color: color,
-                    ),
+                  if (positionLabel != null) ...[
                     const SizedBox(width: 8),
-                    Flexible(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: _positionLabelMaxWidth,
+                      ),
                       child: shadcn.Text(
                         positionLabel!,
                         overflow: TextOverflow.ellipsis,
                       ).small().medium(),
                     ),
                   ],
-                ),
+                  if (hasNote) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: shadcn.Text(
+                        note,
+                        overflow: TextOverflow.ellipsis,
+                      ).muted().xSmall(),
+                    ),
+                  ],
+                ],
               ),
-            const SizedBox(width: 12),
-            Expanded(child: shadcn.Text(_formatDate(transaction.date)).small()),
-            if (!displayTotalOnly) ...[
-              shadcn.Text(
-                '${formatQuantity(transaction.quantity, assetClass)} × '
-                '${transaction.currency == 'EUR' ? displayEuros(transaction.unitPrice, hidden) : formatPriceInCurrency(transaction.unitPrice, transaction.currency, hidden: hidden)}',
-              ).muted().xSmall(),
-              const SizedBox(width: 12),
-            ],
-            shadcn.Text(displayEuros(transaction.amount, hidden)).medium(),
-            if (documents.isNotEmpty && vaultPath != null) ...[
-              const SizedBox(width: 4),
-              // Consultation rapide des pièces justificatives de la
-              // transaction (métaux précieux et "autres") — l'ajout et la
-              // suppression restent sur le formulaire d'édition, voir
-              // `showDocumentViewDialog`.
-              Tooltip(
-                tooltip: (context) => TooltipContainer(
-                  child: shadcn.Text(
-                    '${documents.length} document'
-                    '${documents.length > 1 ? 's' : ''} rattaché'
-                    '${documents.length > 1 ? 's' : ''} — consulter',
-                  ),
-                ),
-                child: IconButton.ghost(
-                  icon: Icon(LucideIcons.paperclip, size: 15),
-                  onPressed: () => showDocumentViewDialog(
-                    context,
-                    vaultPath: vaultPath!,
-                    documents: documents,
-                  ),
-                ),
+            ),
+            Expanded(
+              flex: _dateFlex,
+              child: Align(
+                alignment: centerDate ? Alignment.center : Alignment.centerLeft,
+                child: shadcn.Text(_formatDate(transaction.date)).small(),
               ),
-            ],
+            ),
+            // Calcul (quantité × prix) et montant collés l'un à l'autre,
+            // tout à droite — une seule case à largeur fixe pour les deux
+            // ([_amountsGroupWidth], même raison que [_documentsIconWidth] :
+            // garder le partage de l'espace flexible constant d'une ligne à
+            // l'autre) plutôt qu'une par élément, sans quoi l'espace inutilisé
+            // d'une case trop large pour son contenu s'intercalerait entre
+            // les deux au lieu de rester group à gauche de l'ensemble.
+            SizedBox(
+              width: _amountsGroupWidth,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (!displayTotalOnly) ...[
+                    Flexible(
+                      child: shadcn.Text(
+                        '${formatQuantity(transaction.quantity, assetClass)} × '
+                        '${transaction.currency == 'EUR' ? displayEuros(transaction.unitPrice, hidden) : formatPriceInCurrency(transaction.unitPrice, transaction.currency, hidden: hidden)}',
+                        overflow: TextOverflow.ellipsis,
+                      ).muted().xSmall(),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  shadcn.Text(
+                    displayEuros(transaction.amount, hidden),
+                  ).medium(),
+                ],
+              ),
+            ),
+            // Largeur toujours réservée (bouton affiché ou non) : sans ça,
+            // une ligne avec documents et une ligne sans décaleraient la
+            // part d'espace libre allouée au groupe de gauche/à la date qui
+            // le précèdent (voir [_documentsIconWidth]).
+            SizedBox(
+              width: _documentsIconWidth,
+              child: documents.isEmpty || vaultPath == null
+                  ? null
+                  // Consultation rapide des pièces justificatives de la
+                  // transaction (métaux précieux et "autres") — l'ajout et
+                  // la suppression restent sur le formulaire d'édition, voir
+                  // `showDocumentViewDialog`.
+                  : Tooltip(
+                      tooltip: (context) => TooltipContainer(
+                        child: shadcn.Text(
+                          '${documents.length} document'
+                          '${documents.length > 1 ? 's' : ''} rattaché'
+                          '${documents.length > 1 ? 's' : ''} — consulter',
+                        ),
+                      ),
+                      child: IconButton.ghost(
+                        icon: Icon(LucideIcons.paperclip, size: 15),
+                        onPressed: () => showDocumentViewDialog(
+                          context,
+                          vaultPath: vaultPath!,
+                          documents: documents,
+                        ),
+                      ),
+                    ),
+            ),
             Builder(
               builder: (context) => IconButton.ghost(
                 icon: const Icon(LucideIcons.ellipsisVertical, size: 16),
@@ -358,6 +426,13 @@ class TransactionForm extends StatelessWidget {
   final DateTime? date;
   final TextEditingController quantityController;
   final TextEditingController priceController;
+
+  /// Commentaire libre et facultatif (ex : "Renforcement position", "Achat
+  /// suite au dividende") — affiché sur [TransactionRow] à côté du nom de
+  /// l'actif, en plus petit et plus clair (voir [Transaction.note]), jamais
+  /// utilisé dans les calculs.
+  final TextEditingController noteController;
+
   final ValueChanged<bool> onIsBuyChanged;
   final ValueChanged<DateTime?> onDateChanged;
   final VoidCallback onCreate;
@@ -414,6 +489,7 @@ class TransactionForm extends StatelessWidget {
     required this.date,
     required this.quantityController,
     required this.priceController,
+    required this.noteController,
     this.submitLabel = 'Ajouter la transaction',
     this.quantityLabel = 'Quantité',
     this.priceLabel = 'Prix unitaire',
@@ -460,7 +536,7 @@ class TransactionForm extends StatelessWidget {
                     ),
                   ],
                 ),
-                DatePicker(
+                OpimeDatePicker(
                   value: date,
                   onChanged: onDateChanged,
                   placeholder: const shadcn.Text('Date'),
@@ -473,7 +549,7 @@ class TransactionForm extends StatelessWidget {
                 children: [
                   shadcn.Text('Débloqué le').muted().xSmall(),
                   const SizedBox(width: 8),
-                  DatePicker(
+                  OpimeDatePicker(
                     value: unlockDate,
                     onChanged: onUnlockDateChanged,
                     placeholder: const shadcn.Text('Date de déblocage'),
@@ -520,6 +596,11 @@ class TransactionForm extends StatelessWidget {
                 quantityController: quantityController,
                 priceController: priceController,
               ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: noteController,
+              placeholder: const shadcn.Text('Commentaire (facultatif)'),
+            ),
             if (documentsSection != null) ...[
               const SizedBox(height: 16),
               documentsSection!,

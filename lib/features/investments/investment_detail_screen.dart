@@ -74,6 +74,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   DateTime? _newDate;
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
+  final _noteController = TextEditingController();
 
   /// Devise et taux de change du formulaire de transaction courant (voir
   /// `transaction_price_currency.dart`) : à l'euro par défaut, résolus puis
@@ -122,6 +123,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   void dispose() {
     _quantityController.dispose();
     _priceController.dispose();
+    _noteController.dispose();
     _priceCurrencyController.dispose();
     _editIsinController.dispose();
     _editLabelController.dispose();
@@ -274,6 +276,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
           unitPrice: price,
           currency: currency,
           fxRateToEur: fxRateToEur,
+          note: _noteOrNull,
         ),
       ],
     );
@@ -286,8 +289,16 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     await _repo.saveAccount(updatedAccount);
     _quantityController.clear();
     _priceController.clear();
+    _noteController.clear();
     setState(() => _creating = false);
     widget.onChanged();
+  }
+
+  /// [_noteController]'s text, ou `null` s'il est vide (voir
+  /// [Transaction.note] — jamais une chaîne vide persistée).
+  String? get _noteOrNull {
+    final text = _noteController.text.trim();
+    return text.isEmpty ? null : text;
   }
 
   void _startEdit(Transaction transaction) {
@@ -302,6 +313,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       _priceController.text = _isImmobilier
           ? ''
           : _formatNumber(transaction.unitPrice);
+      _noteController.text = transaction.note ?? '';
     });
     // Devise et taux enregistrés sur la transaction (historiquement exacts)
     // repris tels quels pour l'édition.
@@ -311,6 +323,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   void _cancelEdit() {
     _quantityController.clear();
     _priceController.clear();
+    _noteController.clear();
     _priceCurrencyController.reset();
     setState(() => _editingTransactionId = null);
   }
@@ -346,6 +359,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       unitPrice: price,
       currency: currency,
       fxRateToEur: fxRateToEur,
+      note: _noteOrNull,
     );
     final updatedInvestment = widget.investment.copyWith(
       transactions: [
@@ -362,6 +376,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     await _repo.saveAccount(updatedAccount);
     _quantityController.clear();
     _priceController.clear();
+    _noteController.clear();
     setState(() => _editingTransactionId = null);
     widget.onChanged();
   }
@@ -420,8 +435,12 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     // [isinOptionalFor]) : on en régénère un plutôt que de bloquer
     // l'enregistrement, pour permettre de retirer un ISIN saisi par erreur
     // (auparavant impossible : le champ vide était simplement rejeté).
-    final isin = typedIsin.isEmpty &&
-            isinOptionalFor(_effectiveClass, accountEnvelope: widget.account.envelope)
+    final isin =
+        typedIsin.isEmpty &&
+            isinOptionalFor(
+              _effectiveClass,
+              accountEnvelope: widget.account.envelope,
+            )
         ? placeholderIsinFor(_effectiveClass)
         : typedIsin;
     if ((!_isImmobilier && isin.isEmpty) || label.isEmpty) return;
@@ -591,6 +610,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   Widget build(BuildContext context) {
     final investment = widget.investment;
     final theme = Theme.of(context);
+    // Voir `TransactionRow.centerDate` : la date ne reste centrée que tant
+    // qu'aucune transaction affichée ne porte de commentaire.
+    final centerDate = !investment.transactions.any((t) => t.hasNote);
     final hasPrice = investment.marketValue != null;
     final displayValue =
         investment.effectiveMarketValue ?? investment.investedAmount;
@@ -811,6 +833,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 date: _newDate,
                 quantityController: _quantityController,
                 priceController: _priceController,
+                noteController: _noteController,
                 quantityLabel: _quantityFieldLabel,
                 priceLabel: _priceFieldLabel,
                 showPriceField: !_isEurCurrency && !_isImmobilier,
@@ -859,6 +882,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 vaultPath: _usesTransactionScopedDocuments
                     ? widget.vaultPath
                     : null,
+                centerDate: centerDate,
               ),
             const SizedBox(height: 8),
           ],
@@ -871,6 +895,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               date: _newDate,
               quantityController: _quantityController,
               priceController: _priceController,
+              noteController: _noteController,
               quantityLabel: _quantityFieldLabel,
               priceLabel: _priceFieldLabel,
               showPriceField: !_isEurCurrency && !_isImmobilier,
@@ -895,6 +920,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 );
                 _quantityController.clear();
                 _priceController.clear();
+                _noteController.clear();
                 // Nouvelle transaction : devise et taux remis à l'euro.
                 _priceCurrencyController.reset();
                 _creating = true;
