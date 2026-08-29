@@ -1,5 +1,6 @@
 import 'investments_models.dart';
 import 'investments_repository.dart';
+import 'leveraged_position.dart';
 import 'metal_image_repository.dart';
 import 'metal_price_client.dart';
 import 'metal_price_repository.dart';
@@ -118,8 +119,44 @@ Future<void> refreshAllPrices({
         changed = true;
       }
     }
+
+    // Positions à effet de levier crypto : cours actualisé automatiquement
+    // comme un investissement spot classique (voir la doc de tête de
+    // `LeveragedPosition`) — Actions & Fonds (CFD/action sur marge, pas de
+    // ticker Yahoo fiable) reste en saisie manuelle, seule la crypto a une
+    // source de cours automatique exploitable ici.
+    var updatedLeveragedPositions = account.leveragedPositions;
+    if (account.assetClass == AssetClass.crypto) {
+      final newPositions = <LeveragedPosition>[];
+      var leveragedChanged = false;
+      for (final position in account.leveragedPositions) {
+        final updated = position.isOpen && !position.isMarkPriceFresh
+            ? await _resolveLeveragedPositionPrice(
+                vaultPath: vaultPath,
+                position: position,
+                priceSyncStatus: priceSyncStatus,
+              )
+            : null;
+        if (updated == null) {
+          newPositions.add(position);
+        } else {
+          newPositions.add(updated);
+          leveragedChanged = true;
+        }
+      }
+      if (leveragedChanged) {
+        updatedLeveragedPositions = newPositions;
+        changed = true;
+      }
+    }
+
     if (changed) {
-      await repo.saveAccount(account.copyWith(investments: updatedInvestments));
+      await repo.saveAccount(
+        account.copyWith(
+          investments: updatedInvestments,
+          leveragedPositions: updatedLeveragedPositions,
+        ),
+      );
     }
   }
 }
@@ -289,6 +326,39 @@ Future<Investment?> _resolveInvestmentPrice({
     // Un cours vient d'être trouvé : le drapeau "introuvable" est levé.
     priceUnavailable: false,
   );
+}
+
+/// Résout (si besoin) le cours actuel (mark price) d'une position à effet
+/// de levier crypto — [LeveragedPosition.market] est un ticker de
+/// [kKnownCryptoTickers] (voir `leveraged_position_dialog.dart`), résolu en
+/// euros directement comme n'importe quelle position spot crypto (voir
+/// [YahooFinanceClient.resolveCryptoSymbol], pas de conversion de devise
+/// séparée nécessaire). Partage le même cache que la position spot
+/// éventuelle du même ticker (`market` sert de pseudo-ISIN, comme
+/// `investment.isin` pour un investissement) — un seul appel réseau par
+/// ticker et par jour, quel que soit le nombre de positions (spot et à
+/// effet de levier) qui le suivent. `null` si le cours est déjà à jour
+/// aujourd'hui, ou si aucun cours n'a pu être résolu (panne réseau, ticker
+/// inconnu de Yahoo Finance) — le liquidationPrice/funding restent alors
+/// sur leur dernière valeur saisie à la main, jamais écrasés ici.
+Future<LeveragedPosition?> _resolveLeveragedPositionPrice({
+  required String vaultPath,
+  required LeveragedPosition position,
+  required PriceSyncStatusController priceSyncStatus,
+}) async {
+  final yahoo = YahooFinanceClient();
+  final symbol = yahoo.resolveCryptoSymbol(position.market);
+  final priceRepo = PriceHistoryRepository(vaultPath, client: yahoo);
+  final result = await priceRepo.syncIfNeeded(
+    position.market,
+    symbol,
+    round: false,
+    onNetworkError: () => priceSyncStatus.reportOffline(),
+    onNetworkSuccess: () => priceSyncStatus.reportOnline(),
+  );
+  if (result.points.isEmpty) return null;
+  final latest = result.points.reduce((a, b) => a.date.isAfter(b.date) ? a : b);
+  return position.copyWith(markPrice: latest.close, markPriceAt: DateTime.now());
 }
 
 /// Classes d'actif où un cours de marché (Yahoo Finance) est *attendu* : un

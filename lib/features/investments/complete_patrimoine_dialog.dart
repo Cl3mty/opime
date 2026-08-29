@@ -23,6 +23,7 @@ import 'investments_models.dart';
 import 'investments_repository.dart';
 import 'real_patrimoine_adapter.dart' show emptyCategoryFor;
 import 'transaction_price_currency.dart';
+import 'widgets/leveraged_position_dialog.dart' show showLeveragedPositionDialog;
 
 /// Valeur sentinelle du sélecteur de type "Autres" personnalisé
 /// (`_AccountStep`) : aucun type précis choisi, l'enveloppe générique
@@ -1116,6 +1117,26 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     _finish();
   }
 
+  /// Ouvre le formulaire dédié aux positions à effet de levier
+  /// (`leveraged_position_dialog.dart`) directement depuis l'étape "Quel
+  /// investissement ?" — un compte-titres/crypto peut porter aussi bien des
+  /// positions spot classiques que du levier, voir la doc de tête de
+  /// `LeveragedPosition`. Ce formulaire couvre à lui seul tout ce que les
+  /// étapes "investissement" + "transaction" font pour une position spot
+  /// (marché, taille, prix d'entrée...), donc pas de sous-étape ici : sa
+  /// propre validation/sauvegarde suffit, [_finish] clôt ensuite tout le
+  /// flux "Compléter mon patrimoine" une fois la position enregistrée.
+  Future<void> _openLeveragedPositionDialog() async {
+    final account = _account;
+    if (account == null) return;
+    await showLeveragedPositionDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      account: account,
+      onChanged: () async => _finish(),
+    );
+  }
+
   void _finish() {
     widget.onCompleted();
     Navigator.of(context).pop();
@@ -1309,6 +1330,11 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         final account = _account!;
         final assetClass = _assetClass!;
         final allowsDevises = assetClass == AssetClass.actionsEtFonds;
+        // Même périmètre que `PositionsTable._showLeveragedSection` : seules
+        // ces deux classes couvrent aujourd'hui le trading sur marge.
+        final allowsLeverage =
+            assetClass == AssetClass.actionsEtFonds ||
+            assetClass == AssetClass.crypto;
         return _InvestmentStep(
           stepLabel:
               'Étape ${_isEstablishmentFlow ? 5 : 4} sur $_totalSteps · '
@@ -1365,6 +1391,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           }),
           onCancelCreate: () => setState(() => _creatingInvestment = false),
           onCreate: _commitCreateInvestment,
+          onAddLeveraged: allowsLeverage ? _openLeveragedPositionDialog : null,
         );
       case _Step.transaction:
         return _TransactionStep(
@@ -2148,6 +2175,14 @@ class _InvestmentStep extends StatelessWidget {
   final VoidCallback onCancelCreate;
   final VoidCallback onCreate;
 
+  /// `null` masque l'option "Position à effet de levier" (Actions & Fonds/
+  /// Crypto uniquement, voir `PositionsTable._showLeveragedSection`) —
+  /// ouvre directement `leveraged_position_dialog.dart`, qui couvre à lui
+  /// seul tout ce que les étapes "investissement" + "transaction" font pour
+  /// une position spot (voir `_CompletePatrimoineDialogState
+  /// ._openLeveragedPositionDialog`).
+  final VoidCallback? onAddLeveraged;
+
   const _InvestmentStep({
     required this.stepLabel,
     this.title = 'Quel investissement ?',
@@ -2159,6 +2194,7 @@ class _InvestmentStep extends StatelessWidget {
     this.allowsDevises = false,
     this.creatingDevise = false,
     this.onDeviseModeChanged,
+    this.onAddLeveraged,
     required this.isinController,
     required this.labelController,
     required this.realEstateType,
@@ -2296,8 +2332,17 @@ class _InvestmentStep extends StatelessWidget {
                 )) ...[
                   TextField(
                     controller: labelController,
-                    placeholder: const shadcn.Text(
-                      'Libellé (ex: TotalEnergies)',
+                    // Exemple adapté à la classe d'actif effectivement
+                    // choisie — n'atteint cette branche générique que
+                    // "Actions & Fonds", "Private Equity" et un ETC métaux
+                    // précieux logé dans un CTO (voir [identifierOptionsFor],
+                    // qui exclut les autres avec une liste déroulante connue).
+                    placeholder: shadcn.Text(
+                      assetClass == AssetClass.privateEquity
+                          ? 'Libellé (ex: Ardian Expansion Fund)'
+                          : assetClass == AssetClass.metauxPrecieux
+                          ? 'Libellé (ex: Amundi Physical Gold ETC)'
+                          : 'Libellé (ex: TotalEnergies)',
                     ),
                     autofocus: true,
                   ),
@@ -2355,8 +2400,16 @@ class _InvestmentStep extends StatelessWidget {
             onCancel: onCancelCreate,
             createLabel: createLabel,
           )
-        else
+        else ...[
           _AddOptionButton(label: addLabel, onTap: onStartCreate),
+          if (onAddLeveraged != null) ...[
+            const SizedBox(height: 8),
+            _AddOptionButton(
+              label: 'Position à effet de levier',
+              onTap: onAddLeveraged!,
+            ),
+          ],
+        ],
       ],
     );
   }

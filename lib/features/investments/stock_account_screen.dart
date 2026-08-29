@@ -382,6 +382,8 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               account: account,
               hidden: widget.hidden,
               onTap: _openPosition,
+              vaultPath: widget.vaultPath,
+              onChanged: () async => widget.onChanged(),
             )
           else if (_tabIndex == 1)
             AccountTransactionsTab(

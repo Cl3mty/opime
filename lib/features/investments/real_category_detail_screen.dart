@@ -131,15 +131,20 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
       priceHistories,
       widget.vaultPath,
     );
-    // Fusion par ISIN entre comptes (voir `real_patrimoine_adapter.dart`'s
-    // `buildRealCategoriesByInvestment`) : seule "Actions & Fonds" en a
-    // l'usage aujourd'hui (détenir le même titre dans plusieurs comptes est
-    // un cas réel là où les autres classes n'en ont pas besoin) — calculée
-    // pour toutes les classes reste sans effet (une seule catégorie
-    // recherchée juste après) mais reste bon marché, aucune E/S
-    // supplémentaire par rapport aux deux listes déjà construites ci-dessus.
+    // Fusion par identifiant entre comptes (voir
+    // `real_patrimoine_adapter.dart`'s `buildRealCategoriesByInvestment`,
+    // qui fusionne par ISIN pour "Actions & Fonds" et par ticker pour
+    // "Crypto" — `Investment.isin` sert de ticker en l'absence d'ISIN pour
+    // une crypto, voir `identifierOptionsFor`) : seules ces deux classes ont
+    // l'usage aujourd'hui (détenir le même titre/la même crypto dans
+    // plusieurs comptes/wallets est un cas réel là où les autres classes
+    // n'en ont pas besoin) — calculée pour toutes les classes reste sans
+    // effet (une seule catégorie recherchée juste après) mais reste bon
+    // marché, aucune E/S supplémentaire par rapport aux deux listes déjà
+    // construites ci-dessus.
     final categoriesByInvestment =
-        widget.categoryId == AssetClass.actionsEtFonds.categoryId
+        widget.categoryId == AssetClass.actionsEtFonds.categoryId ||
+            widget.categoryId == AssetClass.crypto.categoryId
         ? buildRealCategoriesByInvestment(
             accounts,
             priceHistories,

@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'currency_data.dart' show kKnownCurrencies;
+import 'leveraged_position.dart' show LeveragedPosition;
 import 'metal_price_client.dart' show kKnownGoldProducts, kKnownSilverProducts;
 import 'yahoo_finance_client.dart' show kKnownCryptoTickers;
 
@@ -1347,6 +1348,14 @@ class InvestmentAccount {
   final DateTime? openingDate;
 
   final List<Investment> investments;
+
+  /// Positions à effet de levier (perpétuels crypto, marge) — un compte
+  /// Actions & Fonds/Crypto peut porter les deux à la fois (positions spot
+  /// dans [investments], positions à levier ici), comme un exchange
+  /// affichant des onglets "Balances"/"Positions" pour un seul compte. Voir
+  /// [LeveragedPosition] pour pourquoi ce n'est pas modélisé comme un
+  /// [Investment] à quantité négative.
+  final List<LeveragedPosition> leveragedPositions;
   final List<VaultDocument> documents;
 
   /// Libellé personnalisé choisi par l'utilisateur pour un compte "Autres"
@@ -1382,6 +1391,7 @@ class InvestmentAccount {
     this.description,
     this.openingDate,
     required this.investments,
+    this.leveragedPositions = const [],
     this.documents = const [],
     this.customOtherCategory,
     this.excludedFromPatrimoine = false,
@@ -1391,6 +1401,7 @@ class InvestmentAccount {
     String? name,
     AccountEnvelope? envelope,
     List<Investment>? investments,
+    List<LeveragedPosition>? leveragedPositions,
     List<VaultDocument>? documents,
     Object? bankName = _unsetBankName,
     Object? description = _unsetDescription,
@@ -1412,6 +1423,7 @@ class InvestmentAccount {
         ? this.openingDate
         : openingDate as DateTime?,
     investments: investments ?? this.investments,
+    leveragedPositions: leveragedPositions ?? this.leveragedPositions,
     documents: documents ?? this.documents,
     customOtherCategory:
         identical(customOtherCategory, _unsetCustomOtherCategory)
@@ -1436,6 +1448,13 @@ class InvestmentAccount {
   double get totalMarketValue =>
       investments.fold(0.0, (sum, i) => sum + i.displayValue);
 
+  /// Somme des positions à effet de levier ENCORE OUVERTES, valorisées à
+  /// [LeveragedPosition.displayValue] (marge + PnL latent, jamais la valeur
+  /// notionnelle) — une position fermée ne compte plus pour rien, son PnL
+  /// étant déjà réalisé.
+  double get totalLeveragedValue =>
+      leveragedPositions.fold(0.0, (sum, p) => sum + p.displayValue);
+
   factory InvestmentAccount.fromJson(Map<String, dynamic> json) {
     // Champ banque normalisé : une chaîne vide (effacement saisi en tant
     // que tel) vaut `null`.
@@ -1457,6 +1476,9 @@ class InvestmentAccount {
           : null,
       investments: (json['investments'] as List? ?? [])
           .map((e) => Investment.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      leveragedPositions: (json['leveragedPositions'] as List? ?? [])
+          .map((e) => LeveragedPosition.fromJson(e as Map<String, dynamic>))
           .toList(),
       documents: (json['documents'] as List? ?? [])
           .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
@@ -1481,6 +1503,8 @@ class InvestmentAccount {
     // Voir `Transaction.toJson` : quantité/prix jamais arrondis à la
     // sauvegarde, pour toute classe d'actif.
     'investments': investments.map((i) => i.toJson()).toList(),
+    if (leveragedPositions.isNotEmpty)
+      'leveragedPositions': leveragedPositions.map((p) => p.toJson()).toList(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
     if (customOtherCategory != null) 'customOtherCategory': customOtherCategory,

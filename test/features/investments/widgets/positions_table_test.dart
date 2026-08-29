@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/features/investments/investments_models.dart';
+import 'package:opime/features/investments/leveraged_position.dart';
 import 'package:opime/features/investments/widgets/positions_table.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -16,6 +17,8 @@ void main() {
             account: account,
             hidden: false,
             onTap: onTap ?? (_) {},
+            vaultPath: '/tmp/unused-in-this-test',
+            onChanged: () async {},
           ),
         ),
       ),
@@ -136,4 +139,80 @@ void main() {
       expect(tapped?.id, closed.id);
     },
   );
+
+  group('positions à effet de levier (régression : section de l\'onglet '
+      'Positions, plus un onglet séparé)', () {
+    testWidgets(
+      'un compte Actions & Fonds/Crypto affiche la section même sans '
+      'position à effet de levier — état vide + bouton "Ajouter"',
+      (tester) async {
+        await pump(tester, buildAccount(const []));
+
+        expect(find.text('Positions à effet de levier'), findsOneWidget);
+        expect(
+          find.text('Aucune position à effet de levier pour l\'instant.'),
+          findsOneWidget,
+        );
+        expect(find.text('Ajouter une position'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'une position ouverte apparaît dans un tableau (marché, taille, '
+      'entrée, cours, marge, PnL), une position fermée sous "Positions '
+      'fermées"',
+      (tester) async {
+        final open = LeveragedPosition(
+          market: 'BTC',
+          side: PositionSide.long,
+          leverage: 2,
+          size: 0.1,
+          entryPrice: 60000,
+          markPrice: 66000,
+          openedAt: DateTime(2026, 1, 1),
+        );
+        final closed = LeveragedPosition(
+          market: 'ETH',
+          side: PositionSide.short,
+          leverage: 3,
+          size: 1,
+          entryPrice: 3000,
+          openedAt: DateTime(2025, 1, 1),
+          closedAt: DateTime(2025, 6, 1),
+          closePrice: 2700,
+        );
+        final account = InvestmentAccount(
+          assetClass: AssetClass.actionsEtFonds,
+          envelope: AccountEnvelope.cto,
+          name: 'CTO',
+          investments: const [],
+          leveragedPositions: [open, closed],
+        );
+        await pump(tester, account);
+
+        expect(find.text('BTC'), findsOneWidget);
+        expect(find.text('Long 2x'), findsOneWidget);
+        expect(find.text('Positions fermées'), findsOneWidget);
+        expect(find.text('ETH'), findsOneWidget);
+        expect(find.text('Fermée'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'un compte épargne (aucun trading sur marge) n\'affiche pas la '
+      'section du tout',
+      (tester) async {
+        final account = InvestmentAccount(
+          assetClass: AssetClass.epargne,
+          envelope: AccountEnvelope.livretA,
+          name: 'Livret A',
+          bankName: 'Boursorama',
+          investments: const [],
+        );
+        await pump(tester, account);
+
+        expect(find.text('Positions à effet de levier'), findsNothing);
+      },
+    );
+  });
 }

@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons, Color;
 import '../dashboard/patrimoine_models.dart';
 import 'investments_models.dart';
+import 'leveraged_position.dart';
 import 'metal_price_client.dart';
 import 'metal_price_repository.dart';
 import 'price_history_repository.dart';
@@ -118,6 +119,8 @@ List<PatrimoineCategory> buildRealCategories(
   String vaultPath,
 ) {
   final byClass = <AssetClass, List<(InvestmentAccount, Investment)>>{};
+  final leveragedByClass =
+      <AssetClass, List<(InvestmentAccount, LeveragedPosition)>>{};
   for (final account in accounts) {
     for (final investment in account.investments) {
       // Une position entièrement vendue (quantité nulle) est un historique,
@@ -128,16 +131,33 @@ List<PatrimoineCategory> buildRealCategories(
       final effectiveClass = investment.assetClass ?? account.assetClass;
       byClass.putIfAbsent(effectiveClass, () => []).add((account, investment));
     }
+    // Une position à effet de levier n'a pas de classe effective propre
+    // (pas d'ISIN, pas de notion de "titre logé dans un compte d'une autre
+    // classe" comme un ETC métaux dans un CTO) : elle compte toujours pour
+    // la classe de son compte porteur.
+    for (final position in account.leveragedPositions) {
+      if (!position.isOpen) continue;
+      leveragedByClass
+          .putIfAbsent(account.assetClass, () => [])
+          .add((account, position));
+    }
   }
   return [
-    for (final entry in byClass.entries)
-      _buildCategory(entry.key, entry.value, priceHistories, vaultPath),
+    for (final assetClass in {...byClass.keys, ...leveragedByClass.keys})
+      _buildCategory(
+        assetClass,
+        byClass[assetClass] ?? const [],
+        leveragedByClass[assetClass] ?? const [],
+        priceHistories,
+        vaultPath,
+      ),
   ];
 }
 
 PatrimoineCategory _buildCategory(
   AssetClass assetClass,
   List<(InvestmentAccount, Investment)> pairs,
+  List<(InvestmentAccount, LeveragedPosition)> leveragedPairs,
   Map<String, List<PricePoint>> priceHistories,
   String vaultPath,
 ) {
@@ -145,6 +165,8 @@ PatrimoineCategory _buildCategory(
   final leaves = <PatrimoineAccount>[
     for (final (account, investment) in pairs)
       _buildLeaf(account, investment, vaultPath),
+    for (final (account, position) in leveragedPairs)
+      _buildLeveragedLeaf(account, position),
   ];
   return PatrimoineCategory(
     id: assetClass.categoryId,
@@ -163,8 +185,8 @@ PatrimoineCategory _buildCategory(
 /// concernée (un même compte peut apparaître dans deux catégories s'il
 /// porte des investissements à classe effective différente — voir
 /// [accountAcceptsCrossClassInvestment]). Utilisé pour l'accordéon du
-/// Dashboard ([CategoryBreakdownCard]) et pour la vue "par compte" de la
-/// Distribution ([CategoryDetailScreen]) — le détail par investissement
+/// Dashboard ([CategoryBreakdownCard]) et pour la vue "par compte" de
+/// l'Allocation ([CategoryDetailScreen]) — le détail par investissement
 /// reste sur la page dédiée à la classe d'actif via [buildRealCategories].
 List<PatrimoineCategory> buildRealCategoriesByAccount(
   List<InvestmentAccount> accounts,
@@ -172,32 +194,45 @@ List<PatrimoineCategory> buildRealCategoriesByAccount(
   String vaultPath,
 ) {
   final byClass = <AssetClass, List<(InvestmentAccount, Investment)>>{};
-  // Un compte sans aucun investissement (tout juste créé, ou vidé après
-  // suppression de sa dernière position) ne produit aucune paire ci-dessous
-  // — sans ce repli, il resterait invisible de tout accordéon établissement
-  // → comptes et donc inatteignable pour être complété ou supprimé. Il est
-  // rattaché à sa seule classe connue, la sienne (pas de notion de classe
-  // effective possible sans investissement porteur — voir
-  // [accountAcceptsCrossClassInvestment]).
-  final emptyAccountsByClass = <AssetClass, List<InvestmentAccount>>{};
+  // Comptes qui ont besoin d'une feuille dans LEUR PROPRE classe sans y
+  // avoir de paire spot (via [byClass]) : soit un compte sans aucun
+  // investissement (tout juste créé, ou vidé après suppression de sa
+  // dernière position — sans ce repli, il resterait invisible de tout
+  // accordéon établissement → comptes et donc inatteignable pour être
+  // complété ou supprimé), soit un compte dont tous les investissements
+  // sont redirigés vers une autre classe (cross-class, voir
+  // [accountAcceptsCrossClassInvestment]) mais qui porte aussi une position
+  // à effet de levier — toujours comptée dans SA classe, jamais celle d'un
+  // investissement cross-class (voir [_buildAccountLeaf]), elle y
+  // deviendrait sinon invisible faute de toute feuille "Actions & Fonds"/
+  // "Crypto" pour ce compte.
+  final ownClassLeafNeededFor = <AssetClass, List<InvestmentAccount>>{};
   for (final account in accounts) {
     if (account.investments.isEmpty) {
-      emptyAccountsByClass
+      ownClassLeafNeededFor
           .putIfAbsent(account.assetClass, () => [])
           .add(account);
       continue;
     }
+    var hasOwnClassInvestment = false;
     for (final investment in account.investments) {
       final effectiveClass = investment.assetClass ?? account.assetClass;
+      if (effectiveClass == account.assetClass) hasOwnClassInvestment = true;
       byClass.putIfAbsent(effectiveClass, () => []).add((account, investment));
+    }
+    if (!hasOwnClassInvestment &&
+        account.leveragedPositions.any((p) => p.isOpen)) {
+      ownClassLeafNeededFor
+          .putIfAbsent(account.assetClass, () => [])
+          .add(account);
     }
   }
   return [
-    for (final assetClass in {...byClass.keys, ...emptyAccountsByClass.keys})
+    for (final assetClass in {...byClass.keys, ...ownClassLeafNeededFor.keys})
       _buildCategoryByAccount(
         assetClass,
         byClass[assetClass] ?? const [],
-        emptyAccountsByClass[assetClass] ?? const [],
+        ownClassLeafNeededFor[assetClass] ?? const [],
         priceHistories,
         vaultPath,
       ),
@@ -207,7 +242,11 @@ List<PatrimoineCategory> buildRealCategoriesByAccount(
 PatrimoineCategory _buildCategoryByAccount(
   AssetClass assetClass,
   List<(InvestmentAccount, Investment)> pairs,
-  List<InvestmentAccount> emptyAccounts,
+  // Comptes sans paire spot dans [pairs] pour cette classe (vide, ou
+  // entièrement cross-class) mais qui ont quand même besoin d'une feuille
+  // ici — voir la doc de [buildRealCategoriesByAccount]'s
+  // `ownClassLeafNeededFor`.
+  List<InvestmentAccount> accountsWithoutOwnClassPair,
   Map<String, List<PricePoint>> priceHistories,
   String vaultPath,
 ) {
@@ -218,9 +257,14 @@ PatrimoineCategory _buildCategoryByAccount(
   }
   final leaves = <PatrimoineAccount>[
     for (final accountPairs in byAccountId.values)
-      _buildAccountLeaf(accountPairs.first.$1, accountPairs, vaultPath),
-    for (final account in emptyAccounts)
-      _buildAccountLeaf(account, const [], vaultPath),
+      _buildAccountLeaf(
+        accountPairs.first.$1,
+        accountPairs,
+        vaultPath,
+        assetClass: assetClass,
+      ),
+    for (final account in accountsWithoutOwnClassPair)
+      _buildAccountLeaf(account, const [], vaultPath, assetClass: assetClass),
   ];
   return PatrimoineCategory(
     id: assetClass.categoryId,
@@ -236,8 +280,17 @@ PatrimoineCategory _buildCategoryByAccount(
 PatrimoineAccount _buildAccountLeaf(
   InvestmentAccount account,
   List<(InvestmentAccount, Investment)> pairs,
-  String vaultPath,
-) {
+  String vaultPath, {
+  // Une position à effet de levier compte toujours pour la classe du
+  // compte porteur (voir `_buildLeveragedLeaf`), jamais une classe
+  // "effective" cross-class (ex : un ETC métaux logé dans un CTO) — sans ce
+  // garde-fou, un compte Actions & Fonds qui porte À LA FOIS un ETC métaux
+  // ET une position à effet de levier verrait cette dernière comptée deux
+  // fois (une fois dans la catégorie "Métaux précieux", une fois dans
+  // "Actions & Fonds"), cette fonction étant appelée une fois par classe
+  // effective présente sur le compte.
+  required AssetClass assetClass,
+}) {
   // Seules les positions encore détenues représentent ce que le compte
   // contient *actuellement* — une position entièrement soldée (ex : un
   // titre entièrement revendu, une devise entièrement dépensée) disparaît
@@ -277,6 +330,22 @@ PatrimoineAccount _buildAccountLeaf(
     valeur += v;
     plusValueAbs += gain;
     costBasis += v - gain;
+  }
+  // Positions à effet de levier du compte (voir `LeveragedPosition`) — même
+  // principe qu'un investissement spot : `displayValue` (marge + PnL
+  // latent, jamais la valeur notionnelle) alimente `valeur`, la marge
+  // engagée tient lieu de "coût d'acquisition" pour le calcul du
+  // pourcentage de plus-value. Ignore les positions fermées (`displayValue`
+  // vaut alors 0, `pnl` déjà réalisé) — et, hors de la classe propre du
+  // compte, ne compte que pour elle (voir la doc du paramètre [assetClass]
+  // ci-dessus, contre un double comptage sur un compte cross-class).
+  final openLeveragedPositions = assetClass == account.assetClass
+      ? [for (final p in account.leveragedPositions) if (p.isOpen) p]
+      : const <LeveragedPosition>[];
+  for (final position in openLeveragedPositions) {
+    valeur += position.displayValue;
+    plusValueAbs += position.pnl ?? 0;
+    costBasis += position.margin;
   }
   return PatrimoineAccount(
     id: account.id,
@@ -334,6 +403,8 @@ PatrimoineAccount _buildAccountLeaf(
           // l'épargne) — une ligne simple par devise, sans répétition.
           showAccountSubtitle: false,
         ),
+      for (final position in openLeveragedPositions)
+        _buildLeveragedLeaf(account, position, showAccountSubtitle: false),
     ],
     // Reflète l'état du compte réel dans son ensemble, pas seulement ses
     // investissements de cette classe : un compte avec des transactions
@@ -360,6 +431,8 @@ List<PatrimoineCategory> buildRealCategoriesByInvestment(
   String vaultPath,
 ) {
   final byClass = <AssetClass, List<(InvestmentAccount, Investment)>>{};
+  final leveragedByClass =
+      <AssetClass, List<(InvestmentAccount, LeveragedPosition)>>{};
   for (final account in accounts) {
     for (final investment in account.investments) {
       // Même filtre que [buildRealCategories] : une position entièrement
@@ -368,16 +441,32 @@ List<PatrimoineCategory> buildRealCategoriesByInvestment(
       final effectiveClass = investment.assetClass ?? account.assetClass;
       byClass.putIfAbsent(effectiveClass, () => []).add((account, investment));
     }
+    // Même principe que [buildRealCategories] : une position à effet de
+    // levier n'a pas de classe effective propre, elle compte toujours pour
+    // celle de son compte porteur — jamais fusionnée avec un titre spot
+    // (voir [_buildCategoryByInvestment], une ligne à part par position).
+    for (final position in account.leveragedPositions) {
+      if (!position.isOpen) continue;
+      leveragedByClass
+          .putIfAbsent(account.assetClass, () => [])
+          .add((account, position));
+    }
   }
   return [
-    for (final entry in byClass.entries)
-      _buildCategoryByInvestment(entry.key, entry.value, vaultPath),
+    for (final assetClass in {...byClass.keys, ...leveragedByClass.keys})
+      _buildCategoryByInvestment(
+        assetClass,
+        byClass[assetClass] ?? const [],
+        leveragedByClass[assetClass] ?? const [],
+        vaultPath,
+      ),
   ];
 }
 
 PatrimoineCategory _buildCategoryByInvestment(
   AssetClass assetClass,
   List<(InvestmentAccount, Investment)> pairs,
+  List<(InvestmentAccount, LeveragedPosition)> leveragedPairs,
   String vaultPath,
 ) {
   final meta = _categoryMeta[assetClass]!;
@@ -388,6 +477,8 @@ PatrimoineCategory _buildCategoryByInvestment(
   final leaves = <PatrimoineAccount>[
     for (final group in byIsin.values)
       _buildMergedInvestmentLeaf(group, vaultPath),
+    for (final (account, position) in leveragedPairs)
+      _buildLeveragedLeaf(account, position),
   ];
   return PatrimoineCategory(
     id: assetClass.categoryId,
@@ -467,6 +558,7 @@ PatrimoineAccount _buildMergedInvestmentLeaf(
     // `PatrimoineAccount.plusValuePercent`.
     plusValuePercent: costBasis == 0 ? null : plusValueAbs / costBasis * 100,
     isCurrency: isCurrencyInvestment(group.first.$1, first),
+    avatarCryptoSymbol: _cryptoAvatarSymbol(group.first.$1, first),
     // Fusionnée uniquement si *toutes* les positions sources le sont : une
     // fusion partiellement exclue continue de compter partiellement dans les
     // agrégats réels, pas la peine d'induire en erreur avec un badge sur
@@ -557,8 +649,11 @@ PatrimoineAccount _buildLeaf(
   bool showAccountSubtitle = true,
 }) {
   final valeur = investment.displayValue;
-  final plusValueAbs = investment.unrealizedGain ?? 0;
-  final costBasis = valeur - plusValueAbs;
+  // `null` (pas `0`) sans valorisation jamais connue (ni cours de marché,
+  // ni estimation manuelle) — distinct d'une plus-value réellement nulle,
+  // voir la doc de [PatrimoineAccount.plusValueAbs].
+  final plusValueAbs = investment.unrealizedGain;
+  final costBasis = plusValueAbs == null ? null : valeur - plusValueAbs;
   return PatrimoineAccount(
     id: investment.id,
     name: investment.label,
@@ -581,8 +676,11 @@ PatrimoineAccount _buildLeaf(
     plusValueAbs: plusValueAbs,
     // `null` (pas `0`) sans coût d'acquisition (ex : un objet "Autres" reçu
     // en cadeau) — une plus-value relative à 0 € investi est infinie, pas
-    // nulle : voir `PatrimoineAccount.plusValuePercent`.
-    plusValuePercent: costBasis == 0 ? null : plusValueAbs / costBasis * 100,
+    // nulle : voir `PatrimoineAccount.plusValuePercent`. `null` aussi,
+    // logiquement, quand [plusValueAbs] lui-même l'est.
+    plusValuePercent: costBasis == null || costBasis == 0
+        ? null
+        : plusValueAbs! / costBasis * 100,
     // Métaux précieux : l'avatar affiche la photo du produit (pièce/lingot)
     // téléchargée localement quand elle existe — sauf ETC logé dans un CTO,
     // sans produit physique associé, où l'avatar affiche "ETC". Position en
@@ -592,6 +690,7 @@ PatrimoineAccount _buildLeaf(
     avatarInitials:
         _currencyAvatarInitials(account, investment) ??
         _metalAvatarInitials(account, investment),
+    avatarCryptoSymbol: _cryptoAvatarSymbol(account, investment),
     isCurrency: isCurrencyInvestment(account, investment),
     // La ligne continue d'afficher la vraie valeur (voir doc de
     // `PatrimoineAccount.excludedFromPatrimoine`) — seul l'agrégat global du
@@ -602,6 +701,59 @@ PatrimoineAccount _buildLeaf(
     // ses lignes, même sans exclusion individuelle.
     excludedFromPatrimoine:
         investment.excludedFromPatrimoine || account.excludedFromPatrimoine,
+  );
+}
+
+/// Feuille d'une position à effet de levier — une ligne par position
+/// ouverte, comme [_buildLeaf] pour un investissement spot. [id] pointe
+/// vers le COMPTE (pas la position, qui n'a pas d'écran dédié) : cliquer la
+/// ligne ouvre le compte, où l'onglet "Positions à effet de levier" prend
+/// le relais pour modifier/clôturer — [canDelete] reste `false`, le menu
+/// générique de suppression d'un investissement ne sait pas résoudre l'id
+/// d'une [LeveragedPosition]. [showAccountSubtitle] suit la même convention
+/// que [_buildLeaf] : `false` quand la ligne est déjà nichée dans
+/// l'accordéon de son compte porteur (voir [_buildAccountLeaf]), où
+/// répéter son nom en sous-titre serait redondant.
+PatrimoineAccount _buildLeveragedLeaf(
+  InvestmentAccount account,
+  LeveragedPosition position, {
+  bool showAccountSubtitle = true,
+}) {
+  final leverageLabel = position.leverage == position.leverage.roundToDouble()
+      ? position.leverage.toStringAsFixed(0)
+      : position.leverage.toString();
+  return PatrimoineAccount(
+    id: account.id,
+    name: '${position.market} ${position.side.label}',
+    subtitle: showAccountSubtitle ? account.name : null,
+    // Taille de la position (unités du sous-jacent) tient lieu de
+    // "quantité" — [pru] est le prix d'entrée (converti en euros, voir
+    // [LeveragedPosition.entryPriceInEur]), [cours] le dernier prix de
+    // référence connu ([LeveragedPosition.markPrice], déjà en euros que la
+    // position soit crypto — auto-actualisé, voir `price_refresh_service
+    // .dart` — ou Actions & Fonds — saisi à la main, jamais en devise
+    // étrangère) : mêmes colonnes qu'une position spot, pour une lecture
+    // cohérente du tableau.
+    quantite: position.size,
+    cours: position.markPrice,
+    pru: position.entryPriceInEur,
+    lastPriceDate: position.markPriceAt,
+    valeur: position.displayValue,
+    // `null` (pas `0`) tant que [LeveragedPosition.markPrice] n'a jamais été
+    // connu — même principe que [_buildLeaf], voir la doc de
+    // `PatrimoineAccount.plusValueAbs`. [roePercent] est déjà `null` dans ce
+    // cas (voir sa doc), rien à ajuster côté pourcentage.
+    plusValueAbs: position.pnl,
+    plusValuePercent: position.roePercent,
+    // Même logo crypto qu'une position spot du même ticker (voir
+    // [_cryptoAvatarSymbol]) — sans objet `Investment` ici pour le
+    // réutiliser tel quel, reconstruit directement depuis [position.market].
+    avatarCryptoSymbol: account.assetClass == AssetClass.crypto
+        ? position.market.trim().toUpperCase()
+        : null,
+    canDelete: false,
+    excludedFromPatrimoine: account.excludedFromPatrimoine,
+    leverageBadge: '${leverageLabel}x',
   );
 }
 
@@ -617,6 +769,18 @@ String? _currencyAvatarInitials(
   if (!isCurrencyInvestment(account, investment)) return null;
   final currency = investment.isin.trim().toUpperCase();
   return currency.isEmpty ? null : currency;
+}
+
+/// Ticker d'une position crypto (ex : "BTC") — voir [PatrimoineAccount.
+/// avatarCryptoSymbol]. `null` hors crypto : l'identifiant y sert de ticker
+/// (pas d'ISIN pour une crypto, voir `identifierOptionsFor`), contrairement
+/// aux autres classes où [investment.isin] n'a pas ce sens.
+String? _cryptoAvatarSymbol(InvestmentAccount account, Investment investment) {
+  if ((investment.assetClass ?? account.assetClass) != AssetClass.crypto) {
+    return null;
+  }
+  final ticker = investment.isin.trim().toUpperCase();
+  return ticker.isEmpty ? null : ticker;
 }
 
 /// Métal précieux *physique* : chemin absolu de l'image locale du produit,

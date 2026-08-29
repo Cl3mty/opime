@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/investments/investments_models.dart';
+import 'package:opime/features/investments/leveraged_position.dart';
 import 'package:opime/features/investments/real_patrimoine_adapter.dart';
 import 'package:opime/features/investments/yahoo_finance_client.dart';
 
@@ -93,6 +94,47 @@ void main() {
     expect(leafById[cto.investments[0].id]!.avatarInitials, isNull);
   });
 
+  test('une position crypto porte son ticker en avatarCryptoSymbol, une '
+      'position non-crypto non', () {
+    final buy = Transaction(
+      date: DateTime.utc(2024, 1, 1),
+      isBuy: true,
+      quantity: 1,
+      unitPrice: 40000,
+    );
+    final wallet = InvestmentAccount(
+      assetClass: AssetClass.crypto,
+      envelope: AccountEnvelope.plateformeEchange,
+      name: 'Binance',
+      investments: [Investment(isin: 'btc', label: 'Bitcoin', transactions: [buy])],
+    );
+    final cto = InvestmentAccount(
+      assetClass: AssetClass.actionsEtFonds,
+      envelope: AccountEnvelope.cto,
+      name: 'CTO Bourso',
+      bankName: 'Bourso',
+      investments: [
+        Investment(isin: 'FR0012345678', label: 'TotalEnergies', transactions: [buy]),
+      ],
+    );
+    final categories = buildRealCategories(
+      [wallet, cto],
+      const <String, List<PricePoint>>{},
+      '/vault',
+    );
+    final cryptoLeaf = categories
+        .singleWhere((c) => c.id == AssetClass.crypto.categoryId)
+        .accounts
+        .single;
+    final actionsLeaf = categories
+        .singleWhere((c) => c.id == AssetClass.actionsEtFonds.categoryId)
+        .accounts
+        .single;
+    // Normalisé en majuscules, quelle que soit la casse saisie ("btc").
+    expect(cryptoLeaf.avatarCryptoSymbol, 'BTC');
+    expect(actionsLeaf.avatarCryptoSymbol, isNull);
+  });
+
   test('cours d\'un titre coté en devise étrangère converti en euros', () {
     final cto = InvestmentAccount(
       assetClass: AssetClass.actionsEtFonds,
@@ -173,6 +215,295 @@ void main() {
       expect(leaf.lastPriceDate, isNull);
     },
   );
+
+  test(
+    'un investissement dont le cours n\'a jamais été connu (ni cours de '
+    'marché, ni estimation manuelle) a un plusValueAbs/plusValuePercent '
+    'null — pas 0, qui masquerait le fait qu\'aucune valorisation n\'a '
+    'jamais été possible (voir PerformanceAmount, qui affiche alors « — »)',
+    () {
+      final neverPriced = InvestmentAccount(
+        assetClass: AssetClass.crypto,
+        envelope: AccountEnvelope.plateformeEchange,
+        name: 'Hyperliquid',
+        investments: [
+          Investment(
+            isin: 'ADA',
+            label: 'ADA',
+            transactions: [
+              Transaction(
+                date: DateTime(2026, 1, 1),
+                isBuy: true,
+                quantity: 100,
+                unitPrice: 0.4,
+              ),
+            ],
+          ),
+        ],
+      );
+      final categories = buildRealCategories(
+        [neverPriced],
+        const <String, List<PricePoint>>{},
+        '/vault',
+      );
+      final leaf = categories
+          .singleWhere((c) => c.id == AssetClass.crypto.categoryId)
+          .accounts
+          .single;
+      expect(leaf.cours, isNull);
+      expect(leaf.plusValueAbs, isNull);
+      expect(leaf.plusValuePercent, isNull);
+      // La valeur affichée retombe sur le montant investi (voir
+      // `Investment.displayValue`), ce n'est que la plus-value qui est
+      // inconnue.
+      expect(leaf.valeur, 40);
+    },
+  );
+
+  group('positions à effet de levier (LeveragedPosition)', () {
+    InvestmentAccount cryptoAccount(List<LeveragedPosition> positions) =>
+        InvestmentAccount(
+          assetClass: AssetClass.crypto,
+          envelope: AccountEnvelope.plateformeEchange,
+          name: 'Hyperliquid',
+          investments: const [],
+          leveragedPositions: positions,
+        );
+
+    test(
+      'InvestmentAccount.totalLeveragedValue somme les positions OUVERTES '
+      '(marge + PnL latent), ignore les fermées',
+      () {
+        final open = LeveragedPosition(
+          market: 'BTC',
+          side: PositionSide.long,
+          leverage: 2,
+          size: 0.1,
+          entryPrice: 60000,
+          markPrice: 66000,
+          openedAt: DateTime(2026, 1, 1),
+        );
+        final closed = LeveragedPosition(
+          market: 'ETH',
+          side: PositionSide.long,
+          leverage: 3,
+          size: 1,
+          entryPrice: 3000,
+          openedAt: DateTime(2025, 1, 1),
+          closedAt: DateTime(2025, 6, 1),
+          closePrice: 3500,
+        );
+        final account = cryptoAccount([open, closed]);
+        expect(account.totalLeveragedValue, 3600); // 3000 + 600, ETH ignoré
+      },
+    );
+
+    test(
+      'buildRealCategories (vue "par actif", alimente le graphique '
+      'principal du Dashboard) : une position ouverte devient sa propre '
+      'ligne, valorisée à displayValue',
+      () {
+        final position = LeveragedPosition(
+          market: 'BTC',
+          side: PositionSide.long,
+          leverage: 2,
+          size: 0.1,
+          entryPrice: 60000,
+          markPrice: 66000,
+          openedAt: DateTime(2026, 1, 1),
+        );
+        final account = cryptoAccount([position]);
+        final categories = buildRealCategories(
+          [account],
+          const <String, List<PricePoint>>{},
+          '/vault',
+        );
+        final crypto = categories.singleWhere(
+          (c) => c.id == AssetClass.crypto.categoryId,
+        );
+        final leaf = crypto.accounts.single;
+        expect(leaf.name, contains('BTC'));
+        expect(leaf.valeur, 3600);
+        expect(leaf.plusValueAbs, 600);
+        expect(leaf.plusValuePercent, 20); // roePercent
+        // Quantité/PRU/cours affichés comme pour une position spot
+        // (régression : ces colonnes restaient vides pour le levier).
+        expect(leaf.quantite, 0.1);
+        expect(leaf.pru, 60000); // entryPriceInEur
+        expect(leaf.cours, 66000); // markPrice
+        expect(leaf.avatarCryptoSymbol, 'BTC');
+        // Une position fermée ne produit aucune ligne.
+        final onlyClosed = cryptoAccount([
+          position.copyWith(closedAt: DateTime(2026, 2, 1), closePrice: 66000),
+        ]);
+        final categoriesClosed = buildRealCategories(
+          [onlyClosed],
+          const <String, List<PricePoint>>{},
+          '/vault',
+        );
+        expect(
+          categoriesClosed.where((c) => c.id == AssetClass.crypto.categoryId),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'une position jamais actualisée (markPrice null) a un plusValueAbs/'
+      'plusValuePercent null — pas 0, même principe que pour un '
+      'investissement spot jamais coté',
+      () {
+        final position = LeveragedPosition(
+          market: 'BTC',
+          side: PositionSide.long,
+          leverage: 2,
+          size: 0.1,
+          entryPrice: 60000,
+          openedAt: DateTime(2026, 1, 1),
+        );
+        final account = cryptoAccount([position]);
+        final leaf = buildRealCategories(
+          [account],
+          const <String, List<PricePoint>>{},
+          '/vault',
+        ).singleWhere((c) => c.id == AssetClass.crypto.categoryId).accounts.single;
+        expect(leaf.plusValueAbs, isNull);
+        expect(leaf.plusValuePercent, isNull);
+        // La valeur retombe sur la marge seule (voir `displayValue`), ce
+        // n'est que le PnL qui est inconnu.
+        expect(leaf.valeur, 3000);
+        // Cours inconnu (dash dans l'UI), mais taille et prix d'entrée
+        // restent connus dès l'ouverture — pas de raison de les masquer.
+        expect(leaf.cours, isNull);
+        expect(leaf.quantite, 0.1);
+        expect(leaf.pru, 60000);
+      },
+    );
+
+    test(
+      'buildRealCategoriesByAccount (vue "par établissement") : la valeur '
+      'du compte inclut ses positions à effet de levier en plus de ses '
+      'investissements spot',
+      () {
+        final spot = Investment(
+          isin: 'crypto-btc',
+          label: 'BTC',
+          lastPrice: 60000,
+          transactions: [
+            Transaction(
+              date: DateTime(2025, 1, 1),
+              isBuy: true,
+              quantity: 0.05,
+              unitPrice: 50000,
+            ),
+          ],
+        );
+        final position = LeveragedPosition(
+          market: 'ETH',
+          side: PositionSide.long,
+          leverage: 2,
+          size: 1,
+          entryPrice: 3000,
+          markPrice: 3300,
+          openedAt: DateTime(2026, 1, 1),
+        );
+        final account = InvestmentAccount(
+          assetClass: AssetClass.crypto,
+          envelope: AccountEnvelope.plateformeEchange,
+          name: 'Hyperliquid',
+          investments: [spot],
+          leveragedPositions: [position],
+        );
+        final categories = buildRealCategoriesByAccount(
+          [account],
+          const <String, List<PricePoint>>{},
+          '/vault',
+        );
+        final crypto = categories.singleWhere(
+          (c) => c.id == AssetClass.crypto.categoryId,
+        );
+        final leaf = crypto.accounts.single;
+        // Spot : 0.05 * 60000 = 3000 €. Levier : 1500 + 300 = 1800 €.
+        expect(leaf.valeur, closeTo(4800, 1e-9));
+        // La position à effet de levier apparaît aussi comme une ligne à
+        // part au sein du compte (régression : elle n'alimentait
+        // auparavant que le total, invisible dans l'accordéon), avec un
+        // badge "2x" et sans répéter le nom du compte en sous-titre
+        // (déjà celui de l'accordéon qui la contient).
+        final leveragedRow = leaf.investments.singleWhere(
+          (i) => i.name.contains('ETH'),
+        );
+        expect(leveragedRow.leverageBadge, '2x');
+        expect(leveragedRow.subtitle, isNull);
+        expect(leveragedRow.valeur, closeTo(1800, 1e-9));
+      },
+    );
+
+    test(
+      'buildRealCategoriesByAccount : un compte cross-class (CTO qui porte '
+      'aussi un ETC métaux précieux) ne compte sa position à effet de '
+      'levier que dans SA classe (Actions & Fonds), jamais deux fois '
+      '(régression potentielle : cette fonction est appelée une fois par '
+      'classe effective présente sur le compte)',
+      () {
+        final etcMetal = Investment(
+          isin: 'FR0013416716', // Amundi Physical Gold ETC
+          label: 'Amundi Physical Gold',
+          assetClass: AssetClass.metauxPrecieux,
+          lastPrice: 100,
+          transactions: [
+            Transaction(
+              date: DateTime(2025, 1, 1),
+              isBuy: true,
+              quantity: 10,
+              unitPrice: 90,
+            ),
+          ],
+        );
+        final position = LeveragedPosition(
+          market: 'BTC',
+          side: PositionSide.long,
+          leverage: 2,
+          size: 0.1,
+          entryPrice: 60000,
+          markPrice: 66000,
+          openedAt: DateTime(2026, 1, 1),
+        );
+        final account = InvestmentAccount(
+          assetClass: AssetClass.actionsEtFonds,
+          envelope: AccountEnvelope.cto,
+          name: 'CTO Bourso',
+          bankName: 'Bourso',
+          investments: [etcMetal],
+          leveragedPositions: [position],
+        );
+        final categories = buildRealCategoriesByAccount(
+          [account],
+          const <String, List<PricePoint>>{},
+          '/vault',
+        );
+        final metaux = categories.singleWhere(
+          (c) => c.id == AssetClass.metauxPrecieux.categoryId,
+        );
+        final actions = categories.singleWhere(
+          (c) => c.id == AssetClass.actionsEtFonds.categoryId,
+        );
+        // Métaux précieux : seul l'ETC (1000 €), pas la position à levier —
+        // sa seule ligne imbriquée est l'ETC lui-même, pas la position.
+        expect(metaux.accounts.single.valeur, closeTo(1000, 1e-9));
+        expect(metaux.accounts.single.investments, hasLength(1));
+        expect(
+          metaux.accounts.single.investments.single.leverageBadge,
+          isNull,
+        );
+        // Actions & Fonds : le compte n'a aucun investissement spot propre
+        // à cette classe, seulement la position à effet de levier
+        // (3000 + 600 = 3600 €).
+        expect(actions.accounts.single.valeur, closeTo(3600, 1e-9));
+        expect(actions.accounts.single.investments, hasLength(1));
+      },
+    );
+  });
 
   test('Actions & Fonds : sous-titre = description facultative, pas une '
       'répétition du nom (comme l\'épargne)', () {
@@ -1077,6 +1408,67 @@ void main() {
       );
     });
 
+    test('un même ticker crypto (sans ISIN) détenu dans deux wallets fusionne '
+        'en une ligne au PRU moyen, avec son logo porté par la ligne '
+        'fusionnée', () {
+      final walletA = InvestmentAccount(
+        assetClass: AssetClass.crypto,
+        envelope: AccountEnvelope.plateformeEchange,
+        name: 'Binance',
+        investments: [
+          Investment(
+            isin: 'SOL',
+            label: 'Solana',
+            lastPrice: 150,
+            transactions: [
+              Transaction(
+                date: DateTime.utc(2024, 1, 1),
+                isBuy: true,
+                quantity: 10,
+                unitPrice: 100,
+              ),
+            ],
+          ),
+        ],
+      );
+      final walletB = InvestmentAccount(
+        assetClass: AssetClass.crypto,
+        envelope: AccountEnvelope.plateformeEchange,
+        name: 'Coinbase',
+        investments: [
+          Investment(
+            isin: 'SOL',
+            label: 'Solana',
+            lastPrice: 150,
+            transactions: [
+              Transaction(
+                date: DateTime.utc(2024, 3, 1),
+                isBuy: true,
+                quantity: 5,
+                unitPrice: 130,
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final categories = buildRealCategoriesByInvestment(
+        [walletA, walletB],
+        const <String, List<PricePoint>>{},
+        '/vault',
+      );
+      final crypto = categories.singleWhere(
+        (c) => c.id == AssetClass.crypto.categoryId,
+      );
+      final merged = crypto.accounts.single;
+
+      expect(merged.quantite, 15);
+      // PRU recalculé sur l'ensemble (1650 / 15), pas la moyenne simple.
+      expect(merged.pru, closeTo(110, 0.001));
+      expect(merged.subtitle, '2 comptes');
+      expect(merged.avatarCryptoSymbol, 'SOL');
+    });
+
     test('un ISIN détenu dans un seul compte n\'est pas fusionné : ligne '
         'identique à `buildRealCategories`, sans détail par compte', () {
       final cto = InvestmentAccount(
@@ -1159,5 +1551,57 @@ void main() {
       ).singleWhere((c) => c.id == AssetClass.actionsEtFonds.categoryId);
       expect(both.accounts.single.excludedFromPatrimoine, isTrue);
     });
+
+    test(
+      'une position à effet de levier apparaît comme sa propre ligne '
+      '(régression : absente de cette vue, contrairement à '
+      'buildRealCategories/buildRealCategoriesByAccount), jamais fusionnée '
+      'avec un titre spot du même ticker',
+      () {
+        final spot = Investment(
+          isin: 'BTC',
+          label: 'BTC',
+          lastPrice: 60000,
+          transactions: [
+            Transaction(
+              date: DateTime(2025, 1, 1),
+              isBuy: true,
+              quantity: 0.1,
+              unitPrice: 50000,
+            ),
+          ],
+        );
+        final position = LeveragedPosition(
+          market: 'BTC',
+          side: PositionSide.short,
+          leverage: 3,
+          size: 0.1,
+          entryPrice: 60000,
+          markPrice: 54000,
+          openedAt: DateTime(2026, 1, 1),
+        );
+        final account = InvestmentAccount(
+          assetClass: AssetClass.crypto,
+          envelope: AccountEnvelope.plateformeEchange,
+          name: 'Hyperliquid',
+          investments: [spot],
+          leveragedPositions: [position],
+        );
+        final crypto = buildRealCategoriesByInvestment(
+          [account],
+          const <String, List<PricePoint>>{},
+          '/vault',
+        ).singleWhere((c) => c.id == AssetClass.crypto.categoryId);
+
+        expect(crypto.accounts, hasLength(2)); // le spot, pas fusionné
+        final leveraged = crypto.accounts.singleWhere(
+          (a) => a.leverageBadge != null,
+        );
+        expect(leveraged.name, contains('Short'));
+        expect(leveraged.leverageBadge, '3x');
+        // (60000-54000) * 0.1 = 600 € de PnL latent (short : cours baisse).
+        expect(leveraged.plusValueAbs, closeTo(600, 1e-9));
+      },
+    );
   });
 }
