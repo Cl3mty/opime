@@ -23,15 +23,28 @@ class AccountSummaryHeader extends StatelessWidget {
   final InvestmentAccount account;
   final bool hidden;
 
+  /// Restreint les totaux/le MWR affichés à ce sous-ensemble des
+  /// investissements du compte (ex : uniquement les parts de SCPI d'un
+  /// contrat d'assurance vie, vues depuis la catégorie Immobilier — voir
+  /// `accountAcceptsCrossClassInvestment`) plutôt qu'à [account.investments]
+  /// dans son intégralité. `null` (défaut) : comportement inchangé, tout le
+  /// compte. Ne touche jamais [account] lui-même — aucune opération
+  /// d'écriture ne part de ce widget, seul l'affichage est restreint.
+  final List<Investment>? visibleInvestments;
+
   const AccountSummaryHeader({
     super.key,
     required this.account,
     required this.hidden,
+    this.visibleInvestments,
   });
+
+  List<Investment> get _investments => visibleInvestments ?? account.investments;
 
   @override
   Widget build(BuildContext context) {
-    final pricedInvestments = account.investments
+    final investments = _investments;
+    final pricedInvestments = investments
         .where((i) => i.marketValue != null)
         .toList();
     final mwr = pricedInvestments.isEmpty
@@ -57,7 +70,7 @@ class AccountSummaryHeader extends StatelessWidget {
     final pegPeeTranches =
         account.envelope == AccountEnvelope.peg ||
             account.envelope == AccountEnvelope.pee
-        ? pegPeeUnlockTranches(investments: account.investments)
+        ? pegPeeUnlockTranches(investments: investments)
         : const <UnlockTranche>[];
 
     return Column(
@@ -106,12 +119,15 @@ class AccountSummaryHeader extends StatelessWidget {
         ],
         const SizedBox(height: 4),
         shadcn.Text(
-          displayEuros(account.totalMarketValue, hidden),
+          displayEuros(
+            investments.fold(0.0, (sum, i) => sum + i.displayValue),
+            hidden,
+          ),
         ).x2Large().bold(),
         const SizedBox(height: 2),
         shadcn.Text(
-          pricedInvestments.length == account.investments.length &&
-                  account.investments.isNotEmpty
+          pricedInvestments.length == investments.length &&
+                  investments.isNotEmpty
               ? 'Valorisation au dernier cours connu'
               : 'Montant net investi (cours pas encore disponible pour '
                     'tous les investissements)',

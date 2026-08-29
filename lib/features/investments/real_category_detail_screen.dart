@@ -353,6 +353,18 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
           );
 
     if (account != null && account.assetClass != AssetClass.immobilier) {
+      // La page compte n'affiche jamais que les investissements dont la
+      // classe effective correspond à la catégorie actuellement parcourue —
+      // dans les deux sens : un contrat d'assurance vie (classe "Actions &
+      // Fonds") qui porte des parts de SCPI (classe effective Immobilier,
+      // voir `accountAcceptsCrossClassInvestment`) ne montre QUE ces parts
+      // depuis la catégorie Immobilier, et QUE ses fonds/actions (jamais les
+      // parts de SCPI) depuis sa propre catégorie Actions & Fonds — jamais
+      // les deux mélangés, peu importe la page d'où l'on vient. `null`
+      // seulement si [widget.categoryId] ne correspond à aucune classe
+      // connue (ne devrait pas arriver depuis une navigation normale) : pas
+      // de filtre plutôt qu'un écran vide dans ce cas dégénéré.
+      final pageAssetClass = assetClassForCategoryId(widget.categoryId);
       return StockAccountScreen(
         vaultPath: widget.vaultPath,
         account: account,
@@ -364,6 +376,7 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
         // dédiée directement — ouvre maintenant sa popup de détail dès
         // l'arrivée sur la page compte, pour garder le même raccourci.
         initialInvestmentId: investment?.id,
+        restrictToAssetClass: pageAssetClass,
         onBack: () => setState(() {
           _selectedAccountId = null;
           _selectedInvestmentId = null;

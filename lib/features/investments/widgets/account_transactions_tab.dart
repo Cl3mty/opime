@@ -37,12 +37,22 @@ class AccountTransactionsTab extends StatefulWidget {
   final bool hidden;
   final Future<void> Function() onChanged;
 
+  /// Restreint les transactions affichées à celles des investissements dont
+  /// la classe effective vaut cette classe (ex : uniquement les parts de
+  /// SCPI d'un contrat d'assurance vie, vues depuis la catégorie Immobilier
+  /// — voir `accountAcceptsCrossClassInvestment`). `null` (défaut) : toutes
+  /// les transactions du compte, comportement inchangé. N'affecte jamais
+  /// [account] lui-même : [_saveInvestment] continue de réécrire la liste
+  /// complète des investissements, jamais ce sous-ensemble affiché.
+  final AssetClass? restrictToAssetClass;
+
   const AccountTransactionsTab({
     super.key,
     required this.vaultPath,
     required this.account,
     required this.hidden,
     required this.onChanged,
+    this.restrictToAssetClass,
   });
 
   @override
@@ -78,9 +88,12 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
   }
 
   List<(Investment, Transaction)> get _allTransactions {
+    final restrict = widget.restrictToAssetClass;
     final list = <(Investment, Transaction)>[
       for (final investment in widget.account.investments)
-        for (final txn in investment.transactions) (investment, txn),
+        if (restrict == null ||
+            (investment.assetClass ?? widget.account.assetClass) == restrict)
+          for (final txn in investment.transactions) (investment, txn),
     ];
     list.sort((a, b) => b.$2.date.compareTo(a.$2.date));
     return list;

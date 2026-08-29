@@ -6,6 +6,7 @@ import 'package:opime/features/investments/autres_photo_avatar.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
 import 'package:opime/features/investments/stock_account_screen.dart';
+import 'package:opime/features/investments/transaction_price_currency.dart';
 import 'package:opime/features/investments/widgets/transaction_widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -430,6 +431,59 @@ void main() {
       await tester.tap(find.text('BTC').first);
       await tester.pump();
       expect(find.text('Quantité détenue'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'ajouter une transaction sur une position crypto propose les '
+    'stablecoins (USDT/USDC) en plus des devises classiques, contrairement '
+    'à Actions & Fonds',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.runAsync(() async {
+        tempDir = await Directory.systemTemp.createTemp(
+          'opime_stock_account_test',
+        );
+        account = InvestmentAccount(
+          assetClass: AssetClass.crypto,
+          name: 'Ledger',
+          investments: [
+            Investment(
+              isin: 'BTC',
+              label: 'BTC',
+              transactions: [
+                Transaction(
+                  date: DateTime(2024, 3, 1),
+                  isBuy: true,
+                  quantity: 0.1,
+                  unitPrice: 40000,
+                ),
+              ],
+            ),
+          ],
+        );
+        await InvestmentsRepository(tempDir.path).saveAccount(account);
+      });
+
+      await tester.pumpWidget(buildScreen());
+      await tester.pump();
+
+      await tester.tap(find.text('BTC').first);
+      await tester.pump();
+      await tester.tap(find.text('Ajouter une transaction'));
+      await tester.pump();
+
+      // Voir `transaction_price_currency_test.dart` : la popup du sélecteur
+      // n'est pas pilotable de façon fiable en test, on vérifie donc
+      // directement l'option reçue par le widget plutôt que son ouverture.
+      final select = tester.widget<TransactionPriceCurrencySelect>(
+        find.byType(TransactionPriceCurrencySelect),
+      );
+      expect(select.extraOptions, containsAll(['USDT', 'USDC']));
     },
   );
 
@@ -1193,4 +1247,204 @@ void main() {
 
     expect(find.text('EUR'), findsWidgets);
   });
+
+  group(
+    'restrictToAssetClass (contrat d\'assurance vie ouvert depuis la '
+    'catégorie Immobilier parce qu\'il porte des parts de SCPI — voir '
+    'accountAcceptsCrossClassInvestment)',
+    () {
+      Future<void> setUpMixedAssuranceVie(WidgetTester tester) async {
+        await tester.runAsync(() async {
+          tempDir = await Directory.systemTemp.createTemp(
+            'opime_stock_account_test',
+          );
+          account = InvestmentAccount(
+            assetClass: AssetClass.actionsEtFonds,
+            envelope: AccountEnvelope.assuranceVie,
+            name: 'Assurance vie Boursorama',
+            bankName: 'Boursorama',
+            investments: [
+              Investment(
+                isin: 'FR0000000scpi',
+                label: 'SCPI Pierre Rendement',
+                assetClass: AssetClass.immobilier,
+                transactions: [
+                  Transaction(
+                    date: DateTime(2024, 3, 1),
+                    isBuy: true,
+                    quantity: 10,
+                    unitPrice: 200,
+                  ),
+                ],
+              ),
+              Investment(
+                isin: 'FR0000120271',
+                label: 'Fonds Euro Actions Monde',
+                transactions: [
+                  Transaction(
+                    date: DateTime(2024, 1, 15),
+                    isBuy: true,
+                    quantity: 50,
+                    unitPrice: 100,
+                  ),
+                ],
+              ),
+            ],
+          );
+          await InvestmentsRepository(tempDir.path).saveAccount(account);
+        });
+      }
+
+      Widget buildRestrictedScreen() => ShadcnApp(
+        home: Scaffold(
+          child: StockAccountScreen(
+            vaultPath: tempDir.path,
+            account: account,
+            hidden: false,
+            bankNames: const ['Boursorama'],
+            onBack: () {},
+            onChanged: () {},
+            restrictToAssetClass: AssetClass.immobilier,
+          ),
+        ),
+      );
+
+      testWidgets(
+        'onglet Positions : seule la SCPI apparaît, pas le fonds actions du '
+        'même contrat',
+        (tester) async {
+          await setUpMixedAssuranceVie(tester);
+          await tester.pumpWidget(buildRestrictedScreen());
+          await tester.pump();
+
+          expect(find.text('SCPI Pierre Rendement'), findsOneWidget);
+          expect(find.text('Fonds Euro Actions Monde'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'onglet Transactions : seule la transaction de la SCPI apparaît',
+        (tester) async {
+          await setUpMixedAssuranceVie(tester);
+          await tester.pumpWidget(buildRestrictedScreen());
+          await tester.pump();
+
+          await tester.tap(find.text('Transactions'));
+          await tester.pumpAndSettle();
+
+          expect(find.byType(TransactionRow), findsOneWidget);
+          expect(find.text('SCPI Pierre Rendement'), findsOneWidget);
+          expect(find.text('Fonds Euro Actions Monde'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'le bouton "Afficher tout le compte" révèle la position masquée, '
+        'puis "Masquer le reste du compte" la masque à nouveau',
+        (tester) async {
+          await setUpMixedAssuranceVie(tester);
+          await tester.pumpWidget(buildRestrictedScreen());
+          await tester.pump();
+
+          expect(find.text('Fonds Euro Actions Monde'), findsNothing);
+          expect(find.text('Afficher tout le compte (+1)'), findsOneWidget);
+
+          await tester.tap(find.text('Afficher tout le compte (+1)'));
+          await tester.pump();
+
+          expect(find.text('SCPI Pierre Rendement'), findsOneWidget);
+          expect(find.text('Fonds Euro Actions Monde'), findsOneWidget);
+          expect(find.text('Masquer le reste du compte'), findsOneWidget);
+
+          await tester.tap(find.text('Masquer le reste du compte'));
+          await tester.pump();
+
+          expect(find.text('SCPI Pierre Rendement'), findsOneWidget);
+          expect(find.text('Fonds Euro Actions Monde'), findsNothing);
+          expect(find.text('Afficher tout le compte (+1)'), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'sans restriction (restrictToAssetClass: null), aucun bouton — rien '
+        'n\'est masqué, rien à révéler',
+        (tester) async {
+          await setUpMixedAssuranceVie(tester);
+          await tester.pumpWidget(
+            ShadcnApp(
+              home: Scaffold(
+                child: StockAccountScreen(
+                  vaultPath: tempDir.path,
+                  account: account,
+                  hidden: false,
+                  bankNames: const ['Boursorama'],
+                  onBack: () {},
+                  onChanged: () {},
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          expect(find.textContaining('Afficher tout le compte'), findsNothing);
+          expect(find.text('Masquer le reste du compte'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'symétrique : ouvert depuis la catégorie Actions & Fonds (sa '
+        'catégorie propre), seul le fonds actions apparaît, pas la SCPI du '
+        'même contrat',
+        (tester) async {
+          await setUpMixedAssuranceVie(tester);
+          await tester.pumpWidget(
+            ShadcnApp(
+              home: Scaffold(
+                child: StockAccountScreen(
+                  vaultPath: tempDir.path,
+                  account: account,
+                  hidden: false,
+                  bankNames: const ['Boursorama'],
+                  onBack: () {},
+                  onChanged: () {},
+                  restrictToAssetClass: AssetClass.actionsEtFonds,
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          expect(find.text('Fonds Euro Actions Monde'), findsOneWidget);
+          expect(find.text('SCPI Pierre Rendement'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'restrictToAssetClass: null (utilisé par les tests qui n\'ont pas '
+        'besoin de ce scoping) : les deux positions du contrat restent '
+        'visibles, aucun filtre',
+        (tester) async {
+          await setUpMixedAssuranceVie(tester);
+          await tester.pumpWidget(
+            ShadcnApp(
+              home: Scaffold(
+                child: StockAccountScreen(
+                  vaultPath: tempDir.path,
+                  account: account,
+                  hidden: false,
+                  bankNames: const ['Boursorama'],
+                  onBack: () {},
+                  onChanged: () {},
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          expect(find.text('SCPI Pierre Rendement'), findsOneWidget);
+          expect(find.text('Fonds Euro Actions Monde'), findsOneWidget);
+        },
+      );
+    },
+  );
 }

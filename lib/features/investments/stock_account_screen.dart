@@ -51,6 +51,22 @@ class StockAccountScreen extends StatefulWidget {
   /// fusion compte/actif, sans pour autant garder de page dédiée.
   final String? initialInvestmentId;
 
+  /// Restreint ce qui est AFFICHÉ (positions, transactions, totaux) aux
+  /// investissements du compte dont la classe effective vaut cette classe —
+  /// utilisé pour qu'un compte multi-support n'affiche jamais que ce qui
+  /// correspond à la catégorie parcourue, dans les deux sens : un contrat
+  /// d'assurance vie (classe propre "Actions & Fonds") qui porte aussi des
+  /// parts de SCPI (classe effective Immobilier — voir
+  /// `accountAcceptsCrossClassInvestment`) n'affiche QUE ces parts ouvert
+  /// depuis Immobilier, et QUE ses fonds/actions (jamais les parts de SCPI)
+  /// ouvert depuis sa propre catégorie Actions & Fonds. `null` : aucun
+  /// filtre — tout le compte, peu importe la classe effective de chaque
+  /// investissement (utilisé par ex. par les tests qui n'ont pas besoin de
+  /// ce scoping). N'affecte jamais [account] lui-même ni aucune opération
+  /// d'écriture (modifier/supprimer le compte, ajouter un document...), qui
+  /// continuent de porter sur le compte réel dans son intégralité.
+  final AssetClass? restrictToAssetClass;
+
   const StockAccountScreen({
     super.key,
     required this.vaultPath,
@@ -61,6 +77,7 @@ class StockAccountScreen extends StatefulWidget {
     required this.onChanged,
     this.startInEditMode = false,
     this.initialInvestmentId,
+    this.restrictToAssetClass,
   });
 
   @override
@@ -70,6 +87,13 @@ class StockAccountScreen extends StatefulWidget {
 class _StockAccountScreenState extends State<StockAccountScreen> {
   late InvestmentsRepository _repo;
   int _tabIndex = 0;
+
+  /// Bascule ponctuelle de [StockAccountScreen.restrictToAssetClass] :
+  /// l'utilisateur peut choisir de voir malgré tout tout le contenu du
+  /// compte (voir le bouton discret sous l'en-tête) plutôt que de rester
+  /// restreint à la catégorie parcourue en permanence. État local à cet
+  /// écran, jamais persisté : repart masqué à chaque nouvelle ouverture.
+  bool _showAllClasses = false;
 
   bool _editingAccount = false;
   final _editNameController = TextEditingController();
@@ -177,6 +201,42 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
   // scopés à la transaction.
   bool get _showDocumentsTab =>
       widget.account.assetClass != AssetClass.metauxPrecieux;
+
+  /// Classe à laquelle restreindre l'affichage — [StockAccountScreen
+  /// .restrictToAssetClass], sauf si l'utilisateur a ponctuellement demandé
+  /// à tout voir (voir [_showAllClasses] et le bouton discret sous
+  /// l'en-tête), auquel cas plus aucun filtre ne s'applique.
+  AssetClass? get _effectiveRestrictToAssetClass =>
+      _showAllClasses ? null : widget.restrictToAssetClass;
+
+  /// Sous-ensemble affiché des positions du compte (voir
+  /// [_effectiveRestrictToAssetClass]) — `null` sans restriction, pour ne
+  /// rien changer au comportement par défaut des composants d'affichage. Ne
+  /// sert jamais aux opérations d'écriture, qui restent toutes basées sur
+  /// `widget.account.investments` en intégralité.
+  List<Investment>? get _visibleInvestments {
+    final restrict = _effectiveRestrictToAssetClass;
+    if (restrict == null) return null;
+    return [
+      for (final i in widget.account.investments)
+        if ((i.assetClass ?? widget.account.assetClass) == restrict) i,
+    ];
+  }
+
+  /// Positions masquées par [StockAccountScreen.restrictToAssetClass] (donc
+  /// jamais affectées par [_showAllClasses], contrairement à
+  /// [_visibleInvestments] — il s'agit ici de savoir si le bouton "Afficher
+  /// tout le compte" a une raison d'exister, pas de ce qui est affiché
+  /// maintenant). Vide si le compte n'est pas restreint : rien à révéler,
+  /// pas de bouton.
+  List<Investment> get _hiddenInvestments {
+    final restrict = widget.restrictToAssetClass;
+    if (restrict == null) return const [];
+    return [
+      for (final i in widget.account.investments)
+        if ((i.assetClass ?? widget.account.assetClass) != restrict) i,
+    ];
+  }
 
   bool get _hasTransactions =>
       widget.account.investments.any((i) => i.transactions.isNotEmpty);
@@ -356,8 +416,22 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               onSave: _commitEditAccount,
               onCancel: () => setState(() => _editingAccount = false),
             )
-          else
-            AccountSummaryHeader(account: account, hidden: widget.hidden),
+          else ...[
+            AccountSummaryHeader(
+              account: account,
+              hidden: widget.hidden,
+              visibleInvestments: _visibleInvestments,
+            ),
+            if (_hiddenInvestments.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              _ShowAllClassesToggle(
+                hiddenCount: _hiddenInvestments.length,
+                expanded: _showAllClasses,
+                onPressed: () =>
+                    setState(() => _showAllClasses = !_showAllClasses),
+              ),
+            ],
+          ],
           const SizedBox(height: 24),
           TabList(
             index: _tabIndex,
@@ -384,6 +458,7 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               onTap: _openPosition,
               vaultPath: widget.vaultPath,
               onChanged: () async => widget.onChanged(),
+              visibleInvestments: _visibleInvestments,
             )
           else if (_tabIndex == 1)
             AccountTransactionsTab(
@@ -391,6 +466,7 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               account: account,
               hidden: widget.hidden,
               onChanged: () async => widget.onChanged(),
+              restrictToAssetClass: _effectiveRestrictToAssetClass,
             )
           else if (_tabIndex == 2 && _showDocumentsTab)
             DocumentsSection(
@@ -402,6 +478,42 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Bouton discret affiché sous l'en-tête quand [StockAccountScreen
+/// .restrictToAssetClass] masque des positions (voir
+/// `_StockAccountScreenState._hiddenInvestments`) — permet de révéler
+/// ponctuellement tout le contenu du compte plutôt que de rester restreint
+/// à la catégorie parcourue en permanence, sans jamais changer les données
+/// elles-mêmes (voir la doc de [StockAccountScreen.restrictToAssetClass]).
+class _ShowAllClassesToggle extends StatelessWidget {
+  final int hiddenCount;
+  final bool expanded;
+  final VoidCallback onPressed;
+
+  const _ShowAllClassesToggle({
+    required this.hiddenCount,
+    required this.expanded,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GhostButton(
+      size: ButtonSize.small,
+      density: ButtonDensity.compact,
+      onPressed: onPressed,
+      leading: Icon(
+        expanded ? LucideIcons.eyeOff : LucideIcons.eye,
+        size: 12,
+      ),
+      child: shadcn.Text(
+        expanded
+            ? 'Masquer le reste du compte'
+            : 'Afficher tout le compte (+$hiddenCount)',
+      ).muted().xSmall(),
     );
   }
 }
