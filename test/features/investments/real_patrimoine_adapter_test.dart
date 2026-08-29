@@ -503,6 +503,165 @@ void main() {
         expect(actions.accounts.single.investments, hasLength(1));
       },
     );
+
+    group(
+      'leveragedValueForEffectiveClass (régression : le total "Patrimoine '
+      'brut" du Dashboard ne comptait jamais les positions à effet de '
+      'levier, contrairement à la carte Allocation/le donut, qui les '
+      'comptent via montantPatrimoine — les deux totaux différaient dès '
+      'qu\'une position était ouverte)',
+      () {
+        test(
+          'une position ouverte compte à sa valeur actuelle (marge + PnL '
+          'latent), à/après sa date d\'ouverture — 0 avant',
+          () {
+            final position = LeveragedPosition(
+              market: 'BTC',
+              side: PositionSide.long,
+              leverage: 2,
+              size: 0.1,
+              entryPrice: 60000,
+              markPrice: 66000,
+              openedAt: DateTime(2026, 1, 15),
+            );
+            final account = cryptoAccount([position]);
+
+            expect(
+              leveragedValueForEffectiveClass(
+                [account],
+                AssetClass.crypto,
+                DateTime(2026, 1, 14),
+              ),
+              0,
+            );
+            expect(
+              leveragedValueForEffectiveClass(
+                [account],
+                AssetClass.crypto,
+                DateTime(2026, 1, 15),
+              ),
+              3600,
+            );
+            expect(
+              leveragedValueForEffectiveClass(
+                [account],
+                AssetClass.crypto,
+                DateTime(2026, 6, 1),
+              ),
+              3600,
+            );
+          },
+        );
+
+        test('une position fermée ne compte jamais, même à/après son '
+            'ouverture', () {
+          final position = LeveragedPosition(
+            market: 'BTC',
+            side: PositionSide.long,
+            leverage: 2,
+            size: 0.1,
+            entryPrice: 60000,
+            openedAt: DateTime(2026, 1, 1),
+            closedAt: DateTime(2026, 2, 1),
+            closePrice: 66000,
+          );
+          final account = cryptoAccount([position]);
+
+          expect(
+            leveragedValueForEffectiveClass(
+              [account],
+              AssetClass.crypto,
+              DateTime(2026, 6, 1),
+            ),
+            0,
+          );
+        });
+
+        test(
+          'excludeFlagged: true omet les positions d\'un compte marqué '
+          '"exclu du patrimoine" — même règle que '
+          'investmentsForEffectiveClass',
+          () {
+            final position = LeveragedPosition(
+              market: 'BTC',
+              side: PositionSide.long,
+              leverage: 2,
+              size: 0.1,
+              entryPrice: 60000,
+              markPrice: 66000,
+              openedAt: DateTime(2026, 1, 1),
+            );
+            final account = InvestmentAccount(
+              assetClass: AssetClass.crypto,
+              envelope: AccountEnvelope.plateformeEchange,
+              name: 'Hyperliquid',
+              investments: const [],
+              leveragedPositions: [position],
+              excludedFromPatrimoine: true,
+            );
+
+            expect(
+              leveragedValueForEffectiveClass(
+                [account],
+                AssetClass.crypto,
+                DateTime(2026, 6, 1),
+              ),
+              3600,
+            );
+            expect(
+              leveragedValueForEffectiveClass(
+                [account],
+                AssetClass.crypto,
+                DateTime(2026, 6, 1),
+                excludeFlagged: true,
+              ),
+              0,
+            );
+          },
+        );
+
+        test(
+          'cohérence avec la carte Allocation : à la date du jour, la somme '
+          'investmentsForEffectiveClass (valorisée) + '
+          'leveragedValueForEffectiveClass égale montantPatrimoine de '
+          'buildRealCategories pour la même classe',
+          () {
+            final position = LeveragedPosition(
+              market: 'BTC',
+              side: PositionSide.long,
+              leverage: 2,
+              size: 0.1,
+              entryPrice: 60000,
+              markPrice: 66000,
+              openedAt: DateTime(2026, 1, 1),
+            );
+            final account = cryptoAccount([position]);
+            final today = DateTime(2026, 6, 1);
+
+            final categories = buildRealCategories(
+              [account],
+              const <String, List<PricePoint>>{},
+              '/vault',
+            );
+            final crypto = categories.singleWhere(
+              (c) => c.id == AssetClass.crypto.categoryId,
+            );
+
+            // Aucun investissement spot sur ce compte : le total "Dashboard"
+            // reconstitué ici se réduit à la contribution du levier.
+            expect(
+              leveragedValueForEffectiveClass(
+                [account],
+                AssetClass.crypto,
+                today,
+                excludeFlagged: true,
+              ),
+              crypto.montantPatrimoine,
+            );
+          },
+        );
+      },
+    );
   });
 
   test('Actions & Fonds : sous-titre = description facultative, pas une '

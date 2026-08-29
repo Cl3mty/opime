@@ -1179,6 +1179,51 @@ List<Investment> investmentsForEffectiveClass(
   ];
 }
 
+/// Valeur des positions à effet de levier ENCORE OUVERTES du compte porteur
+/// dont la classe (toujours la sienne propre, jamais cross-class — voir
+/// [_buildAccountLeaf]) vaut [assetClass], à [date] — à ajouter au résultat
+/// de [investmentsForEffectiveClass]/[_valuationAt] pour que la courbe
+/// "Patrimoine net/brut" du Dashboard (`dashboard_screen.dart`'s
+/// `_actifsHistoryFor`) compte les mêmes lignes que la carte Allocation
+/// ([PatrimoineCategory.montantPatrimoine], qui les compte déjà via
+/// [_buildLeveragedLeaf]) : sans cette prise en compte, ni
+/// [investmentsForEffectiveClass] ni [_valuationAt] ne lisent jamais
+/// [InvestmentAccount.leveragedPositions], et tout utilisateur avec une
+/// position ouverte voyait deux totaux différents pour "le même patrimoine"
+/// sur le même écran (régression trouvée en investiguant un signalement).
+///
+/// Contrairement à un titre spot, une position à effet de levier n'a pas
+/// d'historique de cours journalier (voir [PricePoint]) : seule sa valeur
+/// actuelle ([LeveragedPosition.displayValue]) est connue. Elle est donc
+/// comptée à cette valeur constante à partir de sa date d'ouverture
+/// ([LeveragedPosition.openedAt]) — jamais avant, pour ne pas la faire
+/// apparaître avant qu'elle n'ait existé — plutôt que de reconstituer une
+/// fausse courbe de PnL quotidien qu'aucune donnée ne permet de calculer.
+///
+/// [excludeFlagged] : même règle que [investmentsForEffectiveClass] — omet
+/// les positions d'un compte marqué "exclu du patrimoine" (voir
+/// [InvestmentAccount.excludedFromPatrimoine], seul niveau d'exclusion
+/// disponible pour une position à effet de levier, voir
+/// [_buildLeveragedLeaf]).
+double leveragedValueForEffectiveClass(
+  List<InvestmentAccount> accounts,
+  AssetClass assetClass,
+  DateTime date, {
+  bool excludeFlagged = false,
+}) {
+  var total = 0.0;
+  for (final account in accounts) {
+    if (account.assetClass != assetClass) continue;
+    if (excludeFlagged && account.excludedFromPatrimoine) continue;
+    for (final position in account.leveragedPositions) {
+      if (position.isOpen && _onOrBeforeDay(position.openedAt, date)) {
+        total += position.displayValue;
+      }
+    }
+  }
+  return total;
+}
+
 /// Grille quotidienne complète entre [start] et [end] (bornes incluses) —
 /// contrairement à [evenDateGrid] (~30 points espacés, conçue pour
 /// l'économie de rendu du graphique dashboard), chaque jour calendaire est

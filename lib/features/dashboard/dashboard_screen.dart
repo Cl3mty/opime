@@ -207,6 +207,14 @@ class _RealDashboardState extends State<_RealDashboard> {
   /// patrimoine" (`excludeFlagged: true`, voir
   /// [investmentsForEffectiveClass]) — les pages de catégorie continuent de
   /// tout comptabiliser.
+  ///
+  /// Ajoute [leveragedValueForEffectiveClass] à chaque point :
+  /// [categoryHistoryOnGrid] seul ne lit jamais `InvestmentAccount
+  /// .leveragedPositions` (aucun historique de cours pour ces positions,
+  /// voir sa doc) — sans cet ajout, le dernier point de cette courbe (le
+  /// total "Patrimoine brut" affiché) ne correspondait pas à celui de la
+  /// carte Allocation ([PatrimoineCategory.montantPatrimoine], qui les
+  /// compte déjà) dès qu'une position à effet de levier était ouverte.
   Map<String, List<NetWorthPoint>> _actifsHistoryFor(DashboardPeriod period) {
     final today = DateTime.utc(
       DateTime.now().year,
@@ -218,15 +226,27 @@ class _RealDashboardState extends State<_RealDashboard> {
     final grid = evenDateGrid(start, today);
     return {
       for (final assetClass in AssetClass.values)
-        assetClass.categoryId: categoryHistoryOnGrid(
-          investmentsForEffectiveClass(
-            _accounts,
-            assetClass,
-            excludeFlagged: true,
-          ),
-          _priceHistories,
-          grid,
-        ),
+        assetClass.categoryId: [
+          for (final point in categoryHistoryOnGrid(
+            investmentsForEffectiveClass(
+              _accounts,
+              assetClass,
+              excludeFlagged: true,
+            ),
+            _priceHistories,
+            grid,
+          ))
+            NetWorthPoint(
+              point.date,
+              point.value +
+                  leveragedValueForEffectiveClass(
+                    _accounts,
+                    assetClass,
+                    point.date,
+                    excludeFlagged: true,
+                  ),
+            ),
+        ],
     };
   }
 
