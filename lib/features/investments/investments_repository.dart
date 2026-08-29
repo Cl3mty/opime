@@ -28,9 +28,56 @@ class InvestmentsRepository {
     final content = await _storage.readString(_relativePath);
     if (content.trim().isEmpty) return [];
     final list = jsonDecode(content) as List;
-    return list
+    final accounts = list
         .map((e) => InvestmentAccount.fromJson(e as Map<String, dynamic>))
         .toList();
+    return _migrateImmobilierAccountDocumentsIfNeeded(accounts);
+  }
+
+  /// Migration ponctuelle : les documents d'un bien immobilier vivaient
+  /// auparavant au niveau du COMPTE (`account.documents`, partagés entre
+  /// tous les biens qu'il contient) — désormais rattachés au bien lui-même
+  /// (`Investment.documents`), pour pouvoir les catégoriser (Facture/Plan/
+  /// Photo/Quittance, voir `VaultDocument.category`) et les retrouver bien
+  /// par bien plutôt que noyés dans une liste commune. Seuls les octets
+  /// physiques restent inchangés (`DocumentStorage` les indexe par id de
+  /// document, indépendamment de qui référence ses métadonnées) : cette
+  /// migration ne déplace que la liste dans le JSON, jamais de fichier.
+  ///
+  /// Un compte avec EXACTEMENT un bien migre sans ambiguïté (le cas
+  /// courant, un compte par enveloppe). Un compte sans bien ou avec
+  /// plusieurs (rare) ne sait pas lequel des biens un document concerne —
+  /// ses documents restent au niveau compte plutôt que de deviner à tort.
+  /// Réécrit sur disque une seule fois (comme `ProfileRepository
+  /// ._migrateLegacyDataIfNeeded`) dès qu'un changement est détecté, pour
+  /// que les lectures suivantes n'aient plus rien à migrer.
+  Future<List<InvestmentAccount>> _migrateImmobilierAccountDocumentsIfNeeded(
+    List<InvestmentAccount> accounts,
+  ) async {
+    var changed = false;
+    final migrated = <InvestmentAccount>[];
+    for (final account in accounts) {
+      if (account.assetClass == AssetClass.immobilier &&
+          account.documents.isNotEmpty &&
+          account.investments.length == 1) {
+        changed = true;
+        final property = account.investments.single;
+        migrated.add(
+          account.copyWith(
+            documents: const [],
+            investments: [
+              property.copyWith(
+                documents: [...property.documents, ...account.documents],
+              ),
+            ],
+          ),
+        );
+      } else {
+        migrated.add(account);
+      }
+    }
+    if (changed) await _writeAll(migrated);
+    return migrated;
   }
 
   Future<void> _writeAll(List<InvestmentAccount> all) async {

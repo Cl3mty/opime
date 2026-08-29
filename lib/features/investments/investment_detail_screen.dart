@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
@@ -17,6 +19,12 @@ import 'metal_price_client.dart';
 import 'metal_price_repository.dart';
 import 'performance_calculator.dart';
 import 'price_history_repository.dart';
+import 'real_estate/real_estate_documents_section.dart';
+import 'real_estate/real_estate_loan_link.dart';
+import 'real_estate/real_estate_profitability_section.dart';
+import 'real_estate/rent_models.dart';
+import 'real_estate/rent_periods_section.dart';
+import 'real_estate/work_items_section.dart';
 import 'transaction_price_currency.dart';
 import 'widgets/investment_edit_form.dart';
 import 'widgets/merge_investment_dialog.dart';
@@ -52,6 +60,12 @@ class InvestmentDetailView extends StatefulWidget {
   final VoidCallback onBack;
   final Future<void> Function() onChanged;
 
+  /// Nom du profil actif — utilisé comme "bailleur" sur une quittance de
+  /// loyer générée (voir `RealEstateProfitabilitySection`... en réalité
+  /// `RentPeriodsSection`, aucun champ dédié "bailleur" n'existe sur le
+  /// bien). Sans effet hors immobilier.
+  final String profileName;
+
   const InvestmentDetailView({
     super.key,
     required this.vaultPath,
@@ -60,6 +74,7 @@ class InvestmentDetailView extends StatefulWidget {
     required this.hidden,
     required this.onBack,
     required this.onChanged,
+    required this.profileName,
   });
 
   @override
@@ -70,6 +85,10 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   late InvestmentsRepository _repo;
   List<PricePoint> _priceHistory = [];
   _PerfMode _perfMode = _PerfMode.twr;
+
+  /// Onglet actif de la section Loyers/Travaux/Documents d'un bien
+  /// immobilier — voir [_isImmobilier]. Sans effet pour les autres classes.
+  int _realEstateTabIndex = 0;
 
   bool _creating = false;
   String? _editingTransactionId;
@@ -444,7 +463,14 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   void _startEditInvestment() {
     setState(() {
       _editingInvestment = true;
-      _editIsinController.text = widget.investment.isin;
+      // Un identifiant auto-généré (voir [isGeneratedIdentifier]) n'a rien
+      // d'utile à montrer/re-saisir — le champ reste optionnel pour ces
+      // classes (voir [isinOptionalFor]), donc vide plutôt que de préremplir
+      // avec un id technique interne : ré-enregistrer sans y toucher
+      // régénère simplement un nouveau placeholder ([_commitEditInvestment]).
+      _editIsinController.text = isGeneratedIdentifier(widget.investment.isin)
+          ? ''
+          : widget.investment.isin;
       _editLabelController.text = widget.investment.label;
       _editFundStyle = widget.investment.fundStyle;
     });
@@ -493,10 +519,29 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       quoteCurrency: isinChanged ? null : widget.investment.quoteCurrency,
       lastFxRateToEur: isinChanged ? null : widget.investment.lastFxRateToEur,
       priceUnavailable: isinChanged ? null : widget.investment.priceUnavailable,
+      // Reconstruit à la main plutôt que via `copyWith` (qui ne sait pas
+      // remettre un champ nullable à `null`, nécessaire ci-dessus pour
+      // symbol/lastPrice/etc.) : tous les autres champs doivent donc être
+      // reportés explicitement — régression corrigée ici, une édition
+      // effaçait auparavant silencieusement imageFileName/surfaceM2/
+      // adresse/estimation/cours manuel/exclusion du patrimoine.
+      imageFileName: widget.investment.imageFileName,
       assetClass: widget.investment.assetClass,
       realEstateType: widget.investment.realEstateType,
       fundStyle: _editFundStyle,
+      surfaceM2: widget.investment.surfaceM2,
+      addressLabel: widget.investment.addressLabel,
+      addressCityCode: widget.investment.addressCityCode,
+      addressLat: widget.investment.addressLat,
+      addressLon: widget.investment.addressLon,
+      estimatedPricePerSqm: widget.investment.estimatedPricePerSqm,
+      estimatedValueAt: widget.investment.estimatedValueAt,
+      manualPrice: widget.investment.manualPrice,
+      manualPriceAt: widget.investment.manualPriceAt,
       documents: widget.investment.documents,
+      rentPeriods: widget.investment.rentPeriods,
+      workItems: widget.investment.workItems,
+      excludedFromPatrimoine: widget.investment.excludedFromPatrimoine,
     );
     await _saveInvestment(updatedInvestment);
     setState(() => _editingInvestment = false);
@@ -646,12 +691,14 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     String fileName,
     Uint8List bytes,
     String? transactionId,
-    String? name,
-  ) async {
+    String? name, [
+    String? category,
+  ]) async {
     final document = VaultDocument(
       fileName: fileName,
       note: name,
       transactionId: transactionId,
+      category: category,
     );
     await DocumentStorage(widget.vaultPath).save(document, bytes);
     await _saveInvestment(
@@ -669,6 +716,114 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
         documents: [
           for (final d in widget.investment.documents)
             if (d.id != document.id) d,
+        ],
+      ),
+    );
+    widget.onChanged();
+  }
+
+  Future<void> _addRentPeriod(RentPeriod period) async {
+    await _saveInvestment(
+      widget.investment.copyWith(
+        rentPeriods: [...widget.investment.rentPeriods, period],
+      ),
+    );
+    widget.onChanged();
+  }
+
+  Future<void> _updateRentPeriod(RentPeriod updated) async {
+    await _saveInvestment(
+      widget.investment.copyWith(
+        rentPeriods: [
+          for (final p in widget.investment.rentPeriods)
+            if (p.id == updated.id) updated else p,
+        ],
+      ),
+    );
+    widget.onChanged();
+  }
+
+  Future<void> _deleteRentPeriod(RentPeriod period) async {
+    await _saveInvestment(
+      widget.investment.copyWith(
+        rentPeriods: [
+          for (final p in widget.investment.rentPeriods)
+            if (p.id != period.id) p,
+        ],
+      ),
+    );
+    widget.onChanged();
+  }
+
+  /// Propose l'enregistrement du PDF déjà généré (voir [RentPeriodsSection
+  /// .onDownloadQuittance]) via le sélecteur de fichier natif — même
+  /// séquence que `patrimoine_export_dialog.dart` — puis la conserve AUSSI
+  /// dans les documents du bien (catégorie "Quittance") pour un historique
+  /// consultable sans avoir à la régénérer.
+  Future<void> _downloadQuittance(RentPeriod period, Uint8List pdfBytes) async {
+    final monthLabel =
+        '${period.periodStart.year}-'
+        '${period.periodStart.month.toString().padLeft(2, '0')}';
+    try {
+      final savePath = await FilePicker.saveFile(
+        dialogTitle: 'Enregistrer la quittance',
+        fileName: 'quittance-$monthLabel.pdf',
+        bytes: pdfBytes,
+      );
+      if (savePath == null) return;
+      final path = savePath.toLowerCase().endsWith('.pdf')
+          ? savePath
+          : '$savePath.pdf';
+      await File(path).writeAsBytes(pdfBytes);
+      await _addDocument(
+        'quittance-$monthLabel.pdf',
+        pdfBytes,
+        null,
+        'Quittance $monthLabel',
+        'Quittance',
+      );
+      if (!mounted) return;
+      _showToast(
+        title: 'Quittance enregistrée',
+        subtitle: 'Le PDF a été enregistré : $path',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showToast(
+        title: 'Échec de l\'enregistrement',
+        subtitle: 'La quittance n\'a pas pu être générée ou enregistrée : $e',
+      );
+    }
+  }
+
+  void _showToast({required String title, required String subtitle}) {
+    showToast(
+      context: context,
+      location: ToastLocation.bottomRight,
+      builder: (context, overlay) => SurfaceCard(
+        child: Basic(
+          title: shadcn.Text(title),
+          subtitle: shadcn.Text(subtitle),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addWorkItem(WorkItem item) async {
+    await _saveInvestment(
+      widget.investment.copyWith(
+        workItems: [...widget.investment.workItems, item],
+      ),
+    );
+    widget.onChanged();
+  }
+
+  Future<void> _deleteWorkItem(WorkItem item) async {
+    await _saveInvestment(
+      widget.investment.copyWith(
+        workItems: [
+          for (final w in widget.investment.workItems)
+            if (w.id != item.id) w,
         ],
       ),
     );
@@ -743,17 +898,25 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               onCancel: () => setState(() => _editingInvestment = false),
             )
           else ...[
-            if (!_isImmobilier && !_isCurrency) ...[
+            if (!_isImmobilier &&
+                !_isCurrency &&
+                (!isGeneratedIdentifier(investment.isin) ||
+                    (investment.symbol != null &&
+                        investment.symbol!.isNotEmpty))) ...[
               Wrap(
                 spacing: 12,
                 runSpacing: 4,
                 children: [
-                  CopyableIdentifier(
-                    value: investment.isin,
-                    toastTitle: _isRealIsin
-                        ? 'ISIN copié'
-                        : 'Identifiant copié',
-                  ),
+                  // Un identifiant auto-généré (voir [isGeneratedIdentifier])
+                  // n'a rien d'utile à montrer — pas de vrai ISIN/ticker à
+                  // copier.
+                  if (!isGeneratedIdentifier(investment.isin))
+                    CopyableIdentifier(
+                      value: investment.isin,
+                      toastTitle: _isRealIsin
+                          ? 'ISIN copié'
+                          : 'Identifiant copié',
+                    ),
                   if (investment.symbol != null &&
                       investment.symbol!.isNotEmpty)
                     CopyableIdentifier(
@@ -897,6 +1060,56 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 ),
               ],
             ),
+          if (_isImmobilier) ...[
+            const SizedBox(height: 16),
+            RealEstateLoanLinkSection(
+              vaultPath: widget.vaultPath,
+              investmentId: investment.id,
+            ),
+            const SizedBox(height: 24),
+            TabList(
+              index: _realEstateTabIndex,
+              onChanged: (value) =>
+                  setState(() => _realEstateTabIndex = value),
+              children: const [
+                TabItem(child: shadcn.Text('Loyers')),
+                TabItem(child: shadcn.Text('Travaux')),
+                TabItem(child: shadcn.Text('Documents')),
+                TabItem(child: shadcn.Text('Rentabilité')),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_realEstateTabIndex == 0)
+              RentPeriodsSection(
+                rentPeriods: investment.rentPeriods,
+                onAdd: _addRentPeriod,
+                onUpdate: _updateRentPeriod,
+                onDelete: _deleteRentPeriod,
+                propertyLabel: investment.label,
+                propertyAddress: investment.addressLabel,
+                landlordName: widget.profileName,
+                onDownloadQuittance: _downloadQuittance,
+              )
+            else if (_realEstateTabIndex == 1)
+              WorkItemsSection(
+                workItems: investment.workItems,
+                onAdd: _addWorkItem,
+                onDelete: _deleteWorkItem,
+              )
+            else if (_realEstateTabIndex == 2)
+              RealEstateDocumentsSection(
+                vaultPath: widget.vaultPath,
+                documents: investment.documents,
+                onAdd: (fileName, bytes, category, name) =>
+                    _addDocument(fileName, bytes, null, name, category),
+                onDelete: _deleteDocument,
+              )
+            else
+              RealEstateProfitabilitySection(
+                vaultPath: widget.vaultPath,
+                investment: investment,
+              ),
+          ],
           const SizedBox(height: 24),
           const shadcn.Text('Transactions').large().medium(),
           const SizedBox(height: 12),
@@ -913,6 +1126,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 showPriceField: !_isEurCurrency && !_isImmobilier,
                 showCurrencySelector: _showCurrencySelector,
                 priceCurrencyController: _priceCurrencyController,
+                currencyExtraOptions: _effectiveClass == AssetClass.crypto
+                    ? kKnownStablecoins
+                    : const [],
                 onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
                 onDateChanged: (d) => setState(() => _newDate = d),
                 onCreate: _commitEditTransaction,

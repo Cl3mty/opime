@@ -114,4 +114,93 @@ void main() {
       expect(reloaded.investments.single.transactions, hasLength(1));
     });
   });
+
+  group('migration : documents immobilier compte -> bien', () {
+    test(
+      'un compte immobilier avec un seul bien migre ses documents de '
+      'compte vers ce bien, une seule fois, en réécrivant le fichier',
+      () async {
+        final property = Investment(
+          isin: 'immobilier-abc',
+          label: 'Appartement Lyon 6e',
+          transactions: const [],
+          documents: [VaultDocument(fileName: 'plan.pdf', category: 'Plan')],
+        );
+        final account = InvestmentAccount(
+          assetClass: AssetClass.immobilier,
+          envelope: AccountEnvelope.autre,
+          name: 'Locatif',
+          investments: [property],
+          documents: [VaultDocument(fileName: 'acte-vente.pdf')],
+        );
+        await repo.saveAccount(account);
+
+        final reloaded = (await repo.listAll()).single;
+        expect(reloaded.documents, isEmpty);
+        expect(reloaded.investments.single.documents, hasLength(2));
+        expect(
+          reloaded.investments.single.documents.map((d) => d.fileName),
+          containsAll(['plan.pdf', 'acte-vente.pdf']),
+        );
+
+        // La migration ne se reproduit pas (déjà vide au niveau compte) :
+        // une seconde lecture ne duplique pas les documents.
+        final rereadAgain = (await repo.listAll()).single;
+        expect(rereadAgain.investments.single.documents, hasLength(2));
+      },
+    );
+
+    test(
+      'un compte immobilier avec plusieurs biens (ambigu : lequel des '
+      'biens un document concerne-t-il ?) ne migre PAS ses documents, '
+      'plutôt que de deviner à tort',
+      () async {
+        final account = InvestmentAccount(
+          assetClass: AssetClass.immobilier,
+          envelope: AccountEnvelope.autre,
+          name: 'Plusieurs biens',
+          investments: [
+            Investment(
+              isin: 'immobilier-a',
+              label: 'Bien A',
+              transactions: const [],
+            ),
+            Investment(
+              isin: 'immobilier-b',
+              label: 'Bien B',
+              transactions: const [],
+            ),
+          ],
+          documents: [VaultDocument(fileName: 'acte-vente.pdf')],
+        );
+        await repo.saveAccount(account);
+
+        final reloaded = (await repo.listAll()).single;
+        expect(reloaded.documents, hasLength(1));
+        expect(reloaded.investments.every((i) => i.documents.isEmpty), isTrue);
+      },
+    );
+
+    test('un compte non immobilier n\'est jamais concerné par cette '
+        'migration', () async {
+      final account = InvestmentAccount(
+        assetClass: AssetClass.actionsEtFonds,
+        envelope: AccountEnvelope.cto,
+        name: 'CTO',
+        investments: [
+          Investment(
+            isin: 'FR0000131104',
+            label: 'BNP Paribas',
+            transactions: const [],
+          ),
+        ],
+        documents: [VaultDocument(fileName: 'releve.pdf')],
+      );
+      await repo.saveAccount(account);
+
+      final reloaded = (await repo.listAll()).single;
+      expect(reloaded.documents, hasLength(1));
+      expect(reloaded.investments.single.documents, isEmpty);
+    });
+  });
 }

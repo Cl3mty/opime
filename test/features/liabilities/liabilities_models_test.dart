@@ -140,4 +140,45 @@ void main() {
       expect(liability.years.last.year, 5);
     });
   });
+
+  group('linkedInvestmentId (lien vers le bien immobilier financé)', () {
+    Liability loan({String? linkedInvestmentId}) => Liability(
+      type: LiabilityType.pretImmobilier,
+      name: 'Prêt appartement',
+      montantEmprunte: 200000,
+      tauxInteret: 3.5,
+      nbrEcheances: 240,
+      dateDebut: DateTime(2024, 1, 1),
+      linkedInvestmentId: linkedInvestmentId,
+    );
+
+    test('round-trip JSON conserve le lien', () {
+      final original = loan(linkedInvestmentId: 'immobilier-abc');
+      final restored = Liability.fromJson(original.toJson());
+      expect(restored.linkedInvestmentId, 'immobilier-abc');
+    });
+
+    test('sans lien : clé omise du JSON, reste null au décodage '
+        '(rétrocompatible avec les prêts existants)', () {
+      final json = loan().toJson();
+      expect(json.containsKey('linkedInvestmentId'), isFalse);
+      expect(Liability.fromJson(json).linkedInvestmentId, isNull);
+    });
+
+    test(
+      'copyWith avec sentinelle permet de délier (mettre explicitement à '
+      'null), contrairement au `?? this.x` des autres champs',
+      () {
+        final linked = loan(linkedInvestmentId: 'immobilier-abc');
+        final unlinked = linked.copyWith(linkedInvestmentId: null);
+        expect(unlinked.linkedInvestmentId, isNull);
+      },
+    );
+
+    test('copyWith sans toucher linkedInvestmentId le conserve tel quel', () {
+      final linked = loan(linkedInvestmentId: 'immobilier-abc');
+      final edited = linked.copyWith(name: 'Nouveau nom');
+      expect(edited.linkedInvestmentId, 'immobilier-abc');
+    });
+  });
 }

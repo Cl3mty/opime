@@ -265,6 +265,42 @@ void main() {
     );
 
     testWidgets(
+      'le texte d\'exemple du libellé s\'adapte à la classe d\'actif — '
+      '"Ardian Expansion Fund" pour Private Equity, pas "TotalEnergies"',
+      (tester) async {
+        final account = InvestmentAccount(
+          assetClass: AssetClass.privateEquity,
+          envelope: AccountEnvelope.fcprFcpi,
+          name: 'Moonfare',
+          bankName: 'Moonfare',
+          investments: const [],
+        );
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(account),
+        );
+
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.privateEquity,
+          initialAccountId: account.id,
+          awaitedText: 'Quel investissement ?',
+        );
+
+        // Pas "ou devise" : ce suffixe n'apparaît que pour les classes qui
+        // acceptent une position en devise (Actions & Fonds), pas Private
+        // Equity.
+        await tester.tap(find.text('Nouvel investissement'));
+        await tester.pump();
+
+        expect(
+          find.text('Libellé (ex: Ardian Expansion Fund)'),
+          findsOneWidget,
+        );
+        expect(find.text('Libellé (ex: TotalEnergies)'), findsNothing);
+      },
+    );
+
+    testWidgets(
       'remonter d\'une étape depuis "Quel investissement ?" atteint via '
       'initialAccountId ne plante pas (régression : null check operator '
       'used on a null value — _pendingEstablishmentName jamais renseigné '
@@ -353,6 +389,186 @@ void main() {
         );
 
         expect(find.text('Quel établissement ?'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'un compte Actions & Fonds/Crypto propose "Position à effet de '
+      'levier" à l\'étape "Quel investissement ?", qui ouvre directement '
+      'le formulaire dédié (leveraged_position_dialog.dart) plutôt que les '
+      'étapes investissement + transaction du spot',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final account = InvestmentAccount(
+          assetClass: AssetClass.crypto,
+          envelope: AccountEnvelope.plateformeEchange,
+          name: 'Hyperliquid',
+          investments: const [],
+        );
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(account),
+        );
+
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.crypto,
+          initialAccountId: account.id,
+          awaitedText: 'Quel investissement ?',
+        );
+
+        expect(find.text('Position à effet de levier'), findsOneWidget);
+        await tester.tap(find.text('Position à effet de levier'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Nouvelle position à effet de levier'), findsOneWidget);
+      },
+    );
+  });
+
+  group('Immobilier : plusieurs comptes distingués par enveloppe (résidence '
+      'principale, locatif, SCPI en direct, crowdfunding...)', () {
+    Future<void> pumpImmobilierDialog(WidgetTester tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: Builder(
+              builder: (context) => GestureDetector(
+                onTap: () => showCompletePatrimoineDialog(
+                  context,
+                  vaultPath: tempDir.path,
+                  onCompleted: () {},
+                  initialAssetClass: AssetClass.immobilier,
+                ),
+                child: const Text('OPEN'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('OPEN'));
+      await tester.pump();
+      await tester.runAsync(() async {
+        for (var i = 0; i < 40; i++) {
+          if (find.text('Quel compte ?').evaluate().isNotEmpty) return;
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+        }
+      });
+    }
+
+    testWidgets(
+      'régression : choisir Immobilier passe par "Quel compte ?" comme '
+      'les autres classes sans établissement (crypto, métaux, "Autres"), '
+      'au lieu de sauter directement sur un unique compte technique '
+      '"Biens immobiliers" partagé par tous les biens',
+      (tester) async {
+        await pumpImmobilierDialog(tester);
+
+        expect(find.text('Quel compte ?'), findsOneWidget);
+        expect(find.text('Nouveau compte'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'un compte immobilier existant ("Biens immobiliers") est proposé '
+      'comme option à côté de "Nouveau compte" — un nouveau bien peut '
+      'ainsi vivre dans un compte séparé plutôt que d\'y être forcément '
+      'ajouté',
+      (tester) async {
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(
+            InvestmentAccount(
+              assetClass: AssetClass.immobilier,
+              envelope: AccountEnvelope.autre,
+              name: 'Biens immobiliers',
+              investments: const [],
+            ),
+          ),
+        );
+
+        await pumpImmobilierDialog(tester);
+
+        expect(find.text('Biens immobiliers'), findsOneWidget);
+        expect(find.text('Nouveau compte'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'créer un nouveau compte immobilier avec l\'enveloppe par défaut '
+      '(résidence principale) ne demande pas de banque/établissement — '
+      'l\'immobilier n\'en a jamais, voir assetClassSupportsBankName',
+      (tester) async {
+        await pumpImmobilierDialog(tester);
+
+        await tester.tap(find.text('Nouveau compte'));
+        await tester.pump();
+
+        // Un seul TextField (le nom) : pas de champ "Banque" pour la
+        // résidence principale.
+        expect(find.byType(TextField), findsOneWidget);
+        await tester.enterText(find.byType(TextField), 'Ma maison');
+        await tester.pump();
+
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Créer le compte'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pump();
+
+        final saved = await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).listAll(),
+        );
+        final account = saved!.single;
+        expect(account.assetClass, AssetClass.immobilier);
+        expect(account.envelope, AccountEnvelope.residencePrincipale);
+        expect(account.name, 'Ma maison');
+        expect(account.bankName, isNull);
+      },
+    );
+
+    testWidgets(
+      'régression : deux comptes assurance vie existants (SCPI) restent '
+      'distinguables dans la liste — leur assureur apparaît, pas juste '
+      '"Actions & Fonds · Assurance Vie" identique pour les deux',
+      (tester) async {
+        await tester.runAsync(() async {
+          final repo = InvestmentsRepository(tempDir.path);
+          await repo.saveAccount(
+            InvestmentAccount(
+              assetClass: AssetClass.actionsEtFonds,
+              envelope: AccountEnvelope.assuranceVie,
+              name: 'Assurance Vie',
+              bankName: 'Boursorama',
+              investments: const [],
+            ),
+          );
+          await repo.saveAccount(
+            InvestmentAccount(
+              assetClass: AssetClass.actionsEtFonds,
+              envelope: AccountEnvelope.assuranceVie,
+              name: 'Assurance Vie',
+              bankName: 'Linxea Spirica',
+              investments: const [],
+            ),
+          );
+        });
+
+        await pumpImmobilierDialog(tester);
+
+        expect(
+          find.textContaining('Actions & Fonds · Assurance Vie · Boursorama'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining(
+            'Actions & Fonds · Assurance Vie · Linxea Spirica',
+          ),
+          findsOneWidget,
+        );
       },
     );
   });

@@ -426,10 +426,15 @@ class _AccountDetailViewState extends State<AccountDetailView> {
           // Pour les métaux précieux et "autres", chaque document doit être
           // rattaché à une transaction précise d'un investissement (voir
           // `InvestmentDetailView`) — pas de documents au niveau du compte
-          // pour ces deux classes. Pour toutes les autres, c'est l'inverse :
-          // le compte est le seul niveau où on en attache.
+          // pour ces deux classes. L'immobilier a, lui aussi, ses documents
+          // au niveau du BIEN (voir `InvestmentDetailView`'s onglet
+          // Documents, catégorisé Facture/Plan/Photo/Quittance/Autre) plutôt
+          // qu'au niveau du compte — un compte peut porter plusieurs biens.
+          // Pour toutes les autres classes, c'est l'inverse : le compte est
+          // le seul niveau où on en attache.
           if (account.assetClass != AssetClass.metauxPrecieux &&
-              account.assetClass != AssetClass.autres) ...[
+              account.assetClass != AssetClass.autres &&
+              account.assetClass != AssetClass.immobilier) ...[
             const SizedBox(height: 24),
             DocumentsSection(
               vaultPath: widget.vaultPath,
@@ -510,15 +515,22 @@ class _InvestmentCard extends StatelessWidget {
                       // titres) : l'identifiant est le code de la devise,
                       // déjà porté par le libellé — pas besoin de le répéter.
                       if (accountAssetClass != AssetClass.immobilier &&
-                          !investment.isCurrency)
+                          !investment.isCurrency &&
+                          (!isGeneratedIdentifier(investment.isin) ||
+                              (investment.symbol != null &&
+                                  investment.symbol!.isNotEmpty)))
                         Wrap(
                           spacing: 10,
                           runSpacing: 2,
                           children: [
-                            CopyableIdentifier(
-                              value: investment.isin,
-                              toastTitle: 'Identifiant copié',
-                            ),
+                            // Un identifiant auto-généré (voir
+                            // [isGeneratedIdentifier]) n'a rien d'utile à
+                            // montrer — pas de vrai ISIN/ticker à copier.
+                            if (!isGeneratedIdentifier(investment.isin))
+                              CopyableIdentifier(
+                                value: investment.isin,
+                                toastTitle: 'Identifiant copié',
+                              ),
                             if (investment.symbol != null &&
                                 investment.symbol!.isNotEmpty)
                               CopyableIdentifier(

@@ -297,30 +297,27 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       _accounts = accounts;
       _loading = false;
     });
-    if (_assetClass == AssetClass.immobilier && _step == _Step.account) {
-      await _selectImmobilierAccount();
-    } else {
-      final accountId = widget.initialAccountId;
-      final account = accountId == null
-          ? null
-          : accounts.where((a) => a.id == accountId).firstOrNull;
-      if (account != null) {
-        setState(() {
-          _assetClass = account.assetClass;
-          _envelope = account.envelope;
-          _accountId = account.id;
-          _step = _Step.investment;
-          // Pour une classe à établissement (voir
-          // assetClassRequiresEstablishmentStep), remonter d'une étape
-          // depuis "Quel investissement ?" retombe sur "Quel compte ?" (voir
-          // le `case _Step.accountEnvelope` plus bas), qui exige cette
-          // valeur — jamais renseignée par ce raccourci sinon, contrairement
-          // au parcours normal (choix de l'établissement puis du compte).
-          if (assetClassRequiresEstablishmentStep(account.assetClass)) {
-            _pendingEstablishmentName = account.bankName ?? account.name;
-          }
-        });
-      }
+    final accountId = widget.initialAccountId;
+    final initialAccount = accountId == null
+        ? null
+        : accounts.where((a) => a.id == accountId).firstOrNull;
+    if (initialAccount != null) {
+      setState(() {
+        _assetClass = initialAccount.assetClass;
+        _envelope = initialAccount.envelope;
+        _accountId = initialAccount.id;
+        _step = _Step.investment;
+        // Pour une classe à établissement (voir
+        // assetClassRequiresEstablishmentStep), remonter d'une étape
+        // depuis "Quel investissement ?" retombe sur "Quel compte ?" (voir
+        // le `case _Step.accountEnvelope` plus bas), qui exige cette
+        // valeur — jamais renseignée par ce raccourci sinon, contrairement
+        // au parcours normal (choix de l'établissement puis du compte).
+        if (assetClassRequiresEstablishmentStep(initialAccount.assetClass)) {
+          _pendingEstablishmentName =
+              initialAccount.bankName ?? initialAccount.name;
+        }
+      });
     }
     // Un investissement précis (page dédiée — immobilier uniquement) va
     // encore plus loin que le compte seul : direction directe l'étape
@@ -578,10 +575,6 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       !_investmentIsCurrency;
 
   void _selectAssetClass(AssetClass assetClass) {
-    if (assetClass == AssetClass.immobilier) {
-      _selectImmobilierAccount();
-      return;
-    }
     setState(() {
       _assetClass = assetClass;
       _envelope = accountEnvelopesFor(assetClass).first;
@@ -589,35 +582,14 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       // Les classes détenues chez un établissement suivent un sous-flux
       // dédié : quel établissement → quel compte (enveloppe) → quel
       // investissement et/ou quelle devise → quelle transaction — plutôt
-      // que le compte puis l'investissement des autres classes.
+      // que le compte puis l'investissement des autres classes. L'immobilier
+      // suit le même flux "quel compte" (avec choix d'enveloppe) que la
+      // crypto/les métaux/"Autres" — plusieurs comptes possibles, distingués
+      // par enveloppe (ex : "Biens immobiliers" en direct vs une SCPI logée
+      // en assurance vie), plutôt qu'un unique compte technique partagé.
       _step = assetClassRequiresEstablishmentStep(assetClass)
           ? _Step.establishment
           : _Step.account;
-    });
-  }
-
-  /// L'immobilier ne se rattache pas à un compte de placement. Le modèle de
-  /// stockage conserve un compte technique commun, sans le demander ici.
-  Future<void> _selectImmobilierAccount() async {
-    final existing = _accounts.where(
-      (account) => account.assetClass == AssetClass.immobilier,
-    );
-    final account = existing.isNotEmpty
-        ? existing.first
-        : InvestmentAccount(
-            assetClass: AssetClass.immobilier,
-            envelope: AccountEnvelope.autre,
-            name: 'Biens immobiliers',
-            investments: const [],
-          );
-    if (existing.isEmpty) await _repo.saveAccount(account);
-    if (!mounted) return;
-    setState(() {
-      _assetClass = AssetClass.immobilier;
-      _envelope = account.envelope;
-      _accountId = account.id;
-      _accounts = existing.isEmpty ? [..._accounts, account] : _accounts;
-      _step = _Step.investment;
     });
   }
 
@@ -1576,6 +1548,28 @@ class _AssetClassStep extends StatelessWidget {
   }
 }
 
+/// Texte d'exemple du champ "Nom du compte" de [_AccountStep], adapté à la
+/// classe d'actif choisie à l'étape précédente — "Autres" garde son propre
+/// libellé de champ ("Nom"), géré séparément par l'appelant.
+String _accountNamePlaceholderFor(AssetClass assetClass) {
+  switch (assetClass) {
+    case AssetClass.actionsEtFonds:
+      return 'Nom du compte (ex: PEA Boursorama)';
+    case AssetClass.epargne:
+      return 'Nom du compte (ex: Livret A)';
+    case AssetClass.crypto:
+      return 'Nom du compte (ex: Coinbase)';
+    case AssetClass.privateEquity:
+      return 'Nom du compte (ex: Moonfare)';
+    case AssetClass.metauxPrecieux:
+      return 'Nom du compte (ex: Coffre personnel)';
+    case AssetClass.immobilier:
+      return 'Nom du compte (ex: Résidence principale)';
+    case AssetClass.autres:
+      return 'Nom du compte';
+  }
+}
+
 class _AccountStep extends StatelessWidget {
   final String stepLabel;
   final AssetClass assetClass;
@@ -1657,10 +1651,17 @@ class _AccountStep extends StatelessWidget {
             sublabel: account.assetClass == assetClass
                 ? account.customOtherCategory ?? account.envelope?.label
                 // Compte "étranger" (ex : CTO Actions & Fonds proposé pour
-                // un ETC métaux précieux) : on précise sa vraie classe
-                // pour ne pas laisser croire qu'il en a changé.
+                // un ETC métaux précieux, ou assurance vie proposée pour une
+                // SCPI) : on précise sa vraie classe pour ne pas laisser
+                // croire qu'il en a changé, et son établissement quand il en
+                // a un (l'assureur/la banque) — sans lui, deux comptes de
+                // même enveloppe (deux contrats d'assurance vie chez des
+                // assureurs différents) seraient indiscernables ici, leur
+                // nom valant tous deux le seul libellé de l'enveloppe (voir
+                // `_commitEditAccountName`).
                 : '${account.assetClass.label}'
-                      '${account.envelope != null ? ' · ${account.envelope!.label}' : ''}',
+                      '${account.envelope != null ? ' · ${account.envelope!.label}' : ''}'
+                      '${account.bankName != null ? ' · ${account.bankName}' : ''}',
             onTap: () => onSelectAccount(account.id),
           ),
           const SizedBox(height: 8),
@@ -1730,11 +1731,10 @@ class _AccountStep extends StatelessWidget {
               const SizedBox(height: 8),
               TextField(
                 controller: nameController,
-                placeholder: shadcn.Text(
-                  assetClass == AssetClass.autres
-                      ? 'Nom (ex : Montres de collection)'
-                      : 'Nom du compte (ex: PEA Boursorama)',
-                ),
+                // Exemple adapté à la classe d'actif choisie à l'étape
+                // précédente, plutôt qu'un unique "PEA Boursorama" qui ne
+                // parle qu'à "Actions & Fonds".
+                placeholder: shadcn.Text(_accountNamePlaceholderFor(assetClass)),
                 autofocus: true,
               ),
               // Le champ "Banque" s'affiche pour toute classe détenue chez

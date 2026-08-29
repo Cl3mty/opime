@@ -41,6 +41,9 @@ class RealCategoryDetailScreen extends StatefulWidget {
   /// "Compléter mon patrimoine" plutôt que de le faire rechoisir.
   final CurrentAccountFocusController currentAccountFocus;
 
+  /// Nom du profil actif — voir `InvestmentDetailView.profileName`.
+  final String profileName;
+
   const RealCategoryDetailScreen({
     super.key,
     required this.vaultPath,
@@ -48,6 +51,7 @@ class RealCategoryDetailScreen extends StatefulWidget {
     required this.amountVisibility,
     required this.patrimoineRefreshController,
     required this.currentAccountFocus,
+    required this.profileName,
   });
 
   @override
@@ -376,6 +380,7 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
         hidden: hidden,
         onBack: () => setState(() => _selectedInvestmentId = null),
         onChanged: _refresh,
+        profileName: widget.profileName,
       );
     }
     if (account != null) {

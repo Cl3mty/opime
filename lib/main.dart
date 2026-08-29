@@ -708,6 +708,7 @@ class _OpimeAppState extends State<OpimeApp> {
                 amountVisibility: _amountVisibilityController,
                 patrimoineRefreshController: _patrimoineRefreshController,
                 currentAccountFocus: _currentAccountFocusController,
+                profileName: _profileController!.active?.name ?? '',
               ),
             for (final liabilityType in LiabilityType.values)
               liabilityType.categoryId: (_) => RealPassifDetailScreen(

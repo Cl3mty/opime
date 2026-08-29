@@ -137,6 +137,17 @@ class Liability {
   final List<AmortissementEntry> amortissement;
   final List<VaultDocument> documents;
 
+  /// Id de l'[Investment] immobilier financé par ce prêt — `null` pour un
+  /// prêt sans bien lié (crédit autre, ou prêt immobilier créé avant cette
+  /// fonctionnalité/jamais lié manuellement). Renseigné automatiquement
+  /// par `complete_patrimoine_dialog.dart`'s `_commitCreateLiability` à la
+  /// création d'un prêt immobilier juste après le bien qu'il finance, ou
+  /// manuellement depuis l'onglet Aperçu du bien (voir
+  /// `real_estate_loan_link.dart`). Sert à alimenter la rentabilité
+  /// (`simulateRealEstateProfitability`) avec le vrai prêt plutôt qu'une
+  /// saisie manuelle dans le simulateur autonome.
+  final String? linkedInvestmentId;
+
   Liability({
     String? id,
     required this.type,
@@ -155,6 +166,7 @@ class Liability {
     this.typeDiffere = DeferType.partielle,
     List<AmortissementEntry>? amortissement,
     this.documents = const [],
+    this.linkedInvestmentId,
   }) : id = id ?? generateInvestmentId('liab'),
        amortissement =
            amortissement ??
@@ -232,6 +244,7 @@ class Liability {
     int? dureeDiffereMois,
     DeferType? typeDiffere,
     List<VaultDocument>? documents,
+    Object? linkedInvestmentId = _unset,
   }) {
     final scheduleChanged =
         montantEmprunte != null ||
@@ -263,8 +276,13 @@ class Liability {
       typeDiffere: typeDiffere ?? this.typeDiffere,
       amortissement: scheduleChanged ? null : amortissement,
       documents: documents ?? this.documents,
+      linkedInvestmentId: identical(linkedInvestmentId, _unset)
+          ? this.linkedInvestmentId
+          : linkedInvestmentId as String?,
     );
   }
+
+  static const Object _unset = Object();
 
   int get _totalMonths => amortissement.length;
 
@@ -365,6 +383,7 @@ class Liability {
       documents: (json['documents'] as List? ?? [])
           .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
           .toList(),
+      linkedInvestmentId: json['linkedInvestmentId'] as String?,
     );
   }
 
@@ -386,5 +405,6 @@ class Liability {
     'fraisGarantie': round2(fraisGarantie),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
+    if (linkedInvestmentId != null) 'linkedInvestmentId': linkedInvestmentId,
   };
 }

@@ -2,6 +2,7 @@ import 'dart:math';
 import 'currency_data.dart' show kKnownCurrencies;
 import 'leveraged_position.dart' show LeveragedPosition;
 import 'metal_price_client.dart' show kKnownGoldProducts, kKnownSilverProducts;
+import 'real_estate/rent_models.dart' show RentPeriod, WorkItem;
 import 'yahoo_finance_client.dart' show kKnownCryptoTickers;
 
 String generateInvestmentId(String prefix) {
@@ -558,6 +559,18 @@ class Investment {
 
   final List<VaultDocument> documents;
 
+  /// Historique des loyers d'un bien immobilier loué — voir
+  /// `real_estate/rent_models.dart`'s `RentPeriod`. Vide hors immobilier, ou
+  /// pour une résidence principale/secondaire non louée.
+  final List<RentPeriod> rentPeriods;
+
+  /// Postes de travaux (rénovation, entretien lourd...) d'un bien
+  /// immobilier — voir `real_estate/rent_models.dart`'s `WorkItem`. Leur
+  /// somme s'ajoute à [investedAmount] dans le coût total du projet utilisé
+  /// par la rentabilité, jamais dans la valorisation patrimoine (un poste de
+  /// travaux n'est pas un achat de titre).
+  final List<WorkItem> workItems;
+
   /// `true` si l'utilisateur a explicitement choisi d'exclure cet
   /// investissement du patrimoine global — il reste visible partout où il
   /// apparaît aujourd'hui (position, transaction, compte, page de
@@ -594,6 +607,8 @@ class Investment {
     this.manualPrice,
     this.manualPriceAt,
     this.documents = const [],
+    this.rentPeriods = const [],
+    this.workItems = const [],
     this.excludedFromPatrimoine = false,
   }) : id = id ?? generateInvestmentId('inv');
 
@@ -619,6 +634,8 @@ class Investment {
     double? manualPrice,
     DateTime? manualPriceAt,
     List<VaultDocument>? documents,
+    List<RentPeriod>? rentPeriods,
+    List<WorkItem>? workItems,
     bool? excludedFromPatrimoine,
   }) => Investment(
     id: id,
@@ -645,6 +662,8 @@ class Investment {
     manualPrice: manualPrice ?? this.manualPrice,
     manualPriceAt: manualPriceAt ?? this.manualPriceAt,
     documents: documents ?? this.documents,
+    rentPeriods: rentPeriods ?? this.rentPeriods,
+    workItems: workItems ?? this.workItems,
     excludedFromPatrimoine:
         excludedFromPatrimoine ?? this.excludedFromPatrimoine,
   );
@@ -785,6 +804,12 @@ class Investment {
     documents: (json['documents'] as List? ?? [])
         .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
         .toList(),
+    rentPeriods: (json['rentPeriods'] as List? ?? [])
+        .map((e) => RentPeriod.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    workItems: (json['workItems'] as List? ?? [])
+        .map((e) => WorkItem.fromJson(e as Map<String, dynamic>))
+        .toList(),
     excludedFromPatrimoine: json['excludedFromPatrimoine'] as bool? ?? false,
   );
 
@@ -822,6 +847,10 @@ class Investment {
       'manualPriceAt': manualPriceAt!.toIso8601String(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
+    if (rentPeriods.isNotEmpty)
+      'rentPeriods': rentPeriods.map((r) => r.toJson()).toList(),
+    if (workItems.isNotEmpty)
+      'workItems': workItems.map((w) => w.toJson()).toList(),
     if (excludedFromPatrimoine)
       'excludedFromPatrimoine': excludedFromPatrimoine,
   };
@@ -845,14 +874,31 @@ class VaultDocument {
   /// individuellement — voir `DocumentsSection`'s `transactions` param.
   final String? transactionId;
 
+  /// Regroupement libre utilisé par l'immobilier ("Facture", "Plan",
+  /// "Photo", "Quittance", "Autre" — voir `real_estate/` : documents
+  /// organisés par bien plutôt qu'en une seule liste, contrairement aux
+  /// autres classes). `null` partout ailleurs, sans effet sur
+  /// [DocumentsSection] hors immobilier.
+  final String? category;
+
   VaultDocument({
     String? id,
     required this.fileName,
     DateTime? uploadedAt,
     this.note,
     this.transactionId,
+    this.category,
   }) : id = id ?? generateInvestmentId('doc'),
        uploadedAt = uploadedAt ?? DateTime.now();
+
+  VaultDocument copyWith({String? note, String? category}) => VaultDocument(
+    id: id,
+    fileName: fileName,
+    uploadedAt: uploadedAt,
+    note: note ?? this.note,
+    transactionId: transactionId,
+    category: category ?? this.category,
+  );
 
   factory VaultDocument.fromJson(Map<String, dynamic> json) => VaultDocument(
     id: json['id'] as String? ?? generateInvestmentId('doc'),
@@ -862,6 +908,7 @@ class VaultDocument {
         : null,
     note: json['note'] as String?,
     transactionId: json['transactionId'] as String?,
+    category: json['category'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -870,6 +917,7 @@ class VaultDocument {
     'uploadedAt': uploadedAt.toIso8601String(),
     if (note != null) 'note': note,
     if (transactionId != null) 'transactionId': transactionId,
+    if (category != null) 'category': category,
   };
 }
 
@@ -892,6 +940,7 @@ enum AccountEnvelope {
   lep,
   pel,
   residencePrincipale,
+  residenceSecondaire,
   investissementLocatif,
   scpi,
   crowdfundingImmobilier,
@@ -938,6 +987,8 @@ enum AccountEnvelope {
         return 'PEL';
       case AccountEnvelope.residencePrincipale:
         return 'Résidence principale';
+      case AccountEnvelope.residenceSecondaire:
+        return 'Résidence secondaire';
       case AccountEnvelope.investissementLocatif:
         return 'Investissement locatif';
       case AccountEnvelope.scpi:
@@ -986,6 +1037,7 @@ List<AccountEnvelope> accountEnvelopesFor(AssetClass assetClass) {
     case AssetClass.immobilier:
       return const [
         AccountEnvelope.residencePrincipale,
+        AccountEnvelope.residenceSecondaire,
         AccountEnvelope.investissementLocatif,
         AccountEnvelope.scpi,
         AccountEnvelope.crowdfundingImmobilier,
@@ -1115,14 +1167,22 @@ bool accountEnvelopeIsUniquePerEstablishment(
 /// le flux "Compléter mon patrimoine" propose ces comptes-titres existants
 /// comme destination valide quand la classe choisie est Métaux précieux —
 /// l'investissement qui y est créé porte alors sa propre [Investment.assetClass]
-/// (métaux précieux), différente de celle du compte qui le contient.
+/// (métaux précieux), différente de celle du compte qui le contient. Même
+/// principe pour une SCPI logée dans un contrat d'assurance vie "Actions &
+/// Fonds" existant (fiscalité de l'assurance vie, pas celle des revenus
+/// fonciers d'une SCPI en direct) plutôt que dans un compte immobilier
+/// dédié — un même contrat AV peut ainsi porter à la fois des fonds/ETF et
+/// des parts de SCPI, comme dans la réalité (un seul contrat multi-support).
 bool accountAcceptsCrossClassInvestment(
   InvestmentAccount account,
   AssetClass targetClass,
 ) {
-  return targetClass == AssetClass.metauxPrecieux &&
-      account.assetClass == AssetClass.actionsEtFonds &&
-      account.envelope == AccountEnvelope.cto;
+  return (targetClass == AssetClass.metauxPrecieux &&
+          account.assetClass == AssetClass.actionsEtFonds &&
+          account.envelope == AccountEnvelope.cto) ||
+      (targetClass == AssetClass.immobilier &&
+          account.assetClass == AssetClass.actionsEtFonds &&
+          account.envelope == AccountEnvelope.assuranceVie);
 }
 
 /// Un métal précieux *coté* plutôt que physique : un ETC (Exchange Traded
@@ -1168,7 +1228,10 @@ bool assetClassRequiresEstablishmentStep(AssetClass assetClass) {
 /// une date d'ouverture pertinente : la date d'acquisition de l'objet. La
 /// crypto (portefeuille auto-détenu), les métaux physiques (pièce ou lingot
 /// en coffre) et le compte technique de l'immobilier n'ont pas de date
-/// d'ouverture.
+/// d'ouverture — une SCPI logée en assurance vie n'a pas son propre compte
+/// immobilier distinct (voir `accountAcceptsCrossClassInvestment`), elle
+/// vit dans un compte Actions & Fonds/assurance vie déjà couvert par le cas
+/// général ci-dessous.
 bool accountHasOpeningDate(AssetClass assetClass) {
   if (assetClass == AssetClass.autres) return true;
   return assetClassRequiresEstablishmentStep(assetClass);
@@ -1293,7 +1356,10 @@ List<UnlockTranche> pegPeeUnlockTranches({
 /// (pièce ou lingot en coffre) n'ont pas de banque ; tout le reste
 /// (compte-titres, assurance-vie, épargne...) est bien détenu chez un
 /// établissement. Pour les métaux, l'enveloppe tranche : seule une
-/// détention en CTO ([AccountEnvelope.cto], un ETC coté) est bancaire.
+/// détention en CTO ([AccountEnvelope.cto], un ETC coté) est bancaire. Une
+/// SCPI logée en assurance vie n'a pas son propre compte immobilier
+/// distinct (voir `accountAcceptsCrossClassInvestment`) : elle vit dans un
+/// compte Actions & Fonds/assurance vie, déjà bancaire par ce cas général.
 bool assetClassSupportsBankName(
   AssetClass assetClass, {
   AccountEnvelope? envelope,

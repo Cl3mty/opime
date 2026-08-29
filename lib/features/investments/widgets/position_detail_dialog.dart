@@ -15,6 +15,7 @@ import '../currency_data.dart' show kKnownStablecoins;
 import '../currency_format.dart';
 import '../document_storage.dart';
 import '../documents_section.dart';
+import '../investment_reestimate_dialog.dart';
 import '../investments_models.dart';
 import '../investments_repository.dart';
 import '../performance_calculator.dart';
@@ -198,6 +199,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
               widget.account.envelope == AccountEnvelope.pee ||
               widget.account.envelope == AccountEnvelope.per));
 
+  /// `true` pour une SCPI logée dans un compte Actions & Fonds/assurance
+  /// vie (voir `accountAcceptsCrossClassInvestment`) exactement comme pour
+  /// un bien immobilier natif (`investment_detail_screen.dart`'s
+  /// équivalent) : pas de prix unitaire/devise à saisir (un seul montant
+  /// total), et sa valeur se réestime au m² plutôt que par un cours de
+  /// marché.
+  bool get _isImmobilier => _effectiveClass == AssetClass.immobilier;
+
   bool get _isRealIsin =>
       !_isCurrency &&
       (_effectiveClass == AssetClass.actionsEtFonds ||
@@ -237,11 +246,16 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   bool get _isEurCurrency =>
       _isCurrency && _investment.isin.trim().toUpperCase() == 'EUR';
 
-  bool get _showCurrencySelector => !_isEurCurrency && !_isCurrency;
+  bool get _showCurrencySelector =>
+      !_isEurCurrency && !_isImmobilier && !_isCurrency;
 
-  String get _quantityFieldLabel => _isCurrency
-      ? (_isEurCurrency ? 'Montant (€)' : 'Montant (${_investment.isin})')
-      : 'Quantité';
+  String get _quantityFieldLabel {
+    if (_isImmobilier) return 'Montant total (€)';
+    if (_isCurrency) {
+      return _isEurCurrency ? 'Montant (€)' : 'Montant (${_investment.isin})';
+    }
+    return 'Quantité';
+  }
 
   String get _priceFieldLabel =>
       _isCurrency ? 'Cours de la paire de devise' : 'Prix unitaire';
@@ -267,8 +281,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
 
   Future<void> _commitCreateTransaction() async {
     final date = _newDate;
-    final quantity = parseDecimal(_quantityController.text);
-    final price = _isEurCurrency ? 1.0 : parseDecimal(_priceController.text);
+    final quantity = _isImmobilier
+        ? 1.0
+        : parseDecimal(_quantityController.text);
+    final price = _isImmobilier
+        ? parseDecimal(_quantityController.text)
+        : _isEurCurrency
+        ? 1.0
+        : parseDecimal(_priceController.text);
     final currency = _txnCurrency;
     final fxRateToEur = _txnFxRateToEur;
     // Un objet "Autres" peut avoir été reçu en cadeau (prix d'achat 0) —
@@ -362,8 +382,12 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       _newIsBuy = transaction.isBuy;
       _newDate = transaction.date;
       _newUnlockDateOverride = transaction.manualUnlockDate;
-      _quantityController.text = _formatNumber(transaction.quantity);
-      _priceController.text = _formatNumber(transaction.unitPrice);
+      _quantityController.text = _formatNumber(
+        _isImmobilier ? transaction.amount : transaction.quantity,
+      );
+      _priceController.text = _isImmobilier
+          ? ''
+          : _formatNumber(transaction.unitPrice);
       _noteController.text = transaction.note ?? '';
     });
     _priceCurrencyController.loadFrom(
@@ -386,8 +410,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   Future<void> _commitEditTransaction() async {
     final id = _editingTransactionId;
     final date = _newDate;
-    final quantity = parseDecimal(_quantityController.text);
-    final price = _isEurCurrency ? 1.0 : parseDecimal(_priceController.text);
+    final quantity = _isImmobilier
+        ? 1.0
+        : parseDecimal(_quantityController.text);
+    final price = _isImmobilier
+        ? parseDecimal(_quantityController.text)
+        : _isEurCurrency
+        ? 1.0
+        : parseDecimal(_priceController.text);
     final currency = _txnCurrency;
     final fxRateToEur = _txnFxRateToEur;
     // Voir `_commitCreateTransaction` : un objet "Autres" peut avoir été
@@ -515,6 +545,22 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     ),
   );
 
+  /// "Réestimer la valeur (€/m²)" — même dialogue qu'un bien immobilier
+  /// natif (`investment_detail_screen.dart`'s équivalent), réutilisable ici
+  /// tel quel puisqu'il n'opère que sur l'[Investment], indépendamment du
+  /// compte qui le contient (une SCPI logée en assurance vie s'estime
+  /// exactement comme une SCPI en direct).
+  Future<void> _openReestimateDialog() async {
+    await showRealEstateReestimateDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      investment: _investment,
+      onEstimated: (updated) async {
+        await _saveInvestment(updated);
+      },
+    );
+  }
+
   /// Ouvre une petite popup pour saisir/mettre à jour le cours (prix
   /// unitaire) estimé à la main (voir `Investment.manualPrice`) — seul
   /// moyen de valoriser un objet "Autres" (montre, voiture, art...) ou un
@@ -617,7 +663,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   void _startEditInvestment() {
     setState(() {
       _editingInvestment = true;
-      _editIsinController.text = _investment.isin;
+      // Un identifiant auto-généré (voir [isGeneratedIdentifier]) n'a rien
+      // d'utile à montrer/re-saisir — le champ reste optionnel pour ces
+      // classes (voir [isinOptionalFor]), donc vide plutôt que de préremplir
+      // avec un id technique interne : ré-enregistrer sans y toucher
+      // régénère simplement un nouveau placeholder ([_commitEditInvestment]).
+      _editIsinController.text = isGeneratedIdentifier(_investment.isin)
+          ? ''
+          : _investment.isin;
       _editLabelController.text = _investment.label;
       _editFundStyle = _investment.fundStyle;
     });
@@ -696,6 +749,12 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                 leading: const Icon(LucideIcons.tag, size: 14),
                 child: const shadcn.Text('Réestimer le cours'),
                 onPressed: (_) => _showManualEstimateDialog(),
+              ),
+            if (_isImmobilier)
+              MenuButton(
+                leading: const Icon(LucideIcons.mapPin, size: 14),
+                child: const shadcn.Text('Réestimer la valeur (€/m²)'),
+                onPressed: (_) => _openReestimateDialog(),
               ),
             MenuButton(
               leading: Icon(
@@ -1060,7 +1119,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         noteController: _noteController,
                         quantityLabel: _quantityFieldLabel,
                         priceLabel: _priceFieldLabel,
-                        showPriceField: !_isEurCurrency,
+                        showPriceField: !_isEurCurrency && !_isImmobilier,
                         showCurrencySelector: _showCurrencySelector,
                         priceCurrencyController: _priceCurrencyController,
                         currencyExtraOptions:
@@ -1133,7 +1192,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       noteController: _noteController,
                       quantityLabel: _quantityFieldLabel,
                       priceLabel: _priceFieldLabel,
-                      showPriceField: !_isEurCurrency,
+                      showPriceField: !_isEurCurrency && !_isImmobilier,
                       showCurrencySelector: _showCurrencySelector,
                       priceCurrencyController: _priceCurrencyController,
                       currencyExtraOptions: _effectiveClass == AssetClass.crypto

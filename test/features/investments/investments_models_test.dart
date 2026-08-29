@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/features/investments/currency_data.dart';
 import 'package:opime/features/investments/investments_models.dart';
+import 'package:opime/features/investments/real_estate/rent_models.dart';
 
 void main() {
   InvestmentAccount account({String? description, DateTime? openingDate}) =>
@@ -62,6 +63,52 @@ void main() {
     expect(accountHasOpeningDate(AssetClass.crypto), isFalse);
     expect(accountHasOpeningDate(AssetClass.metauxPrecieux), isFalse);
     expect(accountHasOpeningDate(AssetClass.immobilier), isFalse);
+  });
+
+  test('accountAcceptsCrossClassInvestment : une SCPI peut se loger dans un '
+      'compte Actions & Fonds en assurance vie déjà créé, pas besoin d\'un '
+      'compte immobilier dédié — même principe qu\'un ETC métaux dans un '
+      'CTO', () {
+    final assuranceVie = InvestmentAccount(
+      assetClass: AssetClass.actionsEtFonds,
+      envelope: AccountEnvelope.assuranceVie,
+      name: 'Boursorama Vie',
+      bankName: 'Boursorama',
+      investments: const [],
+    );
+    expect(
+      accountAcceptsCrossClassInvestment(assuranceVie, AssetClass.immobilier),
+      isTrue,
+    );
+    // Un autre compte Actions & Fonds (CTO) n'accepte pas de SCPI.
+    final cto = assuranceVie.copyWith(envelope: AccountEnvelope.cto);
+    expect(
+      accountAcceptsCrossClassInvestment(cto, AssetClass.immobilier),
+      isFalse,
+    );
+    // Un compte immobilier n'a, lui, jamais besoin de ce mécanisme (il
+    // accepte déjà nativement une SCPI, voir `accountEnvelopesFor`).
+    final immobilier = InvestmentAccount(
+      assetClass: AssetClass.immobilier,
+      envelope: AccountEnvelope.scpi,
+      name: 'Biens immobiliers',
+      investments: const [],
+    );
+    expect(
+      accountAcceptsCrossClassInvestment(immobilier, AssetClass.immobilier),
+      isFalse,
+    );
+  });
+
+  test('accountEnvelopesFor(AssetClass.immobilier) propose la résidence '
+      'secondaire, distincte de la résidence principale', () {
+    final envelopes = accountEnvelopesFor(AssetClass.immobilier);
+    expect(envelopes, contains(AccountEnvelope.residenceSecondaire));
+    expect(envelopes, contains(AccountEnvelope.residencePrincipale));
+    expect(
+      AccountEnvelope.residenceSecondaire.label,
+      'Résidence secondaire',
+    );
   });
 
   test('requiresLabelFieldFor : pas de libellé séparé pour l\'épargne', () {
@@ -784,6 +831,103 @@ void main() {
       final investment = property();
       expect(investment.effectiveMarketValue, isNull);
       expect(investment.unrealizedGain, isNull);
+    });
+  });
+
+  group('rentPeriods/workItems (Investment immobilier)', () {
+    Investment property({
+      List<RentPeriod> rentPeriods = const [],
+      List<WorkItem> workItems = const [],
+    }) => Investment(
+      isin: 'immobilier-abc123',
+      label: 'Appartement Lyon 6e',
+      realEstateType: RealEstateType.locationLongueDureeNue,
+      transactions: [
+        Transaction(date: DateTime(2020, 1, 1), isBuy: true, quantity: 1, unitPrice: 250000),
+      ],
+      rentPeriods: rentPeriods,
+      workItems: workItems,
+    );
+
+    test('round-trip JSON conserve les deux listes', () {
+      final rent = RentPeriod(
+        periodStart: DateTime(2026, 1, 1),
+        periodEnd: DateTime(2026, 1, 31),
+        amountDue: 800,
+      );
+      final work = WorkItem(
+        label: 'Peinture',
+        amount: 800,
+        date: DateTime(2026, 2, 1),
+      );
+      final original = property(rentPeriods: [rent], workItems: [work]);
+      final restored = Investment.fromJson(original.toJson());
+
+      expect(restored.rentPeriods, hasLength(1));
+      expect(restored.rentPeriods.single.id, rent.id);
+      expect(restored.workItems, hasLength(1));
+      expect(restored.workItems.single.id, work.id);
+    });
+
+    test('listes vides : clés omises du JSON, restent vides au décodage '
+        '(pas null)', () {
+      final json = property().toJson();
+      expect(json.containsKey('rentPeriods'), isFalse);
+      expect(json.containsKey('workItems'), isFalse);
+
+      final restored = Investment.fromJson(json);
+      expect(restored.rentPeriods, isEmpty);
+      expect(restored.workItems, isEmpty);
+    });
+
+    test(
+      'copyWith reporte les deux listes quand non explicitement changées '
+      '(régression : une reconstruction manuelle de Investment — voir '
+      '_commitEditInvestment — pourrait les oublier)',
+      () {
+        final rent = RentPeriod(
+          periodStart: DateTime(2026, 1, 1),
+          periodEnd: DateTime(2026, 1, 31),
+          amountDue: 800,
+        );
+        final work = WorkItem(
+          label: 'Peinture',
+          amount: 800,
+          date: DateTime(2026, 2, 1),
+        );
+        final original = property(rentPeriods: [rent], workItems: [work]);
+        final edited = original.copyWith(
+          realEstateType: RealEstateType.residencePrincipale,
+        );
+
+        expect(edited.rentPeriods, [rent]);
+        expect(edited.workItems, [work]);
+      },
+    );
+  });
+
+  group('VaultDocument.category (regroupement immobilier : Facture/Plan/'
+      'Photo/Quittance/Autre)', () {
+    test('round-trip JSON conserve la catégorie', () {
+      final doc = VaultDocument(fileName: 'facture.pdf', category: 'Facture');
+      final restored = VaultDocument.fromJson(doc.toJson());
+      expect(restored.category, 'Facture');
+    });
+
+    test('sans catégorie : clé omise du JSON, reste null au décodage '
+        '(rétrocompatible avec les documents existants hors immobilier)', () {
+      final doc = VaultDocument(fileName: 'contrat.pdf');
+      final json = doc.toJson();
+      expect(json.containsKey('category'), isFalse);
+      expect(VaultDocument.fromJson(json).category, isNull);
+    });
+
+    test('copyWith change la catégorie sans toucher au reste', () {
+      final doc = VaultDocument(fileName: 'photo.jpg', note: 'Façade');
+      final recategorized = doc.copyWith(category: 'Photo');
+      expect(recategorized.category, 'Photo');
+      expect(recategorized.fileName, 'photo.jpg');
+      expect(recategorized.note, 'Façade');
     });
   });
 
