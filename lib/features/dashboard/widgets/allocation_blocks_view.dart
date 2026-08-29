@@ -5,8 +5,8 @@ import 'allocation_hover_tooltip.dart';
 
 /// Une part affichée comme bloc dans [AllocationBlocksView] — assez
 /// générique pour représenter aussi bien une catégorie d'allocation
-/// (carte Allocation) qu'un compte au sein d'une catégorie (Distribution
-/// de la page de détail).
+/// (carte Allocation du Dashboard) qu'un compte au sein d'une catégorie
+/// (Allocation de la page de détail).
 class AllocationSlice {
   final String id;
   final String label;

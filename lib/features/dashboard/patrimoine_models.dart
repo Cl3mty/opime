@@ -108,13 +108,20 @@ class PatrimoineAccount {
   final double? cours;
   final double valeur;
   final double? pru;
-  final double plusValueAbs;
+
+  /// `null` quand aucune valorisation n'a jamais été connue pour cette ligne
+  /// (ni cours de marché, ni estimation manuelle — voir `Investment.
+  /// unrealizedGain`/`LeveragedPosition.pnl`) : distinct d'une plus-value
+  /// réellement nulle, affiché comme un simple « — » plutôt qu'une
+  /// croissance à 0 trompeuse (voir [PerformanceAmount]).
+  final double? plusValueAbs;
 
   /// `null` quand le coût d'acquisition est nul (ex : un objet "Autres"
   /// reçu en cadeau, voir `Investment`'s prix d'achat à 0) — la plus-value
   /// relative n'a alors aucun sens à exprimer en pourcentage (ce serait
   /// infini), seul [plusValueAbs] reste affiché (voir [PerformanceAmount],
-  /// qui masque la ligne pourcentage quand elle vaut `null`).
+  /// qui masque la ligne pourcentage quand elle vaut `null`). `null` aussi,
+  /// bien sûr, quand [plusValueAbs] lui-même l'est.
   final double? plusValuePercent;
 
   /// Identifiant de l'investissement réel source de cette ligne — permet à
@@ -151,6 +158,14 @@ class PatrimoineAccount {
   /// un métal précieux coté détenu dans un CTO (pas de produit physique
   /// associé, donc pas d'image non plus).
   final String? avatarInitials;
+
+  /// Ticker crypto (ex : "BTC") pour lequel afficher le vrai logo (police
+  /// `crypto_icons`, embarquée dans l'app — aucun appel réseau, cohérent
+  /// avec la philosophie local-first du projet) à la place des initiales.
+  /// `null` hors crypto. Un ticker sans logo connu dans la police (crypto
+  /// obscure) retombe silencieusement sur [avatarInitials]/les initiales du
+  /// nom — voir `category_detail_screen.dart`'s `_AccountAvatar`.
+  final String? avatarCryptoSymbol;
 
   /// `true` quand un cours a été cherché (Yahoo Finance) et n'a pas été
   /// trouvé — voir `Investment.priceUnavailable` côté réel, propagé par
@@ -199,6 +214,11 @@ class PatrimoineAccount {
   /// `_buildLeaf`.
   final bool excludedFromPatrimoine;
 
+  /// Badge court affiché à côté du nom pour une position à effet de levier
+  /// (ex : "x2") — voir `real_patrimoine_adapter.dart`'s `_buildLeveragedLeaf`.
+  /// `null` pour toute ligne qui n'en est pas une.
+  final String? leverageBadge;
+
   const PatrimoineAccount({
     this.id,
     required this.name,
@@ -213,9 +233,11 @@ class PatrimoineAccount {
     this.canDelete = true,
     this.avatarImagePath,
     this.avatarInitials,
+    this.avatarCryptoSymbol,
     this.isCurrency = false,
     this.priceUnavailable,
     this.lastPriceDate,
+    this.leverageBadge,
     this.manualPriceAt,
     this.bankName,
     this.excludedFromPatrimoine = false,
@@ -271,7 +293,7 @@ class PatrimoineCategory {
   double get montant => accounts.fold(0.0, (sum, a) => sum + a.valeur);
 
   double get plusValueAbs =>
-      accounts.fold(0.0, (sum, a) => sum + a.plusValueAbs);
+      accounts.fold(0.0, (sum, a) => sum + (a.plusValueAbs ?? 0));
 
   /// `null` sans coût d'acquisition (ex : une catégorie composée uniquement
   /// d'objets reçus en cadeau) — voir [PatrimoineAccount.plusValuePercent].
@@ -293,13 +315,14 @@ class PatrimoineCategory {
 
   /// Comme [plusValueAbs], mais ignore les lignes exclues du patrimoine —
   /// même filtre que [montantPatrimoine], pour rester cohérent avec le
-  /// total affiché à côté (la plus-value latente globale du graphique
-  /// principal du Dashboard, `real_patrimoine_card.dart`, dont la courbe
-  /// exclut déjà ces lignes — voir `investmentsForEffectiveClass`'s
-  /// `excludeFlagged`).
+  /// total affiché à côté (la carte Allocation du Dashboard, dont la
+  /// courbe exclut déjà ces lignes — voir `investmentsForEffectiveClass`'s
+  /// `excludeFlagged`). Alimente aussi la plus-value latente globale
+  /// affichée sur l'écran Analyses (`analyses_screen.dart`'s
+  /// `_UnrealizedGainCard`).
   double get plusValueAbsPatrimoine => accounts.fold(
     0.0,
-    (sum, a) => a.excludedFromPatrimoine ? sum : sum + a.plusValueAbs,
+    (sum, a) => a.excludedFromPatrimoine ? sum : sum + (a.plusValueAbs ?? 0),
   );
 
   /// Vrai pour les classes d'actif "unitaires" — une quantité et un cours

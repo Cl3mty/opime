@@ -867,6 +867,14 @@ class _DistributionCardState extends State<_DistributionCard> {
                       constraints.maxHeight,
                     );
                     return MouseRegion(
+                      // `onEnter` en plus de `onHover` : voir
+                      // `allocation_donut_view.dart`'s équivalent — sans
+                      // lui, l'anneau apparu sous une souris déjà immobile
+                      // (ouverture de la page, changement de mois...)
+                      // n'affichait aucun surlignage tant que la souris ne
+                      // bougeait pas encore un peu après y être entrée.
+                      onEnter: (event) =>
+                          _updateHover(event.localPosition, size, total),
                       onHover: (event) =>
                           _updateHover(event.localPosition, size, total),
                       onExit: (_) => setState(() {
@@ -915,7 +923,11 @@ class _DistributionCardState extends State<_DistributionCard> {
             children: [
               for (var i = 0; i < slices.length; i++)
                 AnimatedOpacity(
-                  duration: const Duration(milliseconds: 150),
+                  // Zéro délai : même raisonnement que
+                  // `AllocationDonutView`'s légende — l'arc du donut
+                  // (`_DonutPainter`) est repeint instantanément au survol,
+                  // la légende ne doit pas traîner derrière.
+                  duration: Duration.zero,
                   opacity: hoveredIndex != null && hoveredIndex != i
                       ? 0.35
                       : 1.0,

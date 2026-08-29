@@ -25,9 +25,45 @@ import 'widgets/patrimoine_chart_widgets.dart'
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
 
+/// Logos crypto (police `crypto_icons`, embarquée dans l'app — aucun appel
+/// réseau) pour les tickers de [kKnownCryptoTickers] (`yahoo_finance_client
+/// .dart`), reconstruits ici en `const` avec `fontPackage` explicite plutôt
+/// que via `CryptoIcons.fromSymbol` : ce dernier omet `fontPackage` sur les
+/// `IconData` qu'il renvoie, ce qui empêche Flutter de retrouver la police
+/// "CryptocurrencyIcons" dans le bundle d'assets du package — le glyphe
+/// retombe alors sur le caractère "non défini" (un gros point
+/// d'interrogation), jamais sur le vrai logo. Un `IconData` doit de toute
+/// façon être `const` pour rester compatible avec le tree-shaking des
+/// polices d'icônes en build release (voir `@mustBeConst` sur `IconData
+/// .codePoint`), donc une reconstruction dynamique à l'exécution n'aurait
+/// pas été viable même corrigée. AVAX (dans [kKnownCryptoTickers]) n'a pas
+/// de glyphe dans cette police — absent de cette table, retombe sur les
+/// initiales comme n'importe quel ticker inconnu de la police.
+const _cryptoIcons = <String, IconData>{
+  'BTC': IconData(0xE045, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'ETH': IconData(0xE09E, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'USDT': IconData(0xE1A1, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'BNB': IconData(0xE03B, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'SOL': IconData(0xE174, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'XRP': IconData(0xE1CA, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'USDC': IconData(0xE1A0, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'ADA': IconData(0xE008, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'DOGE': IconData(0xE081, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'TRX': IconData(0xE198, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'DOT': IconData(0xE082, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'LINK': IconData(0xE0EC, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'MATIC': IconData(0xE0F6, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'LTC': IconData(0xE0F2, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'BCH': IconData(0xE02E, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'XLM': IconData(0xE1C0, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'ATOM': IconData(0xE022, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'ETC': IconData(0xE09D, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+  'UNI': IconData(0xE19D, fontFamily: 'CryptocurrencyIcons', fontPackage: 'crypto_icons'),
+};
+
 /// Page de détail générique d'une catégorie d'actif ou de passif : montant
 /// + graphique sur la période sélectionnée, répartition par compte
-/// ("Distribution", réutilise [AllocationBlocksView]) et tableau des
+/// ("Allocation", réutilise [AllocationBlocksView]) et tableau des
 /// comptes de la catégorie — inspirée de la capture Finary "Crypto"
 /// fournie. Réutilisée pour les 9 catégories `actifs_*`/`passifs_*` de
 /// `nav_models.dart`.
@@ -49,25 +85,27 @@ class CategoryDetailScreen extends StatefulWidget {
 
   /// Regroupement par compte (une ligne par compte, montants sommés) de la
   /// même catégorie que [category] — `null` masque le switch "Par compte /
-  /// Par actif" de la Distribution et n'affiche que [category.accounts] tel
+  /// Par actif" de l'Allocation et n'affiche que [category.accounts] tel
   /// quel. Quand renseigné, [category.accounts] est utilisé comme vue "Par
   /// actif" (une ligne par investissement, ex : Google/Meta/Nvidia) et ce
   /// paramètre comme vue "Par compte" (ex : CTO/AV/PER/PEA) — voir
   /// `real_patrimoine_adapter.dart`.
-  final List<PatrimoineAccount>? distributionByAccount;
+  final List<PatrimoineAccount>? allocationByAccount;
 
-  /// Regroupement par investissement réel (une ligne par ISIN, fusionnée
-  /// entre tous les comptes qui le détiennent — voir
-  /// `real_patrimoine_adapter.dart`'s `buildRealCategoriesByInvestment`),
-  /// pour la bascule "Par compte / Par investissement" du tableau des
-  /// comptes (voir [_AccountsCard]) : un même titre détenu dans plusieurs
-  /// comptes (PEA et CTO, par exemple) n'y forme plus qu'une seule ligne à
-  /// PRU/quantité/valeur fusionnés, au lieu d'une ligne par compte. `null`
-  /// masque la bascule et garde le tableau tel quel (comportement par
-  /// défaut, celui de [distributionByAccount] seul) — utilisé uniquement
-  /// pour "Actions & Fonds" (voir `RealCategoryDetailScreen`), où détenir le
-  /// même titre dans plusieurs comptes est un cas réel à fusionner.
-  final List<PatrimoineAccount>? distributionByInvestment;
+  /// Regroupement par investissement réel (une ligne par ISIN — ou par
+  /// ticker pour une crypto, qui n'a pas d'ISIN — fusionnée entre tous les
+  /// comptes qui le détiennent, voir `real_patrimoine_adapter.dart`'s
+  /// `buildRealCategoriesByInvestment`), pour la bascule "Par compte / Par
+  /// investissement" du tableau des comptes (voir [_AccountsCard]) : un
+  /// même titre/même crypto détenu dans plusieurs comptes (PEA et CTO, ou
+  /// plusieurs wallets) n'y forme plus qu'une seule ligne à PRU/quantité/
+  /// valeur fusionnés, au lieu d'une ligne par compte. `null` masque la
+  /// bascule et garde le tableau tel quel (comportement par défaut, celui
+  /// de [allocationByAccount] seul) — utilisé uniquement pour "Actions &
+  /// Fonds" et "Crypto" (voir `RealCategoryDetailScreen`), les deux classes
+  /// où détenir le même titre/la même crypto dans plusieurs comptes est un
+  /// cas réel à fusionner.
+  final List<PatrimoineAccount>? allocationByInvestment;
 
   /// Historique individuel de chaque ligne de [category.accounts] (clé :
   /// [PatrimoineAccount.id]) pour une période donnée, toutes sur une même
@@ -105,7 +143,7 @@ class CategoryDetailScreen extends StatefulWidget {
 
   /// Menu "⋮" (Modifier/Supprimer) affiché au bout de chaque ligne de
   /// *compte* de l'accordéon (voir `_AccountAccordionTile`, uniquement
-  /// quand [distributionByAccount] est renseigné) — `null` masque le menu
+  /// quand [allocationByAccount] est renseigné) — `null` masque le menu
   /// entièrement. "Supprimer" reste désactivé si
   /// [PatrimoineAccount.canDelete] vaut `false`.
   final ValueChanged<PatrimoineAccount>? onAccountEdit;
@@ -142,8 +180,8 @@ class CategoryDetailScreen extends StatefulWidget {
     required this.amountVisibility,
     this.onAccountTap,
     this.trailingSection,
-    this.distributionByAccount,
-    this.distributionByInvestment,
+    this.allocationByAccount,
+    this.allocationByInvestment,
     this.historyByLineIdForPeriod,
     this.historyForPeriod,
     this.showAvatar = true,
@@ -203,7 +241,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     super.didUpdateWidget(oldWidget);
     // Un rechargement des données (autre vault, compte ajouté/renommé...)
     // peut faire apparaître de nouvelles banques : on relit les logos.
-    if (oldWidget.distributionByAccount != widget.distributionByAccount) {
+    if (oldWidget.allocationByAccount != widget.allocationByAccount) {
       _loadBankLogos();
       _loadAutresPhotos();
     }
@@ -212,7 +250,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
   Future<void> _loadBankLogos() async {
     final repo = _logoRepo;
     if (repo == null) return;
-    final byAccount = widget.distributionByAccount ?? const [];
+    final byAccount = widget.allocationByAccount ?? const [];
     final banks = {for (final a in byAccount) a.bankName ?? a.name};
     final logos = <String, String>{};
     for (final bank in banks) {
@@ -240,7 +278,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
   /// Tous les id d'investissement individuel apparaissant sur cette page,
   /// tous modes d'affichage confondus — une ligne de [widget.category.accounts]
   /// (vue "par actif") est déjà un investissement quand elle n'a pas de
-  /// sous-investissements ; une ligne de [widget.distributionByAccount] (vue
+  /// sous-investissements ; une ligne de [widget.allocationByAccount] (vue
   /// "par compte") ne l'est que via ses [PatrimoineAccount.investments].
   Set<String> _autresInvestmentIds() {
     final ids = <String>{};
@@ -257,7 +295,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     for (final a in widget.category.accounts) {
       collect(a);
     }
-    for (final a in widget.distributionByAccount ?? const []) {
+    for (final a in widget.allocationByAccount ?? const []) {
       collect(a);
     }
     return ids;
@@ -324,12 +362,39 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (historyByLineIdForPeriod != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: CategoryMultiSelect(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Le montant réel d'aujourd'hui (category.montant),
+                          // pas le dernier point de [points] : pour un
+                          // passif, ce dernier point est le solde projeté à
+                          // l'échéance (~0 €), pas le capital restant dû
+                          // actuel (voir la doc de classe de
+                          // [showChangePercent]) — les deux ne coïncident
+                          // que côté actifs, où l'historique s'arrête
+                          // toujours à aujourd'hui.
+                          shadcn.Text(
+                            displayEuros(category.montant, hidden),
+                          ).x2Large().bold(),
+                          const SizedBox(height: 4),
+                          PeriodChangeRow(
+                            absoluteChange: absoluteChange,
+                            changePercent: changePercent,
+                            hidden: hidden,
+                            color: color,
+                            icon: positive
+                                ? LucideIcons.trendingUp
+                                : LucideIcons.trendingDown,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (historyByLineIdForPeriod != null) ...[
+                      CategoryMultiSelect(
                         options: [
                           for (final a in category.accounts)
                             if (a.id != null)
@@ -343,32 +408,14 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                         onChanged: (ids) =>
                             setState(() => _selectedLineIds = ids),
                       ),
+                      const SizedBox(width: 12),
+                    ],
+                    PeriodTabs(
+                      labels: [for (final p in DashboardPeriod.values) p.label],
+                      index: _periodIndex,
+                      onChanged: (i) => setState(() => _periodIndex = i),
                     ),
-                  ),
-                // Le montant réel d'aujourd'hui (category.montant), pas le
-                // dernier point de [points] : pour un passif, ce dernier
-                // point est le solde projeté à l'échéance (~0 €), pas le
-                // capital restant dû actuel (voir la doc de classe de
-                // [showChangePercent]) — les deux ne coïncident que côté
-                // actifs, où l'historique s'arrête toujours à aujourd'hui.
-                shadcn.Text(
-                  displayEuros(category.montant, hidden),
-                ).x2Large().bold(),
-                const SizedBox(height: 4),
-                PeriodChangeRow(
-                  absoluteChange: absoluteChange,
-                  changePercent: changePercent,
-                  hidden: hidden,
-                  color: color,
-                  icon: positive
-                      ? LucideIcons.trendingUp
-                      : LucideIcons.trendingDown,
-                ),
-                const SizedBox(height: 12),
-                PeriodTabs(
-                  labels: [for (final p in DashboardPeriod.values) p.label],
-                  index: _periodIndex,
-                  onChanged: (i) => setState(() => _periodIndex = i),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 Expanded(
@@ -385,9 +432,10 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
             ),
           ),
         );
-        final distributionCard = _DistributionCard(
+        final allocationCard = _CategoryAllocationCard(
           category: category,
-          byAccount: widget.distributionByAccount,
+          byAccount: widget.allocationByAccount,
+          byInvestment: widget.allocationByInvestment,
           hidden: hidden,
         );
 
@@ -406,7 +454,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                       children: [
                         SizedBox(height: 420, child: performanceCard),
                         const SizedBox(height: 16),
-                        SizedBox(height: 320, child: distributionCard),
+                        SizedBox(height: 320, child: allocationCard),
                       ],
                     );
                   }
@@ -417,7 +465,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                       children: [
                         Expanded(flex: 2, child: performanceCard),
                         const SizedBox(width: 16),
-                        Expanded(child: distributionCard),
+                        Expanded(child: allocationCard),
                       ],
                     ),
                   );
@@ -426,8 +474,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
               const SizedBox(height: 24),
               _AccountsCard(
                 category: category,
-                byAccount: widget.distributionByAccount,
-                byInvestment: widget.distributionByInvestment,
+                byAccount: widget.allocationByAccount,
+                byInvestment: widget.allocationByInvestment,
                 hidden: hidden,
                 onAccountTap: widget.onAccountTap,
                 showAvatar: widget.showAvatar,
@@ -504,9 +552,9 @@ class _BackHeader extends StatelessWidget {
   }
 }
 
-enum _DistributionMode { parCompte, parActif }
+enum _AllocationMode { parCompte, parActif }
 
-enum _DistributionView { blocs, donut }
+enum _AllocationView { blocs, donut }
 
 // Même correctif que le toggle Actifs/Passifs du Dashboard
 // (`allocation_card.dart`) : la densité "compact" de shadcn_flutter rendait
@@ -516,30 +564,39 @@ const _toggleButtonSize = ButtonSize(0.95);
 const _toggleFontSize = 14.0 * 0.95;
 const _toggleIconSize = 16.0 * 0.95;
 
-/// Carte "Distribution" : répartition de la catégorie en blocs
+/// Carte "Allocation" : répartition de la catégorie en blocs
 /// ([AllocationBlocksView]) ou en anneau ([AllocationDonutView], mêmes 2
 /// vues que la carte Allocation du Dashboard), soit par compte
 /// (CTO/AV/PER/PEA...) soit par actif individuel (Google/Meta/Nvidia...)
 /// quand [byAccount] est fourni — sans lui (Passifs), toujours
 /// [category.accounts] sans switch de mode visible.
-class _DistributionCard extends StatefulWidget {
+class _CategoryAllocationCard extends StatefulWidget {
   final PatrimoineCategory category;
   final List<PatrimoineAccount>? byAccount;
+
+  /// Voir [CategoryDetailScreen.allocationByInvestment] — utilisé en vue
+  /// "Par actif" à la place de [category.accounts] quand renseigné (Actions
+  /// & Fonds, Crypto), pour qu'un même titre/même crypto détenu dans
+  /// plusieurs comptes/wallets forme une seule part plutôt que d'être
+  /// éclaté en plusieurs (régression signalée : BTC sur deux comptes créait
+  /// deux parts distinctes du graphique, même en vue "Par actif").
+  final List<PatrimoineAccount>? byInvestment;
   final bool hidden;
 
-  const _DistributionCard({
+  const _CategoryAllocationCard({
     required this.category,
     this.byAccount,
+    this.byInvestment,
     required this.hidden,
   });
 
   @override
-  State<_DistributionCard> createState() => _DistributionCardState();
+  State<_CategoryAllocationCard> createState() => _CategoryAllocationCardState();
 }
 
-class _DistributionCardState extends State<_DistributionCard> {
-  _DistributionMode _mode = _DistributionMode.parCompte;
-  _DistributionView _view = _DistributionView.blocs;
+class _CategoryAllocationCardState extends State<_CategoryAllocationCard> {
+  _AllocationMode _mode = _AllocationMode.parCompte;
+  _AllocationView _view = _AllocationView.blocs;
 
   /// Regroupe les lignes de l'épargne par devise (le nom de chaque ligne
   /// est sa devise, ex : "EUR") et somme montants et plus-values des poches
@@ -560,7 +617,7 @@ class _DistributionCardState extends State<_DistributionCard> {
     // exclue du patrimoine global (voir `PatrimoineAccount.
     // excludedFromPatrimoine`) — seuls les agrégats du Dashboard l'ignorent.
     final valeur = poches.fold(0.0, (sum, a) => sum + a.valeur);
-    final plusValueAbs = poches.fold(0.0, (sum, a) => sum + a.plusValueAbs);
+    final plusValueAbs = poches.fold(0.0, (sum, a) => sum + (a.plusValueAbs ?? 0));
     final costBasis = valeur - plusValueAbs;
     return PatrimoineAccount(
       id: poches.first.name,
@@ -573,13 +630,13 @@ class _DistributionCardState extends State<_DistributionCard> {
     );
   }
 
-  /// Libellé d'une part de la distribution. Pour l'épargne, un type de
+  /// Libellé d'une part de l'allocation. Pour l'épargne, un type de
   /// compte ouvrable plusieurs fois (assurance vie, contrat de
   /// capitalisation, "autre" — voir `epargneEnvelopeIsUniquePerBank`) peut
   /// exister en plusieurs exemplaires, même dans une même banque : sa
   /// description facultative est alors ajoutée au libellé pour distinguer
   /// les comptes entre eux.
-  String _distributionLabel(
+  String _allocationLabel(
     PatrimoineAccount line,
     PatrimoineCategory category,
   ) {
@@ -605,15 +662,19 @@ class _DistributionCardState extends State<_DistributionCard> {
     // dans plusieurs comptes (Livret A, LDDS, assurance vie...) ne forme
     // pas plusieurs catégories d'allocation distinctes — seul le
     // regroupement par devise compte, les poches d'une même devise sont
-    // donc fusionnées (voir `_epargneLinesByCurrency`).
+    // donc fusionnées (voir `_epargneLinesByCurrency`). Actions & Fonds et
+    // Crypto ont le même besoin pour un titre/une crypto détenu dans
+    // plusieurs comptes/wallets, déjà fusionné par [widget.byInvestment]
+    // (voir sa doc) — priorité sur `category.accounts`, qui n'a jamais
+    // cette fusion (une ligne par investissement PAR COMPTE).
     final lines = byAccount == null
         ? category.accounts
-        : (_mode == _DistributionMode.parCompte
+        : (_mode == _AllocationMode.parCompte
               ? byAccount
               : category.id == AssetClass.epargne.categoryId
               ? _epargneLinesByCurrency(category.accounts)
-              : category.accounts);
-    // Cette distribution reste celle de la catégorie affichée sur sa
+              : widget.byInvestment ?? category.accounts);
+    // Cette allocation reste celle de la catégorie affichée sur sa
     // propre page : une ligne exclue du patrimoine global (voir
     // `PatrimoineAccount.excludedFromPatrimoine`) y garde sa part réelle,
     // seuls les agrégats du Dashboard l'ignorent.
@@ -622,7 +683,7 @@ class _DistributionCardState extends State<_DistributionCard> {
       for (var i = 0; i < lines.length; i++)
         AllocationSlice(
           id: lines[i].id ?? lines[i].name,
-          label: _distributionLabel(lines[i], category),
+          label: _allocationLabel(lines[i], category),
           color:
               Color.lerp(category.color, Colors.white, 0.16 * i) ??
               category.color,
@@ -640,7 +701,7 @@ class _DistributionCardState extends State<_DistributionCard> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final narrow = constraints.maxWidth < 420;
-                final title = shadcn.Text('Distribution').semiBold().large();
+                final title = shadcn.Text('Allocation').semiBold().large();
                 final controls = Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -650,7 +711,7 @@ class _DistributionCardState extends State<_DistributionCard> {
                       ButtonGroup(
                         children: [
                           SelectedButton(
-                            value: _mode == _DistributionMode.parCompte,
+                            value: _mode == _AllocationMode.parCompte,
                             selectedStyle: const ButtonStyle.primary(
                               size: _toggleButtonSize,
                             ),
@@ -659,7 +720,7 @@ class _DistributionCardState extends State<_DistributionCard> {
                               size: _toggleButtonSize,
                             ),
                             onChanged: (_) => setState(
-                              () => _mode = _DistributionMode.parCompte,
+                              () => _mode = _AllocationMode.parCompte,
                             ),
                             child: shadcn.Text(
                               'Par compte',
@@ -667,7 +728,7 @@ class _DistributionCardState extends State<_DistributionCard> {
                             ),
                           ),
                           SelectedButton(
-                            value: _mode == _DistributionMode.parActif,
+                            value: _mode == _AllocationMode.parActif,
                             selectedStyle: const ButtonStyle.primary(
                               size: _toggleButtonSize,
                             ),
@@ -676,7 +737,7 @@ class _DistributionCardState extends State<_DistributionCard> {
                               size: _toggleButtonSize,
                             ),
                             onChanged: (_) => setState(
-                              () => _mode = _DistributionMode.parActif,
+                              () => _mode = _AllocationMode.parActif,
                             ),
                             child: shadcn.Text(
                               'Par actif',
@@ -688,7 +749,7 @@ class _DistributionCardState extends State<_DistributionCard> {
                     ButtonGroup(
                       children: [
                         SelectedButton(
-                          value: _view == _DistributionView.blocs,
+                          value: _view == _AllocationView.blocs,
                           selectedStyle: const ButtonStyle.primary(
                             size: _toggleButtonSize,
                           ),
@@ -697,14 +758,14 @@ class _DistributionCardState extends State<_DistributionCard> {
                             size: _toggleButtonSize,
                           ),
                           onChanged: (_) =>
-                              setState(() => _view = _DistributionView.blocs),
+                              setState(() => _view = _AllocationView.blocs),
                           child: const Icon(
                             LucideIcons.layoutGrid,
                             size: _toggleIconSize,
                           ),
                         ),
                         SelectedButton(
-                          value: _view == _DistributionView.donut,
+                          value: _view == _AllocationView.donut,
                           selectedStyle: const ButtonStyle.primary(
                             size: _toggleButtonSize,
                           ),
@@ -713,7 +774,7 @@ class _DistributionCardState extends State<_DistributionCard> {
                             size: _toggleButtonSize,
                           ),
                           onChanged: (_) =>
-                              setState(() => _view = _DistributionView.donut),
+                              setState(() => _view = _AllocationView.donut),
                           child: const Icon(
                             LucideIcons.chartPie,
                             size: _toggleIconSize,
@@ -734,7 +795,7 @@ class _DistributionCardState extends State<_DistributionCard> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: _view == _DistributionView.blocs
+              child: _view == _AllocationView.blocs
                   ? AllocationBlocksView(slices: slices)
                   : AllocationDonutView(
                       slices: slices,
@@ -756,14 +817,14 @@ class _DistributionCardState extends State<_DistributionCard> {
 /// `real_patrimoine_adapter.dart`). Sans lui (Passifs), reste la liste
 /// plate de [PatrimoineCategory.accounts] d'origine.
 /// Regroupement affiché par [_AccountsCard] — voir
-/// [CategoryDetailScreen.distributionByInvestment].
+/// [CategoryDetailScreen.allocationByInvestment].
 enum _AccountsGroupingMode { parCompte, parInvestissement }
 
 class _AccountsCard extends StatefulWidget {
   final PatrimoineCategory category;
   final List<PatrimoineAccount>? byAccount;
 
-  /// Voir [CategoryDetailScreen.distributionByInvestment].
+  /// Voir [CategoryDetailScreen.allocationByInvestment].
   final List<PatrimoineAccount>? byInvestment;
   final bool hidden;
   final ValueChanged<PatrimoineAccount>? onAccountTap;
@@ -820,7 +881,7 @@ class _AccountsCard extends StatefulWidget {
 
 class _AccountsCardState extends State<_AccountsCard> {
   /// Regroupement affiché — n'a d'effet que quand [_AccountsCard.byInvestment]
-  /// est renseigné (voir [CategoryDetailScreen.distributionByInvestment]),
+  /// est renseigné (voir [CategoryDetailScreen.allocationByInvestment]),
   /// sinon la bascule elle-même reste masquée et ce champ n'est jamais lu.
   _AccountsGroupingMode _groupingMode = _AccountsGroupingMode.parCompte;
 
@@ -928,7 +989,7 @@ class _AccountsCardState extends State<_AccountsCard> {
   }
 
   /// La vue "Par investissement" (voir
-  /// [CategoryDetailScreen.distributionByInvestment]) : une ligne à plat par
+  /// [CategoryDetailScreen.allocationByInvestment]) : une ligne à plat par
   /// ISIN — pas de niveau banque, un même titre pouvant être détenu dans des
   /// banques différentes. Une ligne détenue dans un seul compte se comporte
   /// comme aujourd'hui (clic direct sur la position, pas de chevron) ; une
@@ -1295,7 +1356,7 @@ class _BankAccordionTile extends StatelessWidget {
     // global (voir `PatrimoineAccount.excludedFromPatrimoine`), comme le
     // reste de cette page.
     final total = accounts.fold(0.0, (sum, a) => sum + a.valeur);
-    final plusValueAbs = accounts.fold(0.0, (sum, a) => sum + a.plusValueAbs);
+    final plusValueAbs = accounts.fold(0.0, (sum, a) => sum + (a.plusValueAbs ?? 0));
     final costBasis = total - plusValueAbs;
     // `null` (pas `0`) sans coût d'acquisition — voir
     // `PatrimoineAccount.plusValuePercent`.
@@ -1450,11 +1511,11 @@ class _AccountAvatar extends StatelessWidget {
           width: 28,
           height: 28,
           fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _initials(),
+          errorBuilder: (_, _, _) => _initials(context),
         ),
       );
     } else {
-      avatar = _initials();
+      avatar = _initials(context);
     }
     if (onTap == null) return avatar;
     return MouseRegion(
@@ -1463,8 +1524,27 @@ class _AccountAvatar extends StatelessWidget {
     );
   }
 
-  Widget _initials() =>
-      Avatar(size: 28, initials: account.avatarInitials ?? account.initials);
+  /// Le vrai logo crypto (police `crypto_icons` embarquée dans l'app) quand
+  /// [PatrimoineAccount.avatarCryptoSymbol] est renseigné et connu de
+  /// [_cryptoIcons], sinon les initiales — voir la doc de ce champ.
+  Widget _initials(BuildContext context) {
+    final symbol = account.avatarCryptoSymbol;
+    if (symbol != null) {
+      final icon = _cryptoIcons[symbol.toUpperCase()];
+      if (icon != null) {
+        return Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.muted,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, size: 16),
+        );
+      }
+    }
+    return Avatar(size: 28, initials: account.avatarInitials ?? account.initials);
+  }
 }
 
 class _AccountLine extends StatelessWidget {
@@ -1566,6 +1646,12 @@ class _AccountLine extends StatelessWidget {
                           ? shadcn.Text(account.name).muted().small()
                           : shadcn.Text(account.name).medium().small(),
                     ),
+                    if (account.leverageBadge != null) ...[
+                      const SizedBox(width: 6),
+                      OutlineBadge(
+                        child: shadcn.Text(account.leverageBadge!).xSmall(),
+                      ),
+                    ],
                     if (account.excludedFromPatrimoine) ...[
                       const SizedBox(width: 6),
                       const ExcludedFromPatrimoineBadge(),

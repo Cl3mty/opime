@@ -12,8 +12,8 @@ import 'allocation_hover_tooltip.dart';
 /// (déterminé par l'angle du curseur autour du centre) l'isole — les
 /// autres s'estompent — et affiche son nom et son pourcentage. Prend les mêmes
 /// [AllocationSlice] génériques que [AllocationBlocksView] pour être
-/// réutilisable aussi bien par la carte Allocation (catégories) que par la
-/// Distribution d'une page de détail (comptes/prêts) — voir
+/// réutilisable aussi bien par la carte Allocation du Dashboard (catégories)
+/// que par celle d'une page de détail (comptes/prêts) — voir
 /// `category_detail_screen.dart`.
 class AllocationDonutView extends StatefulWidget {
   final List<AllocationSlice> slices;
@@ -45,7 +45,17 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
     final hoveredIndex = hitTestDonutSlice(
       point: localPosition,
       center: center,
-      radius: radius,
+      // `_DonutPainter` dessine le trait centré sur `radius - strokeWidth /
+      // 2` (voir son `Rect.fromCircle`, requis pour que le bord extérieur
+      // de l'anneau affleure exactement `radius` sans déborder de la
+      // boîte) — [hitTestDonutSlice] doit recevoir cette même valeur
+      // "ligne médiane", pas `radius` brut, sinon sa zone de détection
+      // ([radius - strokeWidth/2, radius + strokeWidth/2]) est décalée
+      // vers l'extérieur par rapport à l'anneau réellement dessiné
+      // ([radius - strokeWidth, radius]) : régression trouvée en
+      // implémentant — la moitié intérieure de l'anneau visible ne
+      // déclenchait alors jamais le survol.
+      radius: radius - strokeWidth / 2,
       strokeWidth: strokeWidth,
       values: [for (final s in slices) s.percent],
     );
@@ -72,6 +82,15 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
         builder: (context, constraints) {
           final size = Size(constraints.maxWidth, constraints.maxHeight);
           return MouseRegion(
+            // `onEnter` en plus de `onHover` : Flutter ne déclenche
+            // `onHover` que sur un vrai mouvement de la souris — quand
+            // l'anneau apparaît *sous* une souris déjà immobile (ouverture
+            // de la page, bascule d'onglet...), seul `onEnter` se déclenche
+            // (voir `MouseTracker.updateAllDevices`, appelé après chaque
+            // frame). Sans lui, aucune part ne se surlignait tant que la
+            // souris ne bougeait pas d'un pixel de plus après être entrée
+            // dans l'anneau — d'où la "latence" au survol.
+            onEnter: (event) => _updateHover(event.localPosition, size),
             onHover: (event) => _updateHover(event.localPosition, size),
             onExit: (_) => setState(() {
               _hoveredId = null;
@@ -214,7 +233,12 @@ class _Legend extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 150),
+              // Zéro délai : l'estompage de la légende doit suivre le
+              // survol au pixel près, comme l'arc du donut lui-même
+              // (`_DonutPainter`, un `CustomPainter` sans transition —
+              // repeint directement à chaque changement de `hoveredId`,
+              // aucune raison que la légende traîne derrière).
+              duration: Duration.zero,
               opacity: hoveredId != null && hoveredId != slice.id ? 0.35 : 1.0,
               child: Row(
                 mainAxisSize: MainAxisSize.min,

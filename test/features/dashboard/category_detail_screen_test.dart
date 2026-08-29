@@ -72,7 +72,7 @@ void main() {
         child: CategoryDetailScreen(
           category: category(),
           amountVisibility: AmountVisibilityController(),
-          distributionByAccount: [account()],
+          allocationByAccount: [account()],
           onAccountTap: (_) {},
           onAccountEdit: (_) {},
           onAccountDelete: (_) async {},
@@ -82,6 +82,184 @@ void main() {
       ),
     );
   }
+
+  testWidgets(
+    'régression : en vue "Par actif", un même actif (BTC) détenu sur deux '
+    'comptes ne forme qu\'un seul bloc du graphique d\'allocation, pas deux '
+    '— même quand allocationByInvestment (fusion par ticker/ISIN) est '
+    'fourni',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // `category.accounts` : la vue "par actif" non fusionnée
+      // (`buildRealCategories`) — une ligne par investissement PAR COMPTE,
+      // donc deux lignes "BTC" ici (Binance et Coinbase).
+      final cryptoCategory = PatrimoineCategory(
+        id: 'actifs_crypto',
+        label: 'Crypto',
+        icon: LucideIcons.bitcoin,
+        color: const Color(0xFF000000),
+        tier: AllocationTier.opportuniste,
+        description: '',
+        accounts: const [
+          PatrimoineAccount(
+            id: 'inv-btc-binance',
+            name: 'BTC',
+            valeur: 4000,
+            plusValueAbs: 500,
+            plusValuePercent: 14,
+          ),
+          PatrimoineAccount(
+            id: 'inv-btc-coinbase',
+            name: 'BTC',
+            valeur: 2000,
+            plusValueAbs: 200,
+            plusValuePercent: 11,
+          ),
+        ],
+      );
+      // `allocationByInvestment` : la fusion par ticker
+      // (`buildRealCategoriesByInvestment`) — une seule ligne "BTC" au
+      // montant sommé (4000 + 2000).
+      const mergedBtc = [
+        PatrimoineAccount(
+          id: 'merged_BTC',
+          name: 'BTC',
+          valeur: 6000,
+          plusValueAbs: 700,
+          plusValuePercent: 13,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryDetailScreen(
+              category: cryptoCategory,
+              amountVisibility: AmountVisibilityController(),
+              allocationByAccount: const [],
+              allocationByInvestment: mergedBtc,
+              onAccountTap: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Par actif'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('BTC •'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'régression : l\'avatar d\'une position crypto connue de la police '
+    '(BTC) affiche son logo réel avec fontPackage renseigné — sans lui, '
+    'Flutter ne retrouve pas la police "CryptocurrencyIcons" du package et '
+    'affiche un glyphe "non défini" (un gros point d\'interrogation) '
+    'plutôt que le logo',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final cryptoCategory = PatrimoineCategory(
+        id: 'actifs_crypto',
+        label: 'Crypto',
+        icon: LucideIcons.bitcoin,
+        color: const Color(0xFF000000),
+        tier: AllocationTier.opportuniste,
+        description: '',
+        accounts: const [
+          PatrimoineAccount(
+            id: 'inv-btc',
+            name: 'BTC',
+            valeur: 4000,
+            plusValueAbs: 500,
+            plusValuePercent: 14,
+            avatarCryptoSymbol: 'BTC',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryDetailScreen(
+              category: cryptoCategory,
+              amountVisibility: AmountVisibilityController(),
+              onAccountTap: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final cryptoLogo = find.byWidgetPredicate(
+        (w) => w is Icon && w.icon?.fontPackage == 'crypto_icons',
+      );
+      expect(cryptoLogo, findsOneWidget);
+      expect(tester.widget<Icon>(cryptoLogo).icon?.fontFamily, 'CryptocurrencyIcons');
+    },
+  );
+
+  testWidgets(
+    'un ticker crypto inconnu de la police (sans logo) retombe sur les '
+    'initiales, pas sur un glyphe cassé',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final cryptoCategory = PatrimoineCategory(
+        id: 'actifs_crypto',
+        label: 'Crypto',
+        icon: LucideIcons.bitcoin,
+        color: const Color(0xFF000000),
+        tier: AllocationTier.opportuniste,
+        description: '',
+        accounts: const [
+          PatrimoineAccount(
+            id: 'inv-avax',
+            name: 'AVAX',
+            valeur: 1000,
+            plusValueAbs: 100,
+            plusValuePercent: 10,
+            avatarCryptoSymbol: 'AVAX',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: CategoryDetailScreen(
+              category: cryptoCategory,
+              amountVisibility: AmountVisibilityController(),
+              onAccountTap: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Icon && w.icon?.fontPackage == 'crypto_icons',
+        ),
+        findsNothing,
+      );
+      // `PatrimoineAccount.initials` (`initialsFor`) : un seul mot ne
+      // garde qu'une lettre, contrairement à `Avatar.getInitials`.
+      expect(find.text('A'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'sans onAccountOpen : menu "⋮", ligne inerte au clic (pas de page à '
@@ -188,7 +366,7 @@ void main() {
             child: CategoryDetailScreen(
               category: category(),
               amountVisibility: AmountVisibilityController(),
-              distributionByAccount: accounts,
+              allocationByAccount: accounts,
               onAccountTap: (_) {},
               defaultExpanded: false,
             ),
@@ -241,7 +419,7 @@ void main() {
             child: CategoryDetailScreen(
               category: category(),
               amountVisibility: AmountVisibilityController(),
-              distributionByAccount: [account()],
+              allocationByAccount: [account()],
               onAccountTap: (_) {},
             ),
           ),

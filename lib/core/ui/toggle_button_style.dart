@@ -2,8 +2,8 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Style d'un `SelectedButton` non sélectionné, pour tous les groupes de
 /// bascule à choix multiples de l'app (Actifs/Passifs, Par compte/Par
-/// investissement, vues Allocation/Distribution blocs/pyramide/anneau,
-/// capital restant dû/répartition des mensualités...).
+/// investissement, vues Allocation blocs/pyramide/anneau, capital restant
+/// dû/répartition des mensualités...).
 ///
 /// `ButtonStyle.ghost` n'a par construction ni fond ni bordure hors survol —
 /// une option non sélectionnée s'y confond avec du texte flottant, pas un

@@ -146,7 +146,11 @@ List<PatrimoineExportCategory> buildAssetExportCategories(
                 quantite: account.quantite,
                 valeur: account.valeur,
                 pru: account.pru,
-                plusValueAbs: account.plusValueAbs,
+                // `?? 0` : le PDF n'a pas de représentation "cours inconnu"
+                // pour cette cellule (contrairement à l'app, voir
+                // `PerformanceAmount`) — imprime 0 plutôt que de propager
+                // `null` jusqu'à la mise en page.
+                plusValueAbs: account.plusValueAbs ?? 0,
                 plusValuePercent: account.plusValuePercent,
               ),
             );
@@ -161,7 +165,7 @@ List<PatrimoineExportCategory> buildAssetExportCategories(
                 quantite: investment.quantite,
                 valeur: investment.valeur,
                 pru: investment.pru,
-                plusValueAbs: investment.plusValueAbs,
+                plusValueAbs: investment.plusValueAbs ?? 0,
                 plusValuePercent: investment.plusValuePercent,
               ),
             );

@@ -15,7 +15,7 @@ const _evolutionWidth = 110.0;
 
 enum _BreakdownMode { parCompte, parInvestissement }
 
-// Même correctif que le toggle "Par compte"/"Par actif" de la Distribution
+// Même correctif que le toggle "Par compte"/"Par actif" de l'Allocation
 // (`category_detail_screen.dart`) : la densité "compact" de shadcn_flutter
 // rend ces boutons illisibles/trop petits, mais la taille normale déborde
 // sur les très grands écrans.
@@ -27,7 +27,7 @@ const _toggleFontSize = 14.0 * 0.95;
 /// qui la composent (CTO/AV/PER/PEA...) soit, quand [categoriesByInvestment]
 /// est fourni, chaque investissement individuel (Google/Meta/Nvidia...) —
 /// un switch "Par compte"/"Par investissement" permet de basculer, comme
-/// pour la Distribution de la page de détail d'une classe d'actif. Sans
+/// pour l'Allocation de la page de détail d'une classe d'actif. Sans
 /// [categoriesByInvestment] (Passifs, un prêt n'a pas de "positions" à
 /// détailler), le switch reste masqué. Cliquer sur une catégorie (hors
 /// chevron) ouvre sa page de détail via [NavigationScope].

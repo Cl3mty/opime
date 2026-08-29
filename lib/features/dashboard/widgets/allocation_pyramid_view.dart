@@ -49,6 +49,12 @@ class _AllocationPyramidViewState extends State<AllocationPyramidView> {
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
         return MouseRegion(
+          // `onEnter` en plus de `onHover` : voir
+          // `allocation_donut_view.dart`'s équivalent — sans lui, la
+          // pyramide apparue sous une souris déjà immobile n'affichait
+          // aucun surlignage tant que la souris ne bougeait pas encore un
+          // peu après y être entrée.
+          onEnter: (event) => _updateHover(event.localPosition, size),
           onHover: (event) => _updateHover(event.localPosition, size),
           onExit: (_) => setState(() {
             _hoveredId = null;

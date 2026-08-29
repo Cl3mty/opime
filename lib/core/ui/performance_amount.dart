@@ -14,8 +14,12 @@ const _red = Color(0xFFEF4444);
 /// [displayEuros]) d'un écart (+/- value, voir [displaySignedEuros]).
 /// Factorise ce que plusieurs tableaux de l'app (comptes, catégories,
 /// positions) reproduisaient chacun à l'identique.
+///
+/// [euros] `null` affiche un simple « — » plutôt qu'une flèche/un montant à
+/// 0 : distingue un actif dont le cours n'a jamais pu être connu (rien à
+/// afficher) d'une plus-value réellement nulle (0,00 € affiché tel quel).
 class PerformanceAmount extends StatelessWidget {
-  final double euros;
+  final double? euros;
   final double? percent;
   final bool hidden;
 
@@ -28,7 +32,19 @@ class PerformanceAmount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final positive = euros >= 0;
+    final value = euros;
+    if (value == null) {
+      // Alignement à droite explicite : contrairement au montant chiffré
+      // ci-dessous, un `Text` seul ne remplit pas la largeur d'un parent à
+      // largeur fixe (`SizedBox(width: ...)`, l'usage systématique de ce
+      // widget dans les tableaux de l'app) — il resterait collé à gauche
+      // sans cet `Align`.
+      return Align(
+        alignment: Alignment.centerRight,
+        child: shadcn.Text('—').small(),
+      );
+    }
+    final positive = value >= 0;
     final color = positive ? _green : _red;
 
     return Column(
@@ -45,7 +61,7 @@ class PerformanceAmount extends StatelessWidget {
             ),
             const SizedBox(width: 2),
             shadcn.Text(
-              displaySignedEuros(euros, hidden),
+              displaySignedEuros(value, hidden),
               style: TextStyle(color: color),
             ).xSmall(),
           ],

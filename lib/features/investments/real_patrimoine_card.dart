@@ -80,25 +80,6 @@ class _RealPatrimoineCardState extends State<RealPatrimoineCard> {
     final positive = absoluteChange >= 0;
     final changeColor = positive ? _green : _red;
 
-    // Plus-value latente globale (aujourd'hui, indépendante de la période
-    // sélectionnée) — même périmètre que le montant total affiché juste
-    // au-dessus : en patrimoine net, toutes les classes (la sélection
-    // multi-classes n'a pas d'effet dans ce mode, voir la doc de tête du
-    // fichier) ; en patrimoine brut, seulement les classes cochées.
-    final gainCategories = _kind == PatrimoineKind.net
-        ? widget.actifs
-        : [for (final c in widget.actifs) if (_selectedIds.contains(c.id)) c];
-    final plusValueAbs = gainCategories.fold(
-      0.0,
-      (sum, c) => sum + c.plusValueAbsPatrimoine,
-    );
-    final coutAcquisition =
-        gainCategories.fold(0.0, (sum, c) => sum + c.montantPatrimoine) -
-        plusValueAbs;
-    final plusValuePercent = coutAcquisition == 0
-        ? null
-        : plusValueAbs / coutAcquisition * 100;
-
     // Aucun investissement nulle part (vs. simplement pas assez de points
     // pour la sélection/période courante, couvert plus bas par
     // [EmptySelectionAmount]) : message dédié, mais uniquement à la place
@@ -153,10 +134,47 @@ class _RealPatrimoineCardState extends State<RealPatrimoineCard> {
               },
             ),
             const SizedBox(height: 14),
-            PeriodTabs(
-              labels: [for (final p in DashboardPeriod.values) p.label],
-              index: _periodIndex,
-              onChanged: (i) => setState(() => _periodIndex = i),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Le montant + variation ne s'affichent qu'une fois les
+                // données disponibles (voir plus bas, même garde que
+                // l'ancien état vide du graphique) — le sélecteur de
+                // période, lui, reste toujours utilisable pour changer de
+                // période même sans donnée sur celle affichée actuellement.
+                Expanded(
+                  child: totalPoints.length < 2
+                      ? const SizedBox.shrink()
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            shadcn.Text(
+                              displayEuros(
+                                totalPoints.last.value,
+                                widget.hidden,
+                              ),
+                            ).x2Large().bold(),
+                            const SizedBox(height: 4),
+                            PeriodChangeRow(
+                              absoluteChange:
+                                  totalPoints.last.value -
+                                  totalPoints.first.value,
+                              changePercent: changePercent,
+                              hidden: widget.hidden,
+                              color: changeColor,
+                              icon: positive
+                                  ? LucideIcons.trendingUp
+                                  : LucideIcons.trendingDown,
+                            ),
+                          ],
+                        ),
+                ),
+                PeriodTabs(
+                  labels: [for (final p in DashboardPeriod.values) p.label],
+                  index: _periodIndex,
+                  onChanged: (i) => setState(() => _periodIndex = i),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -168,58 +186,15 @@ class _RealPatrimoineCardState extends State<RealPatrimoineCard> {
                               'Pas encore de données.',
                             ).muted().small(),
                     )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        shadcn.Text(
-                          displayEuros(totalPoints.last.value, widget.hidden),
-                        ).x2Large().bold(),
-                        const SizedBox(height: 4),
-                        PeriodChangeRow(
-                          absoluteChange:
-                              totalPoints.last.value - totalPoints.first.value,
-                          changePercent: changePercent,
-                          hidden: widget.hidden,
-                          color: changeColor,
-                          icon: positive
-                              ? LucideIcons.trendingUp
-                              : LucideIcons.trendingDown,
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            shadcn.Text('Plus-value latente : ')
-                                .muted()
-                                .xSmall(),
-                            shadcn.Text(
-                              plusValuePercent == null
-                                  ? displaySignedEuros(
-                                      plusValueAbs,
-                                      widget.hidden,
-                                    )
-                                  : '${displaySignedEuros(plusValueAbs, widget.hidden)} '
-                                        '(${displayPercent(plusValuePercent)})',
-                              style: TextStyle(
-                                color: plusValueAbs >= 0 ? _green : _red,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ).xSmall(),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        Expanded(
-                          child: StackedNetWorthChart(
-                            dates: chartData.dates,
-                            layers: chartData.layers,
-                            layerValues: chartData.layerValues,
-                            cumulativeTop: chartData.cumulativeTop,
-                            hidden: widget.hidden,
-                            gridColor: theme.colorScheme.border,
-                            textColor: theme.colorScheme.mutedForeground,
-                            markerColor: theme.colorScheme.primary,
-                          ),
-                        ),
-                      ],
+                  : StackedNetWorthChart(
+                      dates: chartData.dates,
+                      layers: chartData.layers,
+                      layerValues: chartData.layerValues,
+                      cumulativeTop: chartData.cumulativeTop,
+                      hidden: widget.hidden,
+                      gridColor: theme.colorScheme.border,
+                      textColor: theme.colorScheme.mutedForeground,
+                      markerColor: theme.colorScheme.primary,
                     ),
             ),
           ],
