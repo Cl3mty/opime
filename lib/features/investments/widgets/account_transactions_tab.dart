@@ -5,6 +5,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart' show parseDecimal;
 import '../../../core/ui/frosted_card.dart';
 import '../confirm_delete_dialog.dart';
+import '../currency_data.dart' show kKnownStablecoins;
 import '../document_storage.dart';
 import '../documents_section.dart';
 import '../investments_models.dart';
@@ -411,7 +412,10 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
     _priceCurrencyController = TransactionPriceCurrencyController(
       vaultPath: widget.vaultPath,
     );
-    _priceCurrencyController.loadFrom(widget.transaction);
+    _priceCurrencyController.loadFrom(
+      currency: widget.transaction.currency,
+      fxRateToEur: widget.transaction.fxRateToEur,
+    );
   }
 
   @override
@@ -563,6 +567,12 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
                     showPriceField: !_isEurCurrency,
                     showCurrencySelector: _showCurrencySelector,
                     priceCurrencyController: _priceCurrencyController,
+                    currencyExtraOptions:
+                        (widget.investment.assetClass ??
+                                widget.account.assetClass) ==
+                            AssetClass.crypto
+                        ? kKnownStablecoins
+                        : const [],
                     onIsBuyChanged: (v) => setState(() => _isBuy = v),
                     onDateChanged: (d) => setState(() => _date = d),
                     unlockDate: _unlockDate,

@@ -6,6 +6,7 @@ import '../../core/ui/copyable_identifier.dart';
 import '../../core/ui/toggle_button_style.dart';
 import 'account_detail_screen.dart' show BackHeader;
 import 'confirm_delete_dialog.dart';
+import 'currency_data.dart' show kKnownStablecoins;
 import 'currency_format.dart';
 import 'document_storage.dart';
 import 'documents_section.dart';
@@ -319,7 +320,10 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     });
     // Devise et taux enregistrés sur la transaction (historiquement exacts)
     // repris tels quels pour l'édition.
-    _priceCurrencyController.loadFrom(transaction);
+    _priceCurrencyController.loadFrom(
+      currency: transaction.currency,
+      fxRateToEur: transaction.fxRateToEur,
+    );
   }
 
   void _cancelEdit() {
@@ -971,6 +975,9 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               showPriceField: !_isEurCurrency && !_isImmobilier,
               showCurrencySelector: _showCurrencySelector,
               priceCurrencyController: _priceCurrencyController,
+              currencyExtraOptions: _effectiveClass == AssetClass.crypto
+                  ? kKnownStablecoins
+                  : const [],
               onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
               onDateChanged: (d) => setState(() => _newDate = d),
               onCreate: _commitCreateTransaction,

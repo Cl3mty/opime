@@ -11,6 +11,7 @@ import '../../../core/ui/toggle_button_style.dart';
 import '../autres_photo_avatar.dart';
 import '../autres_photo_repository.dart';
 import '../confirm_delete_dialog.dart';
+import '../currency_data.dart' show kKnownStablecoins;
 import '../currency_format.dart';
 import '../document_storage.dart';
 import '../documents_section.dart';
@@ -365,7 +366,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       _priceController.text = _formatNumber(transaction.unitPrice);
       _noteController.text = transaction.note ?? '';
     });
-    _priceCurrencyController.loadFrom(transaction);
+    _priceCurrencyController.loadFrom(
+      currency: transaction.currency,
+      fxRateToEur: transaction.fxRateToEur,
+    );
   }
 
   void _cancelEdit() {
@@ -1059,6 +1063,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         showPriceField: !_isEurCurrency,
                         showCurrencySelector: _showCurrencySelector,
                         priceCurrencyController: _priceCurrencyController,
+                        currencyExtraOptions:
+                            _effectiveClass == AssetClass.crypto
+                            ? kKnownStablecoins
+                            : const [],
                         onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
                         onDateChanged: (d) => setState(() => _newDate = d),
                         unlockDate: _unlockDate,
@@ -1128,6 +1136,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       showPriceField: !_isEurCurrency,
                       showCurrencySelector: _showCurrencySelector,
                       priceCurrencyController: _priceCurrencyController,
+                      currencyExtraOptions: _effectiveClass == AssetClass.crypto
+                          ? kKnownStablecoins
+                          : const [],
                       onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
                       onDateChanged: (d) => setState(() => _newDate = d),
                       unlockDate: _unlockDate,

@@ -28,3 +28,12 @@ const kKnownCurrencies = [
   'ZAR',
   'AED',
 ];
+
+/// Stablecoins proposés en plus de [kKnownCurrencies] comme devise de
+/// cotation d'une transaction crypto (achat/vente) — pour permettre "acheté
+/// X SOL pour Y USDC", pas juste en euros. Le taux de change vers l'euro
+/// (`TransactionPriceCurrencyController`) n'est pas résolu automatiquement
+/// pour eux (absents de Yahoo Finance) : l'utilisateur retombe sur la
+/// saisie manuelle déjà prévue pour ce cas, ~1:1 avec le dollar donc peu
+/// contraignante à renseigner à la main.
+const kKnownStablecoins = ['USDT', 'USDC'];

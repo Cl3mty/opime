@@ -696,6 +696,11 @@ class TransactionForm extends StatelessWidget {
   /// pour résoudre le taux et afficher la zone de rappel/conversion.
   final TransactionPriceCurrencyController? priceCurrencyController;
 
+  /// Options de devise supplémentaires proposées en plus des devises
+  /// classiques (voir [TransactionPriceCurrencySelect.extraOptions]) — les
+  /// stablecoins pour une transaction crypto. Vide par défaut.
+  final List<String> currencyExtraOptions;
+
   /// Section "Documents" scopée à cette transaction (voir
   /// `DocumentsSection`'s `fixedTransactionId`) — `null` pour une
   /// transaction en cours de création (pas encore d'id persisté auquel
@@ -728,6 +733,7 @@ class TransactionForm extends StatelessWidget {
     this.showPriceField = true,
     this.showCurrencySelector = false,
     this.priceCurrencyController,
+    this.currencyExtraOptions = const [],
     required this.onIsBuyChanged,
     required this.onDateChanged,
     required this.onCreate,
@@ -817,6 +823,7 @@ class TransactionForm extends StatelessWidget {
                     const SizedBox(width: 8),
                     TransactionPriceCurrencySelect(
                       controller: priceCurrencyController!,
+                      extraOptions: currencyExtraOptions,
                     ),
                   ],
                 ],

@@ -14,7 +14,7 @@ import '../simulations/loan_calculator.dart' show DeferType, LoanType;
 import 'bank_logo_avatar.dart';
 import 'bank_logo_repository.dart';
 import 'confirm_delete_dialog.dart';
-import 'currency_data.dart' show kKnownCurrencies;
+import 'currency_data.dart' show kKnownCurrencies, kKnownStablecoins;
 import 'custom_other_categories_repository.dart';
 import 'document_storage.dart';
 import 'documents_section.dart';
@@ -1382,6 +1382,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
               !_isEurCurrency && _assetClass != AssetClass.immobilier,
           showCurrencySelector: _showCurrencySelector,
           priceCurrencyController: _priceCurrencyController,
+          currencyExtraOptions: _assetClass == AssetClass.crypto
+              ? kKnownStablecoins
+              : const [],
           onBack: _backFromTransactionStep,
           onIsBuyChanged: (v) => setState(() => _newIsBuy = v),
           onDateChanged: (d) => setState(() => _txnDate = d),
@@ -2384,6 +2387,11 @@ class _TransactionStep extends StatelessWidget {
   /// pour résoudre le taux et afficher la zone de rappel/conversion.
   final TransactionPriceCurrencyController? priceCurrencyController;
 
+  /// Options de devise supplémentaires proposées en plus des devises
+  /// classiques (voir [TransactionPriceCurrencySelect.extraOptions]) — les
+  /// stablecoins pour une transaction crypto. Vide par défaut.
+  final List<String> currencyExtraOptions;
+
   final VoidCallback onBack;
   final ValueChanged<bool> onIsBuyChanged;
   final ValueChanged<DateTime?> onDateChanged;
@@ -2416,6 +2424,7 @@ class _TransactionStep extends StatelessWidget {
     this.showPriceField = true,
     this.showCurrencySelector = false,
     this.priceCurrencyController,
+    this.currencyExtraOptions = const [],
     required this.onBack,
     required this.onIsBuyChanged,
     required this.onDateChanged,
@@ -2509,6 +2518,7 @@ class _TransactionStep extends StatelessWidget {
                 const SizedBox(width: 8),
                 TransactionPriceCurrencySelect(
                   controller: priceCurrencyController!,
+                  extraOptions: currencyExtraOptions,
                 ),
               ],
             ],

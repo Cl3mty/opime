@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart' show parseDecimal;
 import '../../../core/ui/frosted_card.dart';
+import '../currency_data.dart' show kKnownStablecoins;
 import '../document_storage.dart';
 import '../documents_section.dart';
 import '../investments_models.dart';
@@ -506,6 +507,9 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     showPriceField: !_isEurCurrency,
                     showCurrencySelector: _showCurrencySelector,
                     priceCurrencyController: _priceCurrencyController,
+                    currencyExtraOptions: _effectiveClass == AssetClass.crypto
+                        ? kKnownStablecoins
+                        : const [],
                     onIsBuyChanged: (v) => setState(() => _isBuy = v),
                     onDateChanged: (d) => setState(() => _date = d),
                     onCreate: _commit,

@@ -5,6 +5,22 @@ import 'currency_data.dart';
 import 'currency_format.dart';
 import 'investments_models.dart';
 import 'price_history_repository.dart';
+import 'yahoo_finance_client.dart' show YahooFinanceClient;
+
+/// Paire Yahoo Finance à interroger pour résoudre le taux de change de
+/// [code] vers l'euro. Un stablecoin ([kKnownStablecoins]) est une crypto,
+/// pas une devise fiat : sa paire se résout comme un ticker crypto
+/// (`TICKER-EUR`, voir [YahooFinanceClient.resolveCryptoSymbol]) — la paire
+/// fiat classique `TICKERAUR=X` n'existe pas pour un stablecoin sur Yahoo
+/// Finance (elle retombait silencieusement sur la saisie manuelle, alors
+/// qu'un vrai cours y est disponible). Extrait en fonction pure (testable
+/// sans réseau) plutôt que gardé inline dans `_resolveAutoRate`.
+String fxPairFor(String code) {
+  final normalized = code.trim().toUpperCase();
+  return kKnownStablecoins.contains(normalized)
+      ? YahooFinanceClient().resolveCryptoSymbol(normalized)
+      : '${normalized}EUR=X';
+}
 
 /// Devise et taux de change d'une transaction en cours de saisie
 /// (formulaire "Ajouter une transaction" de `InvestmentDetailView` et
@@ -74,14 +90,15 @@ class TransactionPriceCurrencyController extends ChangeNotifier {
     if (code != 'EUR') await _resolveAutoRate(code);
   }
 
-  /// Rétablit l'état depuis une transaction existante (édition) : la devise
-  /// et le taux déjà enregistrés (historiquement exacts) sont repris tels
-  /// quels, sans nouvel appel réseau.
-  void loadFrom(Transaction transaction) {
-    _currency = transaction.currency;
-    _fxRateToEur = transaction.currency == 'EUR'
-        ? null
-        : transaction.fxRateToEur;
+  /// Rétablit l'état depuis une devise/taux déjà enregistrés (édition d'une
+  /// transaction, ou d'un prix d'entrée de position à effet de levier —
+  /// voir `leveraged_position_dialog.dart`) : repris tels quels
+  /// (historiquement exacts), sans nouvel appel réseau. Signature en
+  /// valeurs brutes plutôt qu'un `Transaction` complet : réutilisable par
+  /// n'importe quel autre champ prix/devise du même genre.
+  void loadFrom({required String currency, required double? fxRateToEur}) {
+    _currency = currency;
+    _fxRateToEur = currency == 'EUR' ? null : fxRateToEur;
     _fxLoading = false;
     _manual = false;
     _manualController.clear();
@@ -122,10 +139,7 @@ class TransactionPriceCurrencyController extends ChangeNotifier {
   }
 
   Future<void> _resolveAutoRate(String code) async {
-    // Paire Yahoo `<devise>EUR=X` : la valeur d'une unité de la devise en
-    // euros, mise en cache localement par `PriceHistoryRepository` sous le
-    // pseudo-ISIN de la paire (même mécanique que les cours des titres).
-    final pair = '${code.toUpperCase()}EUR=X';
+    final pair = fxPairFor(code);
     final result = await _priceRepo.syncIfNeeded(
       pair,
       pair,
@@ -159,9 +173,16 @@ class TransactionPriceCurrencyController extends ChangeNotifier {
 class TransactionPriceCurrencySelect extends StatelessWidget {
   final TransactionPriceCurrencyController controller;
 
+  /// Options supplémentaires ajoutées après [kKnownCurrencies] — les
+  /// stablecoins ([kKnownStablecoins]) pour une transaction crypto, afin de
+  /// permettre "acheté X SOL pour Y USDC" en plus des devises classiques.
+  /// Vide par défaut.
+  final List<String> extraOptions;
+
   const TransactionPriceCurrencySelect({
     super.key,
     required this.controller,
+    this.extraOptions = const [],
   });
 
   @override
@@ -179,6 +200,8 @@ class TransactionPriceCurrencySelect extends StatelessWidget {
           items: SelectItemList(
             children: [
               for (final code in kKnownCurrencies)
+                SelectItemButton(value: code, child: shadcn.Text(code)),
+              for (final code in extraOptions)
                 SelectItemButton(value: code, child: shadcn.Text(code)),
             ],
           ),
