@@ -24,6 +24,11 @@ enum AppShortcutAction {
     label: 'Exporter en PDF',
     description: 'Ouvre l\'export du patrimoine en PDF.',
     key: LogicalKeyboardKey.keyP,
+  ),
+  exportTransactions(
+    label: 'Exporter les transactions',
+    description: 'Ouvre l\'export des transactions en JSON ou CSV.',
+    key: LogicalKeyboardKey.keyE,
   );
 
   final String label;

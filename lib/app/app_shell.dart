@@ -22,6 +22,7 @@ import '../features/investments/price_sync_status_controller.dart';
 import '../features/notifications/news_button.dart';
 import '../features/notifications/notifications_controller.dart';
 import '../features/patrimoine_export/patrimoine_export_button.dart';
+import '../features/transactions_export/transactions_export_button.dart';
 import 'theme_controller.dart';
 
 /// Les 4 onglets de la barre de navigation mobile (en dessous de
@@ -436,6 +437,9 @@ class _AppShellState extends State<AppShell> {
               vaultPath: widget.profileController.activeDataPath,
             ),
             PatrimoineExportButton(profileController: widget.profileController),
+            TransactionsExportButton(
+              profileController: widget.profileController,
+            ),
             AddMenuButton(
               profileController: widget.profileController,
               patrimoineRefreshController: widget.patrimoineRefreshController,

@@ -11,6 +11,7 @@ import '../notifications/news_button.dart';
 import '../notifications/notifications_controller.dart';
 import '../patrimoine_export/patrimoine_export_button.dart';
 import '../search/global_search_bar.dart';
+import '../transactions_export/transactions_export_button.dart';
 import 'nav_models.dart';
 import 'top_bar_actions.dart';
 
@@ -86,6 +87,8 @@ class TopBar extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           PatrimoineExportButton(profileController: profileController),
+          const SizedBox(width: 4),
+          TransactionsExportButton(profileController: profileController),
           const SizedBox(width: 4),
           AddMenuButton(
             profileController: profileController,

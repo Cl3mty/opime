@@ -2,10 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/shortcuts/app_shortcuts.dart';
 
 void main() {
-  test('trois actions, une combinaison distincte chacune', () {
-    expect(AppShortcutAction.values, hasLength(3));
+  test('quatre actions, une combinaison distincte chacune', () {
+    expect(AppShortcutAction.values, hasLength(4));
     final keys = AppShortcutAction.values.map((a) => a.key).toSet();
-    expect(keys, hasLength(3));
+    expect(keys, hasLength(4));
   });
 
   test('displayLabel contient la lettre de la touche', () {

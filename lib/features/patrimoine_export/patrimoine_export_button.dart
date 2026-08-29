@@ -5,8 +5,8 @@ import '../navigation/top_bar_actions.dart';
 import 'patrimoine_export_dialog.dart';
 
 /// Bouton "Télécharger mon patrimoine (PDF)" de la TopBar — ouvre
-/// [showPatrimoineExportDialog]. Même structure que les autres boutons de la
-/// barre (`NewsButton`, `AmountVisibilityToggleButton`).
+/// [showPatrimoineExportDialog]. Distinct de [TransactionsExportButton]
+/// (deux exports différents, deux boutons) — voir sa doc de tête.
 class PatrimoineExportButton extends StatelessWidget {
   final ProfileController profileController;
 

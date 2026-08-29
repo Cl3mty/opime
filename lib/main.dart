@@ -43,6 +43,7 @@ import 'features/investments/price_sync_status_controller.dart';
 import 'features/investments/real_category_detail_screen.dart';
 import 'features/notifications/notifications_controller.dart';
 import 'features/patrimoine_export/patrimoine_export_dialog.dart';
+import 'features/transactions_export/transactions_export_dialog.dart';
 import 'features/liabilities/liabilities_models.dart' show LiabilityType;
 import 'features/liabilities/real_passif_detail_screen.dart';
 import 'features/strategy/strategy_screen.dart';
@@ -130,6 +131,13 @@ class _OpimeAppState extends State<OpimeApp> {
   /// l'ouverture, remis à `false` quand `showPatrimoineExportDialog` se
   /// termine, quelle que soit la façon dont il se ferme).
   bool _exportDialogOpen = false;
+
+  /// Même garde que [_exportDialogOpen], pour ⌘E (export des transactions)
+  /// — un dialogue distinct, donc son propre drapeau plutôt que de
+  /// réutiliser celui du PDF (les deux peuvent en théorie être ouverts l'un
+  /// après l'autre, jamais simultanément dans la pratique mais rien ne
+  /// l'empêche techniquement).
+  bool _transactionsExportDialogOpen = false;
 
   /// État (replié/déplié) de la sidebar — remonté ici depuis `AppShell` pour
   /// que le raccourci clavier ⌘B, posé à la racine de l'app (voir
@@ -572,6 +580,24 @@ class _OpimeAppState extends State<OpimeApp> {
             vaultPath: profileController.activeDataPath,
             profileName: profileController.active?.name ?? '',
           ).whenComplete(() => _exportDialogOpen = false);
+        },
+        AppShortcutAction.exportTransactions.activator: () {
+          final navigatorContext = _navigatorKey.currentContext;
+          if (navigatorContext == null) return;
+          if (_transactionsExportDialogOpen) {
+            Navigator.of(navigatorContext).pop();
+            return;
+          }
+          final profileController = _profileController;
+          if (profileController == null) {
+            _showExportUnavailableToast(navigatorContext);
+            return;
+          }
+          _transactionsExportDialogOpen = true;
+          showTransactionsExportDialog(
+            navigatorContext,
+            vaultPath: profileController.activeDataPath,
+          ).whenComplete(() => _transactionsExportDialogOpen = false);
         },
       },
       child: Focus(autofocus: true, child: child),
