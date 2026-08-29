@@ -11,6 +11,7 @@ import '../investments/investments_models.dart'
 import '../investments/performance_calculator.dart' show PerformanceResult;
 import '../investments/real_patrimoine_adapter.dart'
     show
+        buildAllRealCategories,
         categoryHistoryOnGrid,
         dailyDateGrid,
         earliestTransactionDateAcrossAccounts,
@@ -20,6 +21,9 @@ import 'analyses_data_loader.dart';
 import 'analyses_settings_repository.dart';
 import 'widgets/benchmark_comparison_chart.dart';
 import 'widgets/correlation_matrix.dart';
+
+const _green = Color(0xFF22C55E);
+const _red = Color(0xFFEF4444);
 
 /// Écran "Analyses" : métriques avancées de portefeuille (répartition
 /// gestion active/passive, volatilité, corrélation, ratio rendement/risque,
@@ -130,7 +134,7 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
     }
 
     final snapshot = _snapshot!;
-    final metrics = _computeMetrics(snapshot, _period);
+    final metrics = _computeMetrics(snapshot, _period, widget.vaultPath);
 
     return AnimatedBuilder(
       animation: widget.amountVisibility,
@@ -160,6 +164,12 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
               // immédiate ("qu'est-ce que j'ai gagné ?"), donc en premier.
               const _SectionHeader('Performance'),
               const SizedBox(height: 12),
+              _UnrealizedGainCard(
+                plusValueAbs: metrics.globalUnrealizedGain,
+                plusValuePercent: metrics.globalUnrealizedGainPercent,
+                hidden: hidden,
+              ),
+              const SizedBox(height: 16),
               _AlphaCard(
                 controller: _benchmarkController,
                 onSave: _saveBenchmark,
@@ -323,6 +333,15 @@ class _AnalysesMetrics {
   final double? debtRatioIncome;
   final double? leverage;
 
+  /// Plus-value latente globale (aujourd'hui, indépendante de [period]) —
+  /// même périmètre que la carte Allocation du Dashboard
+  /// ([PatrimoineCategory.plusValueAbsPatrimoine]/[montantPatrimoine],
+  /// ignore les lignes exclues du patrimoine). Affichée auparavant sur la
+  /// carte "Patrimoine" du Dashboard (`real_patrimoine_card.dart`),
+  /// déplacée ici pour garder cette carte à sa présentation d'origine.
+  final double globalUnrealizedGain;
+  final double? globalUnrealizedGainPercent;
+
   const _AnalysesMetrics({
     required this.categories,
     required this.total,
@@ -332,6 +351,8 @@ class _AnalysesMetrics {
     required this.debtRatioAssets,
     required this.debtRatioIncome,
     required this.leverage,
+    required this.globalUnrealizedGain,
+    required this.globalUnrealizedGainPercent,
   });
 }
 
@@ -441,7 +462,11 @@ DateTime _dateOnly(DateTime date) =>
     DateTime.utc(date.year, date.month, date.day);
 
 
-_AnalysesMetrics _computeMetrics(AnalysesSnapshot snapshot, DashboardPeriod period) {
+_AnalysesMetrics _computeMetrics(
+  AnalysesSnapshot snapshot,
+  DashboardPeriod period,
+  String vaultPath,
+) {
   final today = _dateOnly(DateTime.now());
   final earliest =
       earliestTransactionDateAcrossAccounts(snapshot.accounts) ?? today;
@@ -595,6 +620,25 @@ _AnalysesMetrics _computeMetrics(AnalysesSnapshot snapshot, DashboardPeriod peri
     (sum, l) => sum + l.mensualite,
   );
 
+  // Même périmètre que la carte Allocation du Dashboard ("mon patrimoine
+  // total") : ignore les lignes exclues du patrimoine, voir
+  // [PatrimoineCategory.montantPatrimoine]/[plusValueAbsPatrimoine].
+  final realCategories = buildAllRealCategories(
+    snapshot.accounts,
+    snapshot.priceHistories,
+    vaultPath,
+  );
+  final globalUnrealizedGain = realCategories.fold<double>(
+    0,
+    (sum, c) => sum + c.plusValueAbsPatrimoine,
+  );
+  final globalCoutAcquisition =
+      realCategories.fold<double>(0, (sum, c) => sum + c.montantPatrimoine) -
+      globalUnrealizedGain;
+  final globalUnrealizedGainPercent = globalCoutAcquisition == 0
+      ? null
+      : globalUnrealizedGain / globalCoutAcquisition * 100;
+
   return _AnalysesMetrics(
     categories: categories,
     total: _TotalMetric(
@@ -622,6 +666,8 @@ _AnalysesMetrics _computeMetrics(AnalysesSnapshot snapshot, DashboardPeriod peri
             monthlyIncome: snapshot.monthlyIncome!,
           ),
     leverage: leverage(totalAssets: totalAssets, netWorth: netWorth),
+    globalUnrealizedGain: globalUnrealizedGain,
+    globalUnrealizedGainPercent: globalUnrealizedGainPercent,
   );
 }
 
@@ -1020,6 +1066,47 @@ class _TriCard extends StatelessWidget {
                   ],
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Plus-value latente globale (aujourd'hui, indépendante de la période
+/// sélectionnée — voir [_AnalysesMetrics.globalUnrealizedGain]) : ce que la
+/// vente immédiate de tout le patrimoine rapporterait au-delà du coût
+/// d'acquisition. Affichée auparavant sur la carte "Patrimoine" du
+/// Dashboard (`real_patrimoine_card.dart`), déplacée ici pour garder cette
+/// carte à sa présentation d'origine, plus sobre.
+class _UnrealizedGainCard extends StatelessWidget {
+  final double plusValueAbs;
+  final double? plusValuePercent;
+  final bool hidden;
+
+  const _UnrealizedGainCard({
+    required this.plusValueAbs,
+    required this.plusValuePercent,
+    required this.hidden,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = plusValueAbs >= 0 ? _green : _red;
+    return FrostedCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            _cardTitle('Plus-value latente', caption: 'Aujourd\'hui'),
+            const Spacer(),
+            shadcn.Text(
+              plusValuePercent == null
+                  ? displaySignedEuros(plusValueAbs, hidden)
+                  : '${displaySignedEuros(plusValueAbs, hidden)} '
+                        '(${displayPercent(plusValuePercent!)})',
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            ).medium(),
           ],
         ),
       ),
