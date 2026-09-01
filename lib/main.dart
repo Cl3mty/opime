@@ -36,6 +36,7 @@ import 'features/dashboard/dashboard_screen.dart';
 import 'features/dashboard/onboarding_highlight_controller.dart';
 import 'features/projects/projects_screen.dart';
 import 'features/investments/current_account_focus_controller.dart';
+import 'features/investments/investment_reminder_banner.dart';
 import 'features/investments/investments_models.dart' show AssetClass;
 import 'features/investments/patrimoine_refresh_controller.dart';
 import 'features/investments/price_sync_banner.dart';
@@ -689,141 +690,148 @@ class _OpimeAppState extends State<OpimeApp> {
       githubRepo: _githubRepo,
       child: PriceSyncBanner(
         controller: _priceSyncStatusController,
-        child: AppShell(
-          themeController: _themeController,
-          profileController: _profileController!,
-          sidebarPrefsController: _sidebarPrefsController!,
-          amountVisibilityController: _amountVisibilityController,
-          patrimoineRefreshController: _patrimoineRefreshController,
-          currentAccountFocusController: _currentAccountFocusController,
-          onboardingHighlightController: _onboardingHighlightController,
-          priceSyncStatusController: _priceSyncStatusController,
-          assistantConfigController: _assistantConfigController,
-          assistantChatController: _assistantChatController!,
-          notificationsSettingsController: _notificationsSettingsController,
-          notificationsController: _notificationsController,
-          sidebarCollapsed: _sidebarCollapsed,
-          vaultFolderService: _vaultFolderService,
-          onVaultActivated: _onVaultReady,
-          onNoVaultSelected: _resetVault,
-          pages: {
-            'dashboard': (_) => DashboardScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-              amountVisibility: _amountVisibilityController,
-              refreshSignal: _patrimoineRefreshController,
-              priceSyncStatus: _priceSyncStatusController,
-              onboardingHighlight: _onboardingHighlightController,
-            ),
-            'analyses': (_) => AnalysesScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-              amountVisibility: _amountVisibilityController,
-            ),
-            'projets': (_) => ProjectsScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-            ),
-            for (final assetClass in AssetClass.values)
-              assetClass.categoryId: (_) => RealCategoryDetailScreen(
-                key: ValueKey(
-                  '${_profileController!.activeDataPath}_${assetClass.categoryId}',
-                ),
+        child: ReminderBanner(
+          vaultPath: _profileController!.activeDataPath,
+          refreshSignal: _patrimoineRefreshController,
+          child: AppShell(
+            themeController: _themeController,
+            profileController: _profileController!,
+            sidebarPrefsController: _sidebarPrefsController!,
+            amountVisibilityController: _amountVisibilityController,
+            patrimoineRefreshController: _patrimoineRefreshController,
+            currentAccountFocusController: _currentAccountFocusController,
+            onboardingHighlightController: _onboardingHighlightController,
+            priceSyncStatusController: _priceSyncStatusController,
+            assistantConfigController: _assistantConfigController,
+            assistantChatController: _assistantChatController!,
+            notificationsSettingsController: _notificationsSettingsController,
+            notificationsController: _notificationsController,
+            sidebarCollapsed: _sidebarCollapsed,
+            vaultFolderService: _vaultFolderService,
+            onVaultActivated: _onVaultReady,
+            onNoVaultSelected: _resetVault,
+            pages: {
+              'dashboard': (_) => DashboardScreen(
+                key: ValueKey(_profileController!.activeDataPath),
                 vaultPath: _profileController!.activeDataPath,
-                categoryId: assetClass.categoryId,
                 amountVisibility: _amountVisibilityController,
-                patrimoineRefreshController: _patrimoineRefreshController,
-                currentAccountFocus: _currentAccountFocusController,
-                profileName: _profileController!.active?.name ?? '',
+                refreshSignal: _patrimoineRefreshController,
+                priceSyncStatus: _priceSyncStatusController,
+                onboardingHighlight: _onboardingHighlightController,
               ),
-            for (final liabilityType in LiabilityType.values)
-              liabilityType.categoryId: (_) => RealPassifDetailScreen(
-                key: ValueKey(
-                  '${_profileController!.activeDataPath}_${liabilityType.categoryId}',
-                ),
+              'analyses': (_) => AnalysesScreen(
+                key: ValueKey(_profileController!.activeDataPath),
                 vaultPath: _profileController!.activeDataPath,
-                categoryId: liabilityType.categoryId,
                 amountVisibility: _amountVisibilityController,
-                patrimoineRefreshController: _patrimoineRefreshController,
               ),
-            for (final envelope in envelopes)
-              envelope.id: (_) => EnvelopeSheetScreen(
-                key: ValueKey(
-                  '${_profileController!.activeDataPath}_${envelope.id}',
-                ),
+              'projets': (_) => ProjectsScreen(
+                key: ValueKey(_profileController!.activeDataPath),
                 vaultPath: _profileController!.activeDataPath,
-                envelope: envelope,
               ),
-            for (final card in investissementCards)
-              card.id: (_) => InvestissementCardScreen(
-                key: ValueKey(
-                  '${_profileController!.activeDataPath}_${card.id}',
+              for (final assetClass in AssetClass.values)
+                assetClass.categoryId: (_) => RealCategoryDetailScreen(
+                  key: ValueKey(
+                    '${_profileController!.activeDataPath}_${assetClass.categoryId}',
+                  ),
+                  vaultPath: _profileController!.activeDataPath,
+                  categoryId: assetClass.categoryId,
+                  amountVisibility: _amountVisibilityController,
+                  patrimoineRefreshController: _patrimoineRefreshController,
+                  currentAccountFocus: _currentAccountFocusController,
+                  profileName: _profileController!.active?.name ?? '',
                 ),
-                vaultPath: _profileController!.activeDataPath,
-                card: card,
-              ),
-            for (final track in formationTracks)
-              track.id: (_) => FormationTrackScreen(
-                key: ValueKey(
-                  '${_profileController!.activeDataPath}_${track.id}',
+              for (final liabilityType in LiabilityType.values)
+                liabilityType.categoryId: (_) => RealPassifDetailScreen(
+                  key: ValueKey(
+                    '${_profileController!.activeDataPath}_${liabilityType.categoryId}',
+                  ),
+                  vaultPath: _profileController!.activeDataPath,
+                  categoryId: liabilityType.categoryId,
+                  amountVisibility: _amountVisibilityController,
+                  patrimoineRefreshController: _patrimoineRefreshController,
                 ),
+              for (final envelope in envelopes)
+                envelope.id: (_) => EnvelopeSheetScreen(
+                  key: ValueKey(
+                    '${_profileController!.activeDataPath}_${envelope.id}',
+                  ),
+                  vaultPath: _profileController!.activeDataPath,
+                  envelope: envelope,
+                ),
+              for (final card in investissementCards)
+                card.id: (_) => InvestissementCardScreen(
+                  key: ValueKey(
+                    '${_profileController!.activeDataPath}_${card.id}',
+                  ),
+                  vaultPath: _profileController!.activeDataPath,
+                  card: card,
+                ),
+              for (final track in formationTracks)
+                track.id: (_) => FormationTrackScreen(
+                  key: ValueKey(
+                    '${_profileController!.activeDataPath}_${track.id}',
+                  ),
+                  vaultPath: _profileController!.activeDataPath,
+                  track: track,
+                ),
+              'strategie': (_) => StrategyScreen(
+                key: ValueKey(_profileController!.activeDataPath),
                 vaultPath: _profileController!.activeDataPath,
-                track: track,
               ),
-            'strategie': (_) => StrategyScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-            ),
-            'budget_ventilation': (_) => BudgetScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-              amountVisibility: _amountVisibilityController,
-            ),
-            'budget_suivi': (_) => BudgetTrackingScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-              amountVisibility: _amountVisibilityController,
-            ),
-            'simulation_taxation': (_) => TaxationSimulationScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-              amountVisibility: _amountVisibilityController,
-            ),
-            'simulation_patrimoine': (_) => WealthSimulationScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-              amountVisibility: _amountVisibilityController,
-            ),
-            'simulation_immobilier': (_) => RealEstateSimulationScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-              amountVisibility: _amountVisibilityController,
-            ),
-            'simulation_transmission': (_) => TransmissionSimulationScreen(
-              key: ValueKey(_profileController!.activeDataPath),
-              vaultPath: _profileController!.activeDataPath,
-              amountVisibility: _amountVisibilityController,
-            ),
-            'assistant': (_) => AssistantScreen(
-              key: ValueKey('assistant_${_profileController!.activeDataPath}'),
-              configController: _assistantConfigController,
-              chatController: _assistantChatController!,
-            ),
-            'settings': (_) => SettingsScreen(
-              vaultFolderService: _vaultFolderService,
-              onVaultActivated: _onVaultReady,
-              onNoVaultSelected: _resetVault,
-              themeController: _themeController,
-              assistantConfigController: _assistantConfigController,
-              notificationsSettingsController: _notificationsSettingsController,
-              keyboardShortcutsController: _keyboardShortcutsController,
-              profileController: _profileController!,
-              vaultPath: _vaultPath!,
-              onVaultEncryptionChanged: () => _initProfiles(_vaultPath!),
-              githubOwner: _githubOwner,
-              githubRepo: _githubRepo,
-            ),
-          },
+              'budget_ventilation': (_) => BudgetScreen(
+                key: ValueKey(_profileController!.activeDataPath),
+                vaultPath: _profileController!.activeDataPath,
+                amountVisibility: _amountVisibilityController,
+              ),
+              'budget_suivi': (_) => BudgetTrackingScreen(
+                key: ValueKey(_profileController!.activeDataPath),
+                vaultPath: _profileController!.activeDataPath,
+                amountVisibility: _amountVisibilityController,
+              ),
+              'simulation_taxation': (_) => TaxationSimulationScreen(
+                key: ValueKey(_profileController!.activeDataPath),
+                vaultPath: _profileController!.activeDataPath,
+                amountVisibility: _amountVisibilityController,
+              ),
+              'simulation_patrimoine': (_) => WealthSimulationScreen(
+                key: ValueKey(_profileController!.activeDataPath),
+                vaultPath: _profileController!.activeDataPath,
+                amountVisibility: _amountVisibilityController,
+              ),
+              'simulation_immobilier': (_) => RealEstateSimulationScreen(
+                key: ValueKey(_profileController!.activeDataPath),
+                vaultPath: _profileController!.activeDataPath,
+                amountVisibility: _amountVisibilityController,
+              ),
+              'simulation_transmission': (_) => TransmissionSimulationScreen(
+                key: ValueKey(_profileController!.activeDataPath),
+                vaultPath: _profileController!.activeDataPath,
+                amountVisibility: _amountVisibilityController,
+              ),
+              'assistant': (_) => AssistantScreen(
+                key: ValueKey(
+                  'assistant_${_profileController!.activeDataPath}',
+                ),
+                configController: _assistantConfigController,
+                chatController: _assistantChatController!,
+              ),
+              'settings': (_) => SettingsScreen(
+                vaultFolderService: _vaultFolderService,
+                onVaultActivated: _onVaultReady,
+                onNoVaultSelected: _resetVault,
+                themeController: _themeController,
+                assistantConfigController: _assistantConfigController,
+                notificationsSettingsController:
+                    _notificationsSettingsController,
+                keyboardShortcutsController: _keyboardShortcutsController,
+                profileController: _profileController!,
+                vaultPath: _vaultPath!,
+                onVaultEncryptionChanged: () => _initProfiles(_vaultPath!),
+                githubOwner: _githubOwner,
+                githubRepo: _githubRepo,
+              ),
+            },
+          ),
         ),
       ),
     );
