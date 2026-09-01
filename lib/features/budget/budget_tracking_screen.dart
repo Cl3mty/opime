@@ -10,10 +10,13 @@ import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/donut_hover.dart';
 import '../../core/ui/frosted_card.dart';
 import '../dashboard/widgets/allocation_hover_tooltip.dart';
+import 'budget_recurring_templates_models.dart';
+import 'budget_recurring_templates_repository.dart';
 import 'budget_tracking_models.dart';
 import 'budget_tracking_repository.dart';
 import 'budget_categories_repository.dart';
 import 'budget_tracking_sankey.dart';
+import 'widgets/recurring_templates_dialog.dart';
 
 /// Annuler/Rétablir (⌘Z/⌘⇧Z sur macOS, Ctrl équivalent ailleurs) — propre
 /// à cet écran (pas de la liste globale `AppShortcutAction`, réservée aux
@@ -82,9 +85,19 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
   );
   late final BudgetCategoriesRepository _categoriesRepo =
       BudgetCategoriesRepository(widget.vaultPath);
+  late final BudgetRecurringTemplatesRepository _templatesRepo =
+      BudgetRecurringTemplatesRepository(widget.vaultPath);
   late int _year;
   late int _month;
   BudgetTrackingMonth? _data;
+  List<RecurringTemplate> _templates = [];
+
+  /// `true` juste après le chargement d'un mois sans fichier existant
+  /// (voir [BudgetTrackingRepository.loadWithStatus]) alors que des lignes
+  /// récurrentes existent pour au moins une section — pilote la petite
+  /// relance affichée sous l'en-tête du mois. Repassé à `false` dès que
+  /// l'utilisateur agit (applique ou ignore), ou en changeant de mois.
+  bool _showTemplatesNudge = false;
 
   /// Deux listes distinctes — une facture (loyer, abonnements...) et une
   /// dépense (courses, loisirs...) n'ont pas vocation à partager le même
@@ -116,21 +129,101 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final data = await _repo.load(_year, _month);
+    final result = await _repo.loadWithStatus(_year, _month);
     final facturesCategories = await _categoriesRepo.load(
       BudgetCategoryScope.factures,
     );
     final depensesCategories = await _categoriesRepo.load(
       BudgetCategoryScope.depenses,
     );
+    final templates = await _templatesRepo.load();
     setState(() {
-      _data = data;
+      _data = result.month;
       _facturesCategories = facturesCategories;
       _depensesCategories = depensesCategories;
+      _templates = templates;
+      _showTemplatesNudge = result.isNew && templates.isNotEmpty;
       _loading = false;
       _undoStack.clear();
       _redoStack.clear();
     });
+  }
+
+  /// Ajoute au mois affiché, pour chaque section, ses lignes récurrentes
+  /// non déjà présentes (déduplication par nom, insensible à la casse) —
+  /// passe par [_update] comme toute autre mutation, donc Annuler/Rétablir
+  /// et persistance fonctionnent sans câblage supplémentaire.
+  void _applyAllTemplates() {
+    if (_templates.isEmpty) return;
+    _update((d) {
+      List<TrackingItem> apply(
+        List<TrackingItem> items,
+        BudgetSection section,
+        String idPrefix,
+      ) {
+        final existingNames = items
+            .map((i) => i.name.trim().toLowerCase())
+            .toSet();
+        final toAdd = _templates.where(
+          (t) =>
+              t.section == section &&
+              !existingNames.contains(t.name.trim().toLowerCase()),
+        );
+        return [
+          ...items,
+          for (final t in toAdd)
+            TrackingItem(
+              id: generateTrackingItemId(idPrefix),
+              name: t.name,
+              budget: t.amount,
+              realite: 0,
+              category: t.category,
+            ),
+        ];
+      }
+
+      return d.copyWith(
+        revenues: apply(d.revenues, BudgetSection.revenue, 'revenue'),
+        factures: apply(d.factures, BudgetSection.facture, 'facture'),
+        depenses: apply(d.depenses, BudgetSection.depense, 'depense'),
+        investEpargnes: apply(
+          d.investEpargnes,
+          BudgetSection.investEpargne,
+          'invest',
+        ),
+        projets: apply(d.projets, BudgetSection.projet, 'projet'),
+        dettes: apply(d.dettes, BudgetSection.dette, 'dette'),
+      );
+    });
+    setState(() => _showTemplatesNudge = false);
+  }
+
+  /// Recharge uniquement les lignes récurrentes (pas tout le mois — voir
+  /// [_load]) après fermeture du dialogue de gestion d'une section, pour
+  /// que [_applyAllTemplates] et une prochaine relance de mois neuf
+  /// reflètent les ajouts/suppressions faits dans le dialogue.
+  Future<void> _refreshTemplates() async {
+    final templates = await _templatesRepo.load();
+    if (mounted) setState(() => _templates = templates);
+  }
+
+  void _openTemplatesDialog(
+    BuildContext context, {
+    required BudgetSection section,
+    required String sectionTitle,
+    required List<TrackingItem> items,
+    required String idPrefix,
+    required ValueChanged<List<TrackingItem>> onChanged,
+  }) {
+    showRecurringTemplatesDialog(
+      context,
+      vaultPath: widget.vaultPath,
+      section: section,
+      sectionTitle: sectionTitle,
+      currentItems: items,
+      idPrefix: idPrefix,
+      onApply: onChanged,
+    ).then((_) => _refreshTemplates());
   }
 
   Future<void> _save() async {
@@ -374,6 +467,15 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                       );
                     },
                   ),
+                  if (_showTemplatesNudge) ...[
+                    const SizedBox(height: 12),
+                    _TemplatesNudgeBanner(
+                      count: _templates.length,
+                      onApply: _applyAllTemplates,
+                      onDismiss: () =>
+                          setState(() => _showTemplatesNudge = false),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 20),
@@ -398,6 +500,15 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                             onChanged: (items) =>
                                 _update((d) => d.copyWith(revenues: items)),
                             hidden: hidden,
+                            onManageTemplates: () => _openTemplatesDialog(
+                              context,
+                              section: BudgetSection.revenue,
+                              sectionTitle: 'REVENUS',
+                              items: data.revenues,
+                              idPrefix: 'revenue',
+                              onChanged: (items) =>
+                                  _update((d) => d.copyWith(revenues: items)),
+                            ),
                           ),
                         ],
                       );
@@ -419,6 +530,15 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         onDeleteCategory: (name) =>
                             _deleteCategory(BudgetCategoryScope.factures, name),
                         hidden: hidden,
+                        onManageTemplates: () => _openTemplatesDialog(
+                          context,
+                          section: BudgetSection.facture,
+                          sectionTitle: 'FACTURES',
+                          items: data.factures,
+                          idPrefix: 'facture',
+                          onChanged: (items) =>
+                              _update((d) => d.copyWith(factures: items)),
+                        ),
                       );
                       final col3 = _CategoryCard(
                         title: 'DÉPENSES',
@@ -438,6 +558,15 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         onDeleteCategory: (name) =>
                             _deleteCategory(BudgetCategoryScope.depenses, name),
                         hidden: hidden,
+                        onManageTemplates: () => _openTemplatesDialog(
+                          context,
+                          section: BudgetSection.depense,
+                          sectionTitle: 'DÉPENSES',
+                          items: data.depenses,
+                          idPrefix: 'depense',
+                          onChanged: (items) =>
+                              _update((d) => d.copyWith(depenses: items)),
+                        ),
                       );
                       final col4 = Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,6 +580,16 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                               (d) => d.copyWith(investEpargnes: items),
                             ),
                             hidden: hidden,
+                            onManageTemplates: () => _openTemplatesDialog(
+                              context,
+                              section: BudgetSection.investEpargne,
+                              sectionTitle: 'INVEST / ÉPARGNE',
+                              items: data.investEpargnes,
+                              idPrefix: 'invest',
+                              onChanged: (items) => _update(
+                                (d) => d.copyWith(investEpargnes: items),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           _CategoryCard(
@@ -461,6 +600,15 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                             onChanged: (items) =>
                                 _update((d) => d.copyWith(projets: items)),
                             hidden: hidden,
+                            onManageTemplates: () => _openTemplatesDialog(
+                              context,
+                              section: BudgetSection.projet,
+                              sectionTitle: 'PROJETS',
+                              items: data.projets,
+                              idPrefix: 'projet',
+                              onChanged: (items) =>
+                                  _update((d) => d.copyWith(projets: items)),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           _CategoryCard(
@@ -471,6 +619,15 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                             onChanged: (items) =>
                                 _update((d) => d.copyWith(dettes: items)),
                             hidden: hidden,
+                            onManageTemplates: () => _openTemplatesDialog(
+                              context,
+                              section: BudgetSection.dette,
+                              sectionTitle: 'DETTES',
+                              items: data.dettes,
+                              idPrefix: 'dette',
+                              onChanged: (items) =>
+                                  _update((d) => d.copyWith(dettes: items)),
+                            ),
                           ),
                         ],
                       );
@@ -1151,6 +1308,59 @@ class _SummaryCard extends StatelessWidget {
 // Carte de catégorie éditable (avec catégorisation optionnelle par item)
 // ---------------------------------------------------------------------
 
+/// Relance discrète affichée uniquement à l'ouverture d'un mois neuf (voir
+/// [_BudgetTrackingScreenState._showTemplatesNudge]) quand des lignes
+/// récurrentes existent — jamais d'application automatique, l'utilisateur
+/// choisit explicitement d'ajouter ou d'ignorer.
+class _TemplatesNudgeBanner extends StatelessWidget {
+  final int count;
+  final VoidCallback onApply;
+  final VoidCallback onDismiss;
+
+  const _TemplatesNudgeBanner({
+    required this.count,
+    required this.onApply,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(Theme.of(context).radiusMd),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Icon(LucideIcons.repeat, size: 16, color: accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: shadcn.Text(
+              count == 1
+                  ? '1 ligne récurrente disponible — l\'ajouter à ce mois ?'
+                  : '$count lignes récurrentes disponibles — les ajouter à '
+                        'ce mois ?',
+            ),
+          ),
+          PrimaryButton(
+            size: ButtonSize.small,
+            onPressed: onApply,
+            child: const shadcn.Text('Ajouter au mois'),
+          ),
+          const SizedBox(width: 4),
+          IconButton.ghost(
+            icon: const Icon(LucideIcons.x, size: 14),
+            onPressed: onDismiss,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CategoryCard extends StatelessWidget {
   final String title;
   final Color color;
@@ -1162,6 +1372,7 @@ class _CategoryCard extends StatelessWidget {
   final void Function(String oldName, String newName)? onRenameCategory;
   final ValueChanged<String>? onDeleteCategory;
   final bool hidden;
+  final VoidCallback? onManageTemplates;
 
   const _CategoryCard({
     required this.title,
@@ -1174,6 +1385,7 @@ class _CategoryCard extends StatelessWidget {
     this.onRenameCategory,
     this.onDeleteCategory,
     required this.hidden,
+    this.onManageTemplates,
   });
 
   bool get _showCategoryPicker =>
@@ -1199,15 +1411,39 @@ class _CategoryCard extends StatelessWidget {
                 top: Radius.circular(Theme.of(context).radiusMd),
               ),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Center(
-              child: shadcn.Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+            child: Row(
+              children: [
+                const SizedBox(width: 28),
+                Expanded(
+                  child: Center(
+                    child: shadcn.Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                if (onManageTemplates != null)
+                  Tooltip(
+                    // ignore: implicit_call_tearoffs
+                    tooltip: TooltipContainer(
+                      child: const shadcn.Text('Lignes récurrentes'),
+                    ),
+                    child: IconButton.ghost(
+                      icon: const Icon(
+                        LucideIcons.repeat,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      onPressed: onManageTemplates,
+                    ),
+                  )
+                else
+                  const SizedBox(width: 28),
+              ],
             ),
           ),
           Padding(

@@ -19,18 +19,37 @@ class BudgetTrackingRepository {
       'budget/tracking/${year}_${month.toString().padLeft(2, '0')}.json';
 
   Future<BudgetTrackingMonth> load(int year, int month) async {
+    final result = await loadWithStatus(year, month);
+    return result.month;
+  }
+
+  /// Même chargement que [load], mais expose aussi si le mois vient d'être
+  /// créé vide faute de fichier existant — plutôt que de l'inférer côté
+  /// écran depuis des listes vides (un mois où l'utilisateur a
+  /// effectivement tout supprimé serait alors, à tort, traité comme neuf).
+  /// Utilisé par la relance "lignes récurrentes disponibles" de
+  /// `budget_tracking_screen.dart`.
+  Future<({BudgetTrackingMonth month, bool isNew})> loadWithStatus(
+    int year,
+    int month,
+  ) async {
     final relativePath = _relativePathFor(year, month);
     if (!await _storage.exists(relativePath)) {
-      return BudgetTrackingMonth.empty(month, year);
+      return (month: BudgetTrackingMonth.empty(month, year), isNew: true);
     }
     final content = await _storage.readString(relativePath);
-    if (content.trim().isEmpty) return BudgetTrackingMonth.empty(month, year);
+    if (content.trim().isEmpty) {
+      return (month: BudgetTrackingMonth.empty(month, year), isNew: false);
+    }
     try {
-      return BudgetTrackingMonth.fromJson(
-        jsonDecode(content) as Map<String, dynamic>,
+      return (
+        month: BudgetTrackingMonth.fromJson(
+          jsonDecode(content) as Map<String, dynamic>,
+        ),
+        isNew: false,
       );
     } catch (_) {
-      return BudgetTrackingMonth.empty(month, year);
+      return (month: BudgetTrackingMonth.empty(month, year), isNew: false);
     }
   }
 

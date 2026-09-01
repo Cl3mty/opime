@@ -5,6 +5,8 @@ import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/privacy/amount_visibility_controller.dart';
+import 'package:opime/features/budget/budget_recurring_templates_models.dart';
+import 'package:opime/features/budget/budget_recurring_templates_repository.dart';
 import 'package:opime/features/budget/budget_tracking_screen.dart';
 import 'package:opime/features/dashboard/widgets/allocation_hover_tooltip.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
@@ -549,6 +551,172 @@ void main() {
       // trace d'"Abonnements" nulle part sur l'écran.
       expect(find.text('Catégorie'), findsOneWidget);
       expect(find.text('Abonnements'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'lignes récurrentes : le bouton dédié de la carte REVENUS ouvre son '
+    'dialogue de gestion',
+    (tester) async {
+      await pumpScreen(tester);
+
+      await pressIconButton(tester, findIconButton(LucideIcons.repeat).first);
+      await pumpUntil(
+        tester,
+        () => find
+            .text('Aucune ligne récurrente pour l\'instant.')
+            .evaluate()
+            .isNotEmpty,
+      );
+
+      expect(find.text('Lignes récurrentes — REVENUS'), findsOneWidget);
+      expect(
+        find.text('Aucune ligne récurrente pour l\'instant.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'lignes récurrentes : en ajouter une puis l\'appliquer crée une '
+    'nouvelle ligne dans le mois courant',
+    (tester) async {
+      await pumpScreen(tester);
+
+      await pressIconButton(tester, findIconButton(LucideIcons.repeat).first);
+      await pumpUntil(
+        tester,
+        () => find
+            .text('Aucune ligne récurrente pour l\'instant.')
+            .evaluate()
+            .isNotEmpty,
+      );
+
+      await tester.enterText(find.byType(TextField).first, 'Salaire');
+      await tester.enterText(find.byType(TextField).at(1), '2500');
+      await pressIconButton(tester, findIconButton(LucideIcons.plus).last);
+      // "Salaire" seul est ambigu : le champ nom fraîchement tapé contient
+      // aussi ce texte tant qu'il n'a pas été vidé par `_add()` — attendre
+      // la disparition du texte d'état vide est un signal univoque que la
+      // liste des templates (pas juste le champ de saisie) contient bien
+      // la nouvelle ligne.
+      await pumpUntil(
+        tester,
+        () => find
+            .text('Aucune ligne récurrente pour l\'instant.')
+            .evaluate()
+            .isEmpty,
+      );
+      expect(
+        find.text('Aucune ligne récurrente pour l\'instant.'),
+        findsNothing,
+      );
+      expect(findIconButton(LucideIcons.trash2), findsOneWidget);
+
+      final applyButton = tester.widget<PrimaryButton>(
+        find.ancestor(
+          of: find.text('Appliquer maintenant'),
+          matching: find.byType(PrimaryButton),
+        ),
+      );
+      expect(
+        applyButton.onPressed,
+        isNotNull,
+        reason: 'le bouton "Appliquer maintenant" ne devrait pas être désactivé',
+      );
+      await tester.tap(find.text('Appliquer maintenant'));
+      await pumpUntil(
+        tester,
+        () => find.text('Lignes récurrentes — REVENUS').evaluate().isEmpty,
+      );
+      expect(
+        find.text('Lignes récurrentes — REVENUS'),
+        findsNothing,
+        reason: 'le dialogue devrait être refermé après "Appliquer maintenant"',
+      );
+
+      // Le dialogue est refermé, la ligne "Salaire" existe désormais dans
+      // le mois courant.
+      expect(find.text('Salaire'), findsOneWidget);
+
+      // Laisse le temps à l'écriture disque (déclenchée sans être attendue
+      // par `_update`) de se terminer avant de démonter l'écran — même
+      // précaution que le test de persistance des formules plus haut.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+
+      // Quitte la page puis y revient sur le même vault : si la ligne
+      // n'était que dans l'état en mémoire (jamais réellement persistée),
+      // elle disparaîtrait ici.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpScreen(tester, reuseVault: true);
+
+      expect(find.text('Salaire'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'un mois neuf avec des lignes récurrentes déjà enregistrées affiche la '
+    'relance, et "Ajouter" les applique toutes en une fois',
+    (tester) async {
+      await tester.runAsync(() async {
+        tempDir = await Directory.systemTemp.createTemp(
+          'opime_budget_tracking_',
+        );
+        final templatesRepo = BudgetRecurringTemplatesRepository(
+          tempDir.path,
+        );
+        await templatesRepo.add(
+          RecurringTemplate(
+            name: 'Loyer',
+            amount: 900,
+            section: BudgetSection.facture,
+          ),
+        );
+        await templatesRepo.add(
+          RecurringTemplate(
+            name: 'Salaire',
+            amount: 2500,
+            section: BudgetSection.revenue,
+          ),
+        );
+      });
+
+      await pumpScreen(tester, reuseVault: true);
+
+      expect(
+        find.textContaining('lignes récurrentes disponibles'),
+        findsOneWidget,
+      );
+      expect(find.text('Loyer'), findsNothing);
+
+      await tester.tap(find.text('Ajouter au mois'));
+      await pumpUntil(tester, () => find.text('Loyer').evaluate().isNotEmpty);
+
+      expect(find.text('Loyer'), findsOneWidget);
+      expect(find.text('Salaire'), findsOneWidget);
+      expect(
+        find.textContaining('lignes récurrentes disponibles'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'un mois neuf sans ligne récurrente enregistrée n\'affiche aucune '
+    'relance',
+    (tester) async {
+      await pumpScreen(tester);
+
+      expect(
+        find.textContaining('lignes récurrentes disponibles'),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('ligne récurrente disponible'),
+        findsNothing,
+      );
     },
   );
 }

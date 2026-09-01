@@ -63,4 +63,43 @@ void main() {
       expect(loaded.revenues, isEmpty);
     },
   );
+
+  group('loadWithStatus (isNew)', () {
+    test('isNew vrai quand aucun fichier n\'existe encore', () async {
+      final result = await repo.loadWithStatus(2026, 3);
+      expect(result.isNew, isTrue);
+      expect(result.month.revenues, isEmpty);
+    });
+
+    test('isNew faux dès qu\'un fichier a été sauvegardé, même vide', () async {
+      await repo.save(BudgetTrackingMonth.empty(3, 2026));
+      final result = await repo.loadWithStatus(2026, 3);
+      expect(result.isNew, isFalse);
+    });
+
+    test(
+      'isNew faux pour un contenu corrompu (le fichier existe, même si '
+      'illisible)',
+      () async {
+        await repo.save(BudgetTrackingMonth.empty(5, 2026));
+        final file = tempDir.listSync(recursive: true).whereType<File>().first;
+        await file.writeAsString('pas du json');
+
+        final result = await repo.loadWithStatus(2026, 5);
+        expect(result.isNew, isFalse);
+        expect(result.month.revenues, isEmpty);
+      },
+    );
+
+    test('load (sans statut) reste équivalent au .month de loadWithStatus', () async {
+      await repo.save(
+        BudgetTrackingMonth.empty(3, 2026).copyWith(
+          revenues: [TrackingItem(name: 'Salaire', budget: 3000, realite: 0)],
+        ),
+      );
+      final viaLoad = await repo.load(2026, 3);
+      final viaStatus = await repo.loadWithStatus(2026, 3);
+      expect(viaLoad.revenues.single.name, viaStatus.month.revenues.single.name);
+    });
+  });
 }
