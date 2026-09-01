@@ -491,9 +491,10 @@ void main() {
   );
 
   testWidgets(
-    'catégorie de passif (prêt) : pas de colonnes Quantité/Cours, ni en '
-    'en-tête ni sur la ligne de compte — un prêt n\'a ni unité ni cours de '
-    'marché, contrairement à un actif',
+    'catégorie de passif (prêt) : pas de colonnes Quantité/Cours ni '
+    '"+/- value", ni en en-tête ni sur la ligne de compte — un prêt n\'a ni '
+    'unité ni cours de marché, et la performance hors flux n\'a pas de sens '
+    'pour une dette',
     (tester) async {
       await tester.pumpWidget(
         ShadcnApp(
@@ -514,6 +515,8 @@ void main() {
       expect(find.text('Quantité'), findsNothing);
       expect(find.text('Cours'), findsNothing);
       expect(find.text('Valeur'), findsOneWidget);
+      expect(find.text('Évolution'), findsOneWidget);
+      expect(find.text('+/- value'), findsNothing);
     },
   );
 
@@ -740,6 +743,107 @@ void main() {
         await tester.pump();
 
         expect(find.text('RS'), findsOneWidget);
+      },
+    );
+  });
+
+  group(
+    'allocationSliceColor (dégradé des lignes d\'une même catégorie)',
+    () {
+      const base = Color(0xFF8B5CF6);
+
+      test('la première ligne (index 0) garde exactement la couleur de base', () {
+        expect(allocationSliceColor(base, 0), base);
+      });
+
+      test('chaque ligne suivante est un peu plus claire que la précédente', () {
+        // On compare via la luminosité (HSLColor.lightness), plus fiable
+        // qu'une comparaison de canaux bruts pour vérifier "plus clair".
+        final l0 = HSLColor.fromColor(allocationSliceColor(base, 0)).lightness;
+        final l1 = HSLColor.fromColor(allocationSliceColor(base, 1)).lightness;
+        final l2 = HSLColor.fromColor(allocationSliceColor(base, 2)).lightness;
+        expect(l1, greaterThan(l0));
+        expect(l2, greaterThan(l1));
+      });
+
+      test(
+        'plafonné avant le blanc pur — une catégorie avec de nombreuses '
+        'lignes ne finit jamais par des couleurs blanches indiscernables '
+        'du fond de la carte',
+        () {
+          // Avant le plafond (t = 0,16 × i non borné), la 10ᵉ ligne
+          // (i = 9) atteignait déjà t = 1,44 > 1, donc du blanc pur.
+          final farLine = allocationSliceColor(base, 9);
+          final veryFarLine = allocationSliceColor(base, 30);
+
+          expect(farLine, isNot(Colors.white));
+          // Au-delà du plafond, toutes les lignes suivantes convergent
+          // vers la même teinte la plus claire (pas de nouveau blanchiment
+          // au-delà), plutôt que de continuer à blanchir indéfiniment.
+          expect(veryFarLine, farLine);
+        },
+      );
+    },
+  );
+
+  group('colonne "+/- value" (PnL period-aware, en plus d\'"Évolution")', () {
+    testWidgets(
+      'l\'en-tête affiche "+/- value" en plus de "Valeur"/"Évolution"',
+      (tester) async {
+        await tester.pumpWidget(buildScreen());
+        await tester.pump();
+
+        expect(find.text('Valeur'), findsOneWidget);
+        expect(find.text('Évolution'), findsOneWidget);
+        expect(find.text('+/- value'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'une ligne compte affiche les euros de periodChangeFor/periodPnlFor '
+      'pour la période sélectionnée (par défaut "Tout")',
+      (tester) async {
+        final accountWithPeriod = PatrimoineAccount(
+          id: 'acc-1',
+          name: 'PEA',
+          valeur: 1000,
+          plusValueAbs: 50,
+          plusValuePercent: 5,
+          periodChangeFor: (period) => period == DashboardPeriod.all
+              ? (euros: 654.0, percent: 10.0)
+              : (euros: 111.0, percent: 2.0),
+          periodPnlFor: (period) => period == DashboardPeriod.all
+              ? (euros: 321.0, percent: 8.0)
+              : (euros: 222.0, percent: 1.5),
+        );
+        final categoryWithPeriod = PatrimoineCategory(
+          id: 'actifs_actions_fonds',
+          label: 'Actions & Fonds',
+          icon: LucideIcons.trendingUp,
+          color: const Color(0xFF000000),
+          tier: AllocationTier.fondation,
+          description: '',
+          accounts: const [],
+        );
+
+        await tester.pumpWidget(
+          ShadcnApp(
+            home: Scaffold(
+              child: CategoryDetailScreen(
+                category: categoryWithPeriod,
+                amountVisibility: AmountVisibilityController(),
+                allocationByAccount: [accountWithPeriod],
+                onAccountTap: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Défaut de `_periodIndex` (5, "Tout") : les colonnes reflètent le
+        // scénario `DashboardPeriod.all` de la closure.
+        expect(find.textContaining('654'), findsWidgets);
+        expect(find.textContaining('321'), findsWidgets);
       },
     );
   });

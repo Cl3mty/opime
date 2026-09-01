@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/liabilities/liabilities_models.dart';
 import 'package:opime/features/liabilities/real_passifs_adapter.dart';
 import 'package:opime/features/simulations/loan_calculator.dart';
@@ -157,4 +158,78 @@ void main() {
       },
     );
   });
+
+  group('periodChangeFor (colonne "Évolution" pour un passif)', () {
+    test(
+      'sur la période "Tout", reflète le capital déjà remboursé depuis le '
+      'déblocage — négatif (la dette a baissé), jusqu\'à -montantEmprunte '
+      'une fois le prêt totalement soldé',
+      () {
+        // Prêt de 12 mensualités débuté en 2015 : totalement amorti bien
+        // avant aujourd'hui, quelle que soit la date réelle d'exécution du
+        // test — un scénario déterministe sans dépendre de `DateTime.now()`
+        // au moment précis de la run (même principe que les tests
+        // `_positionReturnForPeriod`/`periodReturnFor` côté actifs, dont
+        // l'historique de cours tient flat après le dernier point connu).
+        final liability = Liability(
+          type: LiabilityType.creditAutre,
+          name: 'Test',
+          montantEmprunte: 12000,
+          tauxInteret: 3,
+          nbrEcheances: 12,
+          dateDebut: DateTime(2015, 1, 15),
+          loanType: LoanType.amortissable,
+        );
+
+        final change = periodChangeFor([liability], DashboardPeriod.all);
+
+        expect(change.euros, closeTo(-12000, 1e-6));
+        expect(change.percent, closeTo(-100, 1e-6));
+      },
+    );
+
+    test(
+      'sans aucun remboursement (prêt débuté aujourd\'hui), le delta est nul',
+      () {
+        final liability = Liability(
+          type: LiabilityType.creditAutre,
+          name: 'Test',
+          montantEmprunte: 12000,
+          tauxInteret: 3,
+          nbrEcheances: 12,
+          dateDebut: DateTime.now(),
+          loanType: LoanType.amortissable,
+        );
+
+        final change = periodChangeFor([liability], DashboardPeriod.all);
+
+        expect(change.euros, closeTo(0, 1e-6));
+      },
+    );
+  });
+
+  test(
+    'buildRealPassifCategories : la feuille d\'un passif porte '
+    'periodChangeFor mais pas periodPnlFor — la notion de performance hors '
+    'flux n\'a pas de sens pour une dette',
+    () {
+      final liability = Liability(
+        type: LiabilityType.creditAutre,
+        name: 'Test',
+        montantEmprunte: 12000,
+        tauxInteret: 3,
+        nbrEcheances: 12,
+        dateDebut: DateTime(2015, 1, 15),
+        loanType: LoanType.amortissable,
+      );
+      final leaf = buildRealPassifCategories([liability]).single.accounts.single;
+
+      expect(leaf.periodChangeFor, isNotNull);
+      expect(
+        leaf.periodChangeFor!(DashboardPeriod.all).euros,
+        closeTo(-12000, 1e-6),
+      );
+      expect(leaf.periodPnlFor, isNull);
+    },
+  );
 }

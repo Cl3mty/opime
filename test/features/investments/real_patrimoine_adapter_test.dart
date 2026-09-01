@@ -260,6 +260,64 @@ void main() {
     },
   );
 
+  test(
+    'buildRealCategories : la feuille d\'un investissement porte des '
+    'closures periodChangeFor/periodPnlFor cohérentes avec '
+    'periodValueChangeFor/periodReturnFor',
+    () {
+      final priceHistory = [
+        PricePoint(DateTime.utc(2025, 1, 1), 100),
+        PricePoint(DateTime.utc(2025, 2, 1), 120),
+      ];
+      final account = InvestmentAccount(
+        assetClass: AssetClass.actionsEtFonds,
+        envelope: AccountEnvelope.cto,
+        name: 'CTO',
+        investments: [
+          Investment(
+            isin: 'FR0012345678',
+            label: 'TotalEnergies',
+            transactions: [
+              Transaction(
+                date: DateTime.utc(2025, 1, 1),
+                isBuy: true,
+                quantity: 5,
+                unitPrice: 100,
+              ),
+            ],
+          ),
+        ],
+      );
+      final priceHistories = {'FR0012345678': priceHistory};
+      final leaf = buildRealCategories(
+        [account],
+        priceHistories,
+        '/vault',
+      ).single.accounts.single;
+
+      final investment = account.investments.single;
+      final expectedChange = periodValueChangeFor(
+        [investment],
+        priceHistories,
+        DashboardPeriod.all,
+      );
+      final expectedPnl = periodReturnFor(
+        [investment],
+        priceHistories,
+        DashboardPeriod.all,
+      );
+
+      expect(
+        leaf.periodChangeFor!(DashboardPeriod.all).euros,
+        closeTo(expectedChange.euros, 1e-6),
+      );
+      expect(
+        leaf.periodPnlFor!(DashboardPeriod.all).euros,
+        closeTo(expectedPnl.euros, 1e-6),
+      );
+    },
+  );
+
   group('positions à effet de levier (LeveragedPosition)', () {
     InvestmentAccount cryptoAccount(List<LeveragedPosition> positions) =>
         InvestmentAccount(
@@ -332,6 +390,13 @@ void main() {
         expect(leaf.pru, 60000); // entryPriceInEur
         expect(leaf.cours, 66000); // markPrice
         expect(leaf.avatarCryptoSymbol, 'BTC');
+        // Pas de rattachement à une période pour le levier (voir la doc de
+        // `_buildLeveragedLeaf`) : les closures existent (pour ne pas
+        // disparaître des tableaux génériques dès qu'une période autre que
+        // "Tout" est choisie) mais ignorent [period], renvoient toujours le
+        // PnL/ROE depuis l'ouverture.
+        expect(leaf.periodChangeFor!(DashboardPeriod.month1).euros, 600);
+        expect(leaf.periodPnlFor!(DashboardPeriod.all).euros, 600);
         // Une position fermée ne produit aucune ligne.
         final onlyClosed = cryptoAccount([
           position.copyWith(closedAt: DateTime(2026, 2, 1), closePrice: 66000),
@@ -1080,6 +1145,109 @@ void main() {
     expect(change!.euros, closeTo(0, 1e-6));
     expect(change.percent, closeTo(0, 1e-6));
   });
+
+  test(
+    'periodReturnFor : agrège la performance de plusieurs investissements, '
+    'pas seulement le cas à un seul (généralisation de l\'ancienne '
+    '_positionReturnForPeriod)',
+    () {
+      final priceHistories = {
+        'FR0012345678': [
+          PricePoint(DateTime.utc(2025, 1, 1), 100),
+          PricePoint(DateTime.utc(2025, 2, 1), 120),
+        ],
+        'FR0000131104': [
+          PricePoint(DateTime.utc(2025, 1, 1), 50),
+          PricePoint(DateTime.utc(2025, 2, 1), 40),
+        ],
+      };
+      final a = Investment(
+        isin: 'FR0012345678',
+        label: 'TotalEnergies',
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2025, 1, 1),
+            isBuy: true,
+            quantity: 5,
+            unitPrice: 100,
+          ),
+        ],
+      );
+      final b = Investment(
+        isin: 'FR0000131104',
+        label: 'Air Liquide',
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2025, 1, 1),
+            isBuy: true,
+            quantity: 10,
+            unitPrice: 50,
+          ),
+        ],
+      );
+
+      final result = periodReturnFor(
+        [a, b],
+        priceHistories,
+        DashboardPeriod.all,
+      );
+
+      // TotalEnergies : 5 × (120 − 100) = +100 €. Air Liquide :
+      // 10 × (40 − 50) = −100 €. Somme des deux positions : 0 €, pas
+      // seulement le résultat de la première (régression possible d'une
+      // agrégation qui ne sommerait pas correctement sur la liste).
+      expect(result.euros, closeTo(0, 1e-6));
+    },
+  );
+
+  test(
+    'periodValueChangeFor : inclut l\'effet d\'un versement pendant la '
+    'période, contrairement à periodReturnFor',
+    () {
+      final priceHistory = [
+        PricePoint(DateTime.utc(2025, 1, 1), 100),
+        PricePoint(DateTime.utc(2025, 2, 1), 100),
+      ];
+      final investment = Investment(
+        isin: 'FR0012345678',
+        label: 'TotalEnergies',
+        transactions: [
+          Transaction(
+            date: DateTime.utc(2025, 1, 1),
+            isBuy: true,
+            quantity: 5,
+            unitPrice: 100,
+          ),
+          // Nouvel achat en cours de période, cours inchangé : la valeur de
+          // la position augmente uniquement à cause de ce versement, aucune
+          // vraie plus-value réalisée.
+          Transaction(
+            date: DateTime.utc(2025, 1, 20),
+            isBuy: true,
+            quantity: 5,
+            unitPrice: 100,
+          ),
+        ],
+      );
+
+      final change = periodValueChangeFor(
+        [investment],
+        {'FR0012345678': priceHistory},
+        DashboardPeriod.all,
+      );
+      final pnl = periodReturnFor(
+        [investment],
+        {'FR0012345678': priceHistory},
+        DashboardPeriod.all,
+      );
+
+      // Évolution : la valeur de la position a bien augmenté de 500 €
+      // (nouvel achat), un versement compte donc dans ce delta brut.
+      expect(change.euros, closeTo(500, 1e-6));
+      // PnL : cours inchangé, aucune vraie performance malgré le versement.
+      expect(pnl.euros, closeTo(0, 1e-6));
+    },
+  );
 
   test('buildRealCategories : une position entièrement vendue (quantité '
       'nulle) est exclue, une position partiellement vendue reste', () {

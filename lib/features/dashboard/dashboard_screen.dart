@@ -86,6 +86,13 @@ class _RealDashboardState extends State<_RealDashboard> {
   List<PatrimoineCategory> _categories = [];
   List<PatrimoineCategory> _categoriesByAccount = [];
   List<PatrimoineCategory> _passifCategories = [];
+
+  /// Période partagée entre le graphique "Patrimoine" (`RealPatrimoineCard`)
+  /// et les cartes "Actifs"/"Passifs" (`CategoryBreakdownCard`) juste en
+  /// dessous — un seul sélecteur, sur le graphique, pilote les deux (voir
+  /// `RealPatrimoineCard.periodIndex`/`onPeriodChanged`), plutôt qu'un
+  /// sélecteur propre à chaque carte.
+  int _periodIndex = 5;
   List<DashboardAsset> _topAssets = [];
   bool _isEverythingEmpty = false;
 
@@ -306,6 +313,8 @@ class _RealDashboardState extends State<_RealDashboard> {
                     actifsHistoryFor: _actifsHistoryFor,
                     totalPassifHistoryFor: _totalPassifHistoryFor,
                     hidden: hidden,
+                    periodIndex: _periodIndex,
+                    onPeriodChanged: (i) => setState(() => _periodIndex = i),
                   );
                   final allocationCard = AllocationCard(
                     actifs: _categories,
@@ -336,7 +345,11 @@ class _RealDashboardState extends State<_RealDashboard> {
               ),
               const SizedBox(height: 24),
               if (_topAssets.isNotEmpty) ...[
-                TopAssetsRow(assets: _topAssets, hidden: hidden),
+                TopAssetsRow(
+                  assets: _topAssets,
+                  hidden: hidden,
+                  period: DashboardPeriod.values[_periodIndex],
+                ),
                 const SizedBox(height: 24),
               ],
               CategoryBreakdownCard(
@@ -346,8 +359,9 @@ class _RealDashboardState extends State<_RealDashboard> {
                 hidden: hidden,
                 // Le PRU reste visible sur les pages de détail de chaque
                 // classe d'actif, pas ici : la vue agrégée du Dashboard
-                // montre uniquement montant et évolution.
+                // montre uniquement valeur, évolution et +/- value.
                 showPru: false,
+                period: DashboardPeriod.values[_periodIndex],
               ),
               const SizedBox(height: 16),
               CategoryBreakdownCard(
@@ -355,6 +369,7 @@ class _RealDashboardState extends State<_RealDashboard> {
                 categories: _passifCategories,
                 hidden: hidden,
                 showPru: false,
+                period: DashboardPeriod.values[_periodIndex],
               ),
             ],
           ),

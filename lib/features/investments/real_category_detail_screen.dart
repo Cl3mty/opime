@@ -370,6 +370,7 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
         account: account,
         hidden: hidden,
         bankNames: _bankNames,
+        priceHistories: _priceHistories,
         startInEditMode: _openAccountInEditMode,
         // Un clic sur une position directement depuis le tableau de
         // catégorie (voir `_openInvestment`) ouvrait autrefois sa page

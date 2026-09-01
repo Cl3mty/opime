@@ -490,6 +490,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 onImportPhoto: widget.vaultPath == null
                     ? null
                     : _importAutresPhoto,
+                period: period,
               ),
               if (widget.trailingSection != null) ...[
                 const SizedBox(height: 24),
@@ -563,6 +564,20 @@ enum _AllocationView { blocs, donut }
 const _toggleButtonSize = ButtonSize(0.95);
 const _toggleFontSize = 14.0 * 0.95;
 const _toggleIconSize = 16.0 * 0.95;
+
+/// Couleur de la [index]-ième part d'une allocation à plusieurs lignes
+/// partageant la même couleur de base (une catégorie) — chaque ligne
+/// suivante est un peu plus claire, pour les distinguer visuellement sans
+/// leur inventer des couleurs arbitraires. Plafonné avant le blanc pur
+/// (t = 1) : au-delà d'une dizaine de lignes, un dégradé non borné finit par
+/// produire des couleurs blanches indiscernables du fond de la carte — une
+/// ligne de plus n'apporterait alors plus aucune distinction visuelle. Le
+/// dégradé continue de s'éclaircir ligne par ligne jusqu'à ce plafond, puis
+/// les lignes suivantes gardent cette teinte la plus claire.
+Color allocationSliceColor(Color baseColor, int index) {
+  return Color.lerp(baseColor, Colors.white, (0.16 * index).clamp(0.0, 0.7)) ??
+      baseColor;
+}
 
 /// Carte "Allocation" : répartition de la catégorie en blocs
 /// ([AllocationBlocksView]) ou en anneau ([AllocationDonutView], mêmes 2
@@ -684,9 +699,7 @@ class _CategoryAllocationCardState extends State<_CategoryAllocationCard> {
         AllocationSlice(
           id: lines[i].id ?? lines[i].name,
           label: _allocationLabel(lines[i], category),
-          color:
-              Color.lerp(category.color, Colors.white, 0.16 * i) ??
-              category.color,
+          color: allocationSliceColor(category.color, i),
           percent: montant == 0 ? 0 : lines[i].valeur / montant * 100,
         ),
     ];
@@ -857,6 +870,10 @@ class _AccountsCard extends StatefulWidget {
   /// disponible.
   final ValueChanged<PatrimoineAccount>? onImportPhoto;
 
+  /// Période affichée pour les colonnes "Évolution"/"+/- value" — voir
+  /// `_AccountLine.period`.
+  final DashboardPeriod period;
+
   const _AccountsCard({
     required this.category,
     this.byAccount,
@@ -873,6 +890,7 @@ class _AccountsCard extends StatefulWidget {
     this.onImportLogo,
     this.autresPhotos = const {},
     this.onImportPhoto,
+    required this.period,
   });
 
   @override
@@ -911,6 +929,7 @@ class _AccountsCardState extends State<_AccountsCard> {
     List<PatrimoineAccount> byAccount,
     bool showPru,
     bool showQuantityCours,
+    bool showPnl,
   ) {
     final theme = Theme.of(context);
     final quantityAssetClass = assetClassForCategoryId(widget.category.id);
@@ -931,6 +950,7 @@ class _AccountsCardState extends State<_AccountsCard> {
             showAvatar: widget.showAvatar,
             showPru: showPru,
             showQuantityCours: showQuantityCours,
+            showPnl: showPnl,
             quantityAssetClass: quantityAssetClass,
             expanded: _isExpanded(account.id ?? account.name),
             onToggleExpand: () => _toggleExpanded(account.id ?? account.name),
@@ -940,6 +960,7 @@ class _AccountsCardState extends State<_AccountsCard> {
             onAccountOpen: widget.onAccountOpen,
             autresPhotos: widget.autresPhotos,
             onImportPhoto: widget.onImportPhoto,
+            period: widget.period,
           ),
         );
         continue;
@@ -958,6 +979,7 @@ class _AccountsCardState extends State<_AccountsCard> {
             showAvatar: false,
             showPru: showPru,
             showQuantityCours: showQuantityCours,
+            showPnl: showPnl,
             quantityAssetClass: quantityAssetClass,
             expanded: _isExpanded(account.id ?? account.name),
             onToggleExpand: () => _toggleExpanded(account.id ?? account.name),
@@ -967,6 +989,7 @@ class _AccountsCardState extends State<_AccountsCard> {
             onAccountOpen: widget.onAccountOpen,
             autresPhotos: widget.autresPhotos,
             onImportPhoto: widget.onImportPhoto,
+            period: widget.period,
           ),
         );
       }
@@ -979,8 +1002,10 @@ class _AccountsCardState extends State<_AccountsCard> {
           hidden: widget.hidden,
           showPru: showPru,
           showQuantityCours: showQuantityCours,
+          showPnl: showPnl,
           expanded: _isExpanded('bank:$group.key'),
           onToggleExpand: () => _toggleExpanded('bank:$group.key'),
+          period: widget.period,
           children: children,
         ),
       );
@@ -1003,6 +1028,7 @@ class _AccountsCardState extends State<_AccountsCard> {
     List<PatrimoineAccount> byInvestment,
     bool showPru,
     bool showQuantityCours,
+    bool showPnl,
   ) {
     final theme = Theme.of(context);
     final quantityAssetClass = assetClassForCategoryId(widget.category.id);
@@ -1017,9 +1043,11 @@ class _AccountsCardState extends State<_AccountsCard> {
           showAvatar: widget.showAvatar,
           showPru: showPru,
           showQuantityCours: showQuantityCours,
+          showPnl: showPnl,
           quantityAssetClass: quantityAssetClass,
           expanded: _isExpanded(leaf.id ?? leaf.name),
           onToggleExpand: () => _toggleExpanded(leaf.id ?? leaf.name),
+          period: widget.period,
           onInvestmentTap: widget.onAccountTap,
           // Une ligne fusionnée n'a pas de compte unique à ouvrir : son
           // titre reste inerte (comme une ligne banque sans page propre),
@@ -1041,6 +1069,7 @@ class _AccountsCardState extends State<_AccountsCard> {
     final byAccount = widget.byAccount;
     final showPru = widget.category.showsPruColumn;
     final showQuantityCours = widget.category.showsQuantityColumn;
+    final showPnl = widget.category.showsPnlColumn;
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -1112,6 +1141,7 @@ class _AccountsCardState extends State<_AccountsCard> {
                 ],
                 _HeaderCell('Valeur'),
                 _HeaderCell('Évolution'),
+                if (showPnl) _HeaderCell('+/- value'),
                 const SizedBox(width: _actionsWidth),
               ],
             ),
@@ -1121,9 +1151,15 @@ class _AccountsCardState extends State<_AccountsCard> {
                 byInvestment,
                 showPru,
                 showQuantityCours,
+                showPnl,
               ),
             ] else if (byAccount != null) ...[
-              ..._buildAccountAccordions(byAccount, showPru, showQuantityCours),
+              ..._buildAccountAccordions(
+                byAccount,
+                showPru,
+                showQuantityCours,
+                showPnl,
+              ),
             ] else
               for (final account in widget.category.accounts) ...[
                 Container(height: 1, color: theme.colorScheme.border),
@@ -1133,6 +1169,7 @@ class _AccountsCardState extends State<_AccountsCard> {
                   showAvatar: widget.showAvatar,
                   showPru: showPru,
                   showQuantityCours: showQuantityCours,
+                  showPnl: showPnl,
                   quantityAssetClass: assetClassForCategoryId(
                     widget.category.id,
                   ),
@@ -1145,6 +1182,7 @@ class _AccountsCardState extends State<_AccountsCard> {
                   onAvatarTap: widget.onImportPhoto == null
                       ? null
                       : () => widget.onImportPhoto!(account),
+                  period: widget.period,
                 ),
               ],
           ],
@@ -1197,6 +1235,14 @@ class _AccountAccordionTile extends StatelessWidget {
   /// Voir `_AccountsCard.onImportPhoto`.
   final ValueChanged<PatrimoineAccount>? onImportPhoto;
 
+  /// Voir `_AccountsCard.period`.
+  final DashboardPeriod period;
+
+  /// Affiche la colonne "+/- value" du tableau, cf.
+  /// [PatrimoineCategory.showsPnlColumn] — propagée aux deux niveaux de
+  /// l'accordéon, comme [showPru]/[showQuantityCours].
+  final bool showPnl;
+
   const _AccountAccordionTile({
     required this.account,
     required this.hidden,
@@ -1212,6 +1258,8 @@ class _AccountAccordionTile extends StatelessWidget {
     this.quantityAssetClass,
     this.autresPhotos = const {},
     this.onImportPhoto,
+    required this.period,
+    this.showPnl = true,
   });
 
   @override
@@ -1238,7 +1286,9 @@ class _AccountAccordionTile extends StatelessWidget {
               hidden: hidden,
               showPru: showPru,
               showQuantityCours: showQuantityCours,
+              showPnl: showPnl,
               quantityAssetClass: quantityAssetClass,
+              period: period,
               leading: hasChildren
                   ? IconButton.ghost(
                       icon: AnimatedRotation(
@@ -1282,7 +1332,9 @@ class _AccountAccordionTile extends StatelessWidget {
                             showAvatar: showAvatar,
                             showPru: showPru,
                             showQuantityCours: showQuantityCours,
+                            showPnl: showPnl,
                             quantityAssetClass: quantityAssetClass,
+                            period: period,
                             // Une position ouvre une popup (voir
                             // `onAccountOpen`), pas une page : le chevron de
                             // navigation serait trompeur dans ce cas.
@@ -1336,6 +1388,13 @@ class _BankAccordionTile extends StatelessWidget {
   /// [PatrimoineCategory.showsQuantityColumn].
   final bool showQuantityCours;
 
+  /// Voir `_AccountsCard.period`.
+  final DashboardPeriod period;
+
+  /// Affiche la colonne "+/- value" du sous-total, cf.
+  /// [PatrimoineCategory.showsPnlColumn].
+  final bool showPnl;
+
   const _BankAccordionTile({
     required this.bankName,
     required this.accounts,
@@ -1345,8 +1404,10 @@ class _BankAccordionTile extends StatelessWidget {
     required this.expanded,
     required this.onToggleExpand,
     required this.children,
+    required this.period,
     this.showPru = false,
     this.showQuantityCours = true,
+    this.showPnl = true,
   });
 
   @override
@@ -1356,11 +1417,27 @@ class _BankAccordionTile extends StatelessWidget {
     // global (voir `PatrimoineAccount.excludedFromPatrimoine`), comme le
     // reste de cette page.
     final total = accounts.fold(0.0, (sum, a) => sum + a.valeur);
-    final plusValueAbs = accounts.fold(0.0, (sum, a) => sum + (a.plusValueAbs ?? 0));
-    final costBasis = total - plusValueAbs;
-    // `null` (pas `0`) sans coût d'acquisition — voir
-    // `PatrimoineAccount.plusValuePercent`.
-    final percent = costBasis == 0 ? null : plusValueAbs / costBasis * 100;
+    // Évolution/PnL de la banque sur [period] : même astuce de soustraction
+    // que `PatrimoineCategory.periodChangeFor`/`periodPnlFor` (agrégat des
+    // lignes de compte, `total` moins la somme des deltas donne la
+    // valorisation de départ) — un compte sans closure (aucun cas connu
+    // aujourd'hui) est simplement ignoré de la somme.
+    final changeResults = [
+      for (final a in accounts) a.periodChangeFor?.call(period),
+    ].whereType<({double euros, double? percent})>().toList();
+    final changeEuros = changeResults.fold(0.0, (sum, r) => sum + r.euros);
+    final changeStartValue = total - changeEuros;
+    final changePercent = changeResults.isEmpty
+        ? null
+        : (changeStartValue != 0 ? changeEuros / changeStartValue * 100 : null);
+    final pnlResults = [
+      for (final a in accounts) a.periodPnlFor?.call(period),
+    ].whereType<({double euros, double? percent})>().toList();
+    final pnlEuros = pnlResults.fold(0.0, (sum, r) => sum + r.euros);
+    final pnlNetInvested = total - pnlEuros;
+    final pnlPercent = pnlResults.isEmpty
+        ? null
+        : (pnlNetInvested > 0 ? pnlEuros / pnlNetInvested * 100 : null);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1423,11 +1500,20 @@ class _BankAccordionTile extends StatelessWidget {
               SizedBox(
                 width: _colWidth,
                 child: PerformanceAmount(
-                  euros: plusValueAbs,
-                  percent: percent,
+                  euros: changeResults.isEmpty ? null : changeEuros,
+                  percent: changePercent,
                   hidden: hidden,
                 ),
               ),
+              if (showPnl)
+                SizedBox(
+                  width: _colWidth,
+                  child: PerformanceAmount(
+                    euros: pnlResults.isEmpty ? null : pnlEuros,
+                    percent: pnlPercent,
+                    hidden: hidden,
+                  ),
+                ),
               const SizedBox(width: _actionsWidth),
             ],
           ),
@@ -1596,6 +1682,18 @@ class _AccountLine extends StatelessWidget {
   /// (défaut) le laisse non cliquable, comme pour toute autre catégorie.
   final VoidCallback? onAvatarTap;
 
+  /// Période affichée pour les colonnes "Évolution"/"+/- value" — voir
+  /// `_CategoryDetailScreenState`'s `_periodIndex`/`PeriodTabs`, déjà
+  /// utilisé par le graphique du haut de la page, réutilisé ici pour les
+  /// lignes du tableau.
+  final DashboardPeriod period;
+
+  /// Affiche la colonne "+/- value" — cf.
+  /// [PatrimoineCategory.showsPnlColumn] : masquée entièrement pour un
+  /// passif, plutôt que d'y afficher un « — » systématique (la performance
+  /// hors flux n'a pas de sens pour une dette).
+  final bool showPnl;
+
   const _AccountLine({
     required this.account,
     required this.hidden,
@@ -1609,11 +1707,15 @@ class _AccountLine extends StatelessWidget {
     this.showChevron = true,
     this.avatarPhotoPath,
     this.onAvatarTap,
+    required this.period,
+    this.showPnl = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final change = account.periodChangeFor?.call(period);
+    final pnl = account.periodPnlFor?.call(period);
 
     final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1729,11 +1831,20 @@ class _AccountLine extends StatelessWidget {
           SizedBox(
             width: _colWidth,
             child: PerformanceAmount(
-              euros: account.plusValueAbs,
-              percent: account.plusValuePercent,
+              euros: change?.euros,
+              percent: change?.percent,
               hidden: hidden,
             ),
           ),
+          if (showPnl)
+            SizedBox(
+              width: _colWidth,
+              child: PerformanceAmount(
+                euros: pnl?.euros,
+                percent: pnl?.percent,
+                hidden: hidden,
+              ),
+            ),
           SizedBox(
             width: _actionsWidth,
             child: Center(

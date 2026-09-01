@@ -4,7 +4,6 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../patrimoine_models.dart';
-import 'net_worth_chart.dart' show PeriodTabs;
 import 'patrimoine_chart_widgets.dart' show ExtremePercentLabel;
 
 const _green = Color(0xFF22C55E);
@@ -24,29 +23,31 @@ const _avatarPalette = [
 /// Section "Mes meilleures performances" : une ligne de mini-cartes (nom,
 /// ticker, +/- value, %, sparkline de la valeur de ma position) qui défile
 /// horizontalement plutôt que de s'enrouler, pour rester lisible même avec
-/// une dizaine d'actifs. Triée par performance décroissante sur la période
-/// choisie via [PeriodTabs] — MA performance sur la position, pas le
-/// rendement du cours du titre seul (voir
-/// `real_patrimoine_adapter.dart`'s `buildRealTopAssets`).
-class TopAssetsRow extends StatefulWidget {
+/// une dizaine d'actifs. Triée par performance décroissante sur [period] —
+/// MA performance sur la position, pas le rendement du cours du titre seul
+/// (voir `real_patrimoine_adapter.dart`'s `buildRealTopAssets`).
+///
+/// [period] est reçue du Dashboard plutôt que gérée en interne : un seul
+/// sélecteur de période doit piloter toute la page (voir `dashboard_screen
+/// .dart`, qui le partage avec `RealPatrimoineCard`/`CategoryBreakdownCard`),
+/// pas un sélecteur indépendant par section.
+class TopAssetsRow extends StatelessWidget {
   final List<DashboardAsset> assets;
   final bool hidden;
+  final DashboardPeriod period;
 
-  const TopAssetsRow({super.key, required this.assets, required this.hidden});
-
-  @override
-  State<TopAssetsRow> createState() => _TopAssetsRowState();
-}
-
-class _TopAssetsRowState extends State<TopAssetsRow> {
-  int _periodIndex = 2;
+  const TopAssetsRow({
+    super.key,
+    required this.assets,
+    required this.hidden,
+    required this.period,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final period = DashboardPeriod.values[_periodIndex];
     // Performances nulles (rien d'investi ni détenu en début de période)
     // reléguées en fin de liste plutôt que de perturber le tri.
-    final sorted = [...widget.assets]
+    final sorted = [...assets]
       ..sort((a, b) {
         final aPercent = a.changeForPeriod(period)?.percent;
         final bPercent = b.changeForPeriod(period)?.percent;
@@ -59,17 +60,7 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const shadcn.Text('Mes meilleures performances').large().medium(),
-            const Spacer(),
-            PeriodTabs(
-              labels: [for (final p in DashboardPeriod.values) p.label],
-              index: _periodIndex,
-              onChanged: (i) => setState(() => _periodIndex = i),
-            ),
-          ],
-        ),
+        const shadcn.Text('Mes meilleures performances').large().medium(),
         const SizedBox(height: 12),
         SizedBox(
           height: 116,
@@ -83,7 +74,7 @@ class _TopAssetsRowState extends State<TopAssetsRow> {
                 asset: sorted[i],
                 change: sorted[i].changeForPeriod(period),
                 sparkline: sorted[i].sparklineForPeriod(period),
-                hidden: widget.hidden,
+                hidden: hidden,
                 avatarColor: _avatarPalette[i % _avatarPalette.length],
               ),
             ),

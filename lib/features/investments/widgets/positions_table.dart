@@ -2,11 +2,15 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/performance_amount.dart';
+import '../../dashboard/patrimoine_models.dart' show DashboardPeriod;
 import '../confirm_delete_dialog.dart';
 import '../currency_format.dart';
 import '../investments_models.dart';
 import '../investments_repository.dart';
 import '../leveraged_position.dart';
+import '../real_patrimoine_adapter.dart'
+    show periodReturnFor, periodValueChangeFor;
+import '../yahoo_finance_client.dart' show PricePoint;
 import 'leveraged_position_dialog.dart';
 import 'transaction_widgets.dart' show ExcludedFromPatrimoineBadge;
 
@@ -49,6 +53,16 @@ class PositionsTable extends StatelessWidget {
   /// position à effet de levier) continuent de partir de la liste complète.
   final List<Investment>? visibleInvestments;
 
+  /// Période affichée pour les colonnes "Évolution"/"+/- value" (positions
+  /// spot uniquement — voir la doc de classe pour la section levier, hors
+  /// périmètre). Voir `StockAccountScreen._periodIndex`.
+  final DashboardPeriod period;
+
+  /// Historique de cours en cache de chaque investissement — voir
+  /// `StockAccountScreen.priceHistories`, transmis tel quel pour calculer
+  /// [period]/[periodValueChangeFor] sans nouvelle E/S.
+  final Map<String, List<PricePoint>> priceHistories;
+
   const PositionsTable({
     super.key,
     required this.account,
@@ -57,6 +71,8 @@ class PositionsTable extends StatelessWidget {
     required this.vaultPath,
     required this.onChanged,
     this.visibleInvestments,
+    required this.period,
+    required this.priceHistories,
   });
 
   /// Une position à quantité nulle (entièrement vendue, transférée ou
@@ -97,6 +113,8 @@ class PositionsTable extends StatelessWidget {
             account: account,
             hidden: hidden,
             onTap: onTap,
+            period: period,
+            priceHistories: priceHistories,
           )
         else
           shadcn.Text('Aucune position ouverte pour l\'instant.').muted().small(),
@@ -125,6 +143,8 @@ class PositionsTable extends StatelessWidget {
             account: account,
             hidden: hidden,
             onTap: onTap,
+            period: period,
+            priceHistories: priceHistories,
           ),
         ],
       ],
@@ -529,12 +549,16 @@ class _PositionsSubTable extends StatelessWidget {
   final InvestmentAccount account;
   final bool hidden;
   final ValueChanged<Investment> onTap;
+  final DashboardPeriod period;
+  final Map<String, List<PricePoint>> priceHistories;
 
   const _PositionsSubTable({
     required this.investments,
     required this.account,
     required this.hidden,
     required this.onTap,
+    required this.period,
+    required this.priceHistories,
   });
 
   @override
@@ -550,6 +574,7 @@ class _PositionsSubTable extends StatelessWidget {
             const _HeaderCell('PRU'),
             const _HeaderCell('Cours'),
             const _HeaderCell('Valeur'),
+            const _HeaderCell('Évolution'),
             const _HeaderCell('+/- value'),
           ],
         ),
@@ -560,6 +585,8 @@ class _PositionsSubTable extends StatelessWidget {
             account: account,
             hidden: hidden,
             onTap: () => onTap(investment),
+            period: period,
+            priceHistories: priceHistories,
           ),
         ],
       ],
@@ -589,22 +616,24 @@ class _PositionLine extends StatelessWidget {
   final InvestmentAccount account;
   final bool hidden;
   final VoidCallback onTap;
+  final DashboardPeriod period;
+  final Map<String, List<PricePoint>> priceHistories;
 
   const _PositionLine({
     required this.investment,
     required this.account,
     required this.hidden,
     required this.onTap,
+    required this.period,
+    required this.priceHistories,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final value = investment.displayValue;
-    final gain = investment.unrealizedGain;
-    final gainPercent = gain != null && investment.investedAmount != 0
-        ? gain / investment.investedAmount * 100
-        : null;
+    final change = periodValueChangeFor([investment], priceHistories, period);
+    final pnl = periodReturnFor([investment], priceHistories, period);
     final crossClass =
         investment.assetClass != null &&
         investment.assetClass != account.assetClass;
@@ -702,8 +731,16 @@ class _PositionLine extends StatelessWidget {
               SizedBox(
                 width: _colWidth,
                 child: PerformanceAmount(
-                  euros: gain,
-                  percent: gainPercent,
+                  euros: change.euros,
+                  percent: change.percent,
+                  hidden: hidden,
+                ),
+              ),
+              SizedBox(
+                width: _colWidth,
+                child: PerformanceAmount(
+                  euros: pnl.euros,
+                  percent: pnl.percent,
                   hidden: hidden,
                 ),
               ),

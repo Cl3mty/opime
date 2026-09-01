@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../dashboard/patrimoine_models.dart' show DashboardPeriod;
+import '../dashboard/widgets/net_worth_chart.dart' show PeriodTabs;
 import 'account_detail_screen.dart' show AccountEditForm, BackHeader;
 import 'confirm_delete_dialog.dart';
 import 'document_storage.dart';
@@ -12,6 +14,7 @@ import 'widgets/account_summary_header.dart';
 import 'widgets/account_transactions_tab.dart';
 import 'widgets/position_detail_dialog.dart';
 import 'widgets/positions_table.dart';
+import 'yahoo_finance_client.dart' show PricePoint;
 
 /// Écran compte dédié à toutes les classes d'actif sauf l'immobilier
 /// (Actions & Fonds, épargne, métaux précieux, crypto, private equity,
@@ -67,6 +70,13 @@ class StockAccountScreen extends StatefulWidget {
   /// continuent de porter sur le compte réel dans son intégralité.
   final AssetClass? restrictToAssetClass;
 
+  /// Historique de cours en cache de chaque investissement du vault — déjà
+  /// chargé par `real_category_detail_screen.dart` (voir
+  /// `loadAllPriceHistories`), transmis ici plutôt que rechargé pour
+  /// calculer les colonnes "Évolution"/"+/- value" period-aware du tableau
+  /// des positions (voir [_periodIndex]).
+  final Map<String, List<PricePoint>> priceHistories;
+
   const StockAccountScreen({
     super.key,
     required this.vaultPath,
@@ -78,6 +88,7 @@ class StockAccountScreen extends StatefulWidget {
     this.startInEditMode = false,
     this.initialInvestmentId,
     this.restrictToAssetClass,
+    required this.priceHistories,
   });
 
   @override
@@ -87,6 +98,13 @@ class StockAccountScreen extends StatefulWidget {
 class _StockAccountScreenState extends State<StockAccountScreen> {
   late InvestmentsRepository _repo;
   int _tabIndex = 0;
+
+  /// Période affichée pour les colonnes "Évolution"/"+/- value" du tableau
+  /// des positions (onglet "Positions" uniquement) — sélecteur propre à cet
+  /// écran, qui n'a pas de graphique dont partager la période (contrairement
+  /// au Dashboard/`CategoryDetailScreen`). Même défaut ("Tout") que les
+  /// autres sélecteurs de période de l'app.
+  int _periodIndex = 5;
 
   /// Bascule ponctuelle de [StockAccountScreen.restrictToAssetClass] :
   /// l'utilisateur peut choisir de voir malgré tout tout le contenu du
@@ -451,7 +469,16 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          if (_tabIndex == 0)
+          if (_tabIndex == 0) ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: PeriodTabs(
+                labels: [for (final p in DashboardPeriod.values) p.label],
+                index: _periodIndex,
+                onChanged: (i) => setState(() => _periodIndex = i),
+              ),
+            ),
+            const SizedBox(height: 12),
             PositionsTable(
               account: account,
               hidden: widget.hidden,
@@ -459,7 +486,10 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               vaultPath: widget.vaultPath,
               onChanged: () async => widget.onChanged(),
               visibleInvestments: _visibleInvestments,
-            )
+              period: DashboardPeriod.values[_periodIndex],
+              priceHistories: widget.priceHistories,
+            ),
+          ]
           else if (_tabIndex == 1)
             AccountTransactionsTab(
               vaultPath: widget.vaultPath,

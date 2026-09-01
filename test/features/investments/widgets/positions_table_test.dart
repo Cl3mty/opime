@@ -1,7 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/leveraged_position.dart';
 import 'package:opime/features/investments/widgets/positions_table.dart';
+import 'package:opime/features/investments/yahoo_finance_client.dart'
+    show PricePoint;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -9,6 +12,8 @@ void main() {
     WidgetTester tester,
     InvestmentAccount account, {
     ValueChanged<Investment>? onTap,
+    DashboardPeriod period = DashboardPeriod.all,
+    Map<String, List<PricePoint>> priceHistories = const {},
   }) {
     return tester.pumpWidget(
       ShadcnApp(
@@ -19,6 +24,8 @@ void main() {
             onTap: onTap ?? (_) {},
             vaultPath: '/tmp/unused-in-this-test',
             onChanged: () async {},
+            period: period,
+            priceHistories: priceHistories,
           ),
         ),
       ),
@@ -215,4 +222,27 @@ void main() {
       },
     );
   });
+
+  testWidgets(
+    'le tableau des positions spot affiche une colonne "Évolution" en plus '
+    'de "+/- value"',
+    (tester) async {
+      final open = Investment(
+        isin: 'FR0000131104',
+        label: 'TotalEnergies',
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 10,
+            unitPrice: 50,
+          ),
+        ],
+      );
+      await pump(tester, buildAccount([open]));
+
+      expect(find.text('Évolution'), findsOneWidget);
+      expect(find.text('+/- value'), findsOneWidget);
+    },
+  );
 }

@@ -219,6 +219,28 @@ class PatrimoineAccount {
   /// `null` pour toute ligne qui n'en est pas une.
   final String? leverageBadge;
 
+  /// Delta brut de valorisation sur une période donnée (colonne "Évolution"
+  /// des tableaux d'actifs) — `valeur` maintenant moins `valeur` en tout
+  /// début de période, effet des versements/retraits compris. Closure
+  /// capturée par l'adapter à la construction de la ligne (voir
+  /// `real_patrimoine_adapter.dart`'s `periodValueChangeFor`), recalculée à
+  /// la demande à chaque changement d'onglet de période plutôt que
+  /// précalculée pour les 6 périodes. `null` quand cette ligne n'a
+  /// structurellement aucun historique de valorisation reconstituable (ex :
+  /// un passif, voir `real_passifs_adapter.dart`, qui ne renseigne que
+  /// [plusValueAbs]).
+  final ({double euros, double? percent}) Function(DashboardPeriod period)?
+  periodChangeFor;
+
+  /// Performance réelle sur une période donnée (colonne "PnL"/"+/- value"),
+  /// hors effet des versements/retraits — contrairement à [periodChangeFor].
+  /// Voir `real_patrimoine_adapter.dart`'s `periodReturnFor` (la même
+  /// logique que "Mes meilleures performances"). `null` pour un passif (la
+  /// notion de performance d'investissement, hors flux, n'a pas de sens pour
+  /// une dette) ou toute ligne sans historique reconstituable.
+  final ({double euros, double? percent}) Function(DashboardPeriod period)?
+  periodPnlFor;
+
   const PatrimoineAccount({
     this.id,
     required this.name,
@@ -241,6 +263,8 @@ class PatrimoineAccount {
     this.manualPriceAt,
     this.bankName,
     this.excludedFromPatrimoine = false,
+    this.periodChangeFor,
+    this.periodPnlFor,
   });
 
   String get initials => initialsFor(name);
@@ -325,6 +349,44 @@ class PatrimoineCategory {
     (sum, a) => a.excludedFromPatrimoine ? sum : sum + (a.plusValueAbs ?? 0),
   );
 
+  /// Delta brut de valorisation de toute la catégorie sur [period] — somme
+  /// des [PatrimoineAccount.periodChangeFor] de chaque ligne, `percent`
+  /// recalculé sur l'agrégat (même astuce de soustraction que
+  /// [plusValuePercent] : `montant` maintenant moins la somme des deltas
+  /// donne la valorisation de départ, sans avoir besoin de la recalculer
+  /// séparément). `null` si aucune ligne de la catégorie ne sait répondre
+  /// (ex : une catégorie vide).
+  ({double euros, double? percent})? periodChangeFor(DashboardPeriod period) {
+    final results = [
+      for (final a in accounts) a.periodChangeFor?.call(period),
+    ].whereType<({double euros, double? percent})>().toList();
+    if (results.isEmpty) return null;
+    final euros = results.fold(0.0, (sum, r) => sum + r.euros);
+    final startValue = montant - euros;
+    return (
+      euros: euros,
+      percent: startValue != 0 ? euros / startValue * 100 : null,
+    );
+  }
+
+  /// Performance réelle de toute la catégorie sur [period], hors effet des
+  /// versements/retraits — même principe que [periodChangeFor], mais à
+  /// partir de [PatrimoineAccount.periodPnlFor]. `null` quand aucune ligne
+  /// n'en a (ex : une catégorie de passifs, où cette notion n'a pas de sens
+  /// — voir `PatrimoineAccount.periodPnlFor`).
+  ({double euros, double? percent})? periodPnlFor(DashboardPeriod period) {
+    final results = [
+      for (final a in accounts) a.periodPnlFor?.call(period),
+    ].whereType<({double euros, double? percent})>().toList();
+    if (results.isEmpty) return null;
+    final euros = results.fold(0.0, (sum, r) => sum + r.euros);
+    final netInvested = montant - euros;
+    return (
+      euros: euros,
+      percent: netInvested > 0 ? euros / netInvested * 100 : null,
+    );
+  }
+
   /// Vrai pour les classes d'actif "unitaires" — une quantité et un cours
   /// par ligne, où le PRU (Prix de Revient Unitaire, voir
   /// [PatrimoineAccount.pru]) a un sens : actions & fonds, crypto, private
@@ -352,4 +414,12 @@ class PatrimoineCategory {
     }
     return false;
   }
+
+  /// Vrai pour une catégorie d'actif, faux pour une catégorie de passif —
+  /// la performance hors flux (colonne "+/- value") n'a de sens que pour un
+  /// actif, jamais pour une dette (voir `PatrimoineAccount.periodPnlFor`,
+  /// toujours `null` sur une ligne de passif) : les tableaux masquent
+  /// entièrement cette colonne plutôt que d'afficher un « — » systématique
+  /// sur chacune de ses lignes. Même détection que [showsQuantityColumn].
+  bool get showsPnlColumn => showsQuantityColumn;
 }

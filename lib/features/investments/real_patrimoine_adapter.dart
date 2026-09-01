@@ -164,7 +164,7 @@ PatrimoineCategory _buildCategory(
   final meta = _categoryMeta[assetClass]!;
   final leaves = <PatrimoineAccount>[
     for (final (account, investment) in pairs)
-      _buildLeaf(account, investment, vaultPath),
+      _buildLeaf(account, investment, vaultPath, priceHistories),
     for (final (account, position) in leveragedPairs)
       _buildLeveragedLeaf(account, position),
   ];
@@ -261,10 +261,17 @@ PatrimoineCategory _buildCategoryByAccount(
         accountPairs.first.$1,
         accountPairs,
         vaultPath,
+        priceHistories,
         assetClass: assetClass,
       ),
     for (final account in accountsWithoutOwnClassPair)
-      _buildAccountLeaf(account, const [], vaultPath, assetClass: assetClass),
+      _buildAccountLeaf(
+        account,
+        const [],
+        vaultPath,
+        priceHistories,
+        assetClass: assetClass,
+      ),
   ];
   return PatrimoineCategory(
     id: assetClass.categoryId,
@@ -280,7 +287,8 @@ PatrimoineCategory _buildCategoryByAccount(
 PatrimoineAccount _buildAccountLeaf(
   InvestmentAccount account,
   List<(InvestmentAccount, Investment)> pairs,
-  String vaultPath, {
+  String vaultPath,
+  Map<String, List<PricePoint>> priceHistories, {
   // Une position à effet de levier compte toujours pour la classe du
   // compte porteur (voir `_buildLeveragedLeaf`), jamais une classe
   // "effective" cross-class (ex : un ETC métaux logé dans un CTO) — sans ce
@@ -347,6 +355,16 @@ PatrimoineAccount _buildAccountLeaf(
     plusValueAbs += position.pnl ?? 0;
     costBasis += position.margin;
   }
+  final investmentsIci = [
+    for (final (_, investment) in heldPairs) investment,
+  ];
+  // Contribution des positions à effet de levier du compte, constante quelle
+  // que soit la période choisie (voir `_buildLeveragedLeaf`) — ajoutée telle
+  // quelle au calcul, forcément period-aware, des positions spot du compte.
+  final leveragedPnl = openLeveragedPositions.fold(
+    0.0,
+    (sum, p) => sum + (p.pnl ?? 0),
+  );
   return PatrimoineAccount(
     id: account.id,
     // Pour l'épargne, l'identité d'un compte est son type (l'enveloppe
@@ -398,6 +416,7 @@ PatrimoineAccount _buildAccountLeaf(
           investmentAccount,
           investment,
           vaultPath,
+          priceHistories,
           // Sous-titre du compte porteur inutile ici : ces lignes sont déjà
           // affichées à l'intérieur du compte (et de la banque pour
           // l'épargne) — une ligne simple par devise, sans répétition.
@@ -411,6 +430,24 @@ PatrimoineAccount _buildAccountLeaf(
     // dans une autre classe (cross-class) ne doit pas non plus être
     // supprimable depuis ici.
     canDelete: account.investments.every((i) => i.transactions.isEmpty),
+    periodChangeFor: (period) {
+      final r = periodValueChangeFor(investmentsIci, priceHistories, period);
+      final euros = r.euros + leveragedPnl;
+      final startValue = valeur - euros;
+      return (
+        euros: euros,
+        percent: startValue != 0 ? euros / startValue * 100 : null,
+      );
+    },
+    periodPnlFor: (period) {
+      final r = periodReturnFor(investmentsIci, priceHistories, period);
+      final euros = r.euros + leveragedPnl;
+      final netInvested = valeur - euros;
+      return (
+        euros: euros,
+        percent: netInvested > 0 ? euros / netInvested * 100 : null,
+      );
+    },
   );
 }
 
@@ -458,6 +495,7 @@ List<PatrimoineCategory> buildRealCategoriesByInvestment(
         assetClass,
         byClass[assetClass] ?? const [],
         leveragedByClass[assetClass] ?? const [],
+        priceHistories,
         vaultPath,
       ),
   ];
@@ -467,6 +505,7 @@ PatrimoineCategory _buildCategoryByInvestment(
   AssetClass assetClass,
   List<(InvestmentAccount, Investment)> pairs,
   List<(InvestmentAccount, LeveragedPosition)> leveragedPairs,
+  Map<String, List<PricePoint>> priceHistories,
   String vaultPath,
 ) {
   final meta = _categoryMeta[assetClass]!;
@@ -476,7 +515,7 @@ PatrimoineCategory _buildCategoryByInvestment(
   }
   final leaves = <PatrimoineAccount>[
     for (final group in byIsin.values)
-      _buildMergedInvestmentLeaf(group, vaultPath),
+      _buildMergedInvestmentLeaf(group, vaultPath, priceHistories),
     for (final (account, position) in leveragedPairs)
       _buildLeveragedLeaf(account, position),
   ];
@@ -503,6 +542,7 @@ PatrimoineCategory _buildCategoryByInvestment(
 PatrimoineAccount _buildMergedInvestmentLeaf(
   List<(InvestmentAccount, Investment)> group,
   String vaultPath,
+  Map<String, List<PricePoint>> priceHistories,
 ) {
   if (group.length == 1) {
     final (account, investment) = group.single;
@@ -510,6 +550,7 @@ PatrimoineAccount _buildMergedInvestmentLeaf(
       account,
       investment,
       vaultPath,
+      priceHistories,
       showAccountSubtitle: true,
     );
   }
@@ -566,9 +607,25 @@ PatrimoineAccount _buildMergedInvestmentLeaf(
     excludedFromPatrimoine: group.every((p) => p.$2.excludedFromPatrimoine),
     investments: [
       for (final (account, investment) in group)
-        _buildLeaf(account, investment, vaultPath, showAccountSubtitle: true),
+        _buildLeaf(
+          account,
+          investment,
+          vaultPath,
+          priceHistories,
+          showAccountSubtitle: true,
+        ),
     ],
     canDelete: false,
+    periodChangeFor: (period) => periodValueChangeFor(
+      [for (final (_, investment) in group) investment],
+      priceHistories,
+      period,
+    ),
+    periodPnlFor: (period) => periodReturnFor(
+      [for (final (_, investment) in group) investment],
+      priceHistories,
+      period,
+    ),
   );
 }
 
@@ -645,7 +702,8 @@ PatrimoineCategory emptyCategoryFor(String categoryId) {
 PatrimoineAccount _buildLeaf(
   InvestmentAccount account,
   Investment investment,
-  String vaultPath, {
+  String vaultPath,
+  Map<String, List<PricePoint>> priceHistories, {
   bool showAccountSubtitle = true,
 }) {
   final valeur = investment.displayValue;
@@ -701,6 +759,10 @@ PatrimoineAccount _buildLeaf(
     // ses lignes, même sans exclusion individuelle.
     excludedFromPatrimoine:
         investment.excludedFromPatrimoine || account.excludedFromPatrimoine,
+    periodChangeFor: (period) =>
+        periodValueChangeFor([investment], priceHistories, period),
+    periodPnlFor: (period) =>
+        periodReturnFor([investment], priceHistories, period),
   );
 }
 
@@ -754,6 +816,14 @@ PatrimoineAccount _buildLeveragedLeaf(
     canDelete: false,
     excludedFromPatrimoine: account.excludedFromPatrimoine,
     leverageBadge: '${leverageLabel}x',
+    // Pas d'historique de cours quotidien fiable pour une position à effet
+    // de levier (voir la doc de classe) : plutôt que de la faire disparaître
+    // des colonnes Évolution/PnL des tableaux génériques dès qu'une période
+    // autre que "Tout" est choisie, ces closures ignorent [period] et
+    // renvoient toujours le PnL/ROE depuis l'ouverture — déjà ce
+    // qu'affichaient [plusValueAbs]/[plusValuePercent] ci-dessus.
+    periodChangeFor: (_) => (euros: position.pnl ?? 0, percent: position.roePercent),
+    periodPnlFor: (_) => (euros: position.pnl ?? 0, percent: position.roePercent),
   );
 }
 
@@ -871,19 +941,21 @@ List<DateTime> _sparklineDateGrid(
   return dates;
 }
 
-/// Rendement de MA position sur [period] : la valeur de la position
-/// aujourd'hui comparée à sa valeur en tout début de période, plus les
-/// flux réels (achats/ventes) survenus depuis — même modèle que le
-/// rendement money-weighted "période courte" de [calculateMwr]
+/// Rendement de MES positions sur [period] : leur valeur cumulée aujourd'hui
+/// comparée à leur valeur cumulée en tout début de période, plus les flux
+/// réels (achats/ventes) survenus depuis — même modèle que le rendement
+/// money-weighted "période courte" de [calculateMwr]
 /// (`performance_calculator.dart`), simplement amorcé par la valeur de la
 /// position en début de période plutôt que par zéro. Contrairement à
-/// l'ancien [_priceReturnForPeriod] (rendement du cours seul), reflète ce
-/// que j'ai réellement gagné ou perdu sur MA position — une position
-/// achetée en cours de période n'est jamais pénalisée/avantagée par un
-/// mouvement de cours antérieur à mon achat. `null` seulement si rien
-/// n'était investi ni détenu au départ (position ouverte pile aujourd'hui).
-({double euros, double? percent})? _positionReturnForPeriod(
-  Investment investment,
+/// [periodValueChangeFor] (delta brut de valorisation), reflète ce que j'ai
+/// réellement gagné ou perdu — un versement/retrait pendant la période ne
+/// fausse jamais ce nombre, ni une position achetée en cours de période
+/// pénalisée/avantagée par un mouvement de cours antérieur à mon achat.
+/// Généralisée depuis l'ancienne `_positionReturnForPeriod` (un seul
+/// [Investment]) pour pouvoir aussi être appelée sur tout un compte ou toute
+/// une catégorie — voir [PatrimoineAccount.periodPnlFor].
+({double euros, double? percent}) periodReturnFor(
+  List<Investment> investments,
   Map<String, List<PricePoint>> priceHistories,
   DashboardPeriod period,
 ) {
@@ -892,17 +964,44 @@ List<DateTime> _sparklineDateGrid(
     DateTime.now().month,
     DateTime.now().day,
   );
-  final earliest = earliestTransactionDate([investment]) ?? today;
+  final earliest = earliestTransactionDate(investments) ?? today;
   final start = period.startFor(today: today, earliest: earliest);
-  var netInvested = _valuationAt([investment], priceHistories, start);
-  for (final t in investment.transactions) {
-    if (!_onOrBeforeDay(t.date, start)) {
-      netInvested += t.isBuy ? t.amount : -t.amount;
+  var netInvested = _valuationAt(investments, priceHistories, start);
+  for (final investment in investments) {
+    for (final t in investment.transactions) {
+      if (!_onOrBeforeDay(t.date, start)) {
+        netInvested += t.isBuy ? t.amount : -t.amount;
+      }
     }
   }
-  final valuationToday = _valuationAt([investment], priceHistories, today);
+  final valuationToday = _valuationAt(investments, priceHistories, today);
   final euros = valuationToday - netInvested;
   final percent = netInvested > 0 ? euros / netInvested * 100 : null;
+  return (euros: euros, percent: percent);
+}
+
+/// Delta brut de valorisation de MES positions sur [period] : leur valeur
+/// cumulée aujourd'hui moins leur valeur cumulée en tout début de période —
+/// contrairement à [periodReturnFor], n'exclut PAS l'effet d'un versement ou
+/// retrait survenu pendant la période (un dépôt qui finance un nouvel achat
+/// augmente ce nombre autant qu'une vraie plus-value). C'est la colonne
+/// "Évolution" des tableaux d'actifs — voir [PatrimoineAccount.periodChangeFor].
+({double euros, double? percent}) periodValueChangeFor(
+  List<Investment> investments,
+  Map<String, List<PricePoint>> priceHistories,
+  DashboardPeriod period,
+) {
+  final today = DateTime.utc(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+  );
+  final earliest = earliestTransactionDate(investments) ?? today;
+  final start = period.startFor(today: today, earliest: earliest);
+  final startValue = _valuationAt(investments, priceHistories, start);
+  final endValue = _valuationAt(investments, priceHistories, today);
+  final euros = endValue - startValue;
+  final percent = startValue != 0 ? euros / startValue * 100 : null;
   return (euros: euros, percent: percent);
 }
 
@@ -953,7 +1052,7 @@ List<DashboardAsset> buildRealTopAssets(
             ];
           },
           changeForPeriod: (period) =>
-              _positionReturnForPeriod(investment, priceHistories, period),
+              periodReturnFor([investment], priceHistories, period),
         ),
       );
     }

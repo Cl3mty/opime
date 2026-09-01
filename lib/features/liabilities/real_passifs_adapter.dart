@@ -99,6 +99,36 @@ PatrimoineAccount _buildLeaf(Liability liability) {
     plusValuePercent: liability.montantEmprunte == 0
         ? 0
         : repaid / liability.montantEmprunte * 100,
+    // Pas d'équivalent PnL pour un passif — la notion de performance
+    // d'investissement hors flux n'a pas de sens pour une dette (voir
+    // `PatrimoineAccount.periodPnlFor`) : seul `periodChangeFor` est fourni,
+    // colonne "Évolution" = capital remboursé sur la période choisie.
+    periodChangeFor: (period) => periodChangeFor([liability], period),
+  );
+}
+
+/// Delta de capital restant dû de [liabilities] sur [period] — colonne
+/// "Évolution" pour un passif (voir [PatrimoineAccount.periodChangeFor]) :
+/// `_balanceAt(..., today) - _balanceAt(..., start)`, même convention de
+/// signe que l'existant [_buildLeaf] (négatif/rouge quand la dette baisse).
+/// `percent` relatif au capital restant dû en début de période.
+({double euros, double? percent}) periodChangeFor(
+  List<Liability> liabilities,
+  DashboardPeriod period,
+) {
+  final today = DateTime.utc(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+  );
+  final earliest = earliestLiabilityStart(liabilities) ?? today;
+  final start = period.startFor(today: today, earliest: earliest);
+  final startValue = _balanceAt(liabilities, start);
+  final endValue = _balanceAt(liabilities, today);
+  final euros = endValue - startValue;
+  return (
+    euros: euros,
+    percent: startValue != 0 ? euros / startValue * 100 : null,
   );
 }
 

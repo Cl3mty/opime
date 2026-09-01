@@ -31,12 +31,21 @@ class RealPatrimoineCard extends StatefulWidget {
   final List<NetWorthPoint> Function(DashboardPeriod) totalPassifHistoryFor;
   final bool hidden;
 
+  /// Période affichée par le graphique — contrôlée par le parent
+  /// (`dashboard_screen.dart`) plutôt que gardée en état interne, pour que
+  /// les cartes "Actifs"/"Passifs" du Dashboard (`CategoryBreakdownCard`)
+  /// puissent suivre la même période sans sélecteur propre.
+  final int periodIndex;
+  final ValueChanged<int> onPeriodChanged;
+
   const RealPatrimoineCard({
     super.key,
     required this.actifs,
     required this.actifsHistoryFor,
     required this.totalPassifHistoryFor,
     required this.hidden,
+    required this.periodIndex,
+    required this.onPeriodChanged,
   });
 
   @override
@@ -44,7 +53,6 @@ class RealPatrimoineCard extends StatefulWidget {
 }
 
 class _RealPatrimoineCardState extends State<RealPatrimoineCard> {
-  int _periodIndex = 5;
   PatrimoineKind _kind = PatrimoineKind.net;
   // Seules les classes à valeur strictement positive sont sélectionnables
   // pour le patrimoine brut (voir `CategoryMultiSelect`/`ChartLayer.selectable`).
@@ -56,7 +64,7 @@ class _RealPatrimoineCardState extends State<RealPatrimoineCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final period = DashboardPeriod.values[_periodIndex];
+    final period = DashboardPeriod.values[widget.periodIndex];
     final actifsHistoryById = widget.actifsHistoryFor(period);
 
     final chartData = buildPatrimoineChartData(
@@ -171,8 +179,8 @@ class _RealPatrimoineCardState extends State<RealPatrimoineCard> {
                 ),
                 PeriodTabs(
                   labels: [for (final p in DashboardPeriod.values) p.label],
-                  index: _periodIndex,
-                  onChanged: (i) => setState(() => _periodIndex = i),
+                  index: widget.periodIndex,
+                  onChanged: widget.onPeriodChanged,
                 ),
               ],
             ),

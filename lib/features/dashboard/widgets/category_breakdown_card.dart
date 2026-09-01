@@ -12,6 +12,7 @@ import '../patrimoine_models.dart';
 const _pruWidth = 76.0;
 const _montantWidth = 96.0;
 const _evolutionWidth = 110.0;
+const _pnlWidth = 110.0;
 
 enum _BreakdownMode { parCompte, parInvestissement }
 
@@ -47,6 +48,11 @@ class CategoryBreakdownCard extends StatefulWidget {
   /// Revient Unitaire, contrairement à un actif.
   final bool showPru;
 
+  /// Période affichée pour les colonnes "Évolution"/"+/- value" — partagée
+  /// avec le graphique "Patrimoine" juste au-dessus sur le Dashboard (voir
+  /// `dashboard_screen.dart`), pas de sélecteur propre à cette carte.
+  final DashboardPeriod period;
+
   const CategoryBreakdownCard({
     super.key,
     required this.title,
@@ -54,6 +60,7 @@ class CategoryBreakdownCard extends StatefulWidget {
     this.categoriesByInvestment,
     required this.hidden,
     this.showPru = true,
+    required this.period,
   });
 
   @override
@@ -91,6 +98,12 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
         if (category.accounts.isNotEmpty) category,
     ];
     if (populated.isEmpty) return const SizedBox.shrink();
+    // Une carte n'affiche jamais qu'un seul type de ligne à la fois (Actifs
+    // OU Passifs, jamais mélangés — voir `dashboard_screen.dart`) : la
+    // première catégorie suffit à savoir si la colonne "+/- value" a un
+    // sens ici (voir `PatrimoineCategory.showsPnlColumn` : jamais pour un
+    // passif, la performance hors flux n'a pas de sens pour une dette).
+    final showPnl = populated.first.showsPnlColumn;
 
     return FrostedCard(
       child: Padding(
@@ -142,7 +155,7 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
               ],
             ),
             const SizedBox(height: 16),
-            _HeaderRow(showPru: widget.showPru),
+            _HeaderRow(showPru: widget.showPru, showPnl: showPnl),
             const SizedBox(height: 4),
             for (final category in populated)
               _CategoryTile(
@@ -150,6 +163,8 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
                 expanded: !_collapsedIds.contains(category.id),
                 hidden: widget.hidden,
                 showPru: widget.showPru,
+                showPnl: showPnl,
+                period: widget.period,
                 onToggleExpand: () => _toggleExpanded(category.id),
               ),
           ],
@@ -161,8 +176,9 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
 
 class _HeaderRow extends StatelessWidget {
   final bool showPru;
+  final bool showPnl;
 
-  const _HeaderRow({required this.showPru});
+  const _HeaderRow({required this.showPru, required this.showPnl});
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +212,7 @@ class _HeaderRow extends StatelessWidget {
           width: _montantWidth,
           child: Align(
             alignment: Alignment.centerRight,
-            child: shadcn.Text('Montant').muted().xSmall(),
+            child: shadcn.Text('Valeur').muted().xSmall(),
           ),
         ),
         SizedBox(
@@ -206,6 +222,14 @@ class _HeaderRow extends StatelessWidget {
             child: shadcn.Text('Évolution').muted().xSmall(),
           ),
         ),
+        if (showPnl)
+          SizedBox(
+            width: _pnlWidth,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: shadcn.Text('+/- value').muted().xSmall(),
+            ),
+          ),
       ],
     );
   }
@@ -216,6 +240,8 @@ class _CategoryTile extends StatelessWidget {
   final bool expanded;
   final bool hidden;
   final bool showPru;
+  final bool showPnl;
+  final DashboardPeriod period;
   final VoidCallback onToggleExpand;
 
   const _CategoryTile({
@@ -223,12 +249,16 @@ class _CategoryTile extends StatelessWidget {
     required this.expanded,
     required this.hidden,
     required this.showPru,
+    required this.showPnl,
+    required this.period,
     required this.onToggleExpand,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final change = category.periodChangeFor(period);
+    final pnl = category.periodPnlFor(period);
 
     return Column(
       children: [
@@ -286,11 +316,20 @@ class _CategoryTile extends StatelessWidget {
             SizedBox(
               width: _evolutionWidth,
               child: PerformanceAmount(
-                euros: category.plusValueAbs,
-                percent: category.plusValuePercent,
+                euros: change?.euros,
+                percent: change?.percent,
                 hidden: hidden,
               ),
             ),
+            if (showPnl)
+              SizedBox(
+                width: _pnlWidth,
+                child: PerformanceAmount(
+                  euros: pnl?.euros,
+                  percent: pnl?.percent,
+                  hidden: hidden,
+                ),
+              ),
           ],
         ),
         AnimatedSize(
@@ -306,6 +345,8 @@ class _CategoryTile extends StatelessWidget {
                           account: account,
                           hidden: hidden,
                           showPru: showPru,
+                          showPnl: showPnl,
+                          period: period,
                         ),
                     ],
                   ),
@@ -321,15 +362,21 @@ class _AccountRow extends StatelessWidget {
   final PatrimoineAccount account;
   final bool hidden;
   final bool showPru;
+  final bool showPnl;
+  final DashboardPeriod period;
 
   const _AccountRow({
     required this.account,
     required this.hidden,
     required this.showPru,
+    required this.showPnl,
+    required this.period,
   });
 
   @override
   Widget build(BuildContext context) {
+    final change = account.periodChangeFor?.call(period);
+    final pnl = account.periodPnlFor?.call(period);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -376,11 +423,20 @@ class _AccountRow extends StatelessWidget {
           SizedBox(
             width: _evolutionWidth,
             child: PerformanceAmount(
-              euros: account.plusValueAbs,
-              percent: account.plusValuePercent,
+              euros: change?.euros,
+              percent: change?.percent,
               hidden: hidden,
             ),
           ),
+          if (showPnl)
+            SizedBox(
+              width: _pnlWidth,
+              child: PerformanceAmount(
+                euros: pnl?.euros,
+                percent: pnl?.percent,
+                hidden: hidden,
+              ),
+            ),
         ],
       ),
     );
