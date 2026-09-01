@@ -247,28 +247,12 @@ class _NetWorthChartPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
     canvas.drawPath(linePath, linePaint);
 
-    drawDateLabel(
+    drawDateAxisLabels(
       canvas,
-      points.first.date,
-      xFor(0),
+      points.length,
+      (i) => points[i].date,
+      xFor,
       chartHeight,
-      TextAlign.left,
-      textColor,
-    );
-    drawDateLabel(
-      canvas,
-      points[points.length ~/ 2].date,
-      xFor(points.length ~/ 2),
-      chartHeight,
-      TextAlign.center,
-      textColor,
-    );
-    drawDateLabel(
-      canvas,
-      points.last.date,
-      xFor(points.length - 1),
-      chartHeight,
-      TextAlign.right,
       textColor,
     );
 
@@ -402,6 +386,52 @@ void drawDateLabel(
       dx = x - painter.width / 2;
   }
   painter.paint(canvas, Offset(dx, y + 4));
+}
+
+/// Repères de date en bas d'un graphique (premier/milieu/dernier point) —
+/// l'étiquette "milieu" (`pointCount ~/ 2`) est omise dès qu'elle coïncide
+/// avec le premier ou le dernier point (ex : seulement 2 points sur la
+/// période, cas réel — voir `netWorthHistoryFor`, qui garantit au moins 2
+/// points même sur une période d'un seul jour) : régression trouvée en
+/// investiguant un signalement — sans ce garde-fou, l'étiquette "milieu" et
+/// l'étiquette "dernier point" se dessinaient au même endroit (`xFor` ne
+/// dépend que de l'index), deux dates visiblement superposées en bas à
+/// droite du graphique.
+void drawDateAxisLabels(
+  Canvas canvas,
+  int pointCount,
+  DateTime Function(int index) dateFor,
+  double Function(int index) xFor,
+  double chartHeight,
+  Color textColor,
+) {
+  drawDateLabel(
+    canvas,
+    dateFor(0),
+    xFor(0),
+    chartHeight,
+    TextAlign.left,
+    textColor,
+  );
+  final middleIndex = pointCount ~/ 2;
+  if (middleIndex != 0 && middleIndex != pointCount - 1) {
+    drawDateLabel(
+      canvas,
+      dateFor(middleIndex),
+      xFor(middleIndex),
+      chartHeight,
+      TextAlign.center,
+      textColor,
+    );
+  }
+  drawDateLabel(
+    canvas,
+    dateFor(pointCount - 1),
+    xFor(pointCount - 1),
+    chartHeight,
+    TextAlign.right,
+    textColor,
+  );
 }
 
 /// Repère de montant sur l'axe des ordonnées, à gauche d'une ligne de

@@ -813,28 +813,12 @@ class _StackedChartPainter extends CustomPainter {
       );
     }
 
-    drawDateLabel(
+    drawDateAxisLabels(
       canvas,
-      dates.first,
-      xFor(0),
+      pointCount,
+      (i) => dates[i],
+      xFor,
       chartHeight,
-      TextAlign.left,
-      textColor,
-    );
-    drawDateLabel(
-      canvas,
-      dates[pointCount ~/ 2],
-      xFor(pointCount ~/ 2),
-      chartHeight,
-      TextAlign.center,
-      textColor,
-    );
-    drawDateLabel(
-      canvas,
-      dates.last,
-      xFor(pointCount - 1),
-      chartHeight,
-      TextAlign.right,
       textColor,
     );
 

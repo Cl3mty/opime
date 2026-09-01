@@ -9,7 +9,7 @@ import '../../dashboard/widgets/net_worth_chart.dart'
         chartLeftAxisWidth,
         drawAxisLabel,
         drawDashedLine,
-        drawDateLabel,
+        drawDateAxisLabels,
         formatChartTooltipDate;
 
 const _green = Color(0xFF22C55E);
@@ -438,28 +438,12 @@ class _ComparisonChartPainter extends CustomPainter {
     drawLine(benchmark, benchmarkColor);
     drawLine(portfolio, portfolioColor);
 
-    drawDateLabel(
+    drawDateAxisLabels(
       canvas,
-      portfolio.first.date,
-      xFor(0),
+      pointCount,
+      (i) => portfolio[i].date,
+      xFor,
       chartHeight,
-      TextAlign.left,
-      textColor,
-    );
-    drawDateLabel(
-      canvas,
-      portfolio[pointCount ~/ 2].date,
-      xFor(pointCount ~/ 2),
-      chartHeight,
-      TextAlign.center,
-      textColor,
-    );
-    drawDateLabel(
-      canvas,
-      portfolio.last.date,
-      xFor(pointCount - 1),
-      chartHeight,
-      TextAlign.right,
       textColor,
     );
 
