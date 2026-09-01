@@ -1,9 +1,69 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/privacy/amount_visibility_controller.dart';
+import 'package:opime/core/simulations/simulation_state_repository.dart';
 import 'package:opime/features/simulations/simulations_wealth_screen.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
+  group('Widget — l\'onglet actif persisté est restauré au chargement', () {
+    late Directory tempDir;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('opime_wealth_screen_');
+    });
+
+    tearDown(() async {
+      if (await tempDir.exists()) await tempDir.delete(recursive: true);
+    });
+
+    Future<void> pumpScreen(WidgetTester tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: WealthSimulationScreen(
+              vaultPath: tempDir.path,
+              amountVisibility: AmountVisibilityController(),
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(() async {
+        for (var i = 0; i < 40; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+        }
+      });
+    }
+
+    testWidgets(
+      'sans état sauvegardé, l\'onglet Intérêts composés (0) est actif par '
+      'défaut',
+      (tester) async {
+        await pumpScreen(tester);
+        expect(tester.widget<TabList>(find.byType(TabList)).index, 0);
+      },
+    );
+
+    testWidgets(
+      'un onglet Monte-Carlo (1) déjà sauvegardé sur ce vault est restauré '
+      'au chargement',
+      (tester) async {
+        await tester.runAsync(
+          () => SimulationStateRepository(
+            tempDir.path,
+          ).write('wealth', {'tabIndex': 1}),
+        );
+
+        await pumpScreen(tester);
+
+        expect(tester.widget<TabList>(find.byType(TabList)).index, 1);
+      },
+    );
+  });
+
   group('monthlyRateFromAnnualPct', () {
     test('rendement nul -> taux mensuel nul', () {
       expect(monthlyRateFromAnnualPct(0), 0);

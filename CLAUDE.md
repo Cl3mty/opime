@@ -12,11 +12,11 @@ Opime (formerly Freenary) is a local-first personal finance app (net worth track
 flutter pub get                 # install dependencies
 flutter run -d macos            # run (or -d windows / -d linux)
 flutter analyze                 # static analysis (flutter_lints, see analysis_options.yaml)
-flutter test                    # run tests — note: test/ is currently empty, no tests exist yet
+flutter test                    # run the full test suite (test/ has extensive coverage)
 flutter build macos             # release build (also: windows, linux)
 ```
 
-There is no single-test invocation documented because there are no tests in the repo yet (`test/` is empty).
+Run a single file with `flutter test test/path/to/some_test.dart`, or a single test/group with `flutter test test/path/to/some_test.dart --plain-name "some test description"`.
 
 `freezed_annotation`, `json_annotation`, `freezed`, `json_serializable`, and `build_runner` are pubspec dependencies, but no `.freezed.dart`/`.g.dart` files exist anywhere in `lib/` — all models currently use hand-written `fromJson`/`toJson`. Don't assume generated serialization exists; if you add it, you must actually run `dart run build_runner build`.
 
@@ -51,9 +51,12 @@ Built on `shadcn_flutter` (component library, `ShadcnApp` root widget, `Scaffold
 
 The UI is in French and domain code mirrors French financial terminology directly in identifiers (e.g. `patrimoine` = net worth/assets, `IFI` = real-estate wealth tax, `quotient familial` = family quotient for tax). Keep new identifiers and user-facing strings consistent with this rather than translating to English mid-codebase.
 
+### Simulations
+
+`lib/features/simulations/` covers four areas, each with real calculation logic (not placeholders), each persisted via `SimulationStateRepository`, each wired into `nav_models.dart`/`main.dart`'s `pages` map, and each covered by unit tests on its pure calculator functions: wealth/patrimoine (`simulations_wealth_screen.dart` — deterministic + Monte Carlo projections), real estate (`simulations_real_estate_screen.dart`, itself three tabs: estimation, credit-scoring, and loan/`simulations_loan_screen.dart` — the loan tab has no nav entry of its own by design, it lives under "Immobilier"), taxation (`simulations_taxation_screen.dart` — IFI + IR/quotient familial), and transmission (`simulations_transmission_screen.dart` — démembrement/donation/inheritance per CGI barèmes). Only the calculator logic has test coverage; the screens themselves (state persistence across tab switches, form validation) don't have widget tests.
+
 ## Known repo quirks
 
-- `lib/main.dart` has uncommitted changes and `lib/features/simulations/simulations_transmission_screen.dart` is an untracked new file as of this writing — check `git status` before assuming the simulations feature set (wealth/loan/taxation/transmission) is complete or stable.
 - A Codex CLI config exists at `~/.codex/config.toml`. If asked, offer `/import` to bring over any importable items (MCP servers, slash commands, subagents, skills) — don't read that file directly yourself.
 
 ## Rules
