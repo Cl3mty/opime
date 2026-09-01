@@ -183,6 +183,16 @@ Future<Investment?> _resolveInvestmentPrice({
 }) async {
   final effectiveClass = investment.assetClass ?? account.assetClass;
 
+  // Le Private Equity n'a jamais de vrai ticker à résoudre (club deal, FCPR
+  // — voir [isinOptionalFor]) : contrairement aux autres classes sans
+  // cotation, son identifiant est le plus souvent un nom de fonds tapé
+  // librement (pas forcément un id auto-généré filtré par
+  // [isGeneratedIdentifier] plus bas), qui risquerait sinon de matcher par
+  // coïncidence un vrai ticker/nom d'entreprise coté sur Yahoo Finance —
+  // en plus de gaspiller un appel réseau à chaque rafraîchissement pour une
+  // recherche vouée à l'échec.
+  if (effectiveClass == AssetClass.privateEquity) return null;
+
   // Une position en devise — épargne tenue en USD, ou dollars créés dans un
   // compte-titres via le flux de complétion (voir `Investment.isCurrency`) —
   // n'a pas de cours de marché comme un titre : tenue en euros, elle est

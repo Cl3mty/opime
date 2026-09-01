@@ -1447,4 +1447,379 @@ void main() {
       );
     },
   );
+
+  group('Private Equity (versements/distributions en montant, sans ISIN, '
+      'valorisation manuelle du fonds)', () {
+    testWidgets(
+      'le "+" de l\'onglet Transactions affiche "Montant versé (€)" sans '
+      'prix unitaire pour un nouveau fonds, et la transaction est '
+      'enregistrée avec une quantité de 1',
+      (tester) async {
+        await tester.runAsync(() async {
+          tempDir = await Directory.systemTemp.createTemp(
+            'opime_stock_account_test',
+          );
+          account = InvestmentAccount(
+            assetClass: AssetClass.privateEquity,
+            envelope: AccountEnvelope.fcprFcpi,
+            name: 'Moonfare',
+            bankName: 'Moonfare',
+            investments: const [],
+          );
+          await InvestmentsRepository(tempDir.path).saveAccount(account);
+        });
+
+        await tester.pumpWidget(buildScreen());
+        await tester.pump();
+
+        await tester.tap(find.text('Transactions'));
+        await tester.pump();
+        await tester.tap(find.text('Ajouter une transaction'));
+        await tester.pump();
+
+        expect(find.text('Montant versé (€)'), findsOneWidget);
+        expect(find.text('Prix unitaire'), findsNothing);
+
+        // Compte vide : le formulaire de nouvelle position (libellé +
+        // identifiant facultatif) est déjà affiché, puis le montant.
+        final textFields = find.byType(TextField);
+        await tester.enterText(textFields.at(0), 'Ardian Expansion Fund V');
+        await tester.enterText(textFields.at(2), '10000');
+        await tester.ensureVisible(find.text('Ajouter la transaction'));
+        await tester.pump();
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Ajouter la transaction'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pump();
+
+        final saved = await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).listAll(),
+        );
+        final investment = saved!.single.investments.single;
+        expect(investment.label, 'Ardian Expansion Fund V');
+        expect(isGeneratedIdentifier(investment.isin), isTrue);
+        expect(investment.transactions, hasLength(1));
+        expect(investment.transactions.single.quantity, 1);
+        expect(investment.transactions.single.unitPrice, 10000);
+      },
+    );
+
+    testWidgets(
+      'sans valorisation renseignée, la popup l\'indique explicitement '
+      '(pas de mention de cours/ISIN, sans rapport pour un fonds PE)',
+      (tester) async {
+        await tester.runAsync(() async {
+          tempDir = await Directory.systemTemp.createTemp(
+            'opime_stock_account_test',
+          );
+          account = InvestmentAccount(
+            assetClass: AssetClass.privateEquity,
+            envelope: AccountEnvelope.fcprFcpi,
+            name: 'Moonfare',
+            bankName: 'Moonfare',
+            investments: [
+              Investment(
+                isin: 'pe-1',
+                label: 'Ardian Expansion Fund V',
+                assetClass: AssetClass.privateEquity,
+                transactions: [
+                  Transaction(
+                    date: DateTime(2022, 1, 1),
+                    isBuy: true,
+                    quantity: 1,
+                    unitPrice: 10000,
+                  ),
+                ],
+              ),
+            ],
+          );
+          await InvestmentsRepository(tempDir.path).saveAccount(account);
+        });
+
+        await tester.pumpWidget(buildScreen());
+        await tester.pump();
+
+        await tester.tap(find.text('Ardian Expansion Fund V'));
+        await tester.pumpAndSettle();
+
+        // Sans valorisation renseignée : le montant affiché correspond au
+        // capital net investi, avec un rappel explicite (voir le pendant
+        // "Aucun cours renseigné" pour Autres/PEG-PEE-PER) plutôt qu'une
+        // mention de cours/ISIN sans rapport avec un fonds PE.
+        expect(
+          find.textContaining('Aucune valorisation renseignée'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'une fois une valorisation renseignée, MWR est proposé (pas TWR — '
+      'aucun historique de cours), et "Capital net investi" remplace '
+      'Quantité détenue/PRU',
+      (tester) async {
+        await tester.runAsync(() async {
+          tempDir = await Directory.systemTemp.createTemp(
+            'opime_stock_account_test',
+          );
+          account = InvestmentAccount(
+            assetClass: AssetClass.privateEquity,
+            envelope: AccountEnvelope.fcprFcpi,
+            name: 'Moonfare',
+            bankName: 'Moonfare',
+            investments: [
+              Investment(
+                isin: 'pe-1',
+                label: 'Ardian Expansion Fund V',
+                assetClass: AssetClass.privateEquity,
+                manualValuation: 15000,
+                manualValuationAt: DateTime(2026, 1, 1),
+                transactions: [
+                  Transaction(
+                    date: DateTime(2022, 1, 1),
+                    isBuy: true,
+                    quantity: 1,
+                    unitPrice: 5000,
+                  ),
+                  Transaction(
+                    date: DateTime(2023, 1, 1),
+                    isBuy: true,
+                    quantity: 1,
+                    unitPrice: 5000,
+                  ),
+                ],
+              ),
+            ],
+          );
+          await InvestmentsRepository(tempDir.path).saveAccount(account);
+        });
+
+        await tester.pumpWidget(buildScreen());
+        await tester.pump();
+
+        await tester.tap(find.text('Ardian Expansion Fund V'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('MWR'), findsOneWidget);
+        expect(find.text('TWR'), findsNothing);
+        expect(find.text('Capital net investi'), findsOneWidget);
+        // Pas "PRU" seul : ce texte reste par ailleurs le titre de colonne
+        // du tableau des positions, resté monté sous la popup — seul le
+        // chip "Quantité détenue" (jamais un simple "Quantité") identifie
+        // sans ambiguïté celui de la popup.
+        expect(find.text('Quantité détenue'), findsNothing);
+        expect(find.text('Valorisation'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'variante "Rémunération en actions" (BSPCE/stock-options/AGA) : le '
+      '"+" affiche "Nombre de titres/options" et un champ prix (pas '
+      '"Montant versé (€)" comme un fonds), et un prix nul (attribution '
+      'gratuite) est accepté et enregistré tel quel',
+      (tester) async {
+        await tester.runAsync(() async {
+          tempDir = await Directory.systemTemp.createTemp(
+            'opime_stock_account_test',
+          );
+          account = InvestmentAccount(
+            assetClass: AssetClass.privateEquity,
+            envelope: AccountEnvelope.fcprFcpi,
+            name: 'Ma startup',
+            bankName: 'Ma startup',
+            investments: [
+              Investment(
+                isin: 'pe-startup',
+                label: 'Ma startup SAS',
+                assetClass: AssetClass.privateEquity,
+                privateEquityKind: PrivateEquityKind.actionsSalarie,
+                transactions: const [],
+              ),
+            ],
+          );
+          await InvestmentsRepository(tempDir.path).saveAccount(account);
+        });
+
+        await tester.pumpWidget(buildScreen());
+        await tester.pump();
+
+        await tester.tap(find.text('Transactions'));
+        await tester.pump();
+        await tester.tap(find.text('Ajouter une transaction'));
+        await tester.pump();
+
+        // Compte non vide, une seule position : elle est sélectionnée par
+        // défaut (voir `_selection` dans `add_transaction_dialog.dart`),
+        // pas besoin d'ouvrir le sélecteur pour l'atteindre.
+        expect(find.text('Nombre de titres/options'), findsOneWidget);
+        expect(find.text('Montant versé (€)'), findsNothing);
+        expect(find.text('Prix unitaire'), findsOneWidget);
+
+        final textFields = find.byType(TextField);
+        await tester.enterText(textFields.at(0), '1000');
+        await tester.enterText(textFields.at(1), '0');
+        await tester.ensureVisible(find.text('Ajouter la transaction'));
+        await tester.pump();
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Ajouter la transaction'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pump();
+
+        final saved = await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).listAll(),
+        );
+        final investment = saved!.single.investments.single;
+        expect(investment.transactions, hasLength(1));
+        expect(investment.transactions.single.quantity, 1000);
+        expect(investment.transactions.single.unitPrice, 0);
+      },
+    );
+
+    testWidgets(
+      'variante "Rémunération en actions" : une fois un cours estimé '
+      'renseigné (manualPrice), la popup garde Quantité détenue/PRU '
+      '(contrairement au mode "Fonds") et affiche "Cours estimé", pas '
+      '"Valorisation"',
+      (tester) async {
+        await tester.runAsync(() async {
+          tempDir = await Directory.systemTemp.createTemp(
+            'opime_stock_account_test',
+          );
+          account = InvestmentAccount(
+            assetClass: AssetClass.privateEquity,
+            envelope: AccountEnvelope.fcprFcpi,
+            name: 'Ma startup',
+            bankName: 'Ma startup',
+            investments: [
+              Investment(
+                isin: 'pe-startup',
+                label: 'Ma startup SAS',
+                assetClass: AssetClass.privateEquity,
+                privateEquityKind: PrivateEquityKind.actionsSalarie,
+                manualPrice: 8,
+                manualPriceAt: DateTime(2026, 1, 1),
+                transactions: [
+                  Transaction(
+                    date: DateTime(2024, 1, 1),
+                    isBuy: true,
+                    quantity: 1000,
+                    unitPrice: 0,
+                  ),
+                ],
+              ),
+            ],
+          );
+          await InvestmentsRepository(tempDir.path).saveAccount(account);
+        });
+
+        await tester.pumpWidget(buildScreen());
+        await tester.pump();
+
+        await tester.tap(find.text('Ma startup SAS'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('MWR'), findsOneWidget);
+        expect(find.text('TWR'), findsNothing);
+        expect(find.text('Quantité détenue'), findsOneWidget);
+        expect(find.text('Capital net investi'), findsNothing);
+        expect(find.text('Cours estimé'), findsOneWidget);
+        expect(find.text('Valorisation'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'variante "Rémunération en actions" avec un vesting suivi (cliff/'
+      'durée renseignés) : le chip "Acquis" affiche la quantité vestée, pas '
+      'la quantité totale détenue',
+      (tester) async {
+        await tester.runAsync(() async {
+          tempDir = await Directory.systemTemp.createTemp(
+            'opime_stock_account_test',
+          );
+          account = InvestmentAccount(
+            assetClass: AssetClass.privateEquity,
+            envelope: AccountEnvelope.fcprFcpi,
+            name: 'Ma startup',
+            bankName: 'Ma startup',
+            investments: [
+              Investment(
+                isin: 'pe-startup',
+                label: 'Ma startup SAS',
+                assetClass: AssetClass.privateEquity,
+                privateEquityKind: PrivateEquityKind.actionsSalarie,
+                vestingCliffMonths: 12,
+                vestingDurationMonths: 12,
+                transactions: [
+                  // Cliff == durée : 0 % vesté avant la date du cliff, donc
+                  // rien de vesté avec `DateTime.now()` (grant très récent).
+                  Transaction(
+                    date: DateTime.now(),
+                    isBuy: true,
+                    quantity: 1000,
+                    unitPrice: 0,
+                  ),
+                ],
+              ),
+            ],
+          );
+          await InvestmentsRepository(tempDir.path).saveAccount(account);
+        });
+
+        await tester.pumpWidget(buildScreen());
+        await tester.pump();
+
+        await tester.tap(find.text('Ma startup SAS'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Acquis'), findsOneWidget);
+        expect(find.text('Quantité détenue'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'variante "Rémunération en actions" sans vesting suivi (cliff/durée '
+      'non renseignés) : pas de chip "Acquis" — toute la quantité est déjà '
+      'considérée acquise',
+      (tester) async {
+        await tester.runAsync(() async {
+          tempDir = await Directory.systemTemp.createTemp(
+            'opime_stock_account_test',
+          );
+          account = InvestmentAccount(
+            assetClass: AssetClass.privateEquity,
+            envelope: AccountEnvelope.fcprFcpi,
+            name: 'Ma startup',
+            bankName: 'Ma startup',
+            investments: [
+              Investment(
+                isin: 'pe-startup',
+                label: 'Ma startup SAS',
+                assetClass: AssetClass.privateEquity,
+                privateEquityKind: PrivateEquityKind.actionsSalarie,
+                transactions: [
+                  Transaction(
+                    date: DateTime(2024, 1, 1),
+                    isBuy: true,
+                    quantity: 1000,
+                    unitPrice: 0,
+                  ),
+                ],
+              ),
+            ],
+          );
+          await InvestmentsRepository(tempDir.path).saveAccount(account);
+        });
+
+        await tester.pumpWidget(buildScreen());
+        await tester.pump();
+
+        await tester.tap(find.text('Ma startup SAS'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Acquis'), findsNothing);
+      },
+    );
+  });
 }

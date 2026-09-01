@@ -203,15 +203,23 @@ void main() {
     test('autres classes : ISIN toujours requis', () {
       expect(isinOptionalFor(AssetClass.crypto), isFalse);
       expect(isinOptionalFor(AssetClass.metauxPrecieux), isFalse);
-      expect(isinOptionalFor(AssetClass.privateEquity), isFalse);
     });
+
+    test(
+      'Private Equity : ISIN facultatif — un club deal/FCPR n\'a pas '
+      'd\'ISIN, seul le nom du fonds (déjà saisi dans le libellé) l\'identifie',
+      () {
+        expect(isinOptionalFor(AssetClass.privateEquity), isTrue);
+      },
+    );
   });
 
   group('isGeneratedIdentifier (identifiant auto-généré, rien à afficher)', () {
-    test('reconnaît les trois préfixes générés à la création', () {
+    test('reconnaît les quatre préfixes générés à la création', () {
       expect(isGeneratedIdentifier('immobilier-abc123'), isTrue);
       expect(isGeneratedIdentifier('autre-abc123'), isTrue);
       expect(isGeneratedIdentifier('fcpe-abc123'), isTrue);
+      expect(isGeneratedIdentifier('pe-abc123'), isTrue);
     });
 
     test('un vrai ISIN, ticker ou référence saisie n\'est pas confondu', () {
@@ -1095,6 +1103,436 @@ void main() {
       expect(fcpeFund.estimatedValue, 420);
       expect(fcpeFund.effectiveMarketValue, 420);
       expect(fcpeFund.unrealizedGain, 420 - 350);
+    });
+  });
+
+  group('Valorisation manuelle Private Equity (manualValuation)', () {
+    Investment fund({
+      double? manualValuation,
+      DateTime? manualValuationAt,
+      List<Transaction>? transactions,
+    }) => Investment(
+      isin: 'pe-1',
+      label: 'Ardian Expansion Fund',
+      assetClass: AssetClass.privateEquity,
+      transactions:
+          transactions ??
+          [
+            Transaction(
+              date: DateTime(2022, 1, 1),
+              isBuy: true,
+              quantity: 1,
+              unitPrice: 10000,
+            ),
+          ],
+      manualValuation: manualValuation,
+      manualValuationAt: manualValuationAt,
+    );
+
+    test('round-trip JSON', () {
+      final original = fund(
+        manualValuation: 15000,
+        manualValuationAt: DateTime.utc(2026, 8, 15),
+      );
+      final restored = Investment.fromJson(original.toJson());
+
+      expect(restored.manualValuation, 15000);
+      expect(restored.manualValuationAt, DateTime.utc(2026, 8, 15));
+    });
+
+    test('absent : clés omises du JSON, restent null au décodage', () {
+      final json = fund().toJson();
+      expect(json.containsKey('manualValuation'), isFalse);
+      expect(json.containsKey('manualValuationAt'), isFalse);
+
+      final restored = Investment.fromJson(json);
+      expect(restored.manualValuation, isNull);
+      expect(restored.estimatedValue, isNull);
+    });
+
+    test(
+      'estimatedValue = manualValuation tel quel — jamais multiplié par '
+      'quantityHeld, contrairement à manualPrice : plusieurs versements '
+      '(chacun quantité 1, voir usesTotalAmountTransaction) ne doivent pas '
+      'gonfler artificiellement la valorisation du fonds',
+      () {
+        final investment = fund(
+          manualValuation: 15000,
+          transactions: [
+            Transaction(
+              date: DateTime(2022, 1, 1),
+              isBuy: true,
+              quantity: 1,
+              unitPrice: 5000,
+            ),
+            Transaction(
+              date: DateTime(2023, 1, 1),
+              isBuy: true,
+              quantity: 1,
+              unitPrice: 5000,
+            ),
+          ],
+        );
+        expect(investment.quantityHeld, 2);
+        expect(investment.estimatedValue, 15000);
+      },
+    );
+
+    test(
+      'effectiveMarketValue retombe sur la valorisation manuelle sans cours '
+      'de marché',
+      () {
+        final investment = fund(manualValuation: 15000);
+        expect(investment.marketValue, isNull);
+        expect(investment.effectiveMarketValue, 15000);
+      },
+    );
+
+    test('unrealizedGain calculé à partir de la valorisation manuelle', () {
+      final investment = fund(manualValuation: 15000);
+      expect(investment.unrealizedGain, 15000 - 10000);
+    });
+
+    test(
+      'sans valorisation : effectiveMarketValue/unrealizedGain restent null '
+      '— displayValue retombe sur le capital net investi',
+      () {
+        final investment = fund();
+        expect(investment.effectiveMarketValue, isNull);
+        expect(investment.unrealizedGain, isNull);
+        expect(investment.displayValue, 10000);
+      },
+    );
+
+    test(
+      'copyWith bascule la valorisation manuelle sans affecter '
+      'manualPrice/l\'estimation immobilière (mécanismes indépendants)',
+      () {
+        final investment = fund();
+        final updated = investment.copyWith(
+          manualValuation: 15000,
+          manualValuationAt: DateTime(2026, 8, 15),
+        );
+        expect(updated.estimatedValue, 15000);
+        expect(updated.manualPrice, isNull);
+        expect(updated.surfaceM2, isNull);
+      },
+    );
+  });
+
+  group(
+    'usesTotalAmountTransaction (montant total plutôt que quantité × prix)',
+    () {
+      test('immobilier et Private Equity fonds : montant total', () {
+        expect(usesTotalAmountTransaction(AssetClass.immobilier), isTrue);
+        expect(usesTotalAmountTransaction(AssetClass.privateEquity), isTrue);
+        expect(
+          usesTotalAmountTransaction(
+            AssetClass.privateEquity,
+            privateEquityKind: PrivateEquityKind.fonds,
+          ),
+          isTrue,
+        );
+      });
+
+      test(
+        'Private Equity actionsSalarie (BSPCE/stock-options/AGA) : '
+        'quantité × prix unitaire, comme "Actions & Fonds"',
+        () {
+          expect(
+            usesTotalAmountTransaction(
+              AssetClass.privateEquity,
+              privateEquityKind: PrivateEquityKind.actionsSalarie,
+            ),
+            isFalse,
+          );
+        },
+      );
+
+      test('autres classes : quantité × prix unitaire classique', () {
+        expect(usesTotalAmountTransaction(AssetClass.actionsEtFonds), isFalse);
+        expect(usesTotalAmountTransaction(AssetClass.crypto), isFalse);
+        expect(usesTotalAmountTransaction(AssetClass.autres), isFalse);
+        expect(usesTotalAmountTransaction(AssetClass.epargne), isFalse);
+        expect(usesTotalAmountTransaction(AssetClass.metauxPrecieux), isFalse);
+      });
+    },
+  );
+
+  group(
+    'allowsFreeTransactionPrice (prix unitaire nul autorisé — cadeau/AGA)',
+    () {
+      test('"Autres" et Private Equity actionsSalarie : prix nul autorisé', () {
+        expect(allowsFreeTransactionPrice(AssetClass.autres), isTrue);
+        expect(
+          allowsFreeTransactionPrice(
+            AssetClass.privateEquity,
+            privateEquityKind: PrivateEquityKind.actionsSalarie,
+          ),
+          isTrue,
+        );
+      });
+
+      test(
+        'Private Equity fonds (ou sans variante précisée) : prix nul refusé '
+        '— un versement à un fonds n\'est jamais gratuit',
+        () {
+          expect(allowsFreeTransactionPrice(AssetClass.privateEquity), isFalse);
+          expect(
+            allowsFreeTransactionPrice(
+              AssetClass.privateEquity,
+              privateEquityKind: PrivateEquityKind.fonds,
+            ),
+            isFalse,
+          );
+        },
+      );
+
+      test('autres classes : prix nul toujours refusé', () {
+        expect(allowsFreeTransactionPrice(AssetClass.actionsEtFonds), isFalse);
+        expect(allowsFreeTransactionPrice(AssetClass.crypto), isFalse);
+        expect(allowsFreeTransactionPrice(AssetClass.immobilier), isFalse);
+      });
+    },
+  );
+
+  group('PrivateEquityKind (BSPCE/stock-options/AGA vs fonds)', () {
+    Investment equityGrant({
+      double? manualPrice,
+      DateTime? manualPriceAt,
+      List<Transaction>? transactions,
+    }) => Investment(
+      isin: 'pe-2',
+      label: 'Ma startup SAS',
+      assetClass: AssetClass.privateEquity,
+      privateEquityKind: PrivateEquityKind.actionsSalarie,
+      transactions:
+          transactions ??
+          [
+            Transaction(
+              date: DateTime(2024, 1, 1),
+              isBuy: true,
+              quantity: 1000,
+              unitPrice: 0,
+            ),
+          ],
+      manualPrice: manualPrice,
+      manualPriceAt: manualPriceAt,
+    );
+
+    test('round-trip JSON de privateEquityKind', () {
+      final restored = Investment.fromJson(equityGrant().toJson());
+      expect(restored.privateEquityKind, PrivateEquityKind.actionsSalarie);
+    });
+
+    test('null au décodage si absent (position créée avant cet ajout)', () {
+      final json = Investment(
+        isin: 'pe-3',
+        label: 'Fonds historique',
+        assetClass: AssetClass.privateEquity,
+        transactions: const [],
+      ).toJson();
+      expect(json.containsKey('privateEquityKind'), isFalse);
+      expect(Investment.fromJson(json).privateEquityKind, isNull);
+    });
+
+    test(
+      'estimatedValue = manualPrice × quantityHeld (nombre réel de titres) '
+      '— comme "Autres", pas comme manualValuation',
+      () {
+        final investment = equityGrant(manualPrice: 8);
+        expect(investment.quantityHeld, 1000);
+        expect(investment.estimatedValue, 8000);
+      },
+    );
+
+    test('une AGA (prix 0) n\'empêche pas le calcul de plus-value latente', () {
+      final investment = equityGrant(manualPrice: 8);
+      expect(investment.investedAmount, 0);
+      expect(investment.unrealizedGain, 8000);
+    });
+
+    test(
+      'round-trip JSON de vestingCliffMonths/vestingDurationMonths/'
+      'exerciseDeadline',
+      () {
+        final original = equityGrant().copyWith(
+          vestingCliffMonths: 12,
+          vestingDurationMonths: 48,
+          exerciseDeadline: DateTime.utc(2030, 6, 1),
+        );
+        final restored = Investment.fromJson(original.toJson());
+        expect(restored.vestingCliffMonths, 12);
+        expect(restored.vestingDurationMonths, 48);
+        expect(restored.exerciseDeadline, DateTime.utc(2030, 6, 1));
+      },
+    );
+
+    test('absents : clés omises du JSON, restent null au décodage', () {
+      final json = equityGrant().toJson();
+      expect(json.containsKey('vestingCliffMonths'), isFalse);
+      expect(json.containsKey('vestingDurationMonths'), isFalse);
+      expect(json.containsKey('exerciseDeadline'), isFalse);
+    });
+  });
+
+  group('vestedQuantityFor (vesting cliff + durée)', () {
+    test('vesting non suivi (cliff ou durée absent) : quantityHeld tel quel', () {
+      final investment = Investment(
+        isin: 'pe-4',
+        label: 'Startup A',
+        assetClass: AssetClass.privateEquity,
+        privateEquityKind: PrivateEquityKind.actionsSalarie,
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 1000,
+            unitPrice: 0,
+          ),
+        ],
+      );
+      expect(
+        vestedQuantityFor(investment, asOf: DateTime(2025, 1, 1)),
+        1000,
+      );
+    });
+
+    test('avant le cliff : rien de vesté', () {
+      final investment = Investment(
+        isin: 'pe-5',
+        label: 'Startup B',
+        assetClass: AssetClass.privateEquity,
+        privateEquityKind: PrivateEquityKind.actionsSalarie,
+        vestingCliffMonths: 12,
+        vestingDurationMonths: 48,
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 1000,
+            unitPrice: 0,
+          ),
+        ],
+      );
+      expect(
+        vestedQuantityFor(investment, asOf: DateTime(2024, 6, 1)),
+        0,
+      );
+    });
+
+    test('exactement au cliff : le prorata déjà écoulé est vesté', () {
+      final investment = Investment(
+        isin: 'pe-6',
+        label: 'Startup C',
+        assetClass: AssetClass.privateEquity,
+        privateEquityKind: PrivateEquityKind.actionsSalarie,
+        vestingCliffMonths: 12,
+        vestingDurationMonths: 48,
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 4800,
+            unitPrice: 0,
+          ),
+        ],
+      );
+      // 12 mois écoulés sur 48 → environ un quart vesté.
+      final vested = vestedQuantityFor(investment, asOf: DateTime(2025, 1, 1));
+      expect(vested, closeTo(1200, 50));
+    });
+
+    test('après la durée complète : tout est vesté', () {
+      final investment = Investment(
+        isin: 'pe-7',
+        label: 'Startup D',
+        assetClass: AssetClass.privateEquity,
+        privateEquityKind: PrivateEquityKind.actionsSalarie,
+        vestingCliffMonths: 12,
+        vestingDurationMonths: 48,
+        transactions: [
+          Transaction(
+            date: DateTime(2020, 1, 1),
+            isBuy: true,
+            quantity: 4800,
+            unitPrice: 0,
+          ),
+        ],
+      );
+      expect(
+        vestedQuantityFor(investment, asOf: DateTime(2026, 1, 1)),
+        4800,
+      );
+    });
+
+    test('une vente est déduite du total vesté', () {
+      final investment = Investment(
+        isin: 'pe-8',
+        label: 'Startup E',
+        assetClass: AssetClass.privateEquity,
+        privateEquityKind: PrivateEquityKind.actionsSalarie,
+        vestingCliffMonths: 0,
+        vestingDurationMonths: 12,
+        transactions: [
+          Transaction(
+            date: DateTime(2020, 1, 1),
+            isBuy: true,
+            quantity: 1000,
+            unitPrice: 0,
+          ),
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: false,
+            quantity: 300,
+            unitPrice: 5,
+          ),
+        ],
+      );
+      expect(
+        vestedQuantityFor(investment, asOf: DateTime(2026, 1, 1)),
+        700,
+      );
+    });
+
+    test('plusieurs tranches (grants successifs) vestent indépendamment', () {
+      final investment = Investment(
+        isin: 'pe-9',
+        label: 'Startup F',
+        assetClass: AssetClass.privateEquity,
+        privateEquityKind: PrivateEquityKind.actionsSalarie,
+        vestingCliffMonths: 12,
+        vestingDurationMonths: 12,
+        transactions: [
+          // Entièrement vestée au 1er janvier 2026 (cliff == durée : 100 %
+          // dès le cliff atteint).
+          Transaction(
+            date: DateTime(2020, 1, 1),
+            isBuy: true,
+            quantity: 500,
+            unitPrice: 0,
+          ),
+          // Pas encore vestée (grant trop récent, cliff pas atteint).
+          Transaction(
+            date: DateTime(2025, 12, 1),
+            isBuy: true,
+            quantity: 500,
+            unitPrice: 0,
+          ),
+        ],
+      );
+      expect(
+        vestedQuantityFor(investment, asOf: DateTime(2026, 1, 1)),
+        500,
+      );
+    });
+  });
+
+  group('placeholderIsinFor', () {
+    test('Private Equity génère un identifiant préfixé "pe-"', () {
+      final placeholder = placeholderIsinFor(AssetClass.privateEquity);
+      expect(placeholder, startsWith('pe-'));
+      expect(isGeneratedIdentifier(placeholder), isTrue);
     });
   });
 

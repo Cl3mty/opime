@@ -120,6 +120,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   final _editIsinController = TextEditingController();
   final _editLabelController = TextEditingController();
   FundStyle? _editFundStyle;
+  int? _editVestingCliffMonths;
+  int? _editVestingDurationMonths;
+  DateTime? _editExerciseDeadline;
 
   /// Photo importée par l'utilisateur pour un objet "Autres" (voir
   /// `autres_photo_repository.dart`) — `null` tant qu'aucune n'a été
@@ -188,29 +191,42 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   AssetClass get _effectiveClass =>
       _investment.assetClass ?? widget.account.assetClass;
 
-  /// "Autres" (aucune source de cours automatique), ou "Actions & Fonds"
-  /// détenu en PEE/PEG/PER (fonds interne à l'entreprise ou au contrat sans
-  /// ISIN public — voir [isinOptionalFor]) : ces cas peuvent estimer leur
-  /// cours à la main ([Investment.manualPrice]) faute de cours de marché.
+  /// "Autres" (aucune source de cours automatique), "Actions & Fonds" détenu
+  /// en PEE/PEG/PER (fonds interne à l'entreprise ou au contrat sans ISIN
+  /// public — voir [isinOptionalFor]), ou un Private Equity
+  /// [PrivateEquityKind.actionsSalarie] (BSPCE/stock-options/AGA — le nombre
+  /// de titres est réel, voir [_usesTotalAmount], donc [Investment.manualPrice]
+  /// (prix par titre) est le bon mécanisme, pas [Investment.manualValuation]) :
+  /// ces cas peuvent estimer leur cours à la main faute de cours de marché.
   bool get _allowsManualCours =>
       _effectiveClass == AssetClass.autres ||
       (_effectiveClass == AssetClass.actionsEtFonds &&
           (widget.account.envelope == AccountEnvelope.peg ||
               widget.account.envelope == AccountEnvelope.pee ||
-              widget.account.envelope == AccountEnvelope.per));
+              widget.account.envelope == AccountEnvelope.per)) ||
+      (_effectiveClass == AssetClass.privateEquity &&
+          _investment.privateEquityKind == PrivateEquityKind.actionsSalarie);
 
   /// `true` pour une SCPI logée dans un compte Actions & Fonds/assurance
   /// vie (voir `accountAcceptsCrossClassInvestment`) exactement comme pour
   /// un bien immobilier natif (`investment_detail_screen.dart`'s
   /// équivalent) : pas de prix unitaire/devise à saisir (un seul montant
   /// total), et sa valeur se réestime au m² plutôt que par un cours de
-  /// marché.
+  /// marché. Voir [_usesTotalAmount] pour le comportement de saisie de
+  /// transaction, partagé avec le Private Equity — cette classe-ci a en
+  /// plus son propre dialogue de réestimation dédié (`_openReestimateDialog`).
   bool get _isImmobilier => _effectiveClass == AssetClass.immobilier;
 
+  /// Voir [usesTotalAmountTransaction] : une transaction de cette position
+  /// représente un montant total (immobilier, Private Equity de type
+  /// [PrivateEquityKind.fonds]) plutôt qu'une quantité × un prix unitaire.
+  bool get _usesTotalAmount => usesTotalAmountTransaction(
+    _effectiveClass,
+    privateEquityKind: _investment.privateEquityKind,
+  );
+
   bool get _isRealIsin =>
-      !_isCurrency &&
-      (_effectiveClass == AssetClass.actionsEtFonds ||
-          _effectiveClass == AssetClass.privateEquity);
+      !_isCurrency && _effectiveClass == AssetClass.actionsEtFonds;
 
   /// Le champ de date de déblocage a-t-il un sens pour cette transaction
   /// (création comme édition, toutes deux pilotées par `_newDate`/
@@ -247,10 +263,15 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       _isCurrency && _investment.isin.trim().toUpperCase() == 'EUR';
 
   bool get _showCurrencySelector =>
-      !_isEurCurrency && !_isImmobilier && !_isCurrency;
+      !_isEurCurrency && !_usesTotalAmount && !_isCurrency;
 
   String get _quantityFieldLabel {
     if (_isImmobilier) return 'Montant total (€)';
+    if (_effectiveClass == AssetClass.privateEquity) {
+      return _investment.privateEquityKind == PrivateEquityKind.actionsSalarie
+          ? 'Nombre de titres/options'
+          : 'Montant versé (€)';
+    }
     if (_isCurrency) {
       return _isEurCurrency ? 'Montant (€)' : 'Montant (${_investment.isin})';
     }
@@ -281,10 +302,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
 
   Future<void> _commitCreateTransaction() async {
     final date = _newDate;
-    final quantity = _isImmobilier
+    final quantity = _usesTotalAmount
         ? 1.0
         : parseDecimal(_quantityController.text);
-    final price = _isImmobilier
+    final price = _usesTotalAmount
         ? parseDecimal(_quantityController.text)
         : _isEurCurrency
         ? 1.0
@@ -298,7 +319,11 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     final invalidPrice =
         price == null ||
         price < 0 ||
-        (price == 0 && _effectiveClass != AssetClass.autres);
+        (price == 0 &&
+            !allowsFreeTransactionPrice(
+              _effectiveClass,
+              privateEquityKind: _investment.privateEquityKind,
+            ));
     if (date == null ||
         quantity == null ||
         quantity <= 0 ||
@@ -383,9 +408,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       _newDate = transaction.date;
       _newUnlockDateOverride = transaction.manualUnlockDate;
       _quantityController.text = _formatNumber(
-        _isImmobilier ? transaction.amount : transaction.quantity,
+        _usesTotalAmount ? transaction.amount : transaction.quantity,
       );
-      _priceController.text = _isImmobilier
+      _priceController.text = _usesTotalAmount
           ? ''
           : _formatNumber(transaction.unitPrice);
       _noteController.text = transaction.note ?? '';
@@ -410,10 +435,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   Future<void> _commitEditTransaction() async {
     final id = _editingTransactionId;
     final date = _newDate;
-    final quantity = _isImmobilier
+    final quantity = _usesTotalAmount
         ? 1.0
         : parseDecimal(_quantityController.text);
-    final price = _isImmobilier
+    final price = _usesTotalAmount
         ? parseDecimal(_quantityController.text)
         : _isEurCurrency
         ? 1.0
@@ -421,11 +446,15 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     final currency = _txnCurrency;
     final fxRateToEur = _txnFxRateToEur;
     // Voir `_commitCreateTransaction` : un objet "Autres" peut avoir été
-    // reçu en cadeau (prix d'achat 0).
+    // reçu en cadeau (prix d'achat 0), une AGA aussi.
     final invalidPrice =
         price == null ||
         price < 0 ||
-        (price == 0 && _effectiveClass != AssetClass.autres);
+        (price == 0 &&
+            !allowsFreeTransactionPrice(
+              _effectiveClass,
+              privateEquityKind: _investment.privateEquityKind,
+            ));
     if (id == null ||
         date == null ||
         quantity == null ||
@@ -638,6 +667,78 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     );
   }
 
+  /// Ouvre une petite popup pour saisir/mettre à jour la valorisation totale
+  /// d'un fonds de Private Equity (voir `Investment.manualValuation`) —
+  /// contrairement à [_showManualEstimateDialog] (un prix par unité), ce
+  /// dialogue saisit directement le montant total : un club deal/FCPR n'a
+  /// pas de notion de part boursière, seule la dernière valorisation
+  /// communiquée par le gérant (le NAV du fonds) compte.
+  Future<void> _openPrivateEquityValuationDialog() async {
+    final controller = TextEditingController(
+      text: _investment.manualValuation == null
+          ? ''
+          : _formatNumber(_investment.manualValuation!),
+    );
+    final value = await showDialog<double>(
+      context: context,
+      builder: (context) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: FrostedCard(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const shadcn.Text('Valorisation actuelle').large().semiBold(),
+                  const SizedBox(height: 8),
+                  shadcn.Text(
+                    'Dernier NAV/valorisation communiqué par le gérant du '
+                    'fonds — à mettre à jour toi-même quand tu le reçois, '
+                    'aucune source de cours automatique n\'existe pour ce '
+                    'placement.',
+                  ).muted().small(),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    placeholder: const shadcn.Text('Valorisation (€)'),
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      PrimaryButton(
+                        onPressed: () {
+                          final parsed = parseDecimal(controller.text);
+                          Navigator.of(context).pop(parsed);
+                        },
+                        child: const shadcn.Text('Enregistrer'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlineButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const shadcn.Text('Annuler'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (value == null || value <= 0) return;
+    await _saveInvestment(
+      _investment.copyWith(
+        manualValuation: value,
+        manualValuationAt: DateTime.now(),
+      ),
+    );
+  }
+
   bool get _canDelete => _investment.transactions.isEmpty;
 
   Future<void> _deleteInvestment() async {
@@ -673,6 +774,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
           : _investment.isin;
       _editLabelController.text = _investment.label;
       _editFundStyle = _investment.fundStyle;
+      _editVestingCliffMonths = _investment.vestingCliffMonths;
+      _editVestingDurationMonths = _investment.vestingDurationMonths;
+      _editExerciseDeadline = _investment.exerciseDeadline;
     });
   }
 
@@ -715,6 +819,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
         priceUnavailable: isinChanged ? null : _investment.priceUnavailable,
         assetClass: _investment.assetClass,
         fundStyle: _editFundStyle,
+        privateEquityKind: _investment.privateEquityKind,
+        vestingCliffMonths: _editVestingCliffMonths,
+        vestingDurationMonths: _editVestingDurationMonths,
+        exerciseDeadline: _editExerciseDeadline,
         documents: _investment.documents,
         // Modifier l'identifiant/libellé ne doit pas effacer au passage
         // l'exclusion du patrimoine ni une estimation manuelle déjà
@@ -724,6 +832,8 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
         excludedFromPatrimoine: _investment.excludedFromPatrimoine,
         manualPrice: _investment.manualPrice,
         manualPriceAt: _investment.manualPriceAt,
+        manualValuation: _investment.manualValuation,
+        manualValuationAt: _investment.manualValuationAt,
       ),
     );
     setState(() => _editingInvestment = false);
@@ -744,7 +854,14 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
               child: const shadcn.Text('Modifier'),
               onPressed: (_) => _startEditInvestment(),
             ),
-            if (_allowsManualCours)
+            if (_effectiveClass == AssetClass.privateEquity &&
+                _investment.privateEquityKind != PrivateEquityKind.actionsSalarie)
+              MenuButton(
+                leading: const Icon(LucideIcons.tag, size: 14),
+                child: const shadcn.Text('Réestimer la valorisation'),
+                onPressed: (_) => _openPrivateEquityValuationDialog(),
+              )
+            else if (_allowsManualCours)
               MenuButton(
                 leading: const Icon(LucideIcons.tag, size: 14),
                 child: const shadcn.Text('Réestimer le cours'),
@@ -881,21 +998,31 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     // Voir `TransactionRow.centerDate` : la date ne reste centrée que tant
     // qu'aucune transaction affichée ne porte de commentaire.
     final centerDate = !investment.transactions.any((t) => t.hasNote);
+    // Un cours de marché réel ([marketValue]) est seul à disposer d'un
+    // historique de cours ([_priceHistory]) : TWR n'a de sens (et n'est
+    // proposé) que dans ce cas. MWR, lui, ne dépend que de la valeur
+    // courante + l'historique des transactions — il fonctionne donc aussi
+    // à partir d'une estimation manuelle (voir [Investment.effectiveMarketValue],
+    // qui couvre déjà `manualPrice`/`manualValuation`/l'estimation
+    // immobilière) : sans cette distinction, "Autres" et le Private Equity
+    // ne montraient jamais aucune performance, faute de cours de marché.
     final hasPrice = investment.marketValue != null;
+    final currentValuation = investment.effectiveMarketValue;
     final displayValue = investment.displayValue;
 
     PerformanceResult? performance;
-    if (hasPrice) {
-      performance = _perfMode == _PerfMode.mwr
-          ? calculateMwr(
-              transactions: investment.transactions,
-              currentValue: investment.marketValue!,
-              asOf: DateTime.now(),
-            )
-          : calculateTwr(
+    if (currentValuation != null) {
+      final useTwr = _perfMode == _PerfMode.twr && hasPrice;
+      performance = useTwr
+          ? calculateTwr(
               transactions: investment.transactions,
               priceHistory: _priceHistory,
-              currentValue: investment.marketValue!,
+              currentValue: currentValuation,
+              asOf: DateTime.now(),
+            )
+          : calculateMwr(
+              transactions: investment.transactions,
+              currentValue: currentValuation,
               asOf: DateTime.now(),
             );
     }
@@ -957,6 +1084,16 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       fundStyle: _editFundStyle,
                       onFundStyleChanged: (style) =>
                           setState(() => _editFundStyle = style),
+                      privateEquityKind: _investment.privateEquityKind,
+                      vestingCliffMonths: _editVestingCliffMonths,
+                      onVestingCliffMonthsChanged: (months) =>
+                          setState(() => _editVestingCliffMonths = months),
+                      vestingDurationMonths: _editVestingDurationMonths,
+                      onVestingDurationMonthsChanged: (months) =>
+                          setState(() => _editVestingDurationMonths = months),
+                      exerciseDeadline: _editExerciseDeadline,
+                      onExerciseDeadlineChanged: (date) =>
+                          setState(() => _editExerciseDeadline = date),
                       onSave: _commitEditInvestment,
                       onCancel: () =>
                           setState(() => _editingInvestment = false),
@@ -1003,19 +1140,57 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                     spacing: 12,
                     runSpacing: 12,
                     children: [
-                      InvestmentStatChip(
-                        label: 'Quantité détenue',
-                        value: formatQuantity(
-                          investment.quantityHeld,
-                          _effectiveClass,
+                      // "Quantité détenue"/"PRU" n'ont de sens que pour une
+                      // position à unités réelles — un fonds de Private
+                      // Equity ([PrivateEquityKind.fonds]) reçoit un
+                      // versement par transaction (quantité toujours 1, voir
+                      // [usesTotalAmountTransaction]), "quantité détenue" y
+                      // vaudrait le nombre de mouvements et "PRU" un chiffre
+                      // sans signification. Le capital net versé (déjà
+                      // correct, achats − ventes) remplace les deux. Un
+                      // Private Equity [PrivateEquityKind.actionsSalarie]
+                      // (BSPCE/stock-options/AGA) garde au contraire
+                      // Quantité/PRU, exactement comme "Actions & Fonds" : le
+                      // nombre de titres y est réel.
+                      if (_effectiveClass == AssetClass.privateEquity &&
+                          _investment.privateEquityKind !=
+                              PrivateEquityKind.actionsSalarie)
+                        InvestmentStatChip(
+                          label: 'Capital net investi',
+                          value: displayEuros(
+                            investment.investedAmount,
+                            widget.hidden,
+                          ),
+                        )
+                      else ...[
+                        InvestmentStatChip(
+                          label: 'Quantité détenue',
+                          value: formatQuantity(
+                            investment.quantityHeld,
+                            _effectiveClass,
+                          ),
                         ),
-                      ),
-                      InvestmentStatChip(
-                        label: 'PRU',
-                        value: _isCurrency
-                            ? '${investment.pru.toStringAsFixed(4)} €'
-                            : displayEuros(investment.pru, widget.hidden),
-                      ),
+                        InvestmentStatChip(
+                          label: 'PRU',
+                          value: _isCurrency
+                              ? '${investment.pru.toStringAsFixed(4)} €'
+                              : displayEuros(investment.pru, widget.hidden),
+                        ),
+                        // "Acquis" (voir [vestedQuantityFor]) ne s'affiche
+                        // que si un vesting est effectivement suivi pour
+                        // cette position (cliff ET durée renseignés) — sinon
+                        // toute la quantité détenue est déjà considérée
+                        // acquise, ce chip n'apporterait rien.
+                        if (investment.vestingCliffMonths != null &&
+                            investment.vestingDurationMonths != null)
+                          InvestmentStatChip(
+                            label: 'Acquis',
+                            value: formatQuantity(
+                              vestedQuantityFor(investment),
+                              _effectiveClass,
+                            ),
+                          ),
+                      ],
                       if (hasPrice)
                         InvestmentStatChip(
                           label: 'Dernier cours',
@@ -1040,11 +1215,24 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                                   updatedAt: investment.manualPriceAt!,
                                 )
                               : null,
+                        )
+                      else if (investment.manualValuation != null)
+                        InvestmentStatChip(
+                          label: 'Valorisation',
+                          value: displayEuros(
+                            investment.manualValuation!,
+                            widget.hidden,
+                          ),
+                          trailing: investment.manualValuationAt != null
+                              ? ManualPriceBadge(
+                                  updatedAt: investment.manualValuationAt!,
+                                )
+                              : null,
                         ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  if (hasPrice) ...[
+                  if (currentValuation != null) ...[
                     Wrap(
                       spacing: 12,
                       runSpacing: 8,
@@ -1052,16 +1240,21 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       children: [
                         ButtonGroup(
                           children: [
+                            // TWR exige un historique de cours réel — voir
+                            // la doc au calcul de `performance` plus haut.
+                            // Sans cours de marché (estimation manuelle
+                            // seule), seul MWR est proposé.
+                            if (hasPrice)
+                              SelectedButton(
+                                value: _perfMode == _PerfMode.twr,
+                                selectedStyle: const ButtonStyle.primary(),
+                                style: toggleUnselectedStyle(context),
+                                onChanged: (_) =>
+                                    setState(() => _perfMode = _PerfMode.twr),
+                                child: const shadcn.Text('TWR'),
+                              ),
                             SelectedButton(
-                              value: _perfMode == _PerfMode.twr,
-                              selectedStyle: const ButtonStyle.primary(),
-                              style: toggleUnselectedStyle(context),
-                              onChanged: (_) =>
-                                  setState(() => _perfMode = _PerfMode.twr),
-                              child: const shadcn.Text('TWR'),
-                            ),
-                            SelectedButton(
-                              value: _perfMode == _PerfMode.mwr,
+                              value: _perfMode == _PerfMode.mwr || !hasPrice,
                               selectedStyle: const ButtonStyle.primary(),
                               style: toggleUnselectedStyle(context),
                               onChanged: (_) =>
@@ -1083,11 +1276,26 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                           ).medium()
                         else
                           shadcn.Text(
-                            'Pas assez d\'historique de cours pour ce calcul.',
+                            _perfMode == _PerfMode.twr && hasPrice
+                                ? 'Pas assez d\'historique de cours pour ce '
+                                      'calcul.'
+                                : 'Pas assez d\'historique de transactions '
+                                      'pour ce calcul.',
                           ).muted().xSmall(),
                       ],
                     ),
-                  ] else if (_allowsManualCours)
+                  ] else if (_effectiveClass == AssetClass.privateEquity)
+                    shadcn.Text(
+                      investment.manualValuationAt != null
+                          ? 'Valorisation estimée le '
+                                '${formatDateDdMmYyyy(investment.manualValuationAt!)} '
+                                '(menu « ⋮ » pour la mettre à jour).'
+                          : 'Aucune valorisation renseignée : le montant '
+                                'ci-dessus correspond au capital net investi '
+                                '— menu « ⋮ » pour renseigner le dernier NAV '
+                                'communiqué par le gérant.',
+                    ).muted().xSmall()
+                  else if (_allowsManualCours)
                     shadcn.Text(
                       investment.manualPriceAt != null
                           ? 'Cours estimé le '
@@ -1119,7 +1327,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         noteController: _noteController,
                         quantityLabel: _quantityFieldLabel,
                         priceLabel: _priceFieldLabel,
-                        showPriceField: !_isEurCurrency && !_isImmobilier,
+                        showPriceField: !_isEurCurrency && !_usesTotalAmount,
                         showCurrencySelector: _showCurrencySelector,
                         priceCurrencyController: _priceCurrencyController,
                         currencyExtraOptions:
@@ -1192,7 +1400,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       noteController: _noteController,
                       quantityLabel: _quantityFieldLabel,
                       priceLabel: _priceFieldLabel,
-                      showPriceField: !_isEurCurrency && !_isImmobilier,
+                      showPriceField: !_isEurCurrency && !_usesTotalAmount,
                       showCurrencySelector: _showCurrencySelector,
                       priceCurrencyController: _priceCurrencyController,
                       currencyExtraOptions: _effectiveClass == AssetClass.crypto

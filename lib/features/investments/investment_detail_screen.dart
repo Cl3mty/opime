@@ -894,6 +894,12 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               fundStyle: _editFundStyle,
               onFundStyleChanged: (style) =>
                   setState(() => _editFundStyle = style),
+              // Cet écran est réservé à l'immobilier (voir sa doc de tête) :
+              // le Private Equity ne l'atteint jamais, ces callbacks ne sont
+              // donc jamais appelés en pratique.
+              onVestingCliffMonthsChanged: (_) {},
+              onVestingDurationMonthsChanged: (_) {},
+              onExerciseDeadlineChanged: (_) {},
               onSave: _commitEditInvestment,
               onCancel: () => setState(() => _editingInvestment = false),
             )

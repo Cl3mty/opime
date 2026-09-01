@@ -55,12 +55,16 @@ class InvestmentIdentifierField extends StatelessWidget {
         // d'identifiant financier (ISIN) : "référence" couvre un numéro de
         // série ou une référence de fabricant. Un fonds PEE/PEG/PER (FCPE
         // ou unité de compte interne à l'entreprise/au contrat, voir
-        // [isinOptionalFor]) n'a souvent pas d'ISIN public non plus. Les
-        // deux restent facultatifs — voir `_commitCreateInvestment`, qui en
-        // génère un si laissé vide.
+        // [isinOptionalFor]) n'a souvent pas d'ISIN public non plus, pas
+        // plus qu'un club deal/FCPR de Private Equity (aucun ISIN pour une
+        // participation non cotée — seul le nom du fonds, déjà saisi dans
+        // le libellé, l'identifie). Tous restent facultatifs — voir
+        // `_commitCreateInvestment`, qui en génère un si laissé vide.
         placeholder: shadcn.Text(
           assetClass == AssetClass.autres
               ? 'Référence (optionnelle : numéro de série, référence...)'
+              : assetClass == AssetClass.privateEquity
+              ? 'Identifiant (optionnel : laisse vide si le fonds n\'en a pas)'
               : assetClass == AssetClass.actionsEtFonds &&
                     isinOptionalFor(assetClass, accountEnvelope: accountEnvelope)
               ? 'ISIN (optionnel : laisse vide si le fonds n\'en a pas)'

@@ -136,6 +136,44 @@ enum FundStyle {
   }
 }
 
+/// Variante d'un investissement `privateEquity`, renseignée à la création et
+/// **immuable** ensuite (contrairement à [FundStyle]/[RealEstateType]) : elle
+/// détermine si une transaction représente un montant total (voir
+/// [usesTotalAmountTransaction]) ou une quantité réelle × un prix unitaire,
+/// deux interprétations incompatibles qu'on ne peut pas mélanger après coup
+/// sur un même historique de transactions. `null` sur
+/// [Investment.privateEquityKind] (toute position créée avant l'ajout de ce
+/// champ) équivaut à [fonds] : comportement inchangé, pas de migration.
+enum PrivateEquityKind {
+  /// Fonds d'investissement (club deal, FCPR, FCPI, crowdequity...) : les
+  /// transactions sont des versements/distributions en montant total, la
+  /// valorisation est celle, totale, communiquée par le gérant
+  /// ([Investment.manualValuation]).
+  fonds,
+
+  /// Non coté reçu en rémunération (BSPCE, stock-options, actions gratuites)
+  /// : le nombre de titres/options compte réellement, chaque transaction est
+  /// une quantité × un prix unitaire (prix d'exercice, ou 0 pour une
+  /// attribution gratuite — voir [allowsFreeTransactionPrice]), la
+  /// valorisation se fait par titre ([Investment.manualPrice], comme pour
+  /// "Autres").
+  actionsSalarie;
+
+  String get label => switch (this) {
+    PrivateEquityKind.fonds => 'Fonds (club deal, FCPR...)',
+    PrivateEquityKind.actionsSalarie =>
+      'Rémunération en actions (BSPCE, stock-options, AGA)',
+  };
+
+  static PrivateEquityKind? fromName(String? name) {
+    if (name == null) return null;
+    for (final kind in PrivateEquityKind.values) {
+      if (kind.name == name) return kind;
+    }
+    return null;
+  }
+}
+
 /// Retrouve la [AssetClass] correspondant à un id de catégorie Dashboard
 /// (`'actifs_crypto'`...), ou `null` s'il n'y en a pas (id inconnu, ou
 /// catégorie de passifs — pas encore de classe d'actif réelle associée).
@@ -202,19 +240,22 @@ bool requiresLabelFieldFor(
 }
 
 /// À la création d'un investissement, l'identifiant (ISIN) peut-il rester
-/// vide ? Toujours vrai pour l'immobilier et "Autres", qui n'ont pas de
-/// vrai identifiant financier (voir [_commitCreateInvestment] dans
-/// `complete_patrimoine_dialog.dart`, qui en génère un si laissé vide).
-/// Vrai aussi pour "Actions & Fonds" détenu en PEE/PEG/PER : les fonds
-/// internes à l'entreprise ou au contrat (FCPE, unités de compte du PER...)
-/// n'ont souvent pas d'ISIN public — l'estimation manuelle du cours
+/// vide ? Toujours vrai pour l'immobilier, "Autres" et le Private Equity, qui
+/// n'ont pas de vrai identifiant financier (voir [_commitCreateInvestment]
+/// dans `complete_patrimoine_dialog.dart`, qui en génère un si laissé vide) —
+/// un club deal/FCPR n'a pas d'ISIN, seulement le nom du fonds (déjà saisi
+/// dans le libellé). Vrai aussi pour "Actions & Fonds" détenu en PEE/PEG/PER :
+/// les fonds internes à l'entreprise ou au contrat (FCPE, unités de compte du
+/// PER...) n'ont souvent pas d'ISIN public — l'estimation manuelle du cours
 /// ([Investment.manualPrice]) prend alors le relais d'un cours de marché
 /// introuvable, comme pour "Autres".
 bool isinOptionalFor(
   AssetClass assetClass, {
   AccountEnvelope? accountEnvelope,
 }) {
-  if (assetClass == AssetClass.immobilier || assetClass == AssetClass.autres) {
+  if (assetClass == AssetClass.immobilier ||
+      assetClass == AssetClass.autres ||
+      assetClass == AssetClass.privateEquity) {
     return true;
   }
   return assetClass == AssetClass.actionsEtFonds &&
@@ -227,28 +268,70 @@ bool isinOptionalFor(
 /// d'un investissement laissé sans identifiant (voir
 /// [isinOptionalFor]/`_commitCreateInvestment` dans
 /// `complete_patrimoine_dialog.dart`, préfixes `'immobilier-'`, `'autre-'`,
-/// `'fcpe-'`) plutôt qu'un vrai ISIN/ticker saisi par l'utilisateur ou
-/// choisi dans une liste connue — un tel identifiant n'a rien d'utile à
+/// `'fcpe-'`, `'pe-'`) plutôt qu'un vrai ISIN/ticker saisi par l'utilisateur
+/// ou choisi dans une liste connue — un tel identifiant n'a rien d'utile à
 /// montrer à l'écran (voir `positions_table.dart`/
 /// `position_detail_dialog.dart`).
 bool isGeneratedIdentifier(String isin) =>
     isin.startsWith('immobilier-') ||
     isin.startsWith('autre-') ||
-    isin.startsWith('fcpe-');
+    isin.startsWith('fcpe-') ||
+    isin.startsWith('pe-');
 
-/// Identifiant technique généré pour un investissement "Autres" ou un fonds
-/// PEE/PEG/PER (voir [isinOptionalFor]) laissé sans identifiant — que ce
-/// soit à la création, ou en édition quand un ISIN saisi par erreur est
-/// retiré à nouveau (voir `_commitEditInvestment` dans `position_detail_dialog.dart`/
-/// `investment_detail_screen.dart`, qui rejetaient auparavant tout
-/// enregistrement à identifiant vide au lieu d'y regénérer un placeholder).
-/// Sans branche immobilier : l'immobilier ne propose jamais ce champ à la
-/// saisie, son propre préfixe (`'immobilier-'`) reste généré séparément là
-/// où le compte est créé.
-String placeholderIsinFor(AssetClass assetClass) =>
-    assetClass == AssetClass.autres
-    ? 'autre-${generateInvestmentId('bien')}'
-    : 'fcpe-${generateInvestmentId('bien')}';
+/// Identifiant technique généré pour un investissement "Autres", un fonds
+/// PEE/PEG/PER ou un Private Equity (voir [isinOptionalFor]) laissé sans
+/// identifiant — que ce soit à la création, ou en édition quand un ISIN
+/// saisi par erreur est retiré à nouveau (voir `_commitEditInvestment` dans
+/// `position_detail_dialog.dart`/`investment_detail_screen.dart`, qui
+/// rejetaient auparavant tout enregistrement à identifiant vide au lieu d'y
+/// regénérer un placeholder). Sans branche immobilier : l'immobilier ne
+/// propose jamais ce champ à la saisie, son propre préfixe
+/// (`'immobilier-'`) reste généré séparément là où le compte est créé.
+String placeholderIsinFor(AssetClass assetClass) => switch (assetClass) {
+  AssetClass.autres => 'autre-${generateInvestmentId('bien')}',
+  AssetClass.privateEquity => 'pe-${generateInvestmentId('fonds')}',
+  _ => 'fcpe-${generateInvestmentId('bien')}',
+};
+
+/// Une transaction de [assetClass] représente-t-elle un montant total plutôt
+/// qu'une quantité × un prix unitaire ? Vrai pour l'immobilier (un bien
+/// s'achète en une seule "part", seul le prix payé compte) et pour un
+/// Private Equity de type [PrivateEquityKind.fonds] (un versement/une
+/// distribution, pas un nombre de parts significatif pour la plupart des
+/// véhicules — club deal, FCPR...) — mais pas pour
+/// [PrivateEquityKind.actionsSalarie] (BSPCE/stock-options/AGA), où le
+/// nombre de titres/options compte réellement : ce cas suit le flux
+/// générique quantité × prix, comme "Actions & Fonds". `privateEquityKind`
+/// à `null` (position créée avant l'ajout de cette variante) équivaut à
+/// [PrivateEquityKind.fonds]. Quand vrai, `quantity` vaut toujours `1.0` et
+/// le champ affiché à la saisie reçoit directement le montant total (voir
+/// `_commitCreateTransaction` dans `position_detail_dialog.dart`/
+/// `add_transaction_dialog.dart`/`complete_patrimoine_dialog.dart`, qui
+/// partagent ce même traitement).
+bool usesTotalAmountTransaction(
+  AssetClass assetClass, {
+  PrivateEquityKind? privateEquityKind,
+}) =>
+    assetClass == AssetClass.immobilier ||
+    (assetClass == AssetClass.privateEquity &&
+        privateEquityKind != PrivateEquityKind.actionsSalarie);
+
+/// Une transaction de [assetClass] peut-elle avoir un prix unitaire nul ?
+/// Vrai pour "Autres" (un objet peut avoir été reçu en cadeau) et pour un
+/// Private Equity [PrivateEquityKind.actionsSalarie] (une attribution
+/// gratuite d'actions — AGA — n'a pas de prix d'exercice, contrairement à un
+/// BSPCE/stock-option classique). Dans les deux cas, `PerformanceAmount`
+/// masque le pourcentage de plus-value plutôt que d'afficher un chiffre
+/// infini — voir `_commitCreateTransaction`/`_commitEditTransaction` dans
+/// `position_detail_dialog.dart`/`add_transaction_dialog.dart`/
+/// `complete_patrimoine_dialog.dart`, qui partagent ce même garde-fou.
+bool allowsFreeTransactionPrice(
+  AssetClass assetClass, {
+  PrivateEquityKind? privateEquityKind,
+}) =>
+    assetClass == AssetClass.autres ||
+    (assetClass == AssetClass.privateEquity &&
+        privateEquityKind == PrivateEquityKind.actionsSalarie);
 
 /// Une valeur a-t-elle besoin d'une précision au-delà du centime ? Les
 /// cryptomonnaies (quantités et cours ont un sens en dessous du centime) et
@@ -521,6 +604,34 @@ class Investment {
   /// la classe `actionsEtFonds` — voir [FundStyle].
   final FundStyle? fundStyle;
 
+  /// Variante d'un investissement `privateEquity`, pertinente seulement pour
+  /// cette classe — voir [PrivateEquityKind] (immuable après création,
+  /// contrairement à [fundStyle]/[realEstateType]).
+  final PrivateEquityKind? privateEquityKind;
+
+  /// Cliff et durée totale de vesting (en mois) d'un Private Equity
+  /// [PrivateEquityKind.actionsSalarie] (BSPCE/stock-options/AGA) — voir
+  /// [vestedQuantityFor]. `null` sur l'un ou l'autre signifie "vesting non
+  /// suivi" : [quantityHeld] est alors considéré entièrement acquis, comme
+  /// avant l'ajout de ces champs (purement additif). Un seul planning
+  /// s'applique à toutes les transactions de la position, comme
+  /// [pegPeeUnlockDateFor] applique une seule règle à 5 ans à chaque
+  /// versement PEG/PEE — pour un planning réellement différent par
+  /// attribution, créer une seconde position séparée plutôt que de forcer
+  /// un planning unique à s'appliquer à des lots hétérogènes. Contrairement
+  /// à [privateEquityKind], ces champs restent éditables après création : le
+  /// cliff/la durée exacts peuvent être mal connus au moment du grant, ou le
+  /// plan peut être amendé.
+  final int? vestingCliffMonths;
+  final int? vestingDurationMonths;
+
+  /// Date limite d'exercice d'un Private Equity [PrivateEquityKind.actionsSalarie]
+  /// (BSPCE/stock-options) — un rappel proactif à son approche est affiché
+  /// par `ReminderBanner` (`investment_reminder_banner.dart`), sur le même
+  /// principe que [accountFiscalMilestone] pour un compte. `null` tant que
+  /// non renseignée (pas de rappel).
+  final DateTime? exerciseDeadline;
+
   /// Surface habitable (m²) d'un bien immobilier — avec
   /// [estimatedPricePerSqm], permet de calculer [estimatedValue]. `null`
   /// tant que le bien n'a jamais été estimé (voir "Réestimer" dans
@@ -556,6 +667,19 @@ class Investment {
   /// selon la classe d'actif, jamais les deux).
   final double? manualPrice;
   final DateTime? manualPriceAt;
+
+  /// Valorisation totale estimée à la main, et la date de cette estimation —
+  /// utilisée par le Private Equity (voir [usesTotalAmountTransaction]) :
+  /// un fonds de club deal/FCPR n'a pas de notion de part boursière comme
+  /// un objet "Autres", seule la dernière valorisation communiquée par le
+  /// gérant (le NAV du fonds) compte, en montant total — contrairement à
+  /// [manualPrice] (un prix par unité, multiplié par [quantityHeld]) qui ne
+  /// conviendrait pas puisque [quantityHeld] n'a ici aucun sens de "parts
+  /// détenues" (chaque versement/distribution vaut toujours 1 en quantité,
+  /// voir `_commitCreateTransaction` dans `position_detail_dialog.dart`).
+  /// Alimente [estimatedValue] directement, sans multiplication.
+  final double? manualValuation;
+  final DateTime? manualValuationAt;
 
   final List<VaultDocument> documents;
 
@@ -597,6 +721,10 @@ class Investment {
     this.assetClass,
     this.realEstateType,
     this.fundStyle,
+    this.privateEquityKind,
+    this.vestingCliffMonths,
+    this.vestingDurationMonths,
+    this.exerciseDeadline,
     this.surfaceM2,
     this.addressLabel,
     this.addressCityCode,
@@ -606,6 +734,8 @@ class Investment {
     this.estimatedValueAt,
     this.manualPrice,
     this.manualPriceAt,
+    this.manualValuation,
+    this.manualValuationAt,
     this.documents = const [],
     this.rentPeriods = const [],
     this.workItems = const [],
@@ -624,6 +754,10 @@ class Investment {
     AssetClass? assetClass,
     RealEstateType? realEstateType,
     FundStyle? fundStyle,
+    PrivateEquityKind? privateEquityKind,
+    int? vestingCliffMonths,
+    int? vestingDurationMonths,
+    DateTime? exerciseDeadline,
     double? surfaceM2,
     String? addressLabel,
     String? addressCityCode,
@@ -633,6 +767,8 @@ class Investment {
     DateTime? estimatedValueAt,
     double? manualPrice,
     DateTime? manualPriceAt,
+    double? manualValuation,
+    DateTime? manualValuationAt,
     List<VaultDocument>? documents,
     List<RentPeriod>? rentPeriods,
     List<WorkItem>? workItems,
@@ -652,6 +788,10 @@ class Investment {
     assetClass: assetClass ?? this.assetClass,
     realEstateType: realEstateType ?? this.realEstateType,
     fundStyle: fundStyle ?? this.fundStyle,
+    privateEquityKind: privateEquityKind ?? this.privateEquityKind,
+    vestingCliffMonths: vestingCliffMonths ?? this.vestingCliffMonths,
+    vestingDurationMonths: vestingDurationMonths ?? this.vestingDurationMonths,
+    exerciseDeadline: exerciseDeadline ?? this.exerciseDeadline,
     surfaceM2: surfaceM2 ?? this.surfaceM2,
     addressLabel: addressLabel ?? this.addressLabel,
     addressCityCode: addressCityCode ?? this.addressCityCode,
@@ -661,6 +801,8 @@ class Investment {
     estimatedValueAt: estimatedValueAt ?? this.estimatedValueAt,
     manualPrice: manualPrice ?? this.manualPrice,
     manualPriceAt: manualPriceAt ?? this.manualPriceAt,
+    manualValuation: manualValuation ?? this.manualValuation,
+    manualValuationAt: manualValuationAt ?? this.manualValuationAt,
     documents: documents ?? this.documents,
     rentPeriods: rentPeriods ?? this.rentPeriods,
     workItems: workItems ?? this.workItems,
@@ -722,19 +864,21 @@ class Investment {
 
   /// Valeur estimée quand aucun cours de marché n'est possible : surface ×
   /// dernier prix/m² estimé pour l'immobilier (voir
-  /// `real_estate_pricing/`), ou quantité détenue × cours estimé à la main
-  /// par l'utilisateur pour un objet de collection ([manualPrice] — montre,
-  /// voiture, art...), exactement comme [marketValue] avec [lastPrice].
-  /// `null` tant qu'aucune des deux n'est renseignée. Un bien immobilier est
-  /// toujours détenu en une seule unité ([quantityHeld] == 1), donc
-  /// [surfaceM2] × [estimatedPricePerSqm] est déjà directement comparable à
-  /// [investedAmount] sans multiplication de quantité supplémentaire.
+  /// `real_estate_pricing/`), quantité détenue × cours estimé à la main par
+  /// l'utilisateur pour un objet de collection ([manualPrice] — montre,
+  /// voiture, art...), ou [manualValuation] tel quel (déjà un montant total,
+  /// pas un prix par unité) pour un Private Equity, exactement comme
+  /// [marketValue] avec [lastPrice]. `null` tant qu'aucune des trois n'est
+  /// renseignée. Un bien immobilier est toujours détenu en une seule unité
+  /// ([quantityHeld] == 1), donc [surfaceM2] × [estimatedPricePerSqm] est
+  /// déjà directement comparable à [investedAmount] sans multiplication de
+  /// quantité supplémentaire.
   double? get estimatedValue =>
       (surfaceM2 != null && estimatedPricePerSqm != null)
       ? surfaceM2! * estimatedPricePerSqm!
       : manualPrice != null
       ? quantityHeld * manualPrice!
-      : null;
+      : manualValuation;
 
   /// Meilleure valorisation connue hors montant investi : un cours de
   /// marché ([marketValue], jamais renseigné pour l'immobilier aujourd'hui)
@@ -788,6 +932,14 @@ class Investment {
         : null,
     realEstateType: RealEstateType.fromName(json['realEstateType'] as String?),
     fundStyle: FundStyle.fromName(json['fundStyle'] as String?),
+    privateEquityKind: PrivateEquityKind.fromName(
+      json['privateEquityKind'] as String?,
+    ),
+    vestingCliffMonths: json['vestingCliffMonths'] as int?,
+    vestingDurationMonths: json['vestingDurationMonths'] as int?,
+    exerciseDeadline: json['exerciseDeadline'] != null
+        ? DateTime.parse(json['exerciseDeadline'] as String)
+        : null,
     surfaceM2: (json['surfaceM2'] as num?)?.toDouble(),
     addressLabel: json['addressLabel'] as String?,
     addressCityCode: json['addressCityCode'] as String?,
@@ -800,6 +952,10 @@ class Investment {
     manualPrice: (json['manualPrice'] as num?)?.toDouble(),
     manualPriceAt: json['manualPriceAt'] != null
         ? DateTime.parse(json['manualPriceAt'] as String)
+        : null,
+    manualValuation: (json['manualValuation'] as num?)?.toDouble(),
+    manualValuationAt: json['manualValuationAt'] != null
+        ? DateTime.parse(json['manualValuationAt'] as String)
         : null,
     documents: (json['documents'] as List? ?? [])
         .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
@@ -833,6 +989,13 @@ class Investment {
     if (assetClass != null) 'assetClass': assetClass!.name,
     if (realEstateType != null) 'realEstateType': realEstateType!.name,
     if (fundStyle != null) 'fundStyle': fundStyle!.name,
+    if (privateEquityKind != null)
+      'privateEquityKind': privateEquityKind!.name,
+    if (vestingCliffMonths != null) 'vestingCliffMonths': vestingCliffMonths,
+    if (vestingDurationMonths != null)
+      'vestingDurationMonths': vestingDurationMonths,
+    if (exerciseDeadline != null)
+      'exerciseDeadline': exerciseDeadline!.toIso8601String(),
     if (surfaceM2 != null) 'surfaceM2': surfaceM2,
     if (addressLabel != null) 'addressLabel': addressLabel,
     if (addressCityCode != null) 'addressCityCode': addressCityCode,
@@ -845,6 +1008,9 @@ class Investment {
     if (manualPrice != null) 'manualPrice': manualPrice,
     if (manualPriceAt != null)
       'manualPriceAt': manualPriceAt!.toIso8601String(),
+    if (manualValuation != null) 'manualValuation': manualValuation,
+    if (manualValuationAt != null)
+      'manualValuationAt': manualValuationAt!.toIso8601String(),
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
     if (rentPeriods.isNotEmpty)
@@ -1346,6 +1512,56 @@ List<UnlockTranche> pegPeeUnlockTranches({
         }).toList()
         ..sort((a, b) => a.date.compareTo(b.date));
   return tranches;
+}
+
+/// Quantité vestée de [investment] à [asOf] (aujourd'hui par défaut) —
+/// pertinent seulement pour un Private Equity [PrivateEquityKind.actionsSalarie]
+/// suivant un cliff/une durée de vesting (voir [Investment.vestingCliffMonths]/
+/// [vestingDurationMonths]). Retourne [Investment.quantityHeld] tel quel si
+/// l'un des deux est `null` (vesting non suivi) : purement additif, ne change
+/// aucun calcul existant pour une position qui ne renseigne pas ces champs.
+///
+/// Chaque transaction d'achat véste linéairement entre sa date + le cliff
+/// (0 avant) et sa date + la durée totale (acquise à 100 % après) ; une
+/// vente est simplement soustraite du total vesté, sans appariement FIFO
+/// contre une tranche précise — c'est une métrique d'AFFICHAGE, jamais un
+/// calcul fiscal/légal, et dans l'usage réel une vente ne peut normalement
+/// intervenir qu'après livraison (donc après vesting complet), cas où les
+/// deux méthodes coïncident. `DateTime(year, month + N, day)` déborde
+/// correctement sur l'année suivante, mais pour un grant daté du 29-31 d'un
+/// mois, la date de cliff/vesting complet peut dériver de 1 à 3 jours sur le
+/// mois suivant si celui-ci est plus court (ex : 31 janvier + 1 mois → 2 ou
+/// 3 mars) — même tolérance que [pegPeeUnlockDateFor] pour l'année
+/// bissextile, acceptable pour une estimation d'affichage.
+double vestedQuantityFor(Investment investment, {DateTime? asOf}) {
+  final cliff = investment.vestingCliffMonths;
+  final duration = investment.vestingDurationMonths;
+  if (cliff == null || duration == null) return investment.quantityHeld;
+  final now = asOf ?? DateTime.now();
+  double vested = 0;
+  double sold = 0;
+  for (final t in investment.transactions) {
+    if (!t.isBuy) {
+      sold += t.quantity;
+      continue;
+    }
+    final cliffDate = DateTime(t.date.year, t.date.month + cliff, t.date.day);
+    final fullyVestedDate = DateTime(
+      t.date.year,
+      t.date.month + duration,
+      t.date.day,
+    );
+    if (!now.isBefore(fullyVestedDate)) {
+      vested += t.quantity;
+    } else if (!now.isBefore(cliffDate)) {
+      final totalDays = fullyVestedDate.difference(t.date).inDays;
+      final elapsedDays = now.difference(t.date).inDays;
+      vested += t.quantity * (totalDays == 0 ? 1 : elapsedDays / totalDays);
+    }
+  }
+  final result = vested - sold;
+  if (result <= 1e-9) return 0;
+  return result > investment.quantityHeld ? investment.quantityHeld : result;
 }
 
 /// Un établissement (banque, broker...) a-t-il un sens pour un compte de

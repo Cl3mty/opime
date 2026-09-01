@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/ui/frosted_card.dart';
+import '../../../core/ui/opime_date_picker.dart';
 import '../investment_identifier_field.dart';
 import '../investments_models.dart';
 
@@ -86,6 +87,13 @@ class InvestmentEditForm extends StatelessWidget {
   final TextEditingController labelController;
   final FundStyle? fundStyle;
   final ValueChanged<FundStyle?> onFundStyleChanged;
+  final PrivateEquityKind? privateEquityKind;
+  final int? vestingCliffMonths;
+  final ValueChanged<int?> onVestingCliffMonthsChanged;
+  final int? vestingDurationMonths;
+  final ValueChanged<int?> onVestingDurationMonthsChanged;
+  final DateTime? exerciseDeadline;
+  final ValueChanged<DateTime?> onExerciseDeadlineChanged;
   final VoidCallback onSave;
   final VoidCallback onCancel;
 
@@ -98,6 +106,13 @@ class InvestmentEditForm extends StatelessWidget {
     required this.labelController,
     required this.fundStyle,
     required this.onFundStyleChanged,
+    this.privateEquityKind,
+    this.vestingCliffMonths,
+    required this.onVestingCliffMonthsChanged,
+    this.vestingDurationMonths,
+    required this.onVestingDurationMonthsChanged,
+    this.exerciseDeadline,
+    required this.onExerciseDeadlineChanged,
     required this.onSave,
     required this.onCancel,
   });
@@ -171,6 +186,44 @@ class InvestmentEditForm extends StatelessWidget {
                     ),
                   ],
                 ],
+              ),
+            ],
+            if (assetClass == AssetClass.privateEquity &&
+                privateEquityKind == PrivateEquityKind.actionsSalarie) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      initialValue: vestingCliffMonths?.toString() ?? '',
+                      placeholder: const shadcn.Text(
+                        'Cliff (mois, facultatif)',
+                      ),
+                      onChanged: (v) =>
+                          onVestingCliffMonthsChanged(int.tryParse(v.trim())),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      initialValue: vestingDurationMonths?.toString() ?? '',
+                      placeholder: const shadcn.Text(
+                        'Durée de vesting (mois, facultatif)',
+                      ),
+                      onChanged: (v) => onVestingDurationMonthsChanged(
+                        int.tryParse(v.trim()),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              OpimeDatePicker(
+                value: exerciseDeadline,
+                onChanged: onExerciseDeadlineChanged,
+                placeholder: const shadcn.Text(
+                  'Date limite d\'exercice (facultative)',
+                ),
               ),
             ],
             const SizedBox(height: 12),

@@ -190,6 +190,10 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   bool _creatingDevise = false;
   RealEstateType _realEstateType = RealEstateType.residencePrincipale;
   FundStyle? _fundStyle;
+  PrivateEquityKind _privateEquityKind = PrivateEquityKind.fonds;
+  final _vestingCliffController = TextEditingController();
+  final _vestingDurationController = TextEditingController();
+  DateTime? _exerciseDeadline;
   final _isinController = TextEditingController();
   final _labelController = TextEditingController();
 
@@ -274,6 +278,8 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     _accountNameController.dispose();
     _accountBankController.dispose();
     _accountDescriptionController.dispose();
+    _vestingCliffController.dispose();
+    _vestingDurationController.dispose();
     _isinController.dispose();
     _labelController.dispose();
     _quantityController.dispose();
@@ -551,6 +557,11 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     if (investment == null || account == null) return 'Quantité';
     final effectiveClass = investment.assetClass ?? account.assetClass;
     if (effectiveClass == AssetClass.immobilier) return 'Montant total (€)';
+    if (effectiveClass == AssetClass.privateEquity &&
+        investment.privateEquityKind != PrivateEquityKind.actionsSalarie) {
+      return 'Montant versé (€)';
+    }
+    if (effectiveClass == AssetClass.privateEquity) return 'Nombre de titres/options';
     if (_investmentIsCurrency) {
       return _isEurCurrency ? 'Montant (€)' : 'Montant (${investment.isin})';
     }
@@ -566,12 +577,17 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   }
 
   /// Le sélecteur de devise s'affiche sur le champ prix dès qu'il est
-  /// pertinent : hors immobilier (pas de prix unitaire), et hors position
-  /// en devise — dont le "prix" est déjà le taux de change en euros (voir
-  /// `_investmentIsCurrency`).
+  /// pertinent : hors classes à montant total (immobilier, Private Equity —
+  /// voir [usesTotalAmountTransaction], pas de prix unitaire), et hors
+  /// position en devise — dont le "prix" est déjà le taux de change en
+  /// euros (voir `_investmentIsCurrency`).
   bool get _showCurrencySelector =>
       !_isEurCurrency &&
-      _assetClass != AssetClass.immobilier &&
+      (_assetClass == null ||
+          !usesTotalAmountTransaction(
+            _assetClass!,
+            privateEquityKind: _investment?.privateEquityKind,
+          )) &&
       !_investmentIsCurrency;
 
   void _selectAssetClass(AssetClass assetClass) {
@@ -900,6 +916,24 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       fundStyle: assetClass == AssetClass.actionsEtFonds && !_creatingDevise
           ? _fundStyle
           : null,
+      privateEquityKind: assetClass == AssetClass.privateEquity
+          ? _privateEquityKind
+          : null,
+      vestingCliffMonths:
+          assetClass == AssetClass.privateEquity &&
+              _privateEquityKind == PrivateEquityKind.actionsSalarie
+          ? int.tryParse(_vestingCliffController.text.trim())
+          : null,
+      vestingDurationMonths:
+          assetClass == AssetClass.privateEquity &&
+              _privateEquityKind == PrivateEquityKind.actionsSalarie
+          ? int.tryParse(_vestingDurationController.text.trim())
+          : null,
+      exerciseDeadline:
+          assetClass == AssetClass.privateEquity &&
+              _privateEquityKind == PrivateEquityKind.actionsSalarie
+          ? _exerciseDeadline
+          : null,
     );
     final updatedAccount = account.copyWith(
       investments: [...account.investments, investment],
@@ -916,6 +950,10 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       _creatingInvestment = false;
       _creatingDevise = false;
       _fundStyle = null;
+      _privateEquityKind = PrivateEquityKind.fonds;
+      _vestingCliffController.clear();
+      _vestingDurationController.clear();
+      _exerciseDeadline = null;
       _step = _Step.transaction;
       _pendingTransactionId = _usesTransactionScopedDocuments
           ? generateInvestmentId('txn')
@@ -950,11 +988,16 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     final account = _account;
     final investment = _investment;
     final date = _txnDate;
-    final isImmobilier = _assetClass == AssetClass.immobilier;
-    final quantity = isImmobilier
+    final isTotalAmount =
+        _assetClass != null &&
+        usesTotalAmountTransaction(
+          _assetClass!,
+          privateEquityKind: investment?.privateEquityKind,
+        );
+    final quantity = isTotalAmount
         ? 1.0
         : parseDecimal(_quantityController.text);
-    final price = isImmobilier
+    final price = isTotalAmount
         ? parseDecimal(_quantityController.text)
         : _isEurCurrency
         ? 1.0
@@ -977,7 +1020,12 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     final invalidPrice =
         price == null ||
         price < 0 ||
-        (price == 0 && _assetClass != AssetClass.autres);
+        (price == 0 &&
+            (_assetClass == null ||
+                !allowsFreeTransactionPrice(
+                  _assetClass!,
+                  privateEquityKind: investment?.privateEquityKind,
+                )));
     if (account == null ||
         investment == null ||
         date == null ||
@@ -1347,6 +1395,14 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
               setState(() => _realEstateType = type),
           fundStyle: _fundStyle,
           onFundStyleChanged: (style) => setState(() => _fundStyle = style),
+          privateEquityKind: _privateEquityKind,
+          onPrivateEquityKindChanged: (kind) =>
+              setState(() => _privateEquityKind = kind),
+          vestingCliffController: _vestingCliffController,
+          vestingDurationController: _vestingDurationController,
+          exerciseDeadline: _exerciseDeadline,
+          onExerciseDeadlineChanged: (date) =>
+              setState(() => _exerciseDeadline = date),
           onBack: () => setState(() {
             _step = _assetClass == AssetClass.immobilier
                 ? _Step.assetClass
@@ -1378,7 +1434,12 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           quantityLabel: _quantityFieldLabel,
           priceLabel: _priceFieldLabel,
           showPriceField:
-              !_isEurCurrency && _assetClass != AssetClass.immobilier,
+              !_isEurCurrency &&
+              (_assetClass == null ||
+                  !usesTotalAmountTransaction(
+                    _assetClass!,
+                    privateEquityKind: _investment?.privateEquityKind,
+                  )),
           showCurrencySelector: _showCurrencySelector,
           priceCurrencyController: _priceCurrencyController,
           currencyExtraOptions: _assetClass == AssetClass.crypto
@@ -2169,6 +2230,12 @@ class _InvestmentStep extends StatelessWidget {
   final ValueChanged<RealEstateType> onRealEstateTypeChanged;
   final FundStyle? fundStyle;
   final ValueChanged<FundStyle?> onFundStyleChanged;
+  final PrivateEquityKind privateEquityKind;
+  final ValueChanged<PrivateEquityKind> onPrivateEquityKindChanged;
+  final TextEditingController vestingCliffController;
+  final TextEditingController vestingDurationController;
+  final DateTime? exerciseDeadline;
+  final ValueChanged<DateTime?> onExerciseDeadlineChanged;
   final VoidCallback onBack;
   final ValueChanged<String> onSelectInvestment;
   final VoidCallback onStartCreate;
@@ -2201,6 +2268,12 @@ class _InvestmentStep extends StatelessWidget {
     required this.onRealEstateTypeChanged,
     required this.fundStyle,
     required this.onFundStyleChanged,
+    required this.privateEquityKind,
+    required this.onPrivateEquityKindChanged,
+    required this.vestingCliffController,
+    required this.vestingDurationController,
+    required this.exerciseDeadline,
+    required this.onExerciseDeadlineChanged,
     required this.onBack,
     required this.onSelectInvestment,
     required this.onStartCreate,
@@ -2347,6 +2420,59 @@ class _InvestmentStep extends StatelessWidget {
                     autofocus: true,
                   ),
                   const SizedBox(height: 8),
+                ],
+                if (assetClass == AssetClass.privateEquity) ...[
+                  Select<PrivateEquityKind>(
+                    value: privateEquityKind,
+                    onChanged: (kind) {
+                      if (kind != null) onPrivateEquityKindChanged(kind);
+                    },
+                    itemBuilder: (context, kind) => shadcn.Text(kind.label),
+                    popup: (context) => SelectPopup(
+                      items: SelectItemList(
+                        children: [
+                          for (final kind in PrivateEquityKind.values)
+                            SelectItemButton(
+                              value: kind,
+                              child: shadcn.Text(kind.label),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (privateEquityKind == PrivateEquityKind.actionsSalarie) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: vestingCliffController,
+                            placeholder: const shadcn.Text(
+                              'Cliff (mois, facultatif)',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: vestingDurationController,
+                            placeholder: const shadcn.Text(
+                              'Durée de vesting (mois, facultatif)',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    OpimeDatePicker(
+                      value: exerciseDeadline,
+                      onChanged: onExerciseDeadlineChanged,
+                      placeholder: const shadcn.Text(
+                        'Date limite d\'exercice (facultative)',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                 ],
                 InvestmentIdentifierField(
                   assetClass: assetClass,

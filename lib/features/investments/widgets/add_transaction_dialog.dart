@@ -313,9 +313,26 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   bool get _isEurCurrency =>
       _isCurrency && _selectedInvestment!.isin.trim().toUpperCase() == 'EUR';
 
-  bool get _showCurrencySelector => !_isEurCurrency && !_isCurrency;
+  /// Voir [usesTotalAmountTransaction] : un immobilier (SCPI logée en
+  /// assurance vie, voir `accountAcceptsCrossClassInvestment`) ou un
+  /// Private Equity créés/complétés depuis ce dialogue reçoivent le même
+  /// traitement "montant total" que dans `position_detail_dialog.dart`.
+  bool get _usesTotalAmount => usesTotalAmountTransaction(
+    _effectiveClass,
+    privateEquityKind: _selectedInvestment?.privateEquityKind,
+  );
+
+  bool get _showCurrencySelector =>
+      !_isEurCurrency && !_usesTotalAmount && !_isCurrency;
 
   String get _quantityFieldLabel {
+    if (_effectiveClass == AssetClass.immobilier) return 'Montant total (€)';
+    if (_effectiveClass == AssetClass.privateEquity) {
+      return _selectedInvestment?.privateEquityKind ==
+              PrivateEquityKind.actionsSalarie
+          ? 'Nombre de titres/options'
+          : 'Montant versé (€)';
+    }
     if (!_isCurrency) return 'Quantité';
     final isin = _selectedInvestment!.isin;
     return _isEurCurrency ? 'Montant (€)' : 'Montant ($isin)';
@@ -339,8 +356,14 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
 
   Future<void> _commit() async {
     final date = _date;
-    final quantity = parseDecimal(_quantityController.text);
-    final price = _isEurCurrency ? 1.0 : parseDecimal(_priceController.text);
+    final quantity = _usesTotalAmount
+        ? 1.0
+        : parseDecimal(_quantityController.text);
+    final price = _usesTotalAmount
+        ? parseDecimal(_quantityController.text)
+        : _isEurCurrency
+        ? 1.0
+        : parseDecimal(_priceController.text);
     final currency = _txnCurrency;
     final fxRateToEur = _txnFxRateToEur;
     // Un objet "Autres" peut avoir été reçu en cadeau (prix d'achat 0) —
@@ -351,7 +374,11 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     final invalidPrice =
         price == null ||
         price < 0 ||
-        (price == 0 && _effectiveClass != AssetClass.autres);
+        (price == 0 &&
+            !allowsFreeTransactionPrice(
+              _effectiveClass,
+              privateEquityKind: _selectedInvestment?.privateEquityKind,
+            ));
     if (date == null ||
         quantity == null ||
         quantity <= 0 ||
@@ -504,7 +531,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     noteController: _noteController,
                     quantityLabel: _quantityFieldLabel,
                     priceLabel: _priceFieldLabel,
-                    showPriceField: !_isEurCurrency,
+                    showPriceField: !_isEurCurrency && !_usesTotalAmount,
                     showCurrencySelector: _showCurrencySelector,
                     priceCurrencyController: _priceCurrencyController,
                     currencyExtraOptions: _effectiveClass == AssetClass.crypto

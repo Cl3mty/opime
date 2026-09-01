@@ -301,6 +301,152 @@ void main() {
     );
 
     testWidgets(
+      'Private Equity : l\'identifiant est facultatif (pas d\'ISIN pour un '
+      'club deal/FCPR) — laissé vide, un identifiant technique est généré '
+      'plutôt que de bloquer la création, et l\'étape transaction affiche '
+      'un seul champ "Montant versé (€)", sans prix unitaire',
+      (tester) async {
+        final account = InvestmentAccount(
+          assetClass: AssetClass.privateEquity,
+          envelope: AccountEnvelope.fcprFcpi,
+          name: 'Moonfare',
+          bankName: 'Moonfare',
+          investments: const [],
+        );
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(account),
+        );
+
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.privateEquity,
+          initialAccountId: account.id,
+          awaitedText: 'Quel investissement ?',
+        );
+
+        await tester.tap(find.text('Nouvel investissement'));
+        await tester.pump();
+
+        expect(
+          find.text('Identifiant (optionnel : laisse vide si le fonds n\'en '
+              'a pas)'),
+          findsOneWidget,
+        );
+
+        // Libellé seul, identifiant laissé vide.
+        await tester.enterText(
+          find.byType(TextField).first,
+          'Ardian Expansion Fund V',
+        );
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Créer l\'investissement'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pumpAndSettle();
+
+        // L'étape transaction du fonds tout juste créé : montant total,
+        // pas de prix unitaire (voir usesTotalAmountTransaction).
+        expect(find.text('Montant versé (€)'), findsOneWidget);
+        expect(find.text('Prix unitaire'), findsNothing);
+
+        final saved = await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).listAll(),
+        );
+        final investment = saved!.single.investments.single;
+        expect(investment.label, 'Ardian Expansion Fund V');
+        expect(isGeneratedIdentifier(investment.isin), isTrue);
+        expect(investment.isin, startsWith('pe-'));
+      },
+    );
+
+    testWidgets(
+      'Private Equity : le sélecteur de variante ("Fonds" / "Rémunération '
+      'en actions") existe à l\'étape de création d\'un nouvel '
+      'investissement — l\'interaction avec le popup shadcn_flutter Select '
+      'lui-même n\'est pas testable dans ce harnais (même limitation "No '
+      'DrawerOverlay found" que le menu "⋮" de `position_detail_dialog.dart`, '
+      'voir le plan)',
+      (tester) async {
+        final account = InvestmentAccount(
+          assetClass: AssetClass.privateEquity,
+          envelope: AccountEnvelope.fcprFcpi,
+          name: 'Ma startup',
+          bankName: 'Ma startup',
+          investments: const [],
+        );
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(account),
+        );
+
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.privateEquity,
+          initialAccountId: account.id,
+          awaitedText: 'Quel investissement ?',
+        );
+
+        await tester.tap(find.text('Nouvel investissement'));
+        await tester.pump();
+
+        expect(find.byType(Select<PrivateEquityKind>), findsOneWidget);
+        // Mode par défaut "Fonds" : les champs de vesting/échéance
+        // d'exercice (réservés à "Rémunération en actions") ne s'affichent
+        // pas — changer de variante nécessiterait d'ouvrir le popup Select,
+        // non pilotable dans ce harnais (voir la note ci-dessus).
+        expect(find.text('Cliff (mois, facultatif)'), findsNothing);
+        expect(
+          find.text('Durée de vesting (mois, facultatif)'),
+          findsNothing,
+        );
+        expect(
+          find.text('Date limite d\'exercice (facultative)'),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets(
+      'Private Equity "Rémunération en actions" (BSPCE/stock-options/AGA) : '
+      'l\'étape transaction d\'une position déjà créée en ce mode affiche '
+      '"Nombre de titres/options" et un champ prix, pas "Montant versé (€)" '
+      'comme un fonds',
+      (tester) async {
+        final equityGrant = Investment(
+          isin: 'pe-startup',
+          label: 'Ma startup SAS',
+          assetClass: AssetClass.privateEquity,
+          privateEquityKind: PrivateEquityKind.actionsSalarie,
+          transactions: const [],
+        );
+        final account = InvestmentAccount(
+          assetClass: AssetClass.privateEquity,
+          envelope: AccountEnvelope.fcprFcpi,
+          name: 'Ma startup',
+          bankName: 'Ma startup',
+          investments: [equityGrant],
+        );
+        await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).saveAccount(account),
+        );
+
+        await pumpDialogWithFocus(
+          tester,
+          initialAssetClass: AssetClass.privateEquity,
+          initialAccountId: account.id,
+          initialInvestmentId: equityGrant.id,
+          awaitedText: 'Ajouter une transaction',
+        );
+
+        // Contrairement au mode "Fonds" : quantité réelle de titres, un
+        // champ prix visible (0 accepté pour une AGA — voir
+        // allowsFreeTransactionPrice).
+        expect(find.text('Nombre de titres/options'), findsOneWidget);
+        expect(find.text('Montant versé (€)'), findsNothing);
+        expect(find.text('Prix unitaire'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'remonter d\'une étape depuis "Quel investissement ?" atteint via '
       'initialAccountId ne plante pas (régression : null check operator '
       'used on a null value — _pendingEstablishmentName jamais renseigné '
