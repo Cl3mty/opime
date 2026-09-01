@@ -220,6 +220,28 @@ class _StrategyScreenState extends State<StrategyScreen> {
     _openNoteDetail(context, note);
   }
 
+  /// Duplique la note [id] : même dossier que l'original (lu depuis
+  /// [_folderState], déjà en mémoire — pas de lecture disque
+  /// supplémentaire), documents rattachés volontairement non dupliqués
+  /// (voir le plan). Sélectionne directement le duplicata, prêt à éditer.
+  Future<StrategyNote> _duplicateNote(String id) async {
+    final duplicate = await _repo.duplicateNote(id);
+    final originalFolderId = _folderState.value.noteFolders[id];
+    if (originalFolderId != null) {
+      await _foldersRepo.moveNoteToFolder(duplicate.id, originalFolderId);
+    }
+    await _loadNotes();
+    await _loadFolders();
+    if (mounted) setState(() => _selectedId = duplicate.id);
+    return duplicate;
+  }
+
+  Future<void> _duplicateNoteMobile(BuildContext context, String id) async {
+    final duplicate = await _duplicateNote(id);
+    if (!mounted || !context.mounted) return;
+    _openNoteDetail(context, duplicate);
+  }
+
   void _openNoteDetail(BuildContext context, StrategyNote note) {
     setState(() => _selectedId = note.id);
     Navigator.of(context).push(
@@ -269,6 +291,7 @@ class _StrategyScreenState extends State<StrategyScreen> {
               showSearch: true,
               onCreate: () => _createNoteMobile(context),
               onDelete: _deleteNote,
+              onDuplicate: (id) => _duplicateNoteMobile(context, id),
               onOpen: (note) => _openNoteDetail(context, note),
               onCreateFolder: _createFolder,
               onRenameFolder: _renameFolder,
@@ -294,6 +317,7 @@ class _StrategyScreenState extends State<StrategyScreen> {
             selectedId: _selectedId,
             onCreate: _createNoteDesktop,
             onDelete: _deleteNote,
+            onDuplicate: _duplicateNote,
             onOpen: (note) => _selectNote(note.id),
             onCreateFolder: _createFolder,
             onRenameFolder: _renameFolder,
@@ -330,6 +354,7 @@ class _NotesListPanel extends StatefulWidget {
   final String? selectedId;
   final ValueChanged<StrategyNote> onOpen;
   final ValueChanged<String> onDelete;
+  final Future<void> Function(String id) onDuplicate;
   final VoidCallback onCreate;
   final bool showSearch;
 
@@ -346,6 +371,7 @@ class _NotesListPanel extends StatefulWidget {
     required this.selectedId,
     required this.onOpen,
     required this.onDelete,
+    required this.onDuplicate,
     required this.onCreate,
     this.showSearch = false,
     required this.onCreateFolder,
@@ -592,6 +618,11 @@ class _NotesListPanelState extends State<_NotesListPanel> {
               leading: const Icon(LucideIcons.folderInput, size: 14),
               child: const shadcn.Text('Déplacer vers un dossier'),
               onPressed: (_) => _promptMoveToFolder(context, note, folders),
+            ),
+            MenuButton(
+              leading: const Icon(LucideIcons.copyPlus, size: 14),
+              child: const shadcn.Text('Dupliquer'),
+              onPressed: (_) => widget.onDuplicate(note.id),
             ),
             MenuButton(
               leading: const Icon(LucideIcons.trash2, size: 14),

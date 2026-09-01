@@ -66,6 +66,19 @@ class StrategyRepository {
         : firstLine.replaceFirst(RegExp(r'^#+\s*'), '').trim();
   }
 
+  /// Insère " (copie)" à la fin de la première ligne non vide (le titre,
+  /// voir [_titleFromMarkdown]) pour distinguer visuellement un duplicata de
+  /// son original dans la liste — voir [duplicateNote]. Le reste du contenu
+  /// n'est jamais modifié. Sans ligne non vide (note vide), retombe sur un
+  /// titre par défaut plutôt que de produire une note sans titre.
+  String _withCopySuffix(String markdown) {
+    final lines = markdown.split('\n');
+    final index = lines.indexWhere((l) => l.trim().isNotEmpty);
+    if (index == -1) return '# Nouvelle note (copie)\n';
+    lines[index] = '${lines[index].trimRight()} (copie)';
+    return lines.join('\n');
+  }
+
   /// L'id est un timestamp de création (millisecondsSinceEpoch). On s'en sert
   /// comme clé de tri stable, plutôt que la date de modification du fichier
   /// (qui change à chaque autosave et ferait "sauter" les notes dans la liste).
@@ -141,6 +154,25 @@ class StrategyRepository {
     return StrategyNote(
       id: id,
       title: 'Nouvelle note',
+      updatedAt: now,
+      createdAt: now,
+    );
+  }
+
+  /// Duplique le contenu de la note [id] dans une nouvelle note indépendante
+  /// (nouvel id, titre suffixé — voir [_withCopySuffix]) — l'appelant
+  /// (`StrategyScreen`) est responsable de reporter son éventuelle
+  /// affectation à un dossier, celle-ci vivant dans
+  /// `StrategyFoldersRepository`, hors de ce repository.
+  Future<StrategyNote> duplicateNote(String id) async {
+    await _ensureDir();
+    final duplicated = _withCopySuffix(await readNote(id));
+    final newId = DateTime.now().millisecondsSinceEpoch.toString();
+    await writeNote(newId, duplicated);
+    final now = DateTime.now();
+    return StrategyNote(
+      id: newId,
+      title: _titleFromMarkdown(duplicated),
       updatedAt: now,
       createdAt: now,
     );

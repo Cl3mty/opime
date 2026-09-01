@@ -96,6 +96,51 @@ void main() {
   });
 
   test(
+    'duplicateNote crée un nouvel id distinct, avec "(copie)" suffixant le '
+    'titre (première ligne), sans toucher au reste du contenu',
+    () async {
+      final note = await repo.createNote();
+      await repo.writeNote(
+        note.id,
+        '# Ma stratégie\n\nContenu détaillé.\nSuite.',
+      );
+
+      final duplicate = await repo.duplicateNote(note.id);
+
+      expect(duplicate.id, isNot(note.id));
+      expect(duplicate.title, 'Ma stratégie (copie)');
+      expect(
+        await repo.readNote(duplicate.id),
+        '# Ma stratégie (copie)\n\nContenu détaillé.\nSuite.',
+      );
+    },
+  );
+
+  test('duplicateNote laisse l\'original totalement inchangé', () async {
+    final note = await repo.createNote();
+    await repo.writeNote(note.id, '# Original\n\nTexte.');
+
+    await repo.duplicateNote(note.id);
+
+    expect(await repo.readNote(note.id), '# Original\n\nTexte.');
+    final notes = await repo.listNotes();
+    expect(notes, hasLength(2));
+  });
+
+  test(
+    'duplicateNote d\'une note sans ligne non vide retombe sur un titre '
+    'par défaut, plutôt qu\'un duplicata sans titre',
+    () async {
+      final note = await repo.createNote();
+      await repo.writeNote(note.id, '');
+
+      final duplicate = await repo.duplicateNote(note.id);
+
+      expect(duplicate.title, 'Nouvelle note (copie)');
+    },
+  );
+
+  test(
     'listNotes trie par date de création (id), la plus récente en premier',
     () async {
       final older = await repo.createNote();

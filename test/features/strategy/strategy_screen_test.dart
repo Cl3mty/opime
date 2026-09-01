@@ -218,6 +218,57 @@ void main() {
   );
 
   testWidgets(
+    'dupliquer une note (sans dossier) ajoute une seconde note dont le '
+    'titre se termine par "(copie)", sans modifier l\'original',
+    (tester) async {
+      await pumpScreen(tester);
+      final existingId = (await readAsync(tester, repo.listNotes)).single.id;
+      await tester.runAsync(
+        () => repo.writeNote(existingId, '# Ma note'),
+      );
+
+      await tester.tap(find.byIcon(LucideIcons.ellipsisVertical).last);
+      await tester.pumpAndSettle();
+      await tapAndSettle(tester, find.text('Dupliquer'));
+
+      final notes = await readAsync(tester, repo.listNotes);
+      expect(notes, hasLength(2));
+      expect(
+        notes.any((n) => n.title == 'Ma note (copie)'),
+        isTrue,
+        reason: 'Le duplicata devrait porter le titre suffixé',
+      );
+      expect(
+        notes.any((n) => n.title == 'Ma note'),
+        isTrue,
+        reason: 'L\'original ne devrait pas avoir été modifié',
+      );
+    },
+  );
+
+  testWidgets(
+    'dupliquer une note rangée dans un dossier place le duplicata dans le '
+    'même dossier',
+    (tester) async {
+      await pumpScreen(tester);
+      await createFolder(tester, 'Impôts');
+      await moveNoteToFolder(tester, 'Impôts');
+
+      await tester.tap(find.byIcon(LucideIcons.ellipsisVertical).last);
+      await tester.pumpAndSettle();
+      await tapAndSettle(tester, find.text('Dupliquer'));
+
+      final notes = await readAsync(tester, repo.listNotes);
+      final noteFolders = await readAsync(tester, foldersRepo.noteFolders);
+      final folder = (await readAsync(tester, foldersRepo.listFolders)).single;
+      expect(notes, hasLength(2));
+      for (final note in notes) {
+        expect(noteFolders[note.id], folder.id);
+      }
+    },
+  );
+
+  testWidgets(
     'le chevron d\'un dossier replie/déplie ses notes, sans agir sur les '
     'autres dossiers',
     (tester) async {
