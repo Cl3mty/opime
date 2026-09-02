@@ -1,4 +1,6 @@
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/asset_table_header_cell.dart';
 import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/dashboard/widgets/category_breakdown_card.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -348,6 +350,41 @@ void main() {
 
         expect(find.text('+/- value'), findsNothing);
         expect(find.text('Évolution'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'survoler l\'en-tête "Valeur" affiche son explication (bulle '
+      'partagée — voir asset_table_header_cell_test.dart)',
+      (tester) async {
+        await tester.pumpWidget(
+          ShadcnApp(
+            home: Scaffold(
+              child: CategoryBreakdownCard(
+                title: 'Actifs',
+                categories: [category()],
+                hidden: false,
+                period: DashboardPeriod.all,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        addTearDown(gesture.removePointer);
+        await gesture.addPointer(location: Offset.zero);
+        await tester.pump();
+        await gesture.moveTo(tester.getCenter(find.text('Valeur').first));
+
+        final explanation = find.text(assetTableColumnExplanations['Valeur']!);
+        for (var i = 0; i < 20 && explanation.evaluate().isEmpty; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+
+        expect(explanation, findsOneWidget);
       },
     );
   });

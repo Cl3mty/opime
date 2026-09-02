@@ -676,10 +676,28 @@ String _naOr(double? value, String Function(double) format) =>
 
 String _percent(double value) => displayPercent(value * 100);
 
-Widget _cardTitle(String title, {String? caption}) => Row(
+Widget _cardTitle(
+  BuildContext context,
+  String title, {
+  String? caption,
+  String? tooltip,
+}) => Row(
   crossAxisAlignment: CrossAxisAlignment.center,
   children: [
     shadcn.Text(title).semiBold().large(),
+    if (tooltip != null) ...[
+      const SizedBox(width: 6),
+      Tooltip(
+        tooltip: (context) => TooltipContainer(
+          child: SizedBox(width: 260, child: shadcn.Text(tooltip)),
+        ),
+        child: Icon(
+          LucideIcons.info,
+          size: 15,
+          color: Theme.of(context).colorScheme.mutedForeground,
+        ),
+      ),
+    ],
     if (caption != null) ...[
       const SizedBox(width: 8),
       shadcn.Text(caption).muted().xSmall(),
@@ -701,7 +719,15 @@ class _FundStyleCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _cardTitle('Style de gestion', caption: 'Actions & Fonds · aujourd\'hui'),
+            _cardTitle(
+              context,
+              'Style de gestion',
+              caption: 'Actions & Fonds · aujourd\'hui',
+              tooltip:
+                  'Répartition de la valeur des investissements Actions & '
+                  'Fonds par style de gestion (gestion active, indicielle...), '
+                  'en % de la valeur totale de cette classe.',
+            ),
             const SizedBox(height: 12),
             if (allocation.isEmpty)
               shadcn.Text(
@@ -784,7 +810,7 @@ class _RiskReturnCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _cardTitle('Risque et rendement'),
+            _cardTitle(context, 'Risque et rendement'),
             const SizedBox(height: 4),
             shadcn.Text(
               'Bêta face au benchmark configuré dans la carte Alpha vs '
@@ -1000,7 +1026,14 @@ class _CorrelationCardState extends State<_CorrelationCard> {
                     icon: const Icon(LucideIcons.arrowLeft, size: 16),
                     onPressed: () => setState(() => _drilledInto = null),
                   ),
-                _cardTitle(title),
+                _cardTitle(
+                  context,
+                  title,
+                  tooltip:
+                      'Indique si les lignes affichées évoluent ensemble : '
+                      'proche de 0 (ou négatif) = bien diversifié, proche '
+                      'de 1 = elles bougent presque toutes ensemble.',
+                ),
               ],
             ),
             if (avgCorrelation != null) ...[
@@ -1043,7 +1076,14 @@ class _TriCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _cardTitle('TRI (rendement money-weighted)'),
+            _cardTitle(
+              context,
+              'TRI (rendement money-weighted)',
+              tooltip:
+                  'Rendement calculé en tenant compte du montant et de la '
+                  'date de chaque versement (méthode MWR) : il reflète le '
+                  'rendement réellement perçu.',
+            ),
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1098,7 +1138,15 @@ class _UnrealizedGainCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            _cardTitle('Plus-value latente', caption: 'Aujourd\'hui'),
+            _cardTitle(
+              context,
+              'Plus-value latente',
+              caption: 'Aujourd\'hui',
+              tooltip:
+                  'Ce que la vente immédiate de tout le patrimoine '
+                  'rapporterait au-delà du coût d\'acquisition — '
+                  'indépendant de la période sélectionnée.',
+            ),
             const Spacer(),
             shadcn.Text(
               plusValuePercent == null
@@ -1195,34 +1243,19 @@ class _AlphaCardState extends State<_AlphaCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                _cardTitle('Alpha vs benchmark', caption: 'Actions & Fonds'),
-                const SizedBox(width: 6),
-                Tooltip(
-                  tooltip: (context) => const TooltipContainer(
-                    child: SizedBox(
-                      width: 280,
-                      child: shadcn.Text(
-                        'Le portefeuille réel est comparé à ce que les '
-                        'mêmes versements (mêmes dates, mêmes montants) '
-                        'auraient donné investis dans le benchmark à la '
-                        'place, plutôt qu\'un indice supposé investi à '
-                        '100 % dès le début de la période — un apport '
-                        'récent n\'est jamais jugé comme s\'il avait '
-                        'fructifié depuis toujours. Alpha = rendement '
-                        'réel du portefeuille − rendement que ces mêmes '
-                        'flux auraient fait dans le benchmark (deux MWR).',
-                      ),
-                    ),
-                  ),
-                  child: Icon(
-                    LucideIcons.info,
-                    size: 15,
-                    color: theme.colorScheme.mutedForeground,
-                  ),
-                ),
-              ],
+            _cardTitle(
+              context,
+              'Alpha vs benchmark',
+              caption: 'Actions & Fonds',
+              tooltip:
+                  'Le portefeuille réel est comparé à ce que les mêmes '
+                  'versements (mêmes dates, mêmes montants) auraient donné '
+                  'investis dans le benchmark à la place, plutôt qu\'un '
+                  'indice supposé investi à 100 % dès le début de la '
+                  'période — un apport récent n\'est jamais jugé comme '
+                  's\'il avait fructifié depuis toujours. Alpha = rendement '
+                  'réel du portefeuille − rendement que ces mêmes flux '
+                  'auraient fait dans le benchmark (deux MWR).',
             ),
             const SizedBox(height: 12),
             Row(
@@ -1338,7 +1371,11 @@ class _DebtLeverageCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _cardTitle('Endettement et levier', caption: 'Aujourd\'hui'),
+            _cardTitle(
+              context,
+              'Endettement et levier',
+              caption: 'Aujourd\'hui',
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 16,
@@ -1355,14 +1392,28 @@ class _DebtLeverageCard extends StatelessWidget {
                 _StatChip(
                   label: 'Taux d\'endettement (actifs)',
                   value: _naOr(debtRatioAssets, _percent),
+                  tooltip:
+                      'Dette totale rapportée aux actifs totaux — plus il '
+                      'est élevé, plus le patrimoine est financé par '
+                      'l\'emprunt.',
                 ),
                 _StatChip(
                   label: 'Taux d\'endettement (revenus)',
                   value: debtRatioIncome == null
                       ? 'Renseignez vos revenus du mois dans Budget > Suivi'
                       : _percent(debtRatioIncome!),
+                  tooltip:
+                      'Mensualités de crédit rapportées aux revenus '
+                      'mensuels renseignés dans Budget > Suivi.',
                 ),
-                _StatChip(label: 'Levier', value: _naOr(leverage, (v) => v.toStringAsFixed(2))),
+                _StatChip(
+                  label: 'Levier',
+                  value: _naOr(leverage, (v) => v.toStringAsFixed(2)),
+                  tooltip:
+                      'Actifs totaux rapportés au patrimoine net — '
+                      'au-dessus de 1, une partie des actifs est financée '
+                      'par la dette.',
+                ),
               ],
             ),
           ],
@@ -1376,11 +1427,18 @@ class _StatChip extends StatelessWidget {
   final String label;
   final String value;
 
-  const _StatChip({required this.label, required this.value});
+  /// Bulle d'explication au survol du libellé, quand il n'est pas
+  /// auto-explicite (ex : "Levier", "Taux d'endettement (actifs)") — même
+  /// motif que les en-têtes de colonne de [_RiskReturnCard]. `null`
+  /// (défaut) laisse le libellé nu, comme aujourd'hui.
+  final String? tooltip;
+
+  const _StatChip({required this.label, required this.value, this.tooltip});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final labelText = shadcn.Text(label).muted().xSmall();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -1391,7 +1449,14 @@ class _StatChip extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          shadcn.Text(label).muted().xSmall(),
+          tooltip == null
+              ? labelText
+              : Tooltip(
+                  tooltip: (context) => TooltipContainer(
+                    child: SizedBox(width: 240, child: shadcn.Text(tooltip!)),
+                  ),
+                  child: labelText,
+                ),
           shadcn.Text(value).medium(),
         ],
       ),

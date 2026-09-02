@@ -6,6 +6,7 @@ import '../../core/date_format.dart';
 import '../../core/ui/toggle_button_style.dart';
 import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
+import '../../core/ui/asset_table_header_cell.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/performance_amount.dart';
 import '../investments/autres_photo_repository.dart';
@@ -1135,13 +1136,15 @@ class _AccountsCardState extends State<_AccountsCard> {
               children: [
                 const Expanded(child: SizedBox()),
                 if (showQuantityCours) ...[
-                  _HeaderCell('Quantité'),
-                  if (showPru) _HeaderCell('PRU'),
-                  _HeaderCell('Cours'),
+                  const AssetTableHeaderCell('Quantité', width: _colWidth),
+                  if (showPru)
+                    const AssetTableHeaderCell('PRU', width: _colWidth),
+                  const AssetTableHeaderCell('Cours', width: _colWidth),
                 ],
-                _HeaderCell('Valeur'),
-                _HeaderCell('Évolution'),
-                if (showPnl) _HeaderCell('+/- value'),
+                const AssetTableHeaderCell('Valeur', width: _colWidth),
+                const AssetTableHeaderCell('Évolution', width: _colWidth),
+                if (showPnl)
+                  const AssetTableHeaderCell('+/- value', width: _colWidth),
                 const SizedBox(width: _actionsWidth),
               ],
             ),
@@ -1542,23 +1545,6 @@ const _colWidth = 92.0;
 /// chevron, ou le menu "⋮", plus large) désalignait les colonnes de
 /// valeurs des lignes selon ce qu'elles affichaient à leur bout.
 const _actionsWidth = 32.0;
-
-class _HeaderCell extends StatelessWidget {
-  final String label;
-
-  const _HeaderCell(this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: _colWidth,
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: shadcn.Text(label).muted().xSmall(),
-      ),
-    );
-  }
-}
 
 /// Avatar d'une ligne du tableau : la photo du produit ([PatrimoineAccount
 /// .avatarImagePath], métaux précieux physiques) quand elle est disponible,

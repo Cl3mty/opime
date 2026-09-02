@@ -1,4 +1,6 @@
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/asset_table_header_cell.dart';
 import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/leveraged_position.dart';
@@ -243,6 +245,41 @@ void main() {
 
       expect(find.text('Évolution'), findsOneWidget);
       expect(find.text('+/- value'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'survoler l\'en-tête "Valeur" affiche son explication (bulle partagée '
+    '— voir asset_table_header_cell_test.dart)',
+    (tester) async {
+      final open = Investment(
+        isin: 'FR0000131104',
+        label: 'TotalEnergies',
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 10,
+            unitPrice: 50,
+          ),
+        ],
+      );
+      await pump(tester, buildAccount([open]));
+
+      final gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      addTearDown(gesture.removePointer);
+      await gesture.addPointer(location: Offset.zero);
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(find.text('Valeur').first));
+
+      final explanation = find.text(assetTableColumnExplanations['Valeur']!);
+      for (var i = 0; i < 20 && explanation.evaluate().isEmpty; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(explanation, findsOneWidget);
     },
   );
 }

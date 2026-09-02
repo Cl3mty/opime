@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
+import '../../../core/ui/asset_table_header_cell.dart';
 import '../../../core/ui/performance_amount.dart';
 import '../../dashboard/patrimoine_models.dart' show DashboardPeriod;
 import '../confirm_delete_dialog.dart';
@@ -298,11 +299,11 @@ class _LeveragedPositionsSubTable extends StatelessWidget {
         Row(
           children: [
             const Expanded(child: SizedBox()),
-            const _HeaderCell('Taille'),
-            const _HeaderCell('Entrée'),
-            const _HeaderCell('Cours'),
-            const _HeaderCell('Montant'),
-            const _HeaderCell('PnL (ROE)'),
+            const AssetTableHeaderCell('Taille', width: _colWidth),
+            const AssetTableHeaderCell('Entrée', width: _colWidth),
+            const AssetTableHeaderCell('Cours', width: _colWidth),
+            const AssetTableHeaderCell('Montant', width: _colWidth),
+            const AssetTableHeaderCell('PnL (ROE)', width: _colWidth),
             const SizedBox(width: 32),
           ],
         ),
@@ -570,12 +571,12 @@ class _PositionsSubTable extends StatelessWidget {
         Row(
           children: [
             const Expanded(child: SizedBox()),
-            const _HeaderCell('Quantité'),
-            const _HeaderCell('PRU'),
-            const _HeaderCell('Cours'),
-            const _HeaderCell('Valeur'),
-            const _HeaderCell('Évolution'),
-            const _HeaderCell('+/- value'),
+            const AssetTableHeaderCell('Quantité', width: _colWidth),
+            const AssetTableHeaderCell('PRU', width: _colWidth),
+            const AssetTableHeaderCell('Cours', width: _colWidth),
+            const AssetTableHeaderCell('Valeur', width: _colWidth),
+            const AssetTableHeaderCell('Évolution', width: _colWidth),
+            const AssetTableHeaderCell('+/- value', width: _colWidth),
           ],
         ),
         for (final investment in investments) ...[
@@ -590,23 +591,6 @@ class _PositionsSubTable extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-class _HeaderCell extends StatelessWidget {
-  final String label;
-
-  const _HeaderCell(this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: _colWidth,
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: shadcn.Text(label).muted().xSmall(),
-      ),
     );
   }
 }

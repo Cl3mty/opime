@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
+import '../../../core/ui/asset_table_header_cell.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/performance_amount.dart';
 import '../../../core/ui/toggle_button_style.dart';
@@ -200,36 +201,11 @@ class _HeaderRow extends StatelessWidget {
           ),
         ),
         const Expanded(child: SizedBox()),
-        if (showPru)
-          SizedBox(
-            width: _pruWidth,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: shadcn.Text('PRU').muted().xSmall(),
-            ),
-          ),
-        SizedBox(
-          width: _montantWidth,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: shadcn.Text('Valeur').muted().xSmall(),
-          ),
-        ),
-        SizedBox(
-          width: _evolutionWidth,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: shadcn.Text('Évolution').muted().xSmall(),
-          ),
-        ),
+        if (showPru) const AssetTableHeaderCell('PRU', width: _pruWidth),
+        const AssetTableHeaderCell('Valeur', width: _montantWidth),
+        const AssetTableHeaderCell('Évolution', width: _evolutionWidth),
         if (showPnl)
-          SizedBox(
-            width: _pnlWidth,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: shadcn.Text('+/- value').muted().xSmall(),
-            ),
-          ),
+          const AssetTableHeaderCell('+/- value', width: _pnlWidth),
       ],
     );
   }

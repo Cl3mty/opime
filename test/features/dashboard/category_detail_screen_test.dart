@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/privacy/amount_visibility_controller.dart';
+import 'package:opime/core/ui/asset_table_header_cell.dart';
 import 'package:opime/features/dashboard/category_detail_screen.dart';
 import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/investments/autres_photo_repository.dart';
@@ -844,6 +846,38 @@ void main() {
         // scénario `DashboardPeriod.all` de la closure.
         expect(find.textContaining('654'), findsWidgets);
         expect(find.textContaining('321'), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'survoler l\'en-tête "Valeur" affiche son explication (bulle '
+      'partagée — voir asset_table_header_cell_test.dart)',
+      (tester) async {
+        // Fenêtre de test agrandie : sinon l'en-tête du tableau, plus bas
+        // que le graphique/la carte Allocation, tombe hors du viewport
+        // 800x600 par défaut et n'est pas atteignable par le survol.
+        tester.view.physicalSize = const Size(1200, 2400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(buildScreen());
+        await tester.pump();
+
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        addTearDown(gesture.removePointer);
+        await gesture.addPointer(location: Offset.zero);
+        await tester.pump();
+        await gesture.moveTo(tester.getCenter(find.text('Valeur').first));
+
+        final explanation = find.text(assetTableColumnExplanations['Valeur']!);
+        for (var i = 0; i < 20 && explanation.evaluate().isEmpty; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+
+        expect(explanation, findsOneWidget);
       },
     );
   });
