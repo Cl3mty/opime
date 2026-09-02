@@ -2,11 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'anthropic_client.dart';
 import 'assistant_config_controller.dart';
 import 'assistant_context_builder.dart';
 import 'assistant_models.dart';
 import 'document_text_extractor.dart';
+import 'google_ai_client.dart';
+import 'llm_exception.dart';
+import 'llm_provider.dart';
 import 'ollama_client.dart';
+import 'openai_client.dart';
 
 /// Un document joint à la conversation (voir [AssistantChatController.attachDocument]) :
 /// son texte extrait reste épinglé et renvoyé comme contexte à chaque
@@ -102,18 +107,27 @@ class AssistantChatController extends ChangeNotifier {
   final AssistantConfigController _config;
   final String Function() _activeDataPath;
   final OllamaClient _client;
+  final OpenAiClient _openAiClient;
+  final AnthropicClient _anthropicClient;
+  final GoogleAiClient _googleAiClient;
 
   AssistantChatController({
     required AssistantConfigController config,
     required String Function() activeDataPath,
     OllamaClient? client,
+    OpenAiClient? openAiClient,
+    AnthropicClient? anthropicClient,
+    GoogleAiClient? googleAiClient,
   })  : // `config` et `activeDataPath` gardent des noms publics (le champ est
         // privé) : l'assignation directe est volontaire, pas un oubli.
         // ignore: prefer_initializing_formals
         _config = config,
         // ignore: prefer_initializing_formals
         _activeDataPath = activeDataPath,
-        _client = client ?? OllamaClient();
+        _client = client ?? OllamaClient(),
+        _openAiClient = openAiClient ?? OpenAiClient(),
+        _anthropicClient = anthropicClient ?? AnthropicClient(),
+        _googleAiClient = googleAiClient ?? GoogleAiClient();
 
   final List<ChatEntry> _entries = [];
   final List<Completer<void>> _pendingCancellations = [];
@@ -278,17 +292,18 @@ class AssistantChatController extends ChangeNotifier {
     }
 
     try {
-      final response = await _client.streamChat(
-        baseUrl: config.baseUrl,
-        model: config.model!,
+      void onToken(String partial) {
+        // Si l'annulation arrive entre deux lignes du flux, on arrête
+        // d'accumuler : l'état final est posé plus bas dans le `finally`.
+        if (cancel.isCompleted) return;
+        assistantEntry.content += partial;
+        notifyListeners();
+      }
+
+      final response = await _streamChat(
+        config: config,
         messages: _buildPayload(context: context),
-        onToken: (partial) {
-          // Si l'annulation arrive entre deux lignes du flux, on arrête
-          // d'accumuler : l'état final est posé plus bas dans le `finally`.
-          if (cancel.isCompleted) return;
-          assistantEntry.content += partial;
-          notifyListeners();
-        },
+        onToken: onToken,
         isCancelled: () => cancel.isCompleted,
       );
 
@@ -299,7 +314,7 @@ class AssistantChatController extends ChangeNotifier {
         assistantEntry.status = ChatEntryStatus.done;
         _markResponseCompleted();
       }
-    } on OllamaException catch (e) {
+    } on LlmException catch (e) {
       if (cancel.isCompleted) {
         assistantEntry.status = ChatEntryStatus.cancelled;
       } else {
@@ -316,6 +331,52 @@ class AssistantChatController extends ChangeNotifier {
     } finally {
       _pendingCancellations.remove(cancel);
       notifyListeners();
+    }
+  }
+
+  /// Bascule vers le client HTTP du fournisseur actuellement configuré —
+  /// chaque client a sa propre signature d'appel (adresse pour Ollama, clé
+  /// API pour les autres), donc pas d'interface commune forcée ici, juste
+  /// [LlmException] côté gestion d'erreur (voir [_runRequest]).
+  Future<String> _streamChat({
+    required AssistantConfigController config,
+    required List<AssistantMessage> messages,
+    required void Function(String partial) onToken,
+    required bool Function() isCancelled,
+  }) {
+    switch (config.provider) {
+      case LlmProvider.ollama:
+        return _client.streamChat(
+          baseUrl: config.baseUrl,
+          model: config.model!,
+          messages: messages,
+          onToken: onToken,
+          isCancelled: isCancelled,
+        );
+      case LlmProvider.openai:
+        return _openAiClient.streamChat(
+          apiKey: config.apiKeyFor(LlmProvider.openai) ?? '',
+          model: config.model!,
+          messages: messages,
+          onToken: onToken,
+          isCancelled: isCancelled,
+        );
+      case LlmProvider.anthropic:
+        return _anthropicClient.streamChat(
+          apiKey: config.apiKeyFor(LlmProvider.anthropic) ?? '',
+          model: config.model!,
+          messages: messages,
+          onToken: onToken,
+          isCancelled: isCancelled,
+        );
+      case LlmProvider.google:
+        return _googleAiClient.streamChat(
+          apiKey: config.apiKeyFor(LlmProvider.google) ?? '',
+          model: config.model!,
+          messages: messages,
+          onToken: onToken,
+          isCancelled: isCancelled,
+        );
     }
   }
 

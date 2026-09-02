@@ -4,11 +4,13 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'assistant_models.dart';
+import 'llm_exception.dart';
 
 /// Erreur remontée par l'API Ollama (instance injoignable, modèle absent,
 /// réponse mal formée...) — avec un message déjà prêt à afficher à
 /// l'utilisateur, en français.
-class OllamaException implements Exception {
+class OllamaException implements LlmException {
+  @override
   final String message;
   const OllamaException(this.message);
 

@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme_controller.dart';
 import '../../core/assistant/assistant_config_controller.dart';
+import '../../core/assistant/llm_provider.dart';
 import '../../core/notifications/notifications_settings_controller.dart';
 import '../../core/profiles/profile_controller.dart';
 import '../../core/profiles/profile_models.dart';
@@ -74,7 +75,7 @@ class SettingsScreen extends StatelessWidget {
           _ThemeCard(themeController: themeController),
           const SizedBox(height: 16),
           if (isWide) ...[
-            _AssistantCard(configController: assistantConfigController),
+            AssistantSettingsCard(configController: assistantConfigController),
             const SizedBox(height: 16),
           ],
           _NotificationsCard(configController: notificationsSettingsController),
@@ -334,22 +335,30 @@ class _ThemeCard extends StatelessWidget {
   }
 }
 
-class _AssistantCard extends StatefulWidget {
+/// Carte Réglages de l'assistant IA (activation, fournisseur, clé API ou
+/// adresse Ollama). Publique (contrairement aux autres cartes de cet écran)
+/// pour rester testable indépendamment du reste de [SettingsScreen] —
+/// certaines de ses cartes voisines (ex : `_VersionCard`) font de vrais
+/// appels réseau en `initState`, peu désirable dans un test ciblant
+/// uniquement la logique fournisseur/clé API de celle-ci.
+class AssistantSettingsCard extends StatefulWidget {
   final AssistantConfigController configController;
 
-  const _AssistantCard({required this.configController});
+  const AssistantSettingsCard({super.key, required this.configController});
 
   @override
-  State<_AssistantCard> createState() => _AssistantCardState();
+  State<AssistantSettingsCard> createState() => _AssistantSettingsCardState();
 }
 
-class _AssistantCardState extends State<_AssistantCard> {
+class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
   final _baseUrlController = TextEditingController();
+  final _apiKeyController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _baseUrlController.text = widget.configController.baseUrl;
+    _apiKeyController.text = _currentApiKey;
     widget.configController.addListener(_onConfigChanged);
   }
 
@@ -357,8 +366,13 @@ class _AssistantCardState extends State<_AssistantCard> {
   void dispose() {
     widget.configController.removeListener(_onConfigChanged);
     _baseUrlController.dispose();
+    _apiKeyController.dispose();
     super.dispose();
   }
+
+  String get _currentApiKey =>
+      widget.configController.apiKeyFor(widget.configController.provider) ??
+      '';
 
   void _onConfigChanged() {
     // Synchronise le champ d'adresse si une autre source (écran assistant,
@@ -366,6 +380,12 @@ class _AssistantCardState extends State<_AssistantCard> {
     final baseUrl = widget.configController.baseUrl;
     if (baseUrl != _baseUrlController.text) {
       _baseUrlController.text = baseUrl;
+    }
+    // Idem pour la clé API — resynchronisée aussi quand l'utilisateur
+    // bascule de fournisseur, puisque chacun a la sienne.
+    final apiKey = _currentApiKey;
+    if (apiKey != _apiKeyController.text) {
+      _apiKeyController.text = apiKey;
     }
     if (!mounted) return;
     setState(() {});
@@ -383,6 +403,7 @@ class _AssistantCardState extends State<_AssistantCard> {
       animation: widget.configController,
       builder: (context, _) {
         final enabled = widget.configController.enabled;
+        final provider = widget.configController.provider;
         return FrostedCard(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -406,16 +427,18 @@ class _AssistantCardState extends State<_AssistantCard> {
                 ),
                 if (enabled) ...[
                   const SizedBox(height: 8),
-                  const Text(
-                    'Dialogue avec un modèle Ollama local (gemma, llama...) : '
-                    'analyses du patrimoine, explications pédagogiques, '
-                    'questions sur tes simulations et ta stratégie. Tout reste '
-                    'sur ta machine — aucune donnée n\'est envoyée en ligne. '
-                    'Ollama doit tourner en arrière-plan (« ollama serve ») et '
-                    'les modèles s\'installent avec « ollama pull <modèle> ».',
-                  ).muted().small(),
+                  Text(_descriptionFor(provider)).muted().small(),
                   const SizedBox(height: 16),
-                  _buildBaseUrlField(),
+                  _buildProviderSelector(provider),
+                  const SizedBox(height: 12),
+                  if (provider == LlmProvider.ollama)
+                    _buildBaseUrlField()
+                  else
+                    _buildApiKeyField(provider),
+                  if (provider.isCloud) ...[
+                    const SizedBox(height: 12),
+                    _buildCloudWarning(provider),
+                  ],
                   const SizedBox(height: 12),
                   _buildContextCheckbox(),
                 ],
@@ -424,6 +447,45 @@ class _AssistantCardState extends State<_AssistantCard> {
           ),
         );
       },
+    );
+  }
+
+  String _descriptionFor(LlmProvider provider) {
+    if (provider == LlmProvider.ollama) {
+      return 'Dialogue avec un modèle Ollama local (gemma, llama...) : '
+          'analyses du patrimoine, explications pédagogiques, questions sur '
+          'tes simulations et ta stratégie. Tout reste sur ta machine — '
+          'aucune donnée n\'est envoyée en ligne. Ollama doit tourner en '
+          'arrière-plan (« ollama serve ») et les modèles s\'installent '
+          'avec « ollama pull <modèle> ».';
+    }
+    return 'Dialogue avec ${provider.label} via ta propre clé API : '
+        'analyses du patrimoine, explications pédagogiques, questions sur '
+        'tes simulations et ta stratégie.';
+  }
+
+  Widget _buildProviderSelector(LlmProvider provider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Fournisseur').medium(),
+        const SizedBox(height: 6),
+        Select<LlmProvider>(
+          value: provider,
+          onChanged: (value) {
+            if (value != null) widget.configController.setProvider(value);
+          },
+          itemBuilder: (context, value) => Text(value.label),
+          popup: (context) => SelectPopup(
+            items: SelectItemList(
+              children: [
+                for (final p in LlmProvider.values)
+                  SelectItemButton(value: p, child: Text(p.label)),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -453,6 +515,56 @@ class _AssistantCardState extends State<_AssistantCard> {
           placeholder: const Text('http://localhost:11434'),
         ),
       ],
+    );
+  }
+
+  Widget _buildApiKeyField(LlmProvider provider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Clé API ${provider.label}').medium(),
+        const SizedBox(height: 6),
+        TextField(
+          key: ValueKey(provider),
+          controller: _apiKeyController,
+          obscureText: true,
+          features: const [InputFeature.passwordToggle()],
+          placeholder: const Text('Colle ta clé API ici'),
+          onChanged: (value) =>
+              widget.configController.setApiKeyFor(provider, value),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCloudWarning(LlmProvider provider) {
+    final theme = Theme.of(context);
+    final includesPatrimoine = widget.configController.includePatrimoine;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.destructive.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            LucideIcons.triangleAlert,
+            size: 16,
+            color: theme.colorScheme.destructive,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Avec ${provider.label}, tes messages'
+              '${includesPatrimoine ? ' et la synthèse de ton patrimoine' : ''} '
+              'sont envoyés aux serveurs de ce fournisseur, hors de ta '
+              'machine.',
+            ).small(),
+          ),
+        ],
+      ),
     );
   }
 

@@ -64,6 +64,7 @@ dependencies:
   latlong2: ^0.10.1
   pdfrx: ^2.4.7
   crypto_icons: ^1.0.0
+  flutter_secure_storage: ^9.2.4
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -78,6 +79,11 @@ dev_dependencies:
   freezed: ^4.0.0-dev.3
   json_serializable: ^6.14.1
   flutter_launcher_icons: ^0.14.4
+  # Double en mémoire de `FlutterSecureStoragePlatform` (voir
+  # `test_flutter_secure_storage_platform.dart`, fourni par le package
+  # `flutter_secure_storage` lui-même) : utilisé dans les tests pour éviter
+  # tout appel au canal de méthode natif (absent en environnement de test).
+  flutter_secure_storage_platform_interface: ^1.1.2
 
 # Force une version de path_provider_foundation antérieure à sa migration vers
 # le système "native assets" (encore expérimental) — celui-ci tente de

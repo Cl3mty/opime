@@ -4,14 +4,20 @@ import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import '../../core/assistant/anthropic_client.dart';
 import '../../core/assistant/assistant_chat_controller.dart';
 import '../../core/assistant/assistant_config_controller.dart';
 import '../../core/assistant/assistant_models.dart';
 import '../../core/assistant/document_text_extractor.dart';
+import '../../core/assistant/google_ai_client.dart';
+import '../../core/assistant/llm_exception.dart';
+import '../../core/assistant/llm_provider.dart';
 import '../../core/assistant/ollama_client.dart';
+import '../../core/assistant/openai_client.dart';
 import '../navigation/navigation_scope.dart';
 
-/// Écran de chat avec l'assistant IA local (Ollama).
+/// Écran de chat avec l'assistant IA (Ollama local, ou un fournisseur cloud
+/// connecté via une clé API — voir [LlmProvider]).
 ///
 /// L'utilisateur pose des questions sur son patrimoine, ses simulations ou
 /// sa stratégie ; le modèle répond en streaming. La logique de conversation
@@ -20,8 +26,9 @@ import '../navigation/navigation_scope.dart';
 /// en cours — elle continue en arrière-plan et un signal prévient à la fin.
 /// Les envois parallèles sont autorisés (plusieurs questions en même temps).
 ///
-/// Aucune donnée ne sort de la machine : la conversation transite
-/// uniquement vers l'instance Ollama configurée.
+/// Aucune donnée ne sort de la machine avec Ollama ; avec un fournisseur
+/// cloud, la conversation est envoyée à ses serveurs (voir l'avertissement
+/// dans les Réglages).
 class AssistantScreen extends StatefulWidget {
   final AssistantConfigController configController;
   final AssistantChatController chatController;
@@ -73,9 +80,11 @@ class _AssistantScreenState extends State<AssistantScreen> {
   /// Modèles disponibles sur l'instance (liste proposée par le sélecteur).
   List<String> _models = const [];
 
-  /// Adresse du serveur au moment du dernier chargement de la liste : on ne
-  /// relance pas une requête à chaque notification de configuration.
-  String? _lastFetchedBaseUrl;
+  /// Fournisseur + adresse (Ollama) ou clé API (fournisseurs cloud) au
+  /// moment du dernier chargement de la liste : on ne relance pas une
+  /// requête à chaque notification de configuration, seulement quand la
+  /// config effective a changé (voir [_configKeyFor]).
+  String? _lastFetchedConfigKey;
 
   /// Extraction de texte en cours (le bouton se désactive/affiche un
   /// indicateur le temps de lire un gros PDF).
@@ -130,34 +139,86 @@ class _AssistantScreenState extends State<AssistantScreen> {
         position.maxScrollExtent == 0;
   }
 
+  /// Clé identifiant la config effective d'un fournisseur : l'adresse pour
+  /// Ollama, la clé API pour les fournisseurs cloud — changer l'une ou
+  /// l'autre (ou de fournisseur) invalide la dernière détection de modèles.
+  String _configKeyFor(AssistantConfigController config) {
+    final provider = config.provider;
+    final detail = provider.isCloud
+        ? config.apiKeyFor(provider)
+        : config.baseUrl;
+    return '${provider.name}|$detail';
+  }
+
   Future<void> _ensureModel() async {
     final config = widget.configController;
     if (!config.enabled) return;
-    // Aucun modèle encore choisi : détection automatique sur l'instance.
+    // Aucun modèle encore choisi : détection automatique.
     if (config.model == null) {
       await _refreshModels();
       return;
     }
-    // Modèle déjà choisi : on ne recharge la liste que si l'adresse du
-    // serveur a changé (les modèles d'une autre instance peuvent différer).
-    if (_lastFetchedBaseUrl != config.baseUrl) {
+    // Modèle déjà choisi : on ne recharge la liste que si la config
+    // effective a changé (fournisseur, adresse Ollama ou clé API).
+    if (_lastFetchedConfigKey != _configKeyFor(config)) {
       await _refreshModels();
       return;
     }
     setState(() => _modelStatus = null);
   }
 
+  /// Liste les modèles disponibles pour le fournisseur actif — chaque
+  /// client a sa propre signature d'authentification (adresse pour Ollama,
+  /// clé API pour les autres), voir `AssistantChatController._streamChat`
+  /// pour le même motif de bascule côté envoi.
+  Future<List<String>> _listModels(AssistantConfigController config) {
+    switch (config.provider) {
+      case LlmProvider.ollama:
+        return OllamaClient().listModels(config.baseUrl);
+      case LlmProvider.openai:
+        return OpenAiClient().listModels(
+          config.apiKeyFor(LlmProvider.openai)!,
+        );
+      case LlmProvider.anthropic:
+        return AnthropicClient().listModels(
+          config.apiKeyFor(LlmProvider.anthropic)!,
+        );
+      case LlmProvider.google:
+        return GoogleAiClient().listModels(
+          config.apiKeyFor(LlmProvider.google)!,
+        );
+    }
+  }
+
   Future<void> _refreshModels() async {
     final config = widget.configController;
+    final provider = config.provider;
+
+    if (provider.isCloud &&
+        (config.apiKeyFor(provider) == null ||
+            config.apiKeyFor(provider)!.isEmpty)) {
+      // Pas de clé API configurée : inutile de lancer une requête vouée à
+      // l'échec, on renvoie directement vers les Réglages.
+      setState(() {
+        _checkingModel = false;
+        _models = const [];
+        _modelStatus =
+            'Configure ta clé API ${provider.label} dans '
+            'Réglages → Assistant IA.';
+        _modelHelp = null;
+      });
+      _lastFetchedConfigKey = _configKeyFor(config);
+      return;
+    }
+
     setState(() {
       _checkingModel = true;
       _modelStatus = null;
       _modelHelp = null;
     });
-    _lastFetchedBaseUrl = config.baseUrl;
+    _lastFetchedConfigKey = _configKeyFor(config);
     try {
-      final client = OllamaClient();
-      final models = await client.listModels(config.baseUrl);
+      final models = await _listModels(config);
       if (!mounted) return;
       setState(() {
         _models = models;
@@ -165,8 +226,12 @@ class _AssistantScreenState extends State<AssistantScreen> {
       });
       if (models.isEmpty) {
         setState(() {
-          _modelStatus = 'Aucun modèle n\'est installé sur Ollama.';
-          _modelHelp = _modelSetupHelp;
+          _modelStatus = provider == LlmProvider.ollama
+              ? 'Aucun modèle n\'est installé sur Ollama.'
+              : 'Aucun modèle disponible pour cette clé ${provider.label}.';
+          _modelHelp = provider == LlmProvider.ollama
+              ? _modelSetupHelp
+              : null;
         });
       } else if (config.model == null || !models.contains(config.model)) {
         // Aucun choix ou modèle devenu indisponible : on retombe sur le
@@ -182,10 +247,12 @@ class _AssistantScreenState extends State<AssistantScreen> {
       if (!mounted) return;
       setState(() {
         _checkingModel = false;
-        // Serveur injoignable : souvent Ollama n'est pas installé ou pas
-        // lancé — on complète l'erreur par le mini-tutoriel de mise en route.
-        _modelStatus = e is OllamaException ? e.message : 'Erreur : $e';
-        _modelHelp = _modelSetupHelp;
+        // Serveur/API injoignable ou clé invalide — pour Ollama, on
+        // complète l'erreur par le mini-tutoriel de mise en route (souvent
+        // pas encore installé/lancé) ; pour un fournisseur cloud, le
+        // message d'erreur (clé invalide, quota...) suffit.
+        _modelStatus = e is LlmException ? e.message : 'Erreur : $e';
+        _modelHelp = provider == LlmProvider.ollama ? _modelSetupHelp : null;
       });
     }
   }
@@ -317,8 +384,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
               Text(
                 'Active l\'assistant dans les Réglages pour analyser ton '
                 'patrimoine, expliquer des concepts financiers et répondre à '
-                'tes questions — grâce à un modèle Ollama local, sans qu\'aucune '
-                'donnée ne quitte ta machine.',
+                'tes questions — avec un modèle Ollama local (aucune donnée '
+                'ne quitte ta machine) ou un fournisseur cloud connecté via '
+                'une clé API.',
                 textAlign: TextAlign.center,
               ).muted(),
               const SizedBox(height: 16),
