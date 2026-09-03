@@ -7,6 +7,7 @@ import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
+import 'tax_parameters.dart';
 
 class TaxationSimulationScreen extends StatefulWidget {
   final String vaultPath;
@@ -438,38 +439,49 @@ const ifiMontantMax = [
   1200000.0,
 ];
 
-/// L'IFI n'est dû qu'au-delà de 1 300 000 € de patrimoine net (en-dessous,
-/// exonération totale) ; au-delà, le barème s'applique sur la totalité du
-/// patrimoine à partir de 800 000 € (pas de décote implémentée ici, voir
-/// [_IFIDisclaimer]).
-IFIResult computeIFI(double immobilierNet) {
+/// L'IFI n'est dû qu'au-delà de [seuilImposition] de patrimoine net
+/// (en-dessous, exonération totale) ; au-delà, le barème s'applique sur la
+/// totalité du patrimoine à partir de [limits]`[0]` (pas de décote
+/// implémentée ici, voir [_IFIDisclaimer]).
+///
+/// [limits]/[rates]/[seuilImposition] sont les valeurs codées en dur du
+/// barème IFI par défaut ([ifiLimits]/[ifiRates]/`1 300 000`) sauf si
+/// l'utilisateur les a personnalisées dans Réglages → Paramètres fiscaux
+/// (voir `tax_parameters.dart`) — l'appelant transmet alors les valeurs
+/// chargées plutôt que de laisser les paramètres par défaut.
+IFIResult computeIFI(
+  double immobilierNet, {
+  List<double> limits = ifiLimits,
+  List<double> rates = ifiRates,
+  double seuilImposition = 1300000,
+}) {
   double c0(double v) => v < 0 ? 0 : v;
   final montants = [
-    c0(min(immobilierNet, ifiLimits[0])),
-    c0(min(immobilierNet - ifiLimits[0], ifiLimits[1] - ifiLimits[0])),
-    c0(min(immobilierNet - ifiLimits[1], ifiLimits[2] - ifiLimits[1])),
-    c0(min(immobilierNet - ifiLimits[2], ifiLimits[3] - ifiLimits[2])),
-    c0(min(immobilierNet - ifiLimits[3], ifiLimits[4] - ifiLimits[3])),
-    c0(immobilierNet - ifiLimits[4]),
+    c0(min(immobilierNet, limits[0])),
+    c0(min(immobilierNet - limits[0], limits[1] - limits[0])),
+    c0(min(immobilierNet - limits[1], limits[2] - limits[1])),
+    c0(min(immobilierNet - limits[2], limits[3] - limits[2])),
+    c0(min(immobilierNet - limits[3], limits[4] - limits[3])),
+    c0(immobilierNet - limits[4]),
   ];
 
   var maxIndex = 0;
   for (var i = 0; i < montants.length; i++) {
     if (montants[i] > 0) maxIndex = i;
   }
-  final exonere = immobilierNet <= 1300000;
-  final tauxMax = exonere ? 0.0 : ifiRates[maxIndex];
+  final exonere = immobilierNet <= seuilImposition;
+  final tauxMax = exonere ? 0.0 : rates[maxIndex];
 
   final impots = List.generate(
     6,
-    (i) => exonere ? 0.0 : montants[i] * ifiRates[i] / 100,
+    (i) => exonere ? 0.0 : montants[i] * rates[i] / 100,
   );
   final total = impots.fold<double>(0, (s, v) => s + v);
 
   final chartData = List.generate(
     6,
     (i) => BracketRow(
-      label: '${ifiRates[i]}%',
+      label: '${rates[i]}%',
       montant: montants[i],
       montantMax: ifiMontantMax[i],
       impot: impots[i],
@@ -492,13 +504,21 @@ class _IFITab extends StatefulWidget {
 class _IFITabState extends State<_IFITab> {
   double _immobilierNet = 2000000;
   late final SimulationStateRepository _stateRepo;
+  TaxParameters _taxParams = TaxParameters.defaults;
 
   @override
   void initState() {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    _loadTaxParams();
     widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  Future<void> _loadTaxParams() async {
+    final params = await loadTaxParameters(widget.vaultPath);
+    if (!mounted) return;
+    setState(() => _taxParams = params);
   }
 
   void _onAmountVisibilityChanged() {
@@ -532,7 +552,12 @@ class _IFITabState extends State<_IFITab> {
     });
   }
 
-  IFIResult _compute() => computeIFI(_immobilierNet);
+  IFIResult _compute() => computeIFI(
+    _immobilierNet,
+    limits: _taxParams.ifiLimits,
+    rates: _taxParams.ifiRates,
+    seuilImposition: _taxParams.ifiSeuilImposition,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -671,32 +696,41 @@ const irMontantMax = [11294.0, 17503.0, 53544.0, 94765.0, 120000.0];
 /// Quotient familial simplifié : le revenu net imposable est divisé par le
 /// nombre de parts pour obtenir le taux marginal, puis l'impôt par part est
 /// multiplié par le nombre de parts pour obtenir l'impôt total du foyer.
-IRResult computeIR({required double netImposable, required double nbrParts}) {
+///
+/// [limits]/[rates] sont les valeurs codées en dur du barème IR par défaut
+/// ([irLimits]/[irRates]) sauf si l'utilisateur les a personnalisées dans
+/// Réglages → Paramètres fiscaux (voir `tax_parameters.dart`).
+IRResult computeIR({
+  required double netImposable,
+  required double nbrParts,
+  List<double> limits = irLimits,
+  List<double> rates = irRates,
+}) {
   double c0(double v) => v < 0 ? 0 : v;
   final parts = nbrParts < 1 ? 1.0 : nbrParts;
   final quotient = netImposable / parts;
 
   final montants = [
-    c0(min(quotient, irLimits[0])),
-    c0(min(quotient - irLimits[0], irLimits[1] - irLimits[0])),
-    c0(min(quotient - irLimits[1], irLimits[2] - irLimits[1])),
-    c0(min(quotient - irLimits[2], irLimits[3] - irLimits[2])),
-    c0(quotient - irLimits[3]),
+    c0(min(quotient, limits[0])),
+    c0(min(quotient - limits[0], limits[1] - limits[0])),
+    c0(min(quotient - limits[1], limits[2] - limits[1])),
+    c0(min(quotient - limits[2], limits[3] - limits[2])),
+    c0(quotient - limits[3]),
   ];
 
   var maxIndex = 0;
   for (var i = 0; i < montants.length; i++) {
     if (montants[i] > 0) maxIndex = i;
   }
-  final tmi = irRates[maxIndex];
+  final tmi = rates[maxIndex];
 
-  final impots = List.generate(5, (i) => montants[i] * irRates[i] / 100);
+  final impots = List.generate(5, (i) => montants[i] * rates[i] / 100);
   final total = impots.fold<double>(0, (s, v) => s + v) * parts;
 
   final chartData = List.generate(
     5,
     (i) => BracketRow(
-      label: '${irRates[i]}%',
+      label: '${rates[i]}%',
       montant: montants[i],
       montantMax: irMontantMax[i],
       impot: impots[i],
@@ -725,13 +759,21 @@ class _IRTabState extends State<_IRTab> {
   double _netImposable = 150000;
   double _nbrParts = 1;
   late final SimulationStateRepository _stateRepo;
+  TaxParameters _taxParams = TaxParameters.defaults;
 
   @override
   void initState() {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    _loadTaxParams();
     widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  Future<void> _loadTaxParams() async {
+    final params = await loadTaxParameters(widget.vaultPath);
+    if (!mounted) return;
+    setState(() => _taxParams = params);
   }
 
   void _onAmountVisibilityChanged() {
@@ -773,8 +815,12 @@ class _IRTabState extends State<_IRTab> {
     });
   }
 
-  IRResult _compute() =>
-      computeIR(netImposable: _netImposable, nbrParts: _nbrParts);
+  IRResult _compute() => computeIR(
+    netImposable: _netImposable,
+    nbrParts: _nbrParts,
+    limits: _taxParams.irLimits,
+    rates: _taxParams.irRates,
+  );
 
   @override
   Widget build(BuildContext context) {

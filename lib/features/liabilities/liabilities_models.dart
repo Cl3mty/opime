@@ -138,12 +138,16 @@ class Liability {
   final List<VaultDocument> documents;
 
   /// Id de l'[Investment] immobilier financé par ce prêt — `null` pour un
-  /// prêt sans bien lié (crédit autre, ou prêt immobilier créé avant cette
-  /// fonctionnalité/jamais lié manuellement). Renseigné automatiquement
-  /// par `complete_patrimoine_dialog.dart`'s `_commitCreateLiability` à la
-  /// création d'un prêt immobilier juste après le bien qu'il finance, ou
-  /// manuellement depuis l'onglet Aperçu du bien (voir
-  /// `real_estate_loan_link.dart`). Sert à alimenter la rentabilité
+  /// prêt sans bien lié. Les deux [LiabilityType] sont linkables (un crédit
+  /// travaux, par exemple, est un [LiabilityType.creditAutre] nommé comme
+  /// tel — pas un type dédié, voir `RealEstateLoanLinkSection`). Renseigné
+  /// soit à la création, quand le formulaire est ouvert depuis l'onglet
+  /// Aperçu d'un bien (voir `complete_patrimoine_dialog.dart`'s
+  /// `initialLinkedInvestmentId`), soit manuellement après coup depuis ce
+  /// même onglet. Plusieurs [Liability] peuvent pointer vers le même bien
+  /// (ex : prêt immobilier + crédit travaux) — pas de contrainte d'unicité
+  /// côté bien, seulement côté prêt (un prêt ne finance qu'un bien à la
+  /// fois). Sert à alimenter la rentabilité
   /// (`simulateRealEstateProfitability`) avec le vrai prêt plutôt qu'une
   /// saisie manuelle dans le simulateur autonome.
   final String? linkedInvestmentId;

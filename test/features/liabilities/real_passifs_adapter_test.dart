@@ -232,4 +232,37 @@ void main() {
       expect(leaf.periodPnlFor, isNull);
     },
   );
+
+  test(
+    'un crédit travaux n\'est pas un type dédié : c\'est un crédit autre '
+    'nommé comme tel, rangé dans la même catégorie que les autres crédits '
+    'autres',
+    () {
+      final creditTravaux = Liability(
+        type: LiabilityType.creditAutre,
+        name: 'Rénovation cuisine',
+        montantEmprunte: 15000,
+        tauxInteret: 4,
+        nbrEcheances: 36,
+        dateDebut: DateTime(2024, 1, 1),
+      );
+
+      final categories = buildRealPassifCategories([creditTravaux]);
+      expect(categories.single.id, 'passifs_emprunts');
+      expect(categories.single.accounts.single.name, 'Rénovation cuisine');
+    },
+  );
+
+  test(
+    'buildAllRealPassifCategories affiche exactement les 2 catégories '
+    '(prêts immobiliers, crédits autres) même sans passif d\'un type donné',
+    () {
+      final categories = buildAllRealPassifCategories(const []);
+      expect(categories, hasLength(2));
+      expect(
+        categories.map((c) => c.id),
+        containsAll(['passifs_prets_immobiliers', 'passifs_emprunts']),
+      );
+    },
+  );
 }

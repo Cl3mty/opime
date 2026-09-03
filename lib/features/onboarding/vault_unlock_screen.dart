@@ -73,7 +73,7 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
     });
     try {
       final vault = await widget.vaultFolderService.pickAndRememberVault(
-        dialogTitle: 'Choisis ou crée un vault Opime',
+        dialogTitle: 'Choisis ou crée un coffre-fort Opime',
       );
       if (vault != null) await widget.onVaultActivated(vault.vaultPath);
     } catch (e) {
@@ -103,12 +103,13 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
                 ),
                 const SizedBox(height: 24),
                 const shadcn.Text(
-                  'Vault verrouillé',
+                  'Coffre-fort verrouillé',
                   textAlign: TextAlign.center,
                 ).large().large().medium(),
                 const SizedBox(height: 12),
                 const shadcn.Text(
-                  'Ce vault est chiffré. Saisis ton mot de passe pour accéder à tes données.',
+                  'Ce coffre-fort est chiffré. Saisis ton mot de passe pour '
+                  'accéder à tes données.',
                   textAlign: TextAlign.center,
                 ).muted(),
                 const SizedBox(height: 24),
@@ -154,7 +155,7 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
                   child: shadcn.Text(
                     _pickingFolder
                         ? 'Sélection en cours...'
-                        : 'Changer de dossier de vault',
+                        : 'Changer de dossier du coffre-fort',
                   ),
                 ),
                 if (_error != null) ...[

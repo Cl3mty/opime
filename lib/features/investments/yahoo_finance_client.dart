@@ -40,6 +40,63 @@ const kKnownCryptoTickers = [
   'UNI',
 ];
 
+/// Suffixe de ticker Yahoo Finance (place de cotation, ex ".PA" = Paris) →
+/// code pays ISO 3166-1 alpha-2 utilisé par [kInvestmentCountries]. Liste
+/// volontairement non exhaustive et conservatrice : seules les places dont
+/// le suffixe est documenté et sans ambiguïté sont incluses — mieux vaut
+/// laisser [YahooFinanceClient.countryCodeForSymbol] renvoyer `null` (et
+/// laisser l'utilisateur classer à la main, voir [Investment.countryCode])
+/// que risquer un pays erroné sur une place mal identifiée.
+///
+/// Piège volontairement évité : le suffixe Yahoo de la Bourse de Berlin est
+/// ".BE", qui collisionnerait visuellement avec le code ISO de la Belgique
+/// ("BE") — cette place allemande mineure est donc délibérément absente de
+/// la table plutôt que risquer la confusion ; Bruxelles (Belgique) est
+/// ".BR", sans ambiguïté.
+const _yahooSuffixToCountryCode = <String, String>{
+  // Amérique du Nord/Sud
+  'TO': 'CA', 'V': 'CA', 'CN': 'CA', 'NE': 'CA',
+  'MX': 'MX',
+  'SA': 'BR',
+  'BA': 'AR',
+  'SN': 'CL',
+  // Europe
+  'L': 'GB',
+  'PA': 'FR',
+  'DE': 'DE', 'F': 'DE', 'MU': 'DE', 'SG': 'DE', 'DU': 'DE', 'HM': 'DE', 'HA': 'DE',
+  'BR': 'BE',
+  'AS': 'NL',
+  'LS': 'PT',
+  'MI': 'IT',
+  'MC': 'ES',
+  'SW': 'CH', 'VX': 'CH',
+  'ST': 'SE',
+  'OL': 'NO',
+  'CO': 'DK',
+  'HE': 'FI',
+  'VI': 'AT',
+  'AT': 'GR', // Bourse d'Athènes — pas le code ISO de l'Autriche (voir [VI] ci-dessus).
+  'WA': 'PL',
+  // Asie-Pacifique
+  'T': 'JP',
+  'SS': 'CN', 'SZ': 'CN',
+  'HK': 'HK',
+  'TW': 'TW', 'TWO': 'TW',
+  'KS': 'KR', 'KQ': 'KR',
+  'NS': 'IN', 'BO': 'IN',
+  'SI': 'SG',
+  'JK': 'ID',
+  'BK': 'TH',
+  'KL': 'MY',
+  'AX': 'AU',
+  'NZ': 'NZ',
+  // Moyen-Orient / Afrique
+  'JO': 'ZA',
+  'SR': 'SA',
+  'TA': 'IL',
+  'IS': 'TR',
+};
+
 /// Client pour l'API gratuite et non officielle de Yahoo Finance (pas de
 /// clé, pas de garantie de disponibilité ni de contrat de service) — même
 /// philosophie défensive que [UpdateChecker]
@@ -61,6 +118,19 @@ class YahooFinanceClient {
   String resolveCryptoSymbol(String ticker) {
     final normalized = ticker.trim().toUpperCase();
     return normalized.contains('-') ? normalized : '$normalized-EUR';
+  }
+
+  /// Déduit le pays de cotation d'un ticker Yahoo Finance depuis son
+  /// suffixe de place boursière (ex : "TTE.PA" → "FR", voir
+  /// [_yahooSuffixToCountryCode]) — `null` sans suffixe reconnu, y compris
+  /// pour un ticker sans suffixe du tout (place américaine, mais aussi
+  /// parfois une paire de change ou un ticker crypto : pas assez fiable
+  /// pour en déduire "US" par défaut).
+  String? countryCodeForSymbol(String symbol) {
+    final dotIndex = symbol.lastIndexOf('.');
+    if (dotIndex == -1 || dotIndex == symbol.length - 1) return null;
+    final suffix = symbol.substring(dotIndex + 1).toUpperCase();
+    return _yahooSuffixToCountryCode[suffix];
   }
 
   /// Résout un code ISIN vers le ticker Yahoo Finance correspondant, ou
@@ -101,6 +171,72 @@ class YahooFinanceClient {
       return null;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Secteur d'activité (vocabulaire Yahoo brut, ex "Technology" — à
+  /// convertir en [Sector] via `Sector.fromYahooLabel` côté appelant,
+  /// `investments_models.dart` n'étant pas une dépendance de ce fichier) et
+  /// pays de cotation (voir [countryCodeForSymbol]) pour [symbol], déjà
+  /// résolu au préalable (ex : par [resolveSymbol]). Chaque champ est
+  /// `null` indépendamment de l'autre si l'info manque — la plupart des
+  /// ETF/fonds n'ont par exemple pas de secteur chez Yahoo, contrairement
+  /// aux actions individuelles, mais ont bien un suffixe de place de
+  /// cotation exploitable.
+  ///
+  /// Même philosophie défensive que le reste du client : jamais
+  /// d'exception propagée, un échec (réseau, symbole inconnu, réponse
+  /// inattendue) renvoie simplement deux champs `null` — l'investissement
+  /// reste alors "non classé" comme avant cet appel, à retenter au
+  /// prochain rafraîchissement plutôt que d'être marqué en échec permanent
+  /// (voir `price_refresh_service.dart`, qui ne retente que tant que
+  /// [Investment.sector]/[Investment.countryCode] restent `null`).
+  Future<({String? sector, String? countryCode})> fetchClassification(
+    String symbol, {
+    void Function()? onNetworkError,
+    void Function()? onNetworkSuccess,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://query1.finance.yahoo.com/v1/finance/search'
+          '?q=${Uri.encodeComponent(symbol)}',
+        ),
+      );
+      onNetworkSuccess?.call();
+      if (response.statusCode != 200) {
+        return (sector: null, countryCode: null);
+      }
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final quotes = json['quotes'] as List?;
+      if (quotes == null || quotes.isEmpty) {
+        return (sector: null, countryCode: null);
+      }
+      // Le symbole cherché est déjà connu avec certitude (contrairement à
+      // [resolveSymbol], parti d'un ISIN) : on cherche sa propre entrée
+      // exacte dans les résultats plutôt que de faire confiance au premier
+      // (le meilleur score de recherche peut être un homonyme sur une
+      // autre place), avec repli sur le premier résultat si l'exact match
+      // n'apparaît pas (réponse Yahoo parfois incomplète).
+      final match = quotes.cast<Map<String, dynamic>>().firstWhere(
+        (q) => (q['symbol'] as String?)?.toUpperCase() == symbol.toUpperCase(),
+        orElse: () => quotes.first as Map<String, dynamic>,
+      );
+      return (
+        sector: match['sector'] as String?,
+        countryCode: countryCodeForSymbol(symbol),
+      );
+    } on SocketException catch (_) {
+      onNetworkError?.call();
+      return (sector: null, countryCode: null);
+    } on http.ClientException catch (_) {
+      onNetworkError?.call();
+      return (sector: null, countryCode: null);
+    } on TimeoutException catch (_) {
+      onNetworkError?.call();
+      return (sector: null, countryCode: null);
+    } catch (_) {
+      return (sector: null, countryCode: null);
     }
   }
 

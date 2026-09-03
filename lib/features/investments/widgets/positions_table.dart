@@ -120,7 +120,9 @@ class PositionsTable extends StatelessWidget {
             priceHistories: priceHistories,
           )
         else
-          shadcn.Text('Aucune position ouverte pour l\'instant.').muted().small(),
+          shadcn.Text(
+            'Aucune position ouverte pour l\'instant.',
+          ).muted().small(),
         // Ordre volontaire : positions ouvertes, puis positions à effet de
         // levier, puis anciennes positions en dernier — l'historique soldé
         // est ce qu'on consulte le moins souvent, il reste donc tout en bas.
@@ -182,7 +184,8 @@ class _LeveragedPositionsSection extends StatelessWidget {
     final confirmed = await confirmDelete(
       context,
       title: 'Supprimer "${position.market}" ?',
-      message: 'Cette position sera définitivement supprimée. Cette action '
+      message:
+          'Cette position sera définitivement supprimée. Cette action '
           'est irréversible.',
     );
     if (!confirmed) return;
@@ -231,7 +234,9 @@ class _LeveragedPositionsSection extends StatelessWidget {
                   const SizedBox(width: 4),
                   shadcn.Text(
                     'Ajouter une position',
-                    style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ).xSmall(),
                 ],
               ),
@@ -444,9 +449,7 @@ class _LeveragedPositionLine extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color:
-                            (position.side == PositionSide.long
-                                    ? _green
-                                    : _red)
+                            (position.side == PositionSide.long ? _green : _red)
                                 .withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(999),
                       ),
@@ -497,7 +500,9 @@ class _LeveragedPositionLine extends StatelessWidget {
             child: Align(
               alignment: Alignment.centerRight,
               child:
-                  (position.isOpen ? position.markPrice : position.closePrice) ==
+                  (position.isOpen
+                          ? position.markPrice
+                          : position.closePrice) ==
                       null
                   ? shadcn.Text('—').small()
                   : shadcn.Text(

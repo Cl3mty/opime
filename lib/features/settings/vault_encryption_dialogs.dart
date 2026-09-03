@@ -326,7 +326,7 @@ class _EnableEncryptionDialogState extends State<_EnableEncryptionDialog> {
             const SizedBox(height: 8),
             const shadcn.Text(
               'Choisis un mot de passe pour chiffrer les données privées de '
-              'ce vault (comptes, budget, passifs, projets, notes de '
+              'ce coffre-fort (comptes, budget, passifs, projets, notes de '
               'stratégie, simulations). Il te sera redemandé à chaque '
               'lancement de l\'app.',
             ).muted().small(),
@@ -473,8 +473,8 @@ class _DisableEncryptionDialogState extends State<_DisableEncryptionDialog> {
             const shadcn.Text('Désactiver le chiffrement').large().semiBold(),
             const SizedBox(height: 8),
             const shadcn.Text(
-              'Les données privées de ce vault redeviendront des fichiers '
-              'en clair. Confirme ton mot de passe pour continuer.',
+              'Les données privées de ce coffre-fort redeviendront des '
+              'fichiers en clair. Confirme ton mot de passe pour continuer.',
             ).muted().small(),
             const SizedBox(height: 16),
             TextField(

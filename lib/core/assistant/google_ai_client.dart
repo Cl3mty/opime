@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'assistant_models.dart';
+import 'llm_error_message.dart';
 import 'llm_exception.dart';
 
 /// Erreur remontée par l'API Google AI / Gemini (clé invalide, quota
@@ -49,7 +50,14 @@ class GoogleAiClient {
           .get(Uri.parse('$_baseUrl/models?key=$apiKey'))
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) {
-        throw GoogleAiException(_apiErrorMessage(response));
+        throw GoogleAiException(
+          llmApiErrorMessage(
+            providerName: 'Google AI',
+            statusCode: response.statusCode,
+            body: response.body,
+            invalidKeyStatusCodes: const {400, 403},
+          ),
+        );
       }
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       final rawModels = (decoded is Map<String, dynamic>)
@@ -129,7 +137,15 @@ class GoogleAiClient {
         ),
       );
       if (response.statusCode != 200) {
-        throw GoogleAiException(await _streamedErrorMessage(response));
+        final body = await response.stream.bytesToString();
+        throw GoogleAiException(
+          llmApiErrorMessage(
+            providerName: 'Google AI',
+            statusCode: response.statusCode,
+            body: body,
+            invalidKeyStatusCodes: const {400, 403},
+          ),
+        );
       }
 
       final buffer = StringBuffer();
@@ -174,25 +190,4 @@ class GoogleAiClient {
     }
   }
 
-  String _apiErrorMessage(http.Response response) {
-    if (response.statusCode == 400 || response.statusCode == 403) {
-      return 'Clé API Google AI invalide ou expirée.';
-    }
-    if (response.statusCode == 429) {
-      return 'Quota Google AI dépassé. Réessaie plus tard.';
-    }
-    return 'Google AI a répondu HTTP ${response.statusCode}.';
-  }
-
-  Future<String> _streamedErrorMessage(http.StreamedResponse response) async {
-    if (response.statusCode == 400 || response.statusCode == 403) {
-      return 'Clé API Google AI invalide ou expirée.';
-    }
-    if (response.statusCode == 429) {
-      return 'Quota Google AI dépassé. Réessaie plus tard.';
-    }
-    final body = await response.stream.bytesToString();
-    return 'Google AI a répondu HTTP ${response.statusCode}'
-        '${body.trim().isEmpty ? '.' : ' : ${body.trim()}'}';
-  }
 }

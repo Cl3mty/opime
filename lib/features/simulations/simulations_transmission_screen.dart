@@ -9,6 +9,7 @@ import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/toggle_button_style.dart';
+import 'tax_parameters.dart';
 
 class TransmissionSimulationScreen extends StatefulWidget {
   final String vaultPath;
@@ -186,6 +187,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
   int _ageUsufruitier = 62;
   int _nombreEnfants = 2;
   double _abattementParEnfant = 100000;
+  TaxParameters _taxParams = TaxParameters.defaults;
 
   late final SimulationStateRepository _stateRepo;
 
@@ -194,7 +196,14 @@ class _DemembrementTabState extends State<_DemembrementTab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    _loadTaxParams();
     widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  Future<void> _loadTaxParams() async {
+    final params = await loadTaxParameters(widget.vaultPath);
+    if (!mounted) return;
+    setState(() => _taxParams = params);
   }
 
   void _onAmountVisibilityChanged() {
@@ -264,6 +273,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
     ageUsufruitier: _ageUsufruitier,
     nombreEnfants: _nombreEnfants,
     abattementParEnfant: _abattementParEnfant,
+    params: _taxParams,
   );
 
   @override
@@ -425,6 +435,7 @@ class _DonationTabState extends State<_DonationTab> {
   double _montantDonation = 400000;
   int _nombreDonataires = 2;
   DonationRelation _relation = DonationRelation.enfant;
+  TaxParameters _taxParams = TaxParameters.defaults;
 
   late final SimulationStateRepository _stateRepo;
 
@@ -433,7 +444,14 @@ class _DonationTabState extends State<_DonationTab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    _loadTaxParams();
     widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  Future<void> _loadTaxParams() async {
+    final params = await loadTaxParameters(widget.vaultPath);
+    if (!mounted) return;
+    setState(() => _taxParams = params);
   }
 
   void _onAmountVisibilityChanged() {
@@ -493,6 +511,7 @@ class _DonationTabState extends State<_DonationTab> {
     montantDonation: _montantDonation,
     nombreDonataires: _nombreDonataires,
     relation: _relation,
+    params: _taxParams,
   );
 
   @override
@@ -656,6 +675,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
   double _partConjointPct = 25;
   int _nombreEnfants = 2;
   double _abattementParEnfant = 100000;
+  TaxParameters _taxParams = TaxParameters.defaults;
 
   late final SimulationStateRepository _stateRepo;
 
@@ -664,7 +684,14 @@ class _InheritanceTabState extends State<_InheritanceTab> {
     super.initState();
     _stateRepo = SimulationStateRepository(widget.vaultPath);
     _loadState();
+    _loadTaxParams();
     widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  Future<void> _loadTaxParams() async {
+    final params = await loadTaxParameters(widget.vaultPath);
+    if (!mounted) return;
+    setState(() => _taxParams = params);
   }
 
   void _onAmountVisibilityChanged() {
@@ -742,6 +769,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
     partConjointPct: _partConjointPct,
     nombreEnfants: _nombreEnfants,
     abattementParEnfant: _abattementParEnfant,
+    params: _taxParams,
   );
 
   @override
@@ -940,13 +968,17 @@ class InheritanceResult {
 /// l'âge de l'usufruitier, cf. [nueProprietePct]) est transmise et taxée,
 /// l'abattement s'appliquant sur cette base réduite — d'où l'économie fiscale
 /// par rapport à une transmission en pleine propriété.
+/// [params] porte le barème de l'usufruit et le barème ligne directe par
+/// défaut, sauf si l'utilisateur les a personnalisés dans Réglages →
+/// Paramètres fiscaux.
 DemembrementResult computeDemembrement({
   required double valeurPleinePropriete,
   required int ageUsufruitier,
   required int nombreEnfants,
   required double abattementParEnfant,
+  TaxParameters params = TaxParameters.defaults,
 }) {
-  final nuePct = nueProprietePct(ageUsufruitier);
+  final nuePct = nueProprietePct(ageUsufruitier, brackets: params.demembrementBrackets);
   final usufruitPct = 100 - nuePct;
 
   final valeurNuePropriete = valeurPleinePropriete * nuePct / 100;
@@ -962,8 +994,14 @@ DemembrementResult computeDemembrement({
     valeurPleineParEnfant - abattementParEnfant,
   );
 
-  final droitsNueParEnfant = directLineRights(taxableNueParEnfant);
-  final droitsPleineParEnfant = directLineRights(taxablePleineParEnfant);
+  final droitsNueParEnfant = directLineRights(
+    taxableNueParEnfant,
+    brackets: params.directLineBrackets,
+  );
+  final droitsPleineParEnfant = directLineRights(
+    taxablePleineParEnfant,
+    brackets: params.directLineBrackets,
+  );
 
   final droitsTotauxNue = droitsNueParEnfant * nombreEnfants;
   final droitsTotauxPleine = droitsPleineParEnfant * nombreEnfants;
@@ -982,17 +1020,26 @@ DemembrementResult computeDemembrement({
 
 /// Donation simple répartie à parts égales entre bénéficiaires, avec
 /// abattement et barème dépendant du lien de parenté avec le donateur.
+///
+/// [params] porte les abattements et barèmes par défaut, sauf si
+/// l'utilisateur les a personnalisés dans Réglages → Paramètres fiscaux.
 DonationResult computeDonation({
   required double montantDonation,
   required int nombreDonataires,
   required DonationRelation relation,
+  TaxParameters params = TaxParameters.defaults,
 }) {
   final montantParDonataire = montantDonation / nombreDonataires;
-  final abattement = abattementFor(relation);
+  final abattement = abattementFor(
+    relation,
+    enfant: params.abattementEnfant,
+    petitEnfant: params.abattementPetitEnfant,
+    conjoint: params.abattementConjoint,
+  );
   final taxableParDonataire = max(0.0, montantParDonataire - abattement);
   final droitsParDonataire = relation == DonationRelation.conjoint
-      ? spouseRights(taxableParDonataire)
-      : directLineRights(taxableParDonataire);
+      ? spouseRights(taxableParDonataire, brackets: params.spouseBrackets)
+      : directLineRights(taxableParDonataire, brackets: params.directLineBrackets);
 
   final droitsTotaux = droitsParDonataire * nombreDonataires;
 
@@ -1018,6 +1065,7 @@ InheritanceResult computeInheritance({
   required double partConjointPct,
   required int nombreEnfants,
   required double abattementParEnfant,
+  TaxParameters params = TaxParameters.defaults,
 }) {
   final partConjoint = conjointSurvivant
       ? actifNetSuccessoral * partConjointPct / 100
@@ -1025,7 +1073,10 @@ InheritanceResult computeInheritance({
   final masseEnfants = max(0.0, actifNetSuccessoral - partConjoint);
   final partParEnfant = masseEnfants / nombreEnfants;
   final taxableParEnfant = max(0.0, partParEnfant - abattementParEnfant);
-  final droitsParEnfant = directLineRights(taxableParEnfant);
+  final droitsParEnfant = directLineRights(
+    taxableParEnfant,
+    brackets: params.directLineBrackets,
+  );
 
   return InheritanceResult(
     partConjointExoneree: partConjoint,
@@ -1040,43 +1091,23 @@ InheritanceResult computeInheritance({
 
 enum DonationRelation { enfant, petitEnfant, conjoint }
 
-class TaxBracket {
-  final double upper;
-  final double rate;
+/// [brackets] est le barème des droits de mutation à titre gratuit en ligne
+/// directe (parent/enfant, article 777 CGI, [defaultDirectLineBrackets])
+/// par défaut, sauf si l'utilisateur l'a personnalisé dans Réglages →
+/// Paramètres fiscaux (voir `tax_parameters.dart`).
+double directLineRights(
+  double taxable, {
+  List<TaxBracket> brackets = defaultDirectLineBrackets,
+}) => computeRights(taxable, brackets);
 
-  const TaxBracket(this.upper, this.rate);
-}
-
-/// Barème des droits de mutation à titre gratuit en ligne directe
-/// (parent/enfant), article 777 CGI. Inchangé depuis 2011 (non indexé).
-const directLineBrackets = [
-  TaxBracket(8072, 0.05),
-  TaxBracket(12109, 0.10),
-  TaxBracket(15932, 0.15),
-  TaxBracket(552324, 0.20),
-  TaxBracket(902838, 0.30),
-  TaxBracket(1805677, 0.40),
-  TaxBracket(double.infinity, 0.45),
-];
-
-/// Barème des droits de donation entre époux ou partenaires de PACS,
-/// article 777 CGI (la succession entre époux est, elle, totalement
-/// exonérée depuis la loi TEPA de 2007 — ce barème ne s'applique donc
-/// qu'aux donations).
-const spouseBrackets = [
-  TaxBracket(8072, 0.05),
-  TaxBracket(15932, 0.10),
-  TaxBracket(31865, 0.15),
-  TaxBracket(552324, 0.20),
-  TaxBracket(902838, 0.30),
-  TaxBracket(1805677, 0.40),
-  TaxBracket(double.infinity, 0.45),
-];
-
-double directLineRights(double taxable) =>
-    computeRights(taxable, directLineBrackets);
-
-double spouseRights(double taxable) => computeRights(taxable, spouseBrackets);
+/// [brackets] est le barème des droits de donation entre époux/partenaires
+/// de PACS ([defaultSpouseBrackets], la succession entre époux étant, elle,
+/// totalement exonérée depuis la loi TEPA de 2007 — ce barème ne s'applique
+/// donc qu'aux donations) par défaut, même remarque que [directLineRights].
+double spouseRights(
+  double taxable, {
+  List<TaxBracket> brackets = defaultSpouseBrackets,
+}) => computeRights(taxable, brackets);
 
 double computeRights(double taxable, List<TaxBracket> brackets) {
   var remaining = max(0.0, taxable);
@@ -1094,27 +1125,42 @@ double computeRights(double taxable, List<TaxBracket> brackets) {
   return tax;
 }
 
-double abattementFor(DonationRelation relation) {
+/// [enfant]/[petitEnfant]/[conjoint] sont les abattements par défaut
+/// ([defaultAbattementEnfant]/[defaultAbattementPetitEnfant]/
+/// [defaultAbattementConjoint]) sauf si l'utilisateur les a personnalisés
+/// dans Réglages → Paramètres fiscaux.
+double abattementFor(
+  DonationRelation relation, {
+  double enfant = defaultAbattementEnfant,
+  double petitEnfant = defaultAbattementPetitEnfant,
+  double conjoint = defaultAbattementConjoint,
+}) {
   switch (relation) {
     case DonationRelation.enfant:
-      return 100000;
+      return enfant;
     case DonationRelation.petitEnfant:
-      return 31865;
+      return petitEnfant;
     case DonationRelation.conjoint:
-      return 80724;
+      return conjoint;
   }
 }
 
-double nueProprietePct(int ageUsufruitier) {
-  if (ageUsufruitier <= 20) return 10;
-  if (ageUsufruitier <= 30) return 20;
-  if (ageUsufruitier <= 40) return 30;
-  if (ageUsufruitier <= 50) return 40;
-  if (ageUsufruitier <= 60) return 50;
-  if (ageUsufruitier <= 70) return 60;
-  if (ageUsufruitier <= 80) return 70;
-  if (ageUsufruitier <= 90) return 80;
-  return 90;
+/// [brackets] est le barème de l'usufruit (article 669 CGI) par défaut
+/// ([defaultDemembrementBrackets]) sauf si l'utilisateur l'a personnalisé
+/// dans Réglages → Paramètres fiscaux — parcouru dans
+/// l'ordre croissant d'âge, la première tranche dont [UsufruitBracket.maxAge]
+/// couvre [ageUsufruitier] (ou `null`, la dernière tranche non plafonnée)
+/// détermine le pourcentage retourné.
+double nueProprietePct(
+  int ageUsufruitier, {
+  List<UsufruitBracket> brackets = defaultDemembrementBrackets,
+}) {
+  for (final bracket in brackets) {
+    if (bracket.maxAge == null || ageUsufruitier <= bracket.maxAge!) {
+      return bracket.pctNue;
+    }
+  }
+  return brackets.isEmpty ? 90 : brackets.last.pctNue;
 }
 
 double _readDouble(Map<String, dynamic> json, String key, double fallback) {

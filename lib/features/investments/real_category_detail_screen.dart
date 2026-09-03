@@ -395,6 +395,7 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
         onBack: () => setState(() => _selectedInvestmentId = null),
         onChanged: _refresh,
         profileName: widget.profileName,
+        patrimoineRefreshController: widget.patrimoineRefreshController,
       );
     }
     if (account != null) {

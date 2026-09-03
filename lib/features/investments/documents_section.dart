@@ -253,7 +253,7 @@ class DocumentsSection extends StatelessWidget {
     final confirmed = await confirmDelete(
       context,
       title: 'Supprimer "${document.fileName}" ?',
-      message: 'Le fichier sera définitivement supprimé du vault.',
+      message: 'Le fichier sera définitivement supprimé du coffre-fort.',
     );
     if (!confirmed) return;
     onDelete(document);

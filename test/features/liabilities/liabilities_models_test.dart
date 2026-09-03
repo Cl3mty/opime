@@ -181,4 +181,5 @@ void main() {
       expect(edited.linkedInvestmentId, 'immobilier-abc');
     });
   });
+
 }

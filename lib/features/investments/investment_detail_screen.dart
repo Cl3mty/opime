@@ -17,6 +17,7 @@ import 'investments_models.dart';
 import 'investments_repository.dart';
 import 'metal_price_client.dart';
 import 'metal_price_repository.dart';
+import 'patrimoine_refresh_controller.dart';
 import 'performance_calculator.dart';
 import 'price_history_repository.dart';
 import 'real_estate/real_estate_documents_section.dart';
@@ -66,6 +67,14 @@ class InvestmentDetailView extends StatefulWidget {
   /// bien). Sans effet hors immobilier.
   final String profileName;
 
+  /// Signal global de mutation du patrimoine — transmis à
+  /// [RealEstateLoanLinkSection] (immobilier uniquement) pour qu'elle
+  /// recharge la liste des crédits disponibles quand l'un d'eux est créé
+  /// ailleurs (ex : depuis le bouton "+" de la TopBar) pendant que cette
+  /// page reste ouverte, plutôt que de rester figée sur l'état chargé à
+  /// l'ouverture jusqu'à ce que l'utilisateur quitte puis revienne.
+  final PatrimoineRefreshController patrimoineRefreshController;
+
   const InvestmentDetailView({
     super.key,
     required this.vaultPath,
@@ -75,6 +84,7 @@ class InvestmentDetailView extends StatefulWidget {
     required this.onBack,
     required this.onChanged,
     required this.profileName,
+    required this.patrimoineRefreshController,
   });
 
   @override
@@ -1106,6 +1116,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             RealEstateLoanLinkSection(
               vaultPath: widget.vaultPath,
               investmentId: investment.id,
+              patrimoineRefreshController: widget.patrimoineRefreshController,
             ),
             const SizedBox(height: 24),
             TabList(

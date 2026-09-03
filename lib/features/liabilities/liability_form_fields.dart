@@ -23,9 +23,11 @@ class LiabilityFormFields extends StatelessWidget {
   final TextEditingController dureeDiffereController;
   final DateTime? dateDebut;
   final LoanType loanType;
+  final bool differeActif;
   final DeferType typeDiffere;
   final ValueChanged<DateTime?> onDateChanged;
   final ValueChanged<LoanType> onLoanTypeChanged;
+  final ValueChanged<bool> onDiffereActifChanged;
   final ValueChanged<DeferType> onTypeDiffereChanged;
 
   const LiabilityFormFields({
@@ -39,9 +41,11 @@ class LiabilityFormFields extends StatelessWidget {
     required this.dureeDiffereController,
     required this.dateDebut,
     required this.loanType,
+    required this.differeActif,
     required this.typeDiffere,
     required this.onDateChanged,
     required this.onLoanTypeChanged,
+    required this.onDiffereActifChanged,
     required this.onTypeDiffereChanged,
   });
 
@@ -104,25 +108,60 @@ class LiabilityFormFields extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
+        TextField(
+          controller: nbrEcheancesController,
+          placeholder: const shadcn.Text('Nombre d\'échéances (mois)'),
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(
-              child: TextField(
-                controller: nbrEcheancesController,
-                placeholder: const shadcn.Text('Nombre d\'échéances (mois)'),
-                keyboardType: TextInputType.number,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: dureeDiffereController,
-                placeholder: const shadcn.Text('Différé (mois, 0 si aucun)'),
-                keyboardType: TextInputType.number,
-              ),
-            ),
+            Expanded(child: shadcn.Text('Prêt différé').medium()),
+            Switch(value: differeActif, onChanged: onDiffereActifChanged),
           ],
         ),
+        // Le nombre de mois et le mode de franchise n'ont de sens que si le
+        // différé est actif — masqués plutôt qu'affichés en permanence avec
+        // une valeur à 0, pour ne pas laisser croire qu'un différé de 0 mois
+        // est une option distincte de "pas de différé du tout".
+        if (differeActif) ...[
+          const SizedBox(height: 8),
+          TextField(
+            controller: dureeDiffereController,
+            placeholder: const shadcn.Text('Durée du différé (mois)'),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: shadcn.Text('Franchise').muted().small()),
+              // Libellés courts ("Partielle"/"Totale", pas "Franchise
+              // partielle"/"Franchise totale") : le contexte est déjà donné
+              // par le libellé de la ligne, et les deux boutons pleine
+              // longueur débordaient de la largeur étroite du dialogue de
+              // création (régression détectée par les tests d'intégration).
+              ButtonGroup(
+                children: [
+                  SelectedButton(
+                    value: typeDiffere == DeferType.partielle,
+                    selectedStyle: const ButtonStyle.primary(),
+                    style: toggleUnselectedStyle(context),
+                    onChanged: (_) =>
+                        onTypeDiffereChanged(DeferType.partielle),
+                    child: const shadcn.Text('Partielle'),
+                  ),
+                  SelectedButton(
+                    value: typeDiffere == DeferType.totale,
+                    selectedStyle: const ButtonStyle.primary(),
+                    style: toggleUnselectedStyle(context),
+                    onChanged: (_) => onTypeDiffereChanged(DeferType.totale),
+                    child: const shadcn.Text('Totale'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -144,24 +183,6 @@ class LiabilityFormFields extends StatelessWidget {
                   style: toggleUnselectedStyle(context),
                   onChanged: (_) => onLoanTypeChanged(LoanType.inFine),
                   child: const shadcn.Text('In fine'),
-                ),
-              ],
-            ),
-            ButtonGroup(
-              children: [
-                SelectedButton(
-                  value: typeDiffere == DeferType.partielle,
-                  selectedStyle: const ButtonStyle.primary(),
-                  style: toggleUnselectedStyle(context),
-                  onChanged: (_) => onTypeDiffereChanged(DeferType.partielle),
-                  child: const shadcn.Text('Franchise partielle'),
-                ),
-                SelectedButton(
-                  value: typeDiffere == DeferType.totale,
-                  selectedStyle: const ButtonStyle.primary(),
-                  style: toggleUnselectedStyle(context),
-                  onChanged: (_) => onTypeDiffereChanged(DeferType.totale),
-                  child: const shadcn.Text('Franchise totale'),
                 ),
               ],
             ),

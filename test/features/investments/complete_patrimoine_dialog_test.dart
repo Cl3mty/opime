@@ -4,6 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/features/investments/complete_patrimoine_dialog.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
+import 'package:opime/features/liabilities/liabilities_models.dart';
+import 'package:opime/features/liabilities/liabilities_repository.dart';
+import 'package:opime/features/simulations/loan_calculator.dart' show DeferType;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -718,4 +721,358 @@ void main() {
       },
     );
   });
+
+  group(
+    'Passif : différé (switch) et type "Crédit travaux"',
+    () {
+      Future<void> pumpPassifTypeStep(WidgetTester tester) async {
+        await tester.pumpWidget(
+          ShadcnApp(
+            home: Scaffold(
+              child: Builder(
+                builder: (context) => GestureDetector(
+                  onTap: () => showCompletePatrimoineDialog(
+                    context,
+                    vaultPath: tempDir.path,
+                    onCompleted: () {},
+                  ),
+                  child: const Text('OPEN'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('OPEN'));
+        await tester.pump();
+        // Le chargement initial (comptes existants, logos...) est
+        // asynchrone : même l'étape "kind" reste derrière un spinner tant
+        // qu'il n'est pas terminé.
+        await tester.runAsync(() async {
+          for (var i = 0; i < 40; i++) {
+            if (find.text('Un passif').evaluate().isNotEmpty) return;
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump();
+          }
+        });
+        await tester.tap(find.text('Un passif'));
+        await tester.pump();
+      }
+
+      testWidgets(
+        'exactement 2 types de passifs sont proposés (pas de "Crédit '
+        'travaux" dédié — un crédit travaux est un crédit autre nommé '
+        'comme tel, voir RealEstateLoanLinkSection)',
+        (tester) async {
+          await pumpPassifTypeStep(tester);
+
+          expect(find.text('Prêt immobilier'), findsOneWidget);
+          expect(find.text('Crédit autre'), findsOneWidget);
+          expect(find.text('Crédit travaux'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'par défaut, le différé est désactivé : ni la durée ni le choix de '
+        'franchise ne sont affichés',
+        (tester) async {
+          await pumpPassifTypeStep(tester);
+          await tester.tap(find.text('Prêt immobilier'));
+          await tester.pump();
+
+          expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+          expect(find.text('Durée du différé (mois)'), findsNothing);
+          expect(find.text('Partielle'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'activer le différé à la création persiste dureeDiffereMois et le '
+        'type de franchise choisi',
+        (tester) async {
+          await pumpPassifTypeStep(tester);
+          await tester.tap(find.text('Prêt immobilier'));
+          await tester.pump();
+
+          await tester.enterText(
+            find.widgetWithText(
+              TextField,
+              'Nom (ex: Prêt résidence principale)',
+            ),
+            'Prêt maison',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Prix total (€)'),
+            '200000',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Apport (€, 0 si aucun)'),
+            '0',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Taux d\'intérêt (%)'),
+            '3',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Assurance mensuelle (€)'),
+            '0',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Nombre d\'échéances (mois)'),
+            '240',
+          );
+          await tester.tap(find.byType(Switch));
+          await tester.pump();
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Durée du différé (mois)'),
+            '12',
+          );
+          // `pumpAndSettle`, pas un simple `pump()` : le `SingleChildScrollView`
+          // du dialogue défile pour garder ce champ visible une fois focus
+          // pris, et ce défilement décale la position de "Totale"
+          // sous le tap déjà calculé si on n'attend pas la fin de l'animation.
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Totale'));
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('Créer le passif'));
+          await tester.pumpAndSettle();
+
+          await tester.runAsync(() async {
+            await tester.tap(find.text('Créer le passif'));
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+          });
+          await tester.pump();
+
+          final saved = await tester.runAsync(
+            () => LiabilitiesRepository(tempDir.path).listAll(),
+          );
+          final liability = saved!.single;
+          expect(liability.differeActif, isTrue);
+          expect(liability.dureeDiffereMois, 12);
+          expect(liability.typeDiffere, DeferType.totale);
+        },
+      );
+
+      testWidgets(
+        'sans aucun bien immobilier existant, le sélecteur "Bien financé" '
+        'n\'est pas affiché (pas de menu vide)',
+        (tester) async {
+          await pumpPassifTypeStep(tester);
+          await tester.tap(find.text('Prêt immobilier'));
+          await tester.pump();
+
+          expect(find.text('Bien financé (facultatif)'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'avec un bien immobilier existant, le sélecteur "Bien financé" '
+        's\'affiche avec "Aucun" comme valeur par défaut (interaction avec '
+        'le popup Select non testable dans ce harnais — même limitation '
+        '"No DrawerOverlay found" documentée plus haut pour le sélecteur '
+        'de variante Private Equity)',
+        (tester) async {
+          await tester.runAsync(
+            () => InvestmentsRepository(tempDir.path).saveAccount(
+              InvestmentAccount(
+                assetClass: AssetClass.immobilier,
+                envelope: AccountEnvelope.residencePrincipale,
+                name: 'Ma maison',
+                investments: [
+                  Investment(
+                    isin: 'immo-1',
+                    label: 'Ma maison',
+                    realEstateType: RealEstateType.residencePrincipale,
+                    transactions: const [],
+                  ),
+                ],
+              ),
+            ),
+          );
+
+          await pumpPassifTypeStep(tester);
+          await tester.tap(find.text('Prêt immobilier'));
+          await tester.pump();
+
+          expect(find.text('Bien financé (facultatif)'), findsOneWidget);
+          expect(find.text('Aucun'), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'le bien pré-sélectionné (ouvert depuis RealEstateLoanLinkSection) '
+        'se persiste bien tel quel si l\'utilisateur ne touche pas au '
+        'sélecteur — couvre la logique de persistance que le sélecteur '
+        'manuel ne peut pas exercer dans ce harnais (voir le test '
+        'précédent)',
+        (tester) async {
+          // `Investment.id` est généré à la construction — distinct de
+          // `isin` (voir la régression corrigée : le sélecteur plantait
+          // tout le dialogue en confondant les deux, `firstWhere` sans
+          // filet sur un id qui ne matchait jamais).
+          final investment = Investment(
+            isin: 'immo-1',
+            label: 'Ma maison',
+            realEstateType: RealEstateType.residencePrincipale,
+            transactions: const [],
+          );
+          final investmentId = investment.id;
+          await tester.runAsync(
+            () => InvestmentsRepository(tempDir.path).saveAccount(
+              InvestmentAccount(
+                assetClass: AssetClass.immobilier,
+                envelope: AccountEnvelope.residencePrincipale,
+                name: 'Ma maison',
+                investments: [investment],
+              ),
+            ),
+          );
+
+          await tester.pumpWidget(
+            ShadcnApp(
+              home: Scaffold(
+                child: Builder(
+                  builder: (context) => GestureDetector(
+                    onTap: () => showCompletePatrimoineDialog(
+                      context,
+                      vaultPath: tempDir.path,
+                      onCompleted: () {},
+                      initialLiabilityType: LiabilityType.pretImmobilier,
+                      initialLinkedInvestmentId: investmentId,
+                    ),
+                    child: const Text('OPEN'),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.tap(find.text('OPEN'));
+          await tester.runAsync(() async {
+            for (var i = 0; i < 40; i++) {
+              if (find.text('Bien financé (facultatif)').evaluate().isNotEmpty) {
+                return;
+              }
+              await Future<void>.delayed(const Duration(milliseconds: 50));
+              await tester.pump();
+            }
+          });
+
+          // Le bien pré-connu est déjà sélectionné (pas "Aucun") sans que
+          // l'utilisateur n'ait rien eu à faire.
+          expect(find.text('Ma maison'), findsOneWidget);
+          expect(find.text('Aucun'), findsNothing);
+
+          await tester.enterText(
+            find.widgetWithText(
+              TextField,
+              'Nom (ex: Prêt résidence principale)',
+            ),
+            'Prêt maison',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Prix total (€)'),
+            '200000',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Apport (€, 0 si aucun)'),
+            '0',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Taux d\'intérêt (%)'),
+            '3',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Assurance mensuelle (€)'),
+            '0',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Nombre d\'échéances (mois)'),
+            '240',
+          );
+          await tester.ensureVisible(find.text('Créer le passif'));
+          await tester.pumpAndSettle();
+
+          await tester.runAsync(() async {
+            await tester.tap(find.text('Créer le passif'));
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+          });
+          await tester.pump();
+
+          final saved = await tester.runAsync(
+            () => LiabilitiesRepository(tempDir.path).listAll(),
+          );
+          expect(saved!.single.linkedInvestmentId, investmentId);
+        },
+      );
+
+      testWidgets(
+        'avec un bien immobilier existant mais sans le sélectionner (reste '
+        'sur "Aucun"), le passif créé n\'est lié à rien — comportement '
+        'inchangé par défaut',
+        (tester) async {
+          await tester.runAsync(
+            () => InvestmentsRepository(tempDir.path).saveAccount(
+              InvestmentAccount(
+                assetClass: AssetClass.immobilier,
+                envelope: AccountEnvelope.residencePrincipale,
+                name: 'Ma maison',
+                investments: [
+                  Investment(
+                    isin: 'immo-1',
+                    label: 'Ma maison',
+                    realEstateType: RealEstateType.residencePrincipale,
+                    transactions: const [],
+                  ),
+                ],
+              ),
+            ),
+          );
+
+          await pumpPassifTypeStep(tester);
+          await tester.tap(find.text('Prêt immobilier'));
+          await tester.pump();
+
+          await tester.enterText(
+            find.widgetWithText(
+              TextField,
+              'Nom (ex: Prêt résidence principale)',
+            ),
+            'Prêt maison',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Prix total (€)'),
+            '200000',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Apport (€, 0 si aucun)'),
+            '0',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Taux d\'intérêt (%)'),
+            '3',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Assurance mensuelle (€)'),
+            '0',
+          );
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Nombre d\'échéances (mois)'),
+            '240',
+          );
+          await tester.ensureVisible(find.text('Créer le passif'));
+          await tester.pumpAndSettle();
+
+          await tester.runAsync(() async {
+            await tester.tap(find.text('Créer le passif'));
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+          });
+          await tester.pump();
+
+          final saved = await tester.runAsync(
+            () => LiabilitiesRepository(tempDir.path).listAll(),
+          );
+          expect(saved!.single.linkedInvestmentId, isNull);
+        },
+      );
+    },
+  );
 }

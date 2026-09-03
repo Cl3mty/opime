@@ -40,7 +40,27 @@ class AssistantConfigController extends ChangeNotifier {
   final FlutterSecureStorage _secureStorage;
 
   AssistantConfigController({FlutterSecureStorage? secureStorage})
-    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+    : _secureStorage =
+          secureStorage ??
+          // `useDataProtectionKeyChain: false` (le défaut du package est
+          // `true`) : Opime tourne en sandbox App Sandbox
+          // (`com.apple.security.app-sandbox`, voir les `.entitlements` du
+          // Runner) mais sans identité de signature stable (build local
+          // sans compte développeur Apple, `CODE_SIGN_IDENTITY = "-"`) —
+          // le "Data Protection Keychain" moderne exige une entitlement
+          // `keychain-access-groups` valide pour ça, absente ici, et
+          // `SecItemAdd`/`SecItemUpdate` échouaient silencieusement
+          // (`errSecMissingEntitlement`, -34018 : l'appel Dart n'était
+          // jamais attendu par l'UI, voir [setApiKeyFor]). Repli sur
+          // l'API Trousseau historique (pré-Catalina), qui n'a pas cette
+          // exigence et fonctionne en sandbox sans identité de signature
+          // particulière — cause racine du bug "la clé API n'est pas
+          // sauvegardée de façon persistante" : elle semblait enregistrée
+          // (cache mémoire mis à jour, champ toujours rempli pendant la
+          // session) mais ne survivait jamais à un redémarrage de l'app.
+          const FlutterSecureStorage(
+            mOptions: MacOsOptions(useDataProtectionKeyChain: false),
+          );
 
   bool _enabled = false;
   LlmProvider _provider = LlmProvider.ollama;
@@ -48,6 +68,15 @@ class AssistantConfigController extends ChangeNotifier {
   bool _includePatrimoine = true;
   final Map<LlmProvider, String?> _models = {};
   final Map<LlmProvider, String?> _apiKeys = {};
+
+  /// Message d'erreur si le dernier appel à [setApiKeyFor] n'a pas pu
+  /// écrire/effacer la clé dans le stockage sécurisé (`null` sinon) — sans
+  /// ça, un échec du Trousseau système passait inaperçu : le cache mémoire
+  /// (donc [apiKeyFor] et le champ de saisie) restait à jour pendant la
+  /// session, donnant l'illusion que la clé était enregistrée alors
+  /// qu'elle ne survivrait pas à un redémarrage de l'app.
+  String? _apiKeyError;
+  String? get apiKeyError => _apiKeyError;
 
   /// L'assistant est-il activé (via les Réglages) ?
   bool get enabled => _enabled;
@@ -148,13 +177,23 @@ class AssistantConfigController extends ChangeNotifier {
   Future<void> setApiKeyFor(LlmProvider provider, String? value) async {
     final trimmed = value?.trim();
     _apiKeys[provider] = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
-    notifyListeners();
     final key = _apiKeyStorageKeyFor(provider);
-    if (_apiKeys[provider] == null) {
-      await _secureStorage.delete(key: key);
-    } else {
-      await _secureStorage.write(key: key, value: _apiKeys[provider]);
+    try {
+      if (_apiKeys[provider] == null) {
+        await _secureStorage.delete(key: key);
+      } else {
+        await _secureStorage.write(key: key, value: _apiKeys[provider]);
+      }
+      _apiKeyError = null;
+    } catch (e) {
+      // Le cache mémoire ci-dessus reste à jour (la clé continue de
+      // fonctionner pour la session en cours), mais sans être persistée :
+      // signalé via [apiKeyError] plutôt que laissé silencieux, pour que
+      // l'utilisateur sache qu'elle ne survivra pas à un redémarrage.
+      _apiKeyError =
+          'Impossible d\'enregistrer la clé dans le Trousseau du système : $e';
     }
+    notifyListeners();
   }
 
   Future<void> setIncludePatrimoine(bool value) async {

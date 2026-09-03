@@ -151,23 +151,23 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
         await widget.onVaultActivated(activeVault.vaultPath);
         _showAccountToast(
           widget.anchorContext,
-          'Vault actif : ${activeVault.name}',
+          'Coffre-fort actif : ${activeVault.name}',
           'Basculé depuis le sélecteur de compte',
         );
       }
     } catch (e) {
       _showAccountToast(
         widget.anchorContext,
-        'Impossible d\'activer ce vault',
+        'Impossible d\'activer ce coffre-fort',
         '$e',
       );
     }
   }
 
-  /// Flèches gauche/droite pour parcourir les vaults enregistrés, au-dessus
-  /// de la liste des profils — pas de liste des vaults par nom ici, elle
-  /// reste dans Réglages (`SettingsScreen`/`_VaultCard`) pour une gestion
-  /// complète (renommer/oublier/ajouter).
+  /// Flèches gauche/droite pour parcourir les coffres-forts enregistrés,
+  /// au-dessus de la liste des profils — pas de liste des coffres-forts par
+  /// nom ici, elle reste dans Réglages (`SettingsScreen`/`_VaultCard`) pour
+  /// une gestion complète (renommer/oublier/ajouter).
   ///
   /// Toujours présente dans `DropdownMenu.children` (même pendant le
   /// chargement, flèches simplement désactivées) plutôt qu'insérée après
@@ -194,8 +194,8 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
             tooltip: TooltipContainer(
               child: shadcn.Text(
                 previous != null
-                    ? 'Vault précédent : ${previous.name}'
-                    : 'Vault précédent',
+                    ? 'Coffre-fort précédent : ${previous.name}'
+                    : 'Coffre-fort précédent',
               ),
             ),
             child: IconButton.ghost(
@@ -207,14 +207,16 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
           ),
           Expanded(
             child: Center(
-              child: shadcn.Text(activeName ?? 'Vault').medium.small,
+              child: shadcn.Text(activeName ?? 'Coffre-fort').medium.small,
             ),
           ),
           Tooltip(
             // ignore: implicit_call_tearoffs
             tooltip: TooltipContainer(
               child: shadcn.Text(
-                next != null ? 'Vault suivant : ${next.name}' : 'Vault suivant',
+                next != null
+                    ? 'Coffre-fort suivant : ${next.name}'
+                    : 'Coffre-fort suivant',
               ),
             ),
             child: IconButton.ghost(

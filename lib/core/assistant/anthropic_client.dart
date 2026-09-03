@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'assistant_models.dart';
+import 'llm_error_message.dart';
 import 'llm_exception.dart';
 
 /// Erreur remontée par l'API Anthropic (clé invalide, quota dépassé,
@@ -60,7 +61,13 @@ class AnthropicClient {
           .get(Uri.parse('$_baseUrl/models'), headers: _headers(apiKey))
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) {
-        throw AnthropicException(_apiErrorMessage(response));
+        throw AnthropicException(
+          llmApiErrorMessage(
+            providerName: 'Anthropic',
+            statusCode: response.statusCode,
+            body: response.body,
+          ),
+        );
       }
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       final rawModels = (decoded is Map<String, dynamic>)
@@ -120,7 +127,14 @@ class AnthropicClient {
         ),
       );
       if (response.statusCode != 200) {
-        throw AnthropicException(await _streamedErrorMessage(response));
+        final body = await response.stream.bytesToString();
+        throw AnthropicException(
+          llmApiErrorMessage(
+            providerName: 'Anthropic',
+            statusCode: response.statusCode,
+            body: body,
+          ),
+        );
       }
 
       final buffer = StringBuffer();
@@ -169,25 +183,4 @@ class AnthropicClient {
     }
   }
 
-  String _apiErrorMessage(http.Response response) {
-    if (response.statusCode == 401) {
-      return 'Clé API Anthropic invalide ou expirée.';
-    }
-    if (response.statusCode == 429) {
-      return 'Quota Anthropic dépassé. Réessaie plus tard.';
-    }
-    return 'Anthropic a répondu HTTP ${response.statusCode}.';
-  }
-
-  Future<String> _streamedErrorMessage(http.StreamedResponse response) async {
-    if (response.statusCode == 401) {
-      return 'Clé API Anthropic invalide ou expirée.';
-    }
-    if (response.statusCode == 429) {
-      return 'Quota Anthropic dépassé. Réessaie plus tard.';
-    }
-    final body = await response.stream.bytesToString();
-    return 'Anthropic a répondu HTTP ${response.statusCode}'
-        '${body.trim().isEmpty ? '.' : ' : ${body.trim()}'}';
-  }
 }

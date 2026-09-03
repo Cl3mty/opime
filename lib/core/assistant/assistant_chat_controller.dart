@@ -469,7 +469,8 @@ class AssistantChatController extends ChangeNotifier {
       prompt.writeln();
       prompt.writeln('## Contexte (données locales du profil actif)');
       prompt.writeln(
-        'Les données ci-dessous viennent directement du vault local de '
+        'Les données ci-dessous viennent directement du coffre-fort local '
+        'de '
         'l\'utilisateur (comptes, budget, notes, simulations) : elles sont '
         'à jour et fiables, pas une supposition. Tu as bien accès à ces '
         'données — ne dis JAMAIS que tu n\'as pas accès aux informations '

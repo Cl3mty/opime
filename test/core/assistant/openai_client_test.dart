@@ -100,32 +100,81 @@ void main() {
       },
     );
 
-    test('erreur HTTP non-200 : le corps est inclus dans le message', () async {
-      final client = OpenAiClient(
-        httpClient: MockClient.streaming(
-          (request, bodyStream) async => http.StreamedResponse(
-            Stream.value(utf8.encode('quota exceeded')),
-            429,
+    test(
+      'erreur HTTP non-200 sans corps JSON exploitable : message générique',
+      () async {
+        final client = OpenAiClient(
+          httpClient: MockClient.streaming(
+            (request, bodyStream) async => http.StreamedResponse(
+              Stream.value(utf8.encode('quota exceeded')),
+              429,
+            ),
           ),
-        ),
-      );
+        );
 
-      await expectLater(
-        client.streamChat(
-          apiKey: 'sk-test',
-          model: 'gpt-4o',
-          messages: const [
-            AssistantMessage(role: AssistantRole.user, content: 'Salut'),
-          ],
-        ),
-        throwsA(
-          isA<OpenAiException>().having(
-            (e) => e.message,
-            'message',
-            contains('Quota'),
+        await expectLater(
+          client.streamChat(
+            apiKey: 'sk-test',
+            model: 'gpt-4o',
+            messages: const [
+              AssistantMessage(role: AssistantRole.user, content: 'Salut'),
+            ],
           ),
-        ),
-      );
-    });
+          throwsA(
+            isA<OpenAiException>().having(
+              (e) => e.message,
+              'message',
+              contains('Quota'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      '429 avec quota épuisé (insufficient_quota) : le vrai message '
+      'd\'OpenAI est affiché, pas un générique "réessaie plus tard" '
+      'trompeur — un compte sans crédit renvoie 429 dès le tout premier '
+      'appel, retenter ne change rien',
+      () async {
+        final client = OpenAiClient(
+          httpClient: MockClient.streaming(
+            (request, bodyStream) async => http.StreamedResponse(
+              Stream.value(
+                utf8.encode(
+                  jsonEncode({
+                    'error': {
+                      'message':
+                          'You exceeded your current quota, please check '
+                          'your plan and billing details.',
+                      'type': 'insufficient_quota',
+                      'code': 'insufficient_quota',
+                    },
+                  }),
+                ),
+              ),
+              429,
+            ),
+          ),
+        );
+
+        await expectLater(
+          client.streamChat(
+            apiKey: 'sk-test',
+            model: 'gpt-4o',
+            messages: const [
+              AssistantMessage(role: AssistantRole.user, content: 'Salut'),
+            ],
+          ),
+          throwsA(
+            isA<OpenAiException>().having(
+              (e) => e.message,
+              'message',
+              contains('You exceeded your current quota'),
+            ),
+          ),
+        );
+      },
+    );
   });
 }

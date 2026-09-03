@@ -16,6 +16,7 @@ import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/responsive.dart';
 import '../../core/ui/vault_kind_selector.dart';
+import '../navigation/navigation_scope.dart';
 import 'vault_encryption_dialogs.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -85,6 +86,8 @@ class SettingsScreen extends StatelessWidget {
             _ShortcutsCard(configController: keyboardShortcutsController),
             const SizedBox(height: 16),
           ],
+          _TaxParametersCard(vaultPath: profileController.activeDataPath),
+          const SizedBox(height: 16),
           _EncryptionCard(
             vaultPath: vaultPath,
             onChanged: onVaultEncryptionChanged,
@@ -520,6 +523,7 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
   }
 
   Widget _buildApiKeyField(LlmProvider provider) {
+    final error = widget.configController.apiKeyError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -534,6 +538,21 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
           onChanged: (value) =>
               widget.configController.setApiKeyFor(provider, value),
         ),
+        if (error != null) ...[
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                LucideIcons.triangleAlert,
+                size: 14,
+                color: Theme.of(context).colorScheme.destructive,
+              ),
+              const SizedBox(width: 6),
+              Expanded(child: Text(error).small()),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -629,6 +648,56 @@ class _NotificationsCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Carte d'entrée vers [TaxParametersScreen] (voir sa doc de classe) —
+/// juste un bouton, la personnalisation elle-même se fait sur son propre
+/// écran plutôt que dans cette carte, vu le nombre de valeurs concernées
+/// (barèmes IR/IFI/démembrement/donation, une dizaine de tranches
+/// chacune).
+class _TaxParametersCard extends StatelessWidget {
+  final String vaultPath;
+
+  const _TaxParametersCard({required this.vaultPath});
+
+  @override
+  Widget build(BuildContext context) {
+    return FrostedCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              LucideIcons.scale,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Paramètres fiscaux').large().medium(),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Barèmes, seuils et abattements utilisés par les '
+                    'simulateurs (IR, IFI, démembrement, donation, '
+                    'succession) — à jour toi-même en cas de révision par '
+                    'l\'État.',
+                  ).muted().small(),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlineButton(
+              onPressed: () =>
+                  NavigationScope.maybeOf(context)?.call('tax_parameters'),
+              child: const Text('Modifier'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

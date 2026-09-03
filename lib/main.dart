@@ -25,6 +25,7 @@ import 'features/onboarding/vault_migration_interrupted_screen.dart';
 import 'features/onboarding/vault_recovery_screen.dart';
 import 'features/onboarding/vault_unlock_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/settings/tax_parameters_screen.dart';
 import 'features/assistant/assistant_screen.dart';
 import 'app/theme_controller.dart';
 import 'app/app_shell.dart';
@@ -856,6 +857,10 @@ class _OpimeAppState extends State<OpimeApp> {
                 onVaultEncryptionChanged: () => _initProfiles(_vaultPath!),
                 githubOwner: _githubOwner,
                 githubRepo: _githubRepo,
+              ),
+              'tax_parameters': (_) => TaxParametersScreen(
+                key: ValueKey(_profileController!.activeDataPath),
+                vaultPath: _profileController!.activeDataPath,
               ),
             },
           ),

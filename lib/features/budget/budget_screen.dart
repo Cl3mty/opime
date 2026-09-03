@@ -189,7 +189,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       return LoadErrorView(
         message:
             'Impossible de charger les budgets. Vérifiez que le dossier '
-            'Vault est accessible.',
+            'Coffre-fort est accessible.',
         onRetry: _retryInit,
       );
     }

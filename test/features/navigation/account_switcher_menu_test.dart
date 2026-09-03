@@ -114,8 +114,8 @@ void main() {
       expect(find.text('Vault A'), findsOneWidget);
       expect(findIconButton(LucideIcons.chevronLeft), findsOneWidget);
       expect(findIconButton(LucideIcons.chevronRight), findsOneWidget);
-      expect(find.text('Vaults'), findsNothing);
-      expect(find.text('Ajouter un vault'), findsNothing);
+      expect(find.text('Coffres-forts'), findsNothing);
+      expect(find.text('Ajouter un coffre-fort'), findsNothing);
     },
   );
 

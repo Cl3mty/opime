@@ -131,4 +131,67 @@ void main() {
       expect(config.apiKeyFor(LlmProvider.google), 'sk-google');
     },
   );
+
+  test(
+    'échec du stockage sécurisé (ex : Trousseau système inaccessible) : '
+    'signalé via apiKeyError plutôt que silencieusement avalé — la clé '
+    'reste utilisable pour la session en cours (cache mémoire) mais ne '
+    'survivrait pas à un redémarrage',
+    () async {
+      FlutterSecureStoragePlatform.instance = _ThrowingSecureStoragePlatform();
+      final config = AssistantConfigController();
+      await config.load();
+
+      expect(config.apiKeyError, isNull);
+      await config.setApiKeyFor(LlmProvider.openai, 'sk-test-123');
+
+      expect(config.apiKeyError, contains('Trousseau'));
+      // Le cache mémoire reste néanmoins à jour pour la session en cours.
+      expect(config.apiKeyFor(LlmProvider.openai), 'sk-test-123');
+    },
+  );
+
+  test(
+    'un nouvel enregistrement réussi efface l\'erreur d\'un échec précédent',
+    () async {
+      FlutterSecureStoragePlatform.instance = _ThrowingSecureStoragePlatform();
+      final config = AssistantConfigController();
+      await config.load();
+      await config.setApiKeyFor(LlmProvider.openai, 'sk-test-123');
+      expect(config.apiKeyError, isNotNull);
+
+      FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform(
+        secureStorageData,
+      );
+      await config.setApiKeyFor(LlmProvider.openai, 'sk-test-456');
+
+      expect(config.apiKeyError, isNull);
+    },
+  );
+}
+
+/// Fait échouer toute écriture/suppression, comme un Trousseau système
+/// inaccessible (entitlement manquante, session verrouillée...) — pour
+/// vérifier que [AssistantConfigController.setApiKeyFor] remonte l'échec
+/// via `apiKeyError` plutôt que de le laisser filer en erreur asynchrone
+/// non gérée.
+class _ThrowingSecureStoragePlatform extends TestFlutterSecureStoragePlatform {
+  _ThrowingSecureStoragePlatform() : super({});
+
+  @override
+  Future<void> write({
+    required String key,
+    required String value,
+    required Map<String, String> options,
+  }) async {
+    throw Exception('errSecMissingEntitlement (-34018)');
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    required Map<String, String> options,
+  }) async {
+    throw Exception('errSecMissingEntitlement (-34018)');
+  }
 }

@@ -70,6 +70,7 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
   final _dureeDiffereController = TextEditingController();
   DateTime? _dateDebut;
   LoanType _loanType = LoanType.amortissable;
+  bool _differeActif = false;
   DeferType _typeDiffere = DeferType.partielle;
 
   @override
@@ -113,6 +114,7 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
       _dureeDiffereController.text = liability.dureeDiffereMois.toString();
       _dateDebut = liability.dateDebut;
       _loanType = liability.loanType;
+      _differeActif = liability.differeActif;
       _typeDiffere = liability.typeDiffere;
     });
   }
@@ -154,8 +156,8 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
       nbrEcheances: nbrEcheances,
       dateDebut: dateDebut,
       loanType: _loanType,
-      differeActif: dureeDiffere > 0,
-      dureeDiffereMois: dureeDiffere,
+      differeActif: _differeActif,
+      dureeDiffereMois: _differeActif ? dureeDiffere : 0,
       typeDiffere: _typeDiffere,
       documents: widget.liability.documents,
     );
@@ -282,9 +284,11 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
               dureeDiffereController: _dureeDiffereController,
               dateDebut: _dateDebut,
               loanType: _loanType,
+              differeActif: _differeActif,
               typeDiffere: _typeDiffere,
               onDateChanged: (d) => setState(() => _dateDebut = d),
               onLoanTypeChanged: (t) => setState(() => _loanType = t),
+              onDiffereActifChanged: (v) => setState(() => _differeActif = v),
               onTypeDiffereChanged: (t) => setState(() => _typeDiffere = t),
               onSave: _commitEdit,
               onCancel: () => setState(() => _editing = false),
@@ -447,9 +451,11 @@ class _EditLiabilityForm extends StatelessWidget {
   final TextEditingController dureeDiffereController;
   final DateTime? dateDebut;
   final LoanType loanType;
+  final bool differeActif;
   final DeferType typeDiffere;
   final ValueChanged<DateTime?> onDateChanged;
   final ValueChanged<LoanType> onLoanTypeChanged;
+  final ValueChanged<bool> onDiffereActifChanged;
   final ValueChanged<DeferType> onTypeDiffereChanged;
   final VoidCallback onSave;
   final VoidCallback onCancel;
@@ -464,9 +470,11 @@ class _EditLiabilityForm extends StatelessWidget {
     required this.dureeDiffereController,
     required this.dateDebut,
     required this.loanType,
+    required this.differeActif,
     required this.typeDiffere,
     required this.onDateChanged,
     required this.onLoanTypeChanged,
+    required this.onDiffereActifChanged,
     required this.onTypeDiffereChanged,
     required this.onSave,
     required this.onCancel,
@@ -490,9 +498,11 @@ class _EditLiabilityForm extends StatelessWidget {
               dureeDiffereController: dureeDiffereController,
               dateDebut: dateDebut,
               loanType: loanType,
+              differeActif: differeActif,
               typeDiffere: typeDiffere,
               onDateChanged: onDateChanged,
               onLoanTypeChanged: onLoanTypeChanged,
+              onDiffereActifChanged: onDiffereActifChanged,
               onTypeDiffereChanged: onTypeDiffereChanged,
             ),
             const SizedBox(height: 12),

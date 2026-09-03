@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'assistant_models.dart';
+import 'llm_error_message.dart';
 import 'llm_exception.dart';
 
 /// Erreur remontée par l'API OpenAI (clé invalide, quota dépassé, réponse
@@ -56,7 +57,13 @@ class OpenAiClient {
           .get(Uri.parse('$_baseUrl/models'), headers: _headers(apiKey))
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) {
-        throw OpenAiException(_apiErrorMessage(response));
+        throw OpenAiException(
+          llmApiErrorMessage(
+            providerName: 'OpenAI',
+            statusCode: response.statusCode,
+            body: response.body,
+          ),
+        );
       }
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       final rawModels = (decoded is Map<String, dynamic>)
@@ -110,7 +117,14 @@ class OpenAiClient {
         ),
       );
       if (response.statusCode != 200) {
-        throw OpenAiException(await _streamedErrorMessage(response));
+        final body = await response.stream.bytesToString();
+        throw OpenAiException(
+          llmApiErrorMessage(
+            providerName: 'OpenAI',
+            statusCode: response.statusCode,
+            body: body,
+          ),
+        );
       }
 
       final buffer = StringBuffer();
@@ -149,21 +163,4 @@ class OpenAiClient {
     }
   }
 
-  String _apiErrorMessage(http.Response response) {
-    if (response.statusCode == 401) {
-      return 'Clé API OpenAI invalide ou expirée.';
-    }
-    if (response.statusCode == 429) {
-      return 'Quota OpenAI dépassé. Réessaie plus tard.';
-    }
-    return 'OpenAI a répondu HTTP ${response.statusCode}.';
-  }
-
-  Future<String> _streamedErrorMessage(http.StreamedResponse response) async {
-    if (response.statusCode == 401) return 'Clé API OpenAI invalide ou expirée.';
-    if (response.statusCode == 429) return 'Quota OpenAI dépassé. Réessaie plus tard.';
-    final body = await response.stream.bytesToString();
-    return 'OpenAI a répondu HTTP ${response.statusCode}'
-        '${body.trim().isEmpty ? '.' : ' : ${body.trim()}'}';
-  }
 }

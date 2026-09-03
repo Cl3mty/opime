@@ -156,7 +156,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       return LoadErrorView(
         message:
             'Impossible de charger les projets. Vérifiez que le dossier '
-            'Vault est accessible.',
+            'Coffre-fort est accessible.',
         onRetry: _retryLoad,
       );
     }

@@ -142,7 +142,7 @@ class VaultEncryptionMetadata {
     final decrypted = utf8.decode(unseal(verification, dek));
     if (decrypted != _verificationPlaintext) {
       throw StateError(
-        'Vérification échouée : la DEK désenveloppée ne correspond pas à ce vault.',
+        'Vérification échouée : la DEK désenveloppée ne correspond pas à ce coffre-fort.',
       );
     }
   }

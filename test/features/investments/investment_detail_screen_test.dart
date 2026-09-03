@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/features/investments/investment_detail_screen.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
+import 'package:opime/features/investments/patrimoine_refresh_controller.dart';
 import 'package:opime/features/investments/real_estate/rent_models.dart';
 import 'package:opime/features/investments/widgets/transaction_widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -61,6 +62,7 @@ void main() {
               onBack: () {},
               onChanged: () async {},
               profileName: 'Moi',
+              patrimoineRefreshController: PatrimoineRefreshController(),
             ),
           ),
         ),
@@ -137,6 +139,7 @@ void main() {
               onBack: () {},
               onChanged: () async {},
               profileName: 'Moi',
+              patrimoineRefreshController: PatrimoineRefreshController(),
             ),
           ),
         ),
@@ -207,6 +210,7 @@ void main() {
               onBack: () {},
               onChanged: () async {},
               profileName: 'Moi',
+              patrimoineRefreshController: PatrimoineRefreshController(),
             ),
           ),
         ),
@@ -279,6 +283,7 @@ void main() {
               onBack: () {},
               onChanged: () async {},
               profileName: 'Moi',
+              patrimoineRefreshController: PatrimoineRefreshController(),
             ),
           ),
         ),
@@ -336,6 +341,7 @@ void main() {
             onBack: () {},
             onChanged: () async {},
             profileName: 'Moi',
+            patrimoineRefreshController: PatrimoineRefreshController(),
           ),
         ),
       ),
@@ -383,6 +389,7 @@ void main() {
                 onBack: () {},
                 onChanged: () async {},
                 profileName: 'Moi',
+                patrimoineRefreshController: PatrimoineRefreshController(),
               ),
             ),
           ),
@@ -431,6 +438,7 @@ void main() {
                 onBack: () {},
                 onChanged: () async {},
                 profileName: 'Moi',
+                patrimoineRefreshController: PatrimoineRefreshController(),
               ),
             ),
           ),
@@ -528,6 +536,7 @@ void main() {
                 onBack: () {},
                 onChanged: () async {},
                 profileName: 'Camille Martin',
+                patrimoineRefreshController: PatrimoineRefreshController(),
               ),
             ),
           ),

@@ -271,7 +271,7 @@ class _StrategyScreenState extends State<StrategyScreen> {
       return LoadErrorView(
         message:
             'Impossible de charger les notes. Vérifiez que le dossier '
-            'Vault est accessible.',
+            'Coffre-fort est accessible.',
         onRetry: _retryLoad,
       );
     }

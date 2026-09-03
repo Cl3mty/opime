@@ -756,6 +756,94 @@ void main() {
     );
   });
 
+  group('Sector (secteur d\'activité)', () {
+    Investment stock({Sector? sector}) => Investment(
+      isin: 'FR0000120271',
+      label: 'TotalEnergies',
+      transactions: const [],
+      sector: sector,
+    );
+
+    test('toJson/fromJson round-trip quand renseigné', () {
+      final roundTripped = Investment.fromJson(
+        stock(sector: Sector.energie).toJson(),
+      );
+      expect(roundTripped.sector, Sector.energie);
+    });
+
+    test('non classé (null) : clé omise du JSON, reste null au décodage', () {
+      final json = stock().toJson();
+      expect(json.containsKey('sector'), isFalse);
+      expect(Investment.fromJson(json).sector, isNull);
+    });
+
+    test(
+      'Sector.fromName : nom inconnu renvoie null, pas de repli par défaut',
+      () {
+        expect(Sector.fromName('inconnu'), isNull);
+        expect(Sector.fromName(null), isNull);
+      },
+    );
+
+    test(
+      'Sector.fromYahooLabel : les 11 libellés Yahoo correspondent chacun '
+      'à un Sector distinct, sans perte',
+      () {
+        expect(Sector.fromYahooLabel('Technology'), Sector.technologie);
+        expect(Sector.fromYahooLabel('Healthcare'), Sector.sante);
+        expect(Sector.fromYahooLabel('Financial Services'), Sector.finance);
+        expect(
+          Sector.fromYahooLabel('Consumer Cyclical'),
+          Sector.consommationDiscretionnaire,
+        );
+        expect(
+          Sector.fromYahooLabel('Consumer Defensive'),
+          Sector.consommationBase,
+        );
+        expect(Sector.fromYahooLabel('Industrials'), Sector.industrie);
+        expect(Sector.fromYahooLabel('Energy'), Sector.energie);
+        expect(Sector.fromYahooLabel('Basic Materials'), Sector.materiaux);
+        expect(Sector.fromYahooLabel('Utilities'), Sector.servicesPublics);
+        expect(Sector.fromYahooLabel('Real Estate'), Sector.immobilier);
+        expect(
+          Sector.fromYahooLabel('Communication Services'),
+          Sector.communication,
+        );
+      },
+    );
+
+    test(
+      'Sector.fromYahooLabel : libellé absent ou inconnu renvoie null, pas '
+      'de repli hasardeux',
+      () {
+        expect(Sector.fromYahooLabel(null), isNull);
+        expect(Sector.fromYahooLabel('Miscellaneous'), isNull);
+      },
+    );
+  });
+
+  group('countryCode (pays)', () {
+    Investment stock({String? countryCode}) => Investment(
+      isin: 'FR0000120271',
+      label: 'TotalEnergies',
+      transactions: const [],
+      countryCode: countryCode,
+    );
+
+    test('toJson/fromJson round-trip quand renseigné', () {
+      final roundTripped = Investment.fromJson(
+        stock(countryCode: 'FR').toJson(),
+      );
+      expect(roundTripped.countryCode, 'FR');
+    });
+
+    test('non classé (null) : clé omise du JSON, reste null au décodage', () {
+      final json = stock().toJson();
+      expect(json.containsKey('countryCode'), isFalse);
+      expect(Investment.fromJson(json).countryCode, isNull);
+    });
+  });
+
   group('countryFlagEmoji', () {
     test('construit le drapeau à partir des indicateurs régionaux Unicode', () {
       expect(countryFlagEmoji('FR'), '🇫🇷');

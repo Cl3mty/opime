@@ -54,8 +54,8 @@ class ProfileRepository {
       // appel de create()/rename() : on préfère un échec explicite,
       // rattrapable par l'appelant, plutôt qu'une perte de données.
       throw StateError(
-        'profiles.json existe mais est vide : le dossier Vault est peut-être '
-        'encore en cours de synchronisation.',
+        'profiles.json existe mais est vide : le dossier Coffre-fort est '
+        'peut-être encore en cours de synchronisation.',
       );
     }
     final list = jsonDecode(content) as List;

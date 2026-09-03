@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/privacy/amount_visibility_controller.dart';
 import 'package:opime/core/simulations/simulation_state_repository.dart';
 import 'package:opime/features/simulations/simulations_transmission_screen.dart';
+import 'package:opime/features/simulations/tax_parameters.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -252,4 +253,162 @@ void main() {
       expect(result.masseTaxableEnfants, 1200000);
     });
   });
+
+  group(
+    'override des paramètres fiscaux (Réglages → Paramètres fiscaux)',
+    () {
+      test(
+        'directLineRights/spouseRights sans override reproduisent le '
+        'barème par défaut',
+        () {
+          expect(
+            directLineRights(100000),
+            directLineRights(100000, brackets: defaultDirectLineBrackets),
+          );
+          expect(
+            spouseRights(100000),
+            spouseRights(100000, brackets: defaultSpouseBrackets),
+          );
+        },
+      );
+
+      test(
+        'directLineRights avec un barème personnalisé (taux relevés par '
+        'l\'État) donne un résultat différent du barème par défaut',
+        () {
+          const higherRates = [
+            TaxBracket(8072, 0.10),
+            TaxBracket(12109, 0.10),
+            TaxBracket(15932, 0.15),
+            TaxBracket(552324, 0.20),
+            TaxBracket(902838, 0.30),
+            TaxBracket(1805677, 0.40),
+            TaxBracket(double.infinity, 0.45),
+          ];
+          final withDefault = directLineRights(100000);
+          final withHigherRates = directLineRights(100000, brackets: higherRates);
+          expect(withHigherRates, greaterThan(withDefault));
+        },
+      );
+
+      test(
+        'abattementFor avec des abattements personnalisés (relevés par '
+        'l\'État) retourne la valeur personnalisée, pas la valeur légale '
+        'par défaut',
+        () {
+          expect(
+            abattementFor(DonationRelation.enfant, enfant: 150000),
+            150000,
+          );
+          expect(
+            abattementFor(DonationRelation.petitEnfant, petitEnfant: 40000),
+            40000,
+          );
+          expect(
+            abattementFor(DonationRelation.conjoint, conjoint: 90000),
+            90000,
+          );
+          // Les autres relations restent inchangées par un override ciblé.
+          expect(abattementFor(DonationRelation.enfant, conjoint: 90000), 100000);
+        },
+      );
+
+      test(
+        'nueProprietePct avec un barème personnalisé donne un résultat '
+        'différent du barème par défaut',
+        () {
+          const custom = [UsufruitBracket(30, 50), UsufruitBracket(null, 90)];
+          // 25 ans : tranche "≤30" dans les deux barèmes, mais un
+          // pourcentage différent (20 % par défaut, 50 % personnalisé).
+          expect(nueProprietePct(25), 20);
+          expect(nueProprietePct(25, brackets: custom), 50);
+        },
+      );
+
+      test(
+        'computeDemembrement avec des paramètres personnalisés utilise '
+        'bien le barème usufruit ET le barème ligne directe personnalisés',
+        () {
+          final withDefaults = computeDemembrement(
+            valeurPleinePropriete: 1000000,
+            ageUsufruitier: 62,
+            nombreEnfants: 2,
+            abattementParEnfant: 100000,
+          );
+          final customParams = TaxParameters.defaults.copyWith(
+            demembrementBrackets: const [
+              UsufruitBracket(50, 10),
+              UsufruitBracket(70, 20),
+              UsufruitBracket(null, 90),
+            ],
+          );
+          final withCustom = computeDemembrement(
+            valeurPleinePropriete: 1000000,
+            ageUsufruitier: 62,
+            nombreEnfants: 2,
+            abattementParEnfant: 100000,
+            params: customParams,
+          );
+          // 62 ans : 60 % de nue-propriété par défaut, 20 % avec le
+          // barème personnalisé (tranche ≤70 → 20 %).
+          expect(withDefaults.nueProprietePct, 60);
+          expect(withCustom.nueProprietePct, 20);
+        },
+      );
+
+      test(
+        'computeDonation avec un abattement personnalisé change le '
+        'montant taxable',
+        () {
+          final withDefaults = computeDonation(
+            montantDonation: 400000,
+            nombreDonataires: 2,
+            relation: DonationRelation.enfant,
+          );
+          final withCustom = computeDonation(
+            montantDonation: 400000,
+            nombreDonataires: 2,
+            relation: DonationRelation.enfant,
+            params: TaxParameters.defaults.copyWith(abattementEnfant: 150000),
+          );
+          expect(withCustom.abattementParDonataire, 150000);
+          expect(withCustom.taxableParDonataire, lessThan(withDefaults.taxableParDonataire));
+        },
+      );
+
+      test(
+        'computeInheritance avec un barème ligne directe personnalisé '
+        'change les droits calculés',
+        () {
+          final withDefaults = computeInheritance(
+            actifNetSuccessoral: 1200000,
+            conjointSurvivant: true,
+            partConjointPct: 25,
+            nombreEnfants: 2,
+            abattementParEnfant: 100000,
+          );
+          const higherRates = [
+            TaxBracket(8072, 0.20),
+            TaxBracket(12109, 0.10),
+            TaxBracket(15932, 0.15),
+            TaxBracket(552324, 0.20),
+            TaxBracket(902838, 0.30),
+            TaxBracket(1805677, 0.40),
+            TaxBracket(double.infinity, 0.45),
+          ];
+          final withCustom = computeInheritance(
+            actifNetSuccessoral: 1200000,
+            conjointSurvivant: true,
+            partConjointPct: 25,
+            nombreEnfants: 2,
+            abattementParEnfant: 100000,
+            params: TaxParameters.defaults.copyWith(
+              directLineBrackets: higherRates,
+            ),
+          );
+          expect(withCustom.droitsParEnfant, greaterThan(withDefaults.droitsParEnfant));
+        },
+      );
+    },
+  );
 }

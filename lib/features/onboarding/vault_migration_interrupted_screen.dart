@@ -43,8 +43,9 @@ class VaultMigrationInterruptedScreen extends StatelessWidget {
                 ).large().large().medium(),
                 const SizedBox(height: 12),
                 const shadcn.Text(
-                  'Une opération de chiffrement ou déchiffrement de ce vault '
-                  'a été interrompue avant sa fin (l\'app a peut-être été '
+                  'Une opération de chiffrement ou déchiffrement de ce '
+                  'coffre-fort a été interrompue avant sa fin (l\'app a '
+                  'peut-être été '
                   'fermée pendant l\'opération). Certains fichiers privés '
                   'peuvent être restés dans un ancien état pendant que '
                   'd\'autres sont déjà à jour.',

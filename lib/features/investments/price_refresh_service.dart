@@ -268,6 +268,35 @@ Future<Investment?> _resolveInvestmentPrice({
     }
   }
 
+  // Diversification géographique/sectorielle automatique (voir
+  // `Investment.sector`/`countryCode`) : un seul essai tant que le champ
+  // reste `null`, jamais réessayé une fois renseigné — que ce soit par cet
+  // appel ou par une classification manuelle de l'utilisateur, qui doit
+  // toujours pouvoir écraser une valeur auto-détectée sans qu'elle ne
+  // revienne au rafraîchissement suivant. Un échec (Yahoo sans secteur
+  // pour cet actif, suffixe de place non reconnu, panne réseau) laisse
+  // simplement le ou les champs à `null`, retentés au prochain passage —
+  // pas de drapeau d'échec permanent comme [Investment.priceUnavailable],
+  // `null` étant déjà l'état "non classé" existant avant cette
+  // fonctionnalité.
+  Sector? autoSector;
+  String? autoCountryCode;
+  if (effectiveClass == AssetClass.actionsEtFonds &&
+      !isCurrency &&
+      (investment.sector == null || investment.countryCode == null)) {
+    final classification = await yahoo.fetchClassification(
+      symbol,
+      onNetworkError: onNetworkError,
+      onNetworkSuccess: onNetworkSuccess,
+    );
+    if (investment.sector == null) {
+      autoSector = Sector.fromYahooLabel(classification.sector);
+    }
+    if (investment.countryCode == null) {
+      autoCountryCode = classification.countryCode;
+    }
+  }
+
   // Date la plus ancienne à couvrir par l'historique de cours — la
   // transaction la plus ancienne de l'investissement, pour qu'une
   // estimation de performance sur toute sa durée de détention (voir
@@ -285,8 +314,16 @@ Future<Investment?> _resolveInvestmentPrice({
     onNetworkSuccess: onNetworkSuccess,
   );
   if (result.points.isEmpty) {
-    if (networkError || !expectsMarketPrice) return null;
-    return investment.copyWith(priceUnavailable: true);
+    if (networkError || !expectsMarketPrice) {
+      return autoSector == null && autoCountryCode == null
+          ? null
+          : investment.copyWith(sector: autoSector, countryCode: autoCountryCode);
+    }
+    return investment.copyWith(
+      priceUnavailable: true,
+      sector: autoSector,
+      countryCode: autoCountryCode,
+    );
   }
 
   final latest = result.points.reduce((a, b) => a.date.isAfter(b.date) ? a : b);
@@ -335,6 +372,8 @@ Future<Investment?> _resolveInvestmentPrice({
     lastFxRateToEur: fxRateToEur,
     // Un cours vient d'être trouvé : le drapeau "introuvable" est levé.
     priceUnavailable: false,
+    sector: autoSector,
+    countryCode: autoCountryCode,
   );
 }
 

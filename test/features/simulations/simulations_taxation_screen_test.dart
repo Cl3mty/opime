@@ -145,4 +145,72 @@ void main() {
       expect(computeIFI(-100).total, 0);
     });
   });
+
+  group(
+    'override des paramètres fiscaux (Réglages → Paramètres fiscaux)',
+    () {
+      test(
+        'computeIR sans override reproduit le barème par défaut '
+        '(non-régression : les paramètres optionnels ne changent rien tant '
+        'qu\'on ne les fournit pas)',
+        () {
+          final withDefaults = computeIR(netImposable: 150000, nbrParts: 1);
+          final explicit = computeIR(
+            netImposable: 150000,
+            nbrParts: 1,
+            limits: irLimits,
+            rates: irRates,
+          );
+          expect(withDefaults.total, explicit.total);
+        },
+      );
+
+      test(
+        'computeIR avec un barème personnalisé (ex : seuils relevés par '
+        'l\'État) donne un résultat différent du barème par défaut',
+        () {
+          final withDefaultBareme = computeIR(
+            netImposable: 50000,
+            nbrParts: 1,
+          );
+          // Premier seuil doublé : le même revenu tombe dans une tranche
+          // inférieure, donc paie moins d'impôt.
+          final withHigherThreshold = computeIR(
+            netImposable: 50000,
+            nbrParts: 1,
+            limits: [22588.0, 28797.0, 82341.0, 177106.0],
+            rates: irRates,
+          );
+          expect(
+            withHigherThreshold.total,
+            lessThan(withDefaultBareme.total),
+          );
+        },
+      );
+
+      test(
+        'computeIFI avec un seuil d\'imposition personnalisé change '
+        'l\'exonération (ex : seuil abaissé par l\'État)',
+        () {
+          // 1 000 000 € : exonéré au seuil par défaut (1 300 000 €).
+          expect(computeIFI(1000000).total, 0);
+          final withLowerSeuil = computeIFI(1000000, seuilImposition: 500000);
+          expect(withLowerSeuil.total, greaterThan(0));
+        },
+      );
+
+      test(
+        'computeIFI avec des taux personnalisés change le montant dû',
+        () {
+          final withDefaultRates = computeIFI(2000000);
+          final withHigherRates = computeIFI(
+            2000000,
+            limits: ifiLimits,
+            rates: [0.0, 1.0, 1.4, 2.0, 2.5, 3.0], // taux doublés
+          );
+          expect(withHigherRates.total, greaterThan(withDefaultRates.total));
+        },
+      );
+    },
+  );
 }

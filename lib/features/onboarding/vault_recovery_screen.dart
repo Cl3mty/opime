@@ -123,14 +123,18 @@ class _VaultRecoveryScreenState extends State<VaultRecoveryScreen> {
                 ),
                 const SizedBox(height: 24),
                 shadcn.Text(
-                  recovered ? 'Nouveau mot de passe' : 'Récupération du vault',
+                  recovered
+                      ? 'Nouveau mot de passe'
+                      : 'Récupération du coffre-fort',
                   textAlign: TextAlign.center,
                 ).large().large().medium(),
                 const SizedBox(height: 12),
                 shadcn.Text(
                   recovered
-                      ? 'Ta clé de récupération est valide. Choisis un nouveau mot de passe pour ce vault.'
-                      : 'Saisis la clé de récupération que tu as reçue à l\'activation du chiffrement.',
+                      ? 'Ta clé de récupération est valide. Choisis un '
+                            'nouveau mot de passe pour ce coffre-fort.'
+                      : 'Saisis la clé de récupération que tu as reçue à '
+                            'l\'activation du chiffrement.',
                   textAlign: TextAlign.center,
                 ).muted(),
                 const SizedBox(height: 24),

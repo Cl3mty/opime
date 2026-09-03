@@ -33,6 +33,11 @@ import 'widgets/leveraged_position_dialog.dart' show showLeveragedPositionDialog
 /// pas porter comme valeur sélectionnée.
 const _noCustomOtherCategoryValue = '__none__';
 
+/// Même motif que [_noCustomOtherCategoryValue], pour le sélecteur "Bien
+/// financé" de l'étape passif (voir `_LiabilityFormStep`) : aucun bien
+/// choisi, `Liability.linkedInvestmentId` reste `null`.
+const _noLinkedInvestmentValue = '__none__';
+
 enum _Step {
   kind,
   assetClass,
@@ -79,6 +84,12 @@ enum _Step {
 /// sur l'ajout d'une transaction pour cet investissement. Les deux sont
 /// ignorés si l'id ne correspond à rien trouvé sur disque (compte/
 /// investissement supprimé entre-temps).
+///
+/// [initialLinkedInvestmentId], combiné à [initialLiabilityType], lie
+/// automatiquement le passif créé au bien immobilier désigné (voir
+/// `Liability.linkedInvestmentId`) — utilisé par `RealEstateLoanLinkSection`
+/// depuis l'onglet Aperçu d'un bien pour créer un crédit déjà rattaché,
+/// sans étape manuelle de liaison en plus.
 Future<void> showCompletePatrimoineDialog(
   BuildContext context, {
   required String vaultPath,
@@ -87,6 +98,7 @@ Future<void> showCompletePatrimoineDialog(
   String? initialAccountId,
   String? initialInvestmentId,
   LiabilityType? initialLiabilityType,
+  String? initialLinkedInvestmentId,
 }) {
   return showDialog<void>(
     context: context,
@@ -97,6 +109,7 @@ Future<void> showCompletePatrimoineDialog(
       initialAccountId: initialAccountId,
       initialInvestmentId: initialInvestmentId,
       initialLiabilityType: initialLiabilityType,
+      initialLinkedInvestmentId: initialLinkedInvestmentId,
     ),
   );
 }
@@ -108,6 +121,7 @@ class _CompletePatrimoineDialog extends StatefulWidget {
   final String? initialAccountId;
   final String? initialInvestmentId;
   final LiabilityType? initialLiabilityType;
+  final String? initialLinkedInvestmentId;
 
   const _CompletePatrimoineDialog({
     required this.vaultPath,
@@ -116,6 +130,7 @@ class _CompletePatrimoineDialog extends StatefulWidget {
     this.initialAccountId,
     this.initialInvestmentId,
     this.initialLiabilityType,
+    this.initialLinkedInvestmentId,
   });
 
   @override
@@ -239,7 +254,17 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   final _liabDureeDiffereController = TextEditingController();
   DateTime? _liabDateDebut;
   LoanType _liabLoanType = LoanType.amortissable;
+  bool _liabDifereActif = false;
   DeferType _liabTypeDiffere = DeferType.partielle;
+
+  /// Bien immobilier auquel rattacher le passif en cours de création — déjà
+  /// connu (et non modifiable dans l'UI, voir [_LiabilityFormStep]) si le
+  /// flux a été ouvert depuis l'onglet Aperçu d'un bien (voir
+  /// [showCompletePatrimoineDialog]'s `initialLinkedInvestmentId`) ; sinon
+  /// `null` par défaut, avec un sélecteur laissant le choix de lier tout de
+  /// suite un bien existant plutôt que de devoir repasser par cet onglet
+  /// après coup.
+  String? _liabLinkedInvestmentId;
 
   @override
   void initState() {
@@ -275,6 +300,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       _liabilityType = initialLiabilityType;
       _step = _Step.liabilityForm;
     }
+    _liabLinkedInvestmentId = widget.initialLinkedInvestmentId;
     _load();
   }
 
@@ -406,6 +432,16 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     }
     return null;
   }
+
+  /// Tous les biens immobiliers existants (tous comptes confondus) —
+  /// candidats du sélecteur "Bien financé" de l'étape passif (voir
+  /// [_LiabilityFormStep]), peu importe si un autre prêt les finance déjà
+  /// (plusieurs prêts peuvent financer le même bien, voir
+  /// `Liability.linkedInvestmentId`).
+  List<Investment> get _realEstateInvestments => [
+    for (final account in _accounts)
+      if (account.assetClass == AssetClass.immobilier) ...account.investments,
+  ];
 
   /// L'investissement courant est-il tenu en devise (épargne, ou devise
   /// créée dans un compte-titres via l'étape "Investissement et/ou
@@ -1150,9 +1186,10 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       nbrEcheances: nbrEcheances,
       dateDebut: dateDebut,
       loanType: _liabLoanType,
-      differeActif: dureeDiffere > 0,
-      dureeDiffereMois: dureeDiffere,
+      differeActif: _liabDifereActif,
+      dureeDiffereMois: _liabDifereActif ? dureeDiffere : 0,
       typeDiffere: _liabTypeDiffere,
+      linkedInvestmentId: _liabLinkedInvestmentId,
     );
     await _liabilitiesRepo.saveLiability(liability);
     _finish();
@@ -1516,10 +1553,17 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           dureeDiffereController: _liabDureeDiffereController,
           dateDebut: _liabDateDebut,
           loanType: _liabLoanType,
+          differeActif: _liabDifereActif,
           typeDiffere: _liabTypeDiffere,
           onDateChanged: (d) => setState(() => _liabDateDebut = d),
           onLoanTypeChanged: (t) => setState(() => _liabLoanType = t),
+          onDiffereActifChanged: (v) =>
+              setState(() => _liabDifereActif = v),
           onTypeDiffereChanged: (t) => setState(() => _liabTypeDiffere = t),
+          realEstateInvestments: _realEstateInvestments,
+          linkedInvestmentId: _liabLinkedInvestmentId,
+          onLinkedInvestmentIdChanged: (id) =>
+              setState(() => _liabLinkedInvestmentId = id),
           onBack: () => setState(() {
             _step = _Step.liabilityType;
             _liabilityType = null;
@@ -2850,10 +2894,25 @@ class _LiabilityFormStep extends StatelessWidget {
   final TextEditingController dureeDiffereController;
   final DateTime? dateDebut;
   final LoanType loanType;
+  final bool differeActif;
   final DeferType typeDiffere;
   final ValueChanged<DateTime?> onDateChanged;
   final ValueChanged<LoanType> onLoanTypeChanged;
+  final ValueChanged<bool> onDiffereActifChanged;
   final ValueChanged<DeferType> onTypeDiffereChanged;
+
+  /// Biens immobiliers existants proposés comme candidats au sélecteur
+  /// "Bien financé" — vide si aucun bien immobilier n'a encore été créé
+  /// (le sélecteur est alors masqué, voir [build]).
+  final List<Investment> realEstateInvestments;
+
+  /// Bien actuellement choisi pour être financé par ce passif — `null` tant
+  /// qu'aucun n'est sélectionné (passif sans lien, comme aujourd'hui) ou si
+  /// le flux a été ouvert depuis "Compléter mon patrimoine" sans bien
+  /// pré-connu.
+  final String? linkedInvestmentId;
+  final ValueChanged<String?> onLinkedInvestmentIdChanged;
+
   final VoidCallback onBack;
   final VoidCallback onCreate;
 
@@ -2868,10 +2927,15 @@ class _LiabilityFormStep extends StatelessWidget {
     required this.dureeDiffereController,
     required this.dateDebut,
     required this.loanType,
+    required this.differeActif,
     required this.typeDiffere,
     required this.onDateChanged,
     required this.onLoanTypeChanged,
+    required this.onDiffereActifChanged,
     required this.onTypeDiffereChanged,
+    required this.realEstateInvestments,
+    required this.linkedInvestmentId,
+    required this.onLinkedInvestmentIdChanged,
     required this.onBack,
     required this.onCreate,
   });
@@ -2898,11 +2962,62 @@ class _LiabilityFormStep extends StatelessWidget {
           dureeDiffereController: dureeDiffereController,
           dateDebut: dateDebut,
           loanType: loanType,
+          differeActif: differeActif,
           typeDiffere: typeDiffere,
           onDateChanged: onDateChanged,
           onLoanTypeChanged: onLoanTypeChanged,
+          onDiffereActifChanged: onDiffereActifChanged,
           onTypeDiffereChanged: onTypeDiffereChanged,
         ),
+        // Masqué s'il n'existe encore aucun bien immobilier — pas de menu
+        // vide à afficher, le lien restera de toute façon toujours
+        // possible après coup depuis l'onglet Aperçu du bien une fois créé.
+        if (realEstateInvestments.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const shadcn.Text('Bien financé (facultatif)').medium(),
+              const SizedBox(height: 6),
+              Select<String>(
+                value: linkedInvestmentId ?? _noLinkedInvestmentValue,
+                itemBuilder: (context, value) {
+                  // `firstWhereOrNull` plutôt que `firstWhere` : le bien
+                  // pré-lié (voir `initialLinkedInvestmentId`) peut en
+                  // théorie ne plus exister dans `realEstateInvestments`
+                  // (rechargement entre-temps) — retomber sur "Aucun"
+                  // plutôt que de faire planter tout le dialogue.
+                  Investment? match;
+                  for (final inv in realEstateInvestments) {
+                    if (inv.id == value) {
+                      match = inv;
+                      break;
+                    }
+                  }
+                  return shadcn.Text(match?.label ?? 'Aucun');
+                },
+                onChanged: (v) => onLinkedInvestmentIdChanged(
+                  v == null || v == _noLinkedInvestmentValue ? null : v,
+                ),
+                popup: (context) => SelectPopup(
+                  items: SelectItemList(
+                    children: [
+                      const SelectItemButton(
+                        value: _noLinkedInvestmentValue,
+                        child: shadcn.Text('Aucun'),
+                      ),
+                      for (final inv in realEstateInvestments)
+                        SelectItemButton(
+                          value: inv.id,
+                          child: shadcn.Text(inv.label),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 16),
         PrimaryButton(
           onPressed: onCreate,
