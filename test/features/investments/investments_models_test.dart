@@ -756,6 +756,87 @@ void main() {
     );
   });
 
+  group('countryFlagEmoji', () {
+    test('construit le drapeau à partir des indicateurs régionaux Unicode', () {
+      expect(countryFlagEmoji('FR'), '🇫🇷');
+      expect(countryFlagEmoji('US'), '🇺🇸');
+      expect(countryFlagEmoji('JP'), '🇯🇵');
+    });
+
+    test('insensible à la casse', () {
+      expect(countryFlagEmoji('fr'), countryFlagEmoji('FR'));
+    });
+
+    test('null : code absent, trop court/long, ou hors A-Z', () {
+      expect(countryFlagEmoji(null), isNull);
+      expect(countryFlagEmoji('F'), isNull);
+      expect(countryFlagEmoji('FRA'), isNull);
+      expect(countryFlagEmoji('F1'), isNull);
+    });
+
+    test('couvre chaque code de kInvestmentCountries sans planter', () {
+      for (final code in kInvestmentCountries.keys) {
+        expect(countryFlagEmoji(code), isNotNull, reason: code);
+      }
+    });
+  });
+
+  group('countryBreakdown/sectorBreakdown (répartition pondérée ETF)', () {
+    test('vide par défaut, absent du JSON', () {
+      final investment = Investment(
+        isin: 'IE00B4L5Y983',
+        label: 'ETF',
+        transactions: const [],
+      );
+      expect(investment.countryBreakdown, isEmpty);
+      expect(investment.sectorBreakdown, isEmpty);
+      final json = investment.toJson();
+      expect(json.containsKey('countryBreakdown'), isFalse);
+      expect(json.containsKey('sectorBreakdown'), isFalse);
+    });
+
+    test('toJson/fromJson round-trip, plusieurs entrées', () {
+      final investment = Investment(
+        isin: 'IE00B4L5Y983',
+        label: 'MSCI World',
+        transactions: const [],
+        countryBreakdown: [
+          CountryWeight(countryCode: 'US', percent: 60),
+          CountryWeight(countryCode: 'FR', percent: 10),
+        ],
+        sectorBreakdown: [
+          SectorWeight(sector: Sector.technologie, percent: 25),
+          SectorWeight(sector: Sector.sante, percent: 15),
+        ],
+      );
+      final roundTripped = Investment.fromJson(investment.toJson());
+
+      expect(roundTripped.countryBreakdown, hasLength(2));
+      expect(roundTripped.countryBreakdown[0].countryCode, 'US');
+      expect(roundTripped.countryBreakdown[0].percent, 60);
+      expect(roundTripped.countryBreakdown[1].countryCode, 'FR');
+      expect(roundTripped.countryBreakdown[1].percent, 10);
+
+      expect(roundTripped.sectorBreakdown, hasLength(2));
+      expect(roundTripped.sectorBreakdown[0].sector, Sector.technologie);
+      expect(roundTripped.sectorBreakdown[0].percent, 25);
+      expect(roundTripped.sectorBreakdown[1].sector, Sector.sante);
+      expect(roundTripped.sectorBreakdown[1].percent, 15);
+    });
+
+    test('copyWith remplace bien la liste (vidage possible, contrairement '
+        "aux champs simples qui ne peuvent pas être remis à null via lui)", () {
+      final withBreakdown = Investment(
+        isin: 'IE00B4L5Y983',
+        label: 'ETF',
+        transactions: const [],
+        countryBreakdown: [CountryWeight(countryCode: 'US', percent: 100)],
+      );
+      final cleared = withBreakdown.copyWith(countryBreakdown: const []);
+      expect(cleared.countryBreakdown, isEmpty);
+    });
+  });
+
   group('Estimation immobilière (surfaceM2/estimatedPricePerSqm)', () {
     Investment property({
       double? surfaceM2,

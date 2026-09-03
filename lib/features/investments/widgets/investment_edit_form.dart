@@ -4,6 +4,7 @@ import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/opime_date_picker.dart';
 import '../investment_identifier_field.dart';
 import '../investments_models.dart';
+import 'investment_classification_fields.dart';
 
 /// Champ(s) d'identification d'une nouvelle position — un bien immobilier
 /// n'a qu'un nom (pas d'identifiant), un actif à liste déroulante connue
@@ -87,6 +88,14 @@ class InvestmentEditForm extends StatelessWidget {
   final TextEditingController labelController;
   final FundStyle? fundStyle;
   final ValueChanged<FundStyle?> onFundStyleChanged;
+  final Sector? sector;
+  final ValueChanged<Sector?> onSectorChanged;
+  final List<SectorWeight> sectorBreakdown;
+  final ValueChanged<List<SectorWeight>> onSectorBreakdownChanged;
+  final String? countryCode;
+  final ValueChanged<String?> onCountryCodeChanged;
+  final List<CountryWeight> countryBreakdown;
+  final ValueChanged<List<CountryWeight>> onCountryBreakdownChanged;
   final PrivateEquityKind? privateEquityKind;
   final int? vestingCliffMonths;
   final ValueChanged<int?> onVestingCliffMonthsChanged;
@@ -106,6 +115,14 @@ class InvestmentEditForm extends StatelessWidget {
     required this.labelController,
     required this.fundStyle,
     required this.onFundStyleChanged,
+    required this.sector,
+    required this.onSectorChanged,
+    this.sectorBreakdown = const [],
+    required this.onSectorBreakdownChanged,
+    required this.countryCode,
+    required this.onCountryCodeChanged,
+    this.countryBreakdown = const [],
+    required this.onCountryBreakdownChanged,
     this.privateEquityKind,
     this.vestingCliffMonths,
     required this.onVestingCliffMonthsChanged,
@@ -157,35 +174,58 @@ class InvestmentEditForm extends StatelessWidget {
               ),
             if (assetClass == AssetClass.actionsEtFonds) ...[
               const SizedBox(height: 12),
-              Row(
+              // `Wrap` plutôt qu'un unique `Row` : avec les 3 classements
+              // manuels (style de gestion, secteur, pays — voir
+              // `Investment.fundStyle`/`sector`/`countryCode`), un `Row`
+              // seul déborderait sur les fenêtres étroites.
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Select<FundStyle>(
-                    value: fundStyle,
-                    placeholder: const shadcn.Text('Style de gestion'),
-                    onChanged: (style) {
-                      if (style != null) onFundStyleChanged(style);
-                    },
-                    itemBuilder: (context, style) => shadcn.Text(style.label),
-                    popup: (context) => SelectPopup(
-                      items: SelectItemList(
-                        children: [
-                          for (final style in FundStyle.values)
-                            SelectItemButton(
-                              value: style,
-                              child: shadcn.Text(style.label),
-                            ),
-                        ],
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Select<FundStyle>(
+                        value: fundStyle,
+                        placeholder: const shadcn.Text('Style de gestion'),
+                        onChanged: (style) {
+                          if (style != null) onFundStyleChanged(style);
+                        },
+                        itemBuilder: (context, style) =>
+                            shadcn.Text(style.label),
+                        popup: (context) => SelectPopup(
+                          items: SelectItemList(
+                            children: [
+                              for (final style in FundStyle.values)
+                                SelectItemButton(
+                                  value: style,
+                                  child: shadcn.Text(style.label),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                      if (fundStyle != null) ...[
+                        const SizedBox(width: 4),
+                        IconButton.ghost(
+                          icon: const Icon(LucideIcons.x, size: 14),
+                          onPressed: () => onFundStyleChanged(null),
+                        ),
+                      ],
+                    ],
                   ),
-                  if (fundStyle != null) ...[
-                    const SizedBox(width: 4),
-                    IconButton.ghost(
-                      icon: const Icon(LucideIcons.x, size: 14),
-                      onPressed: () => onFundStyleChanged(null),
-                    ),
-                  ],
                 ],
+              ),
+              const SizedBox(height: 8),
+              InvestmentClassificationFields(
+                sector: sector,
+                onSectorChanged: onSectorChanged,
+                sectorBreakdown: sectorBreakdown,
+                onSectorBreakdownChanged: onSectorBreakdownChanged,
+                countryCode: countryCode,
+                onCountryCodeChanged: onCountryCodeChanged,
+                countryBreakdown: countryBreakdown,
+                onCountryBreakdownChanged: onCountryBreakdownChanged,
               ),
             ],
             if (assetClass == AssetClass.privateEquity &&

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import '../dashboard/patrimoine_models.dart' show NetWorthPoint;
-import '../investments/investments_models.dart' show FundStyle, Investment, Transaction;
+import '../investments/investments_models.dart'
+    show FundStyle, Investment, Sector, Transaction;
 import '../investments/performance_calculator.dart'
     show PerformanceResult, calculateMwr;
 import '../investments/real_patrimoine_adapter.dart' show priceAt;
@@ -479,5 +480,91 @@ Map<FundStyle?, double> fundStyleAllocation(
   if (total == 0) return {};
   return {
     for (final entry in totalsByStyle.entries) entry.key: entry.value / total * 100,
+  };
+}
+
+/// Répartition de la valeur des investissements `actionsEtFonds` par
+/// secteur d'activité — même principe que [fundStyleAllocation] (clé
+/// `null` = non classé, pourcentages sommant à 100, un investissement sans
+/// valorisation connue est ignoré).
+///
+/// Un investissement dont [Investment.sectorBreakdown] est renseigné (ETF
+/// multi-secteurs) ventile sa valeur sur chacune des entrées de la
+/// répartition (`value * entry.percent / 100`) plutôt que de compter en
+/// bloc pour un seul secteur ; la part non couverte par la répartition
+/// (`100 - somme des percent`, plancher à 0) tombe dans le seau "non
+/// classé", comme un investissement sans [Investment.sector] du tout.
+Map<Sector?, double> sectorAllocation(
+  List<Investment> equityInvestments, {
+  required double Function(Investment) valueOf,
+}) {
+  final totalsBySector = <Sector?, double>{};
+  var total = 0.0;
+  for (final investment in equityInvestments) {
+    final value = valueOf(investment);
+    if (value <= 0) continue;
+    if (investment.sectorBreakdown.isNotEmpty) {
+      var coveredPercent = 0.0;
+      for (final weight in investment.sectorBreakdown) {
+        final share = value * weight.percent / 100;
+        totalsBySector[weight.sector] = (totalsBySector[weight.sector] ?? 0) + share;
+        coveredPercent += weight.percent;
+      }
+      final remainder = value * (100 - coveredPercent).clamp(0, 100) / 100;
+      if (remainder > 0) {
+        totalsBySector[null] = (totalsBySector[null] ?? 0) + remainder;
+      }
+    } else {
+      totalsBySector[investment.sector] =
+          (totalsBySector[investment.sector] ?? 0) + value;
+    }
+    total += value;
+  }
+  if (total == 0) return {};
+  return {
+    for (final entry in totalsBySector.entries)
+      entry.key: entry.value / total * 100,
+  };
+}
+
+/// Répartition de la valeur des investissements `actionsEtFonds` par pays
+/// (code ISO 3166-1 alpha-2) — même principe que [fundStyleAllocation] (clé
+/// `null` = non classé, pourcentages sommant à 100, un investissement sans
+/// valorisation connue est ignoré).
+///
+/// Même ventilation pondérée que [sectorAllocation] quand
+/// [Investment.countryBreakdown] est renseigné (ETF multi-pays) — voir sa
+/// doc pour le détail du calcul et du reliquat "non classé".
+Map<String?, double> countryAllocation(
+  List<Investment> equityInvestments, {
+  required double Function(Investment) valueOf,
+}) {
+  final totalsByCountry = <String?, double>{};
+  var total = 0.0;
+  for (final investment in equityInvestments) {
+    final value = valueOf(investment);
+    if (value <= 0) continue;
+    if (investment.countryBreakdown.isNotEmpty) {
+      var coveredPercent = 0.0;
+      for (final weight in investment.countryBreakdown) {
+        final share = value * weight.percent / 100;
+        totalsByCountry[weight.countryCode] =
+            (totalsByCountry[weight.countryCode] ?? 0) + share;
+        coveredPercent += weight.percent;
+      }
+      final remainder = value * (100 - coveredPercent).clamp(0, 100) / 100;
+      if (remainder > 0) {
+        totalsByCountry[null] = (totalsByCountry[null] ?? 0) + remainder;
+      }
+    } else {
+      totalsByCountry[investment.countryCode] =
+          (totalsByCountry[investment.countryCode] ?? 0) + value;
+    }
+    total += value;
+  }
+  if (total == 0) return {};
+  return {
+    for (final entry in totalsByCountry.entries)
+      entry.key: entry.value / total * 100,
   };
 }

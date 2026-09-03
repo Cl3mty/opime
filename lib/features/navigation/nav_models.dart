@@ -101,6 +101,18 @@ const patrimoineCategoryItems = [
   ),
 ];
 
+/// Holdings, sociétés commerciales, SCI, comptes pro — module réservé aux
+/// coffres-forts professionnels (voir `core/storage/vault_folder_service
+/// .dart`'s `VaultKind`, et `features/entities/entities_models.dart`).
+/// N'apparaît dans la sidebar (`app_sidebar.dart`) que pour un coffre-fort
+/// de ce type.
+const entitesGroup = NavGroup(
+  label: 'Professionnel',
+  items: [
+    NavItem(key: 'entites', label: 'Entités', icon: LucideIcons.building2),
+  ],
+);
+
 const academieGroup = NavGroup(
   label: 'Académie',
   items: [
@@ -134,6 +146,11 @@ const academieGroup = NavGroup(
           key: 'invest_frais',
           label: 'Les frais',
           icon: LucideIcons.percent,
+        ),
+        NavItem(
+          key: 'invest_fiscalite',
+          label: 'La fiscalité',
+          icon: LucideIcons.receiptEuro,
         ),
         NavItem(
           key: 'invest_pyramide',
@@ -219,6 +236,11 @@ const academieGroup = NavGroup(
           label: 'Immobilier',
           icon: LucideIcons.house,
         ),
+        NavItem(
+          key: 'formation_structuration',
+          label: 'Structuration patrimoniale',
+          icon: LucideIcons.network,
+        ),
       ],
     ),
   ],
@@ -302,6 +324,7 @@ final toolsTabItems = [
 List<String> navBreadcrumbForKey(String key) {
   final navItems = [
     ...patrimoineGroup.items,
+    ...entitesGroup.items,
     ...academieGroup.items,
     ...outilsGroup.items,
     ...patrimoineCategoryItems,
@@ -324,7 +347,7 @@ List<String> navBreadcrumbForKey(String key) {
 /// reste celui de l'entrée de sidebar, pas du sous-menu. Les pages hors
 /// sidebar (Réglages...) retombent sur leur propre libellé.
 String navLabelForKey(String key) {
-  for (final group in [patrimoineGroup, academieGroup, outilsGroup]) {
+  for (final group in [patrimoineGroup, entitesGroup, academieGroup, outilsGroup]) {
     for (final item in group.items) {
       if (item.key == key) return item.label;
       for (final child in item.children) {

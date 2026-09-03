@@ -12,6 +12,8 @@ import 'ibkr/ibkr_import_dialog.dart';
 import 'investments_models.dart';
 import 'investments_repository.dart';
 import 'widgets/account_summary_header.dart';
+import 'widgets/asset_classification_badges.dart'
+    show CountryFlagBadge, MultiCountryBadge, MultiSectorBadge, SectorBadge;
 import 'widgets/investment_edit_form.dart';
 
 /// Détail d'un compte de placement : montant total, liste des
@@ -509,7 +511,34 @@ class _InvestmentCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      shadcn.Text(investment.label).medium(),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: shadcn.Text(investment.label).medium(),
+                          ),
+                          if (investment.countryBreakdown.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            MultiCountryBadge(
+                              breakdown: investment.countryBreakdown,
+                            ),
+                          ] else if (investment.countryCode != null) ...[
+                            const SizedBox(width: 6),
+                            CountryFlagBadge(
+                              countryCode: investment.countryCode!,
+                            ),
+                          ],
+                          if (investment.sectorBreakdown.isNotEmpty) ...[
+                            const SizedBox(width: 4),
+                            MultiSectorBadge(
+                              breakdown: investment.sectorBreakdown,
+                            ),
+                          ] else if (investment.sector != null) ...[
+                            const SizedBox(width: 4),
+                            SectorBadge(sector: investment.sector!),
+                          ],
+                        ],
+                      ),
                       // Immobilier : pas d'identifiant à afficher. Position
                       // en devise (épargne, ou devise logée dans un compte-
                       // titres) : l'identifiant est le code de la devise,

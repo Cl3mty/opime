@@ -11,6 +11,10 @@ import '../investments/real_patrimoine_adapter.dart';
 import '../investments/real_patrimoine_card.dart';
 import '../liabilities/liabilities_repository.dart';
 import '../liabilities/real_passifs_adapter.dart';
+import '../entities/entities_models.dart' show BusinessEntity;
+import '../entities/entities_patrimoine_adapter.dart';
+import '../entities/entities_repository.dart';
+import '../../core/storage/vault_folder_service.dart' show VaultKind;
 import 'onboarding_highlight_controller.dart';
 import 'patrimoine_models.dart';
 import 'widgets/allocation_card.dart';
@@ -38,6 +42,7 @@ class DashboardScreen extends StatelessWidget {
   final PatrimoineRefreshController refreshSignal;
   final PriceSyncStatusController priceSyncStatus;
   final OnboardingHighlightController onboardingHighlight;
+  final VaultKind vaultKind;
 
   const DashboardScreen({
     super.key,
@@ -46,6 +51,7 @@ class DashboardScreen extends StatelessWidget {
     required this.refreshSignal,
     required this.priceSyncStatus,
     required this.onboardingHighlight,
+    this.vaultKind = VaultKind.personal,
   });
 
   @override
@@ -56,6 +62,7 @@ class DashboardScreen extends StatelessWidget {
       refreshSignal: refreshSignal,
       priceSyncStatus: priceSyncStatus,
       onboardingHighlight: onboardingHighlight,
+      vaultKind: vaultKind,
     );
   }
 }
@@ -66,6 +73,7 @@ class _RealDashboard extends StatefulWidget {
   final PatrimoineRefreshController refreshSignal;
   final PriceSyncStatusController priceSyncStatus;
   final OnboardingHighlightController onboardingHighlight;
+  final VaultKind vaultKind;
 
   const _RealDashboard({
     required this.vaultPath,
@@ -73,6 +81,7 @@ class _RealDashboard extends StatefulWidget {
     required this.refreshSignal,
     required this.priceSyncStatus,
     required this.onboardingHighlight,
+    required this.vaultKind,
   });
 
   @override
@@ -169,12 +178,23 @@ class _RealDashboardState extends State<_RealDashboard> {
       accounts,
     );
     final liabilities = await _liabilitiesRepo.listAll();
+    // Uniquement pour un coffre-fort professionnel (voir `VaultKind`) — un
+    // coffre-fort personnel n'a pas accès au module Entités, inutile de
+    // lire un fichier qui n'existe jamais pour lui.
+    final entities = widget.vaultKind == VaultKind.professional
+        ? await EntityRepository(widget.vaultPath).listAll()
+        : const <BusinessEntity>[];
     if (!mounted) return;
-    // Aucun compte avec au moins un investissement, et aucun passif : rien
-    // à montrer dans les cartes habituelles, voir [DashboardOnboardingView]
-    // et [OnboardingHighlightController].
+    // Aucun compte avec au moins un investissement, aucun passif, et aucune
+    // entité professionnelle : rien à montrer dans les cartes habituelles,
+    // voir [DashboardOnboardingView] et [OnboardingHighlightController] —
+    // sans le `entities.isEmpty` ici, un coffre-fort professionnel qui n'a
+    // encore saisi QUE des entités (aucun compte/passif personnel) verrait
+    // à tort l'écran d'accueil vide plutôt que sa catégorie Entités.
     final isEverythingEmpty =
-        accounts.every((a) => a.investments.isEmpty) && liabilities.isEmpty;
+        accounts.every((a) => a.investments.isEmpty) &&
+        liabilities.isEmpty &&
+        entities.isEmpty;
     widget.onboardingHighlight.setEmpty(isEverythingEmpty);
     setState(() {
       _isEverythingEmpty = isEverythingEmpty;
@@ -185,16 +205,24 @@ class _RealDashboardState extends State<_RealDashboard> {
         earliestTransactionDateAcrossAccounts(accounts),
         earliestLiabilityStart(liabilities),
       );
-      _categories = buildAllRealCategories(
-        accounts,
-        priceHistories,
-        widget.vaultPath,
-      );
-      _categoriesByAccount = buildAllRealCategoriesByAccount(
-        accounts,
-        priceHistories,
-        widget.vaultPath,
-      );
+      // Une seule ligne par entité (pas de distinction "par compte/par
+      // investissement" comme pour les classes réelles) : la même catégorie
+      // sert aux deux vues.
+      final entitiesCategory = entities.isEmpty
+          ? null
+          : buildEntitiesCategory(entities);
+      _categories = [
+        ...buildAllRealCategories(accounts, priceHistories, widget.vaultPath),
+        ?entitiesCategory,
+      ];
+      _categoriesByAccount = [
+        ...buildAllRealCategoriesByAccount(
+          accounts,
+          priceHistories,
+          widget.vaultPath,
+        ),
+        ?entitiesCategory,
+      ];
       _topAssets = buildRealTopAssets(accounts, priceHistories);
       _passifCategories = buildAllRealPassifCategories(liabilities);
     });

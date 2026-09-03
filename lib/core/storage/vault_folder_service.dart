@@ -7,12 +7,39 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
 
+/// Un coffre-fort **personnel** (par défaut) ne propose que les
+/// fonctionnalités patrimoniales habituelles ; un coffre-fort
+/// **professionnel** donne en plus accès au module Entités (holdings,
+/// sociétés commerciales, SCI, comptes pro — voir
+/// `features/entities/entities_models.dart`), dont la valeur n'est jamais
+/// consolidée dans le patrimoine personnel. Choisi une seule fois, à la
+/// création du coffre-fort (voir `OnboardingScreen`/`SettingsScreen`'s
+/// bouton "Ajouter un coffre-fort").
+enum VaultKind {
+  personal,
+  professional;
+
+  String get label => switch (this) {
+    VaultKind.personal => 'Personnel',
+    VaultKind.professional => 'Professionnel',
+  };
+
+  static VaultKind fromName(String? name) => VaultKind.values.firstWhere(
+    (k) => k.name == name,
+    // Un coffre-fort créé avant cette fonctionnalité n'a pas de `kind`
+    // enregistré : traité comme personnel plutôt que de faire apparaître
+    // le module Entités sans que l'utilisateur ne l'ait jamais demandé.
+    orElse: () => VaultKind.personal,
+  );
+}
+
 class SavedVault {
   final String id;
   final String name;
   final String vaultPath;
   final String? bookmarkData;
   final bool bookmarkTargetsVault;
+  final VaultKind kind;
 
   const SavedVault({
     required this.id,
@@ -20,6 +47,7 @@ class SavedVault {
     required this.vaultPath,
     this.bookmarkData,
     required this.bookmarkTargetsVault,
+    this.kind = VaultKind.personal,
   });
 
   SavedVault copyWith({
@@ -28,6 +56,7 @@ class SavedVault {
     String? vaultPath,
     Object? bookmarkData = _missingBookmarkData,
     bool? bookmarkTargetsVault,
+    VaultKind? kind,
   }) {
     return SavedVault(
       id: id ?? this.id,
@@ -37,6 +66,7 @@ class SavedVault {
           ? this.bookmarkData
           : bookmarkData as String?,
       bookmarkTargetsVault: bookmarkTargetsVault ?? this.bookmarkTargetsVault,
+      kind: kind ?? this.kind,
     );
   }
 
@@ -46,14 +76,16 @@ class SavedVault {
     'vaultPath': vaultPath,
     'bookmarkData': bookmarkData,
     'bookmarkTargetsVault': bookmarkTargetsVault,
+    'kind': kind.name,
   };
 
   factory SavedVault.fromJson(Map<String, dynamic> json) => SavedVault(
     id: json['id'] as String,
-    name: json['name'] as String? ?? 'Vault',
+    name: json['name'] as String? ?? 'Coffre-fort',
     vaultPath: json['vaultPath'] as String,
     bookmarkData: json['bookmarkData'] as String?,
     bookmarkTargetsVault: json['bookmarkTargetsVault'] as bool? ?? false,
+    kind: VaultKind.fromName(json['kind'] as String?),
   );
 }
 
@@ -175,6 +207,14 @@ class VaultFolderService {
     String? currentVaultPath,
     void Function(int copied, int total)? onMigrationProgress,
     String? name,
+    // Uniquement utilisé si le dossier choisi correspond à un coffre-fort
+    // réellement nouveau (branche ci-dessous) — le `kind` d'un coffre-fort
+    // déjà connu n'est jamais réécrit en re-choisissant son dossier.
+    // Défaut personnel : les appelants qui ne redemandent pas
+    // explicitement (ex : "changer de dossier" depuis l'écran de
+    // déverrouillage) ne doivent pas silencieusement créer un coffre-fort
+    // professionnel.
+    VaultKind kind = VaultKind.personal,
   }) async {
     final picked = await _pickVaultFolder(
       dialogTitle: dialogTitle,
@@ -199,6 +239,7 @@ class VaultFolderService {
       vaultPath: picked.vaultPath,
       bookmarkData: picked.bookmarkData,
       bookmarkTargetsVault: picked.bookmarkTargetsVault,
+      kind: kind,
     );
     await _saveVaults([...vaults, savedVault]);
     await prefs.setString(_activeVaultIdKey, savedVault.id);
@@ -220,11 +261,13 @@ class VaultFolderService {
     String? dialogTitle,
     String? currentVaultPath,
     void Function(int copied, int total)? onMigrationProgress,
+    VaultKind kind = VaultKind.personal,
   }) async {
     final vault = await pickAndRememberVault(
       dialogTitle: dialogTitle,
       currentVaultPath: currentVaultPath,
       onMigrationProgress: onMigrationProgress,
+      kind: kind,
     );
     return vault?.vaultPath;
   }
@@ -413,7 +456,7 @@ class VaultFolderService {
 
     final legacyVault = SavedVault(
       id: const Uuid().v4(),
-      name: _effectiveVaultName('Vault principal', legacyPath),
+      name: _effectiveVaultName('Coffre-fort principal', legacyPath),
       vaultPath: legacyPath,
       bookmarkData: legacyBookmarkData,
       bookmarkTargetsVault: bookmarkTargetsVault,
@@ -466,7 +509,7 @@ class VaultFolderService {
       final parent = p.basename(p.dirname(vaultPath));
       if (parent.isNotEmpty && parent != '.') return parent;
     }
-    return base.isNotEmpty ? base : 'Vault';
+    return base.isNotEmpty ? base : 'Coffre-fort';
   }
 
   /// Renomme un dossier vault encore sous l'ancien nom caché (`.opime`) en

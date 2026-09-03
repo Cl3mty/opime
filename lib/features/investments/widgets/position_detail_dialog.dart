@@ -120,6 +120,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   final _editIsinController = TextEditingController();
   final _editLabelController = TextEditingController();
   FundStyle? _editFundStyle;
+  Sector? _editSector;
+  List<SectorWeight> _editSectorBreakdown = const [];
+  String? _editCountryCode;
+  List<CountryWeight> _editCountryBreakdown = const [];
   int? _editVestingCliffMonths;
   int? _editVestingDurationMonths;
   DateTime? _editExerciseDeadline;
@@ -774,6 +778,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
           : _investment.isin;
       _editLabelController.text = _investment.label;
       _editFundStyle = _investment.fundStyle;
+      _editSector = _investment.sector;
+      _editSectorBreakdown = _investment.sectorBreakdown;
+      _editCountryCode = _investment.countryCode;
+      _editCountryBreakdown = _investment.countryBreakdown;
       _editVestingCliffMonths = _investment.vestingCliffMonths;
       _editVestingDurationMonths = _investment.vestingDurationMonths;
       _editExerciseDeadline = _investment.exerciseDeadline;
@@ -819,6 +827,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
         priceUnavailable: isinChanged ? null : _investment.priceUnavailable,
         assetClass: _investment.assetClass,
         fundStyle: _editFundStyle,
+        sector: _editSector,
+        sectorBreakdown: _editSectorBreakdown,
+        countryCode: _editCountryCode,
+        countryBreakdown: _editCountryBreakdown,
         privateEquityKind: _investment.privateEquityKind,
         vestingCliffMonths: _editVestingCliffMonths,
         vestingDurationMonths: _editVestingDurationMonths,
@@ -1084,6 +1096,18 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       fundStyle: _editFundStyle,
                       onFundStyleChanged: (style) =>
                           setState(() => _editFundStyle = style),
+                      sector: _editSector,
+                      onSectorChanged: (value) =>
+                          setState(() => _editSector = value),
+                      sectorBreakdown: _editSectorBreakdown,
+                      onSectorBreakdownChanged: (value) =>
+                          setState(() => _editSectorBreakdown = value),
+                      countryCode: _editCountryCode,
+                      onCountryCodeChanged: (value) =>
+                          setState(() => _editCountryCode = value),
+                      countryBreakdown: _editCountryBreakdown,
+                      onCountryBreakdownChanged: (value) =>
+                          setState(() => _editCountryBreakdown = value),
                       privateEquityKind: _investment.privateEquityKind,
                       vestingCliffMonths: _editVestingCliffMonths,
                       onVestingCliffMonthsChanged: (months) =>
@@ -1130,9 +1154,22 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                     shadcn.Text(
                       displayEuros(displayValue, widget.hidden),
                     ).x2Large().bold(),
-                    if (!_isCurrency && investment.fundStyle != null) ...[
+                    if (!_isCurrency &&
+                        (investment.fundStyle != null ||
+                            investment.sector != null ||
+                            investment.countryCode != null)) ...[
                       const SizedBox(height: 4),
-                      shadcn.Text(investment.fundStyle!.label).muted().small(),
+                      shadcn.Text(
+                        [
+                          if (investment.fundStyle != null)
+                            investment.fundStyle!.label,
+                          if (investment.sector != null)
+                            investment.sector!.label,
+                          if (investment.countryCode != null)
+                            kInvestmentCountries[investment.countryCode] ??
+                                investment.countryCode!,
+                        ].join(' · '),
+                      ).muted().small(),
                     ],
                   ],
                   const SizedBox(height: 12),

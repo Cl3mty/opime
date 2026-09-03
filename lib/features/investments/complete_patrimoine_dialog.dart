@@ -23,6 +23,7 @@ import 'investments_models.dart';
 import 'investments_repository.dart';
 import 'real_patrimoine_adapter.dart' show emptyCategoryFor;
 import 'transaction_price_currency.dart';
+import 'widgets/investment_classification_fields.dart';
 import 'widgets/leveraged_position_dialog.dart' show showLeveragedPositionDialog;
 
 /// Valeur sentinelle du sélecteur de type "Autres" personnalisé
@@ -190,6 +191,10 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   bool _creatingDevise = false;
   RealEstateType _realEstateType = RealEstateType.residencePrincipale;
   FundStyle? _fundStyle;
+  Sector? _sector;
+  List<SectorWeight> _sectorBreakdown = const [];
+  String? _countryCode;
+  List<CountryWeight> _countryBreakdown = const [];
   PrivateEquityKind _privateEquityKind = PrivateEquityKind.fonds;
   final _vestingCliffController = TextEditingController();
   final _vestingDurationController = TextEditingController();
@@ -916,6 +921,18 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       fundStyle: assetClass == AssetClass.actionsEtFonds && !_creatingDevise
           ? _fundStyle
           : null,
+      sector: assetClass == AssetClass.actionsEtFonds && !_creatingDevise
+          ? _sector
+          : null,
+      sectorBreakdown: assetClass == AssetClass.actionsEtFonds && !_creatingDevise
+          ? _sectorBreakdown
+          : const [],
+      countryCode: assetClass == AssetClass.actionsEtFonds && !_creatingDevise
+          ? _countryCode
+          : null,
+      countryBreakdown: assetClass == AssetClass.actionsEtFonds && !_creatingDevise
+          ? _countryBreakdown
+          : const [],
       privateEquityKind: assetClass == AssetClass.privateEquity
           ? _privateEquityKind
           : null,
@@ -950,6 +967,10 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       _creatingInvestment = false;
       _creatingDevise = false;
       _fundStyle = null;
+      _sector = null;
+      _sectorBreakdown = const [];
+      _countryCode = null;
+      _countryBreakdown = const [];
       _privateEquityKind = PrivateEquityKind.fonds;
       _vestingCliffController.clear();
       _vestingDurationController.clear();
@@ -1395,6 +1416,16 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
               setState(() => _realEstateType = type),
           fundStyle: _fundStyle,
           onFundStyleChanged: (style) => setState(() => _fundStyle = style),
+          sector: _sector,
+          onSectorChanged: (value) => setState(() => _sector = value),
+          sectorBreakdown: _sectorBreakdown,
+          onSectorBreakdownChanged: (value) =>
+              setState(() => _sectorBreakdown = value),
+          countryCode: _countryCode,
+          onCountryCodeChanged: (value) => setState(() => _countryCode = value),
+          countryBreakdown: _countryBreakdown,
+          onCountryBreakdownChanged: (value) =>
+              setState(() => _countryBreakdown = value),
           privateEquityKind: _privateEquityKind,
           onPrivateEquityKindChanged: (kind) =>
               setState(() => _privateEquityKind = kind),
@@ -1732,9 +1763,6 @@ class _AccountStep extends StatelessWidget {
             fields: [
               Select<AccountEnvelope>(
                 value: envelope,
-                // Assez large pour que chaque libellé ("Contrat de
-                // Capitalisation"...) tienne sur une seule ligne dans le
-                // popup, aligné par défaut sur la largeur de l'ancre.
                 constraints: const BoxConstraints(minWidth: 220),
                 onChanged: (v) {
                   if (v != null) onEnvelopeChanged(v);
@@ -2230,6 +2258,14 @@ class _InvestmentStep extends StatelessWidget {
   final ValueChanged<RealEstateType> onRealEstateTypeChanged;
   final FundStyle? fundStyle;
   final ValueChanged<FundStyle?> onFundStyleChanged;
+  final Sector? sector;
+  final ValueChanged<Sector?> onSectorChanged;
+  final List<SectorWeight> sectorBreakdown;
+  final ValueChanged<List<SectorWeight>> onSectorBreakdownChanged;
+  final String? countryCode;
+  final ValueChanged<String?> onCountryCodeChanged;
+  final List<CountryWeight> countryBreakdown;
+  final ValueChanged<List<CountryWeight>> onCountryBreakdownChanged;
   final PrivateEquityKind privateEquityKind;
   final ValueChanged<PrivateEquityKind> onPrivateEquityKindChanged;
   final TextEditingController vestingCliffController;
@@ -2268,6 +2304,14 @@ class _InvestmentStep extends StatelessWidget {
     required this.onRealEstateTypeChanged,
     required this.fundStyle,
     required this.onFundStyleChanged,
+    required this.sector,
+    required this.onSectorChanged,
+    this.sectorBreakdown = const [],
+    required this.onSectorBreakdownChanged,
+    required this.countryCode,
+    required this.onCountryCodeChanged,
+    this.countryBreakdown = const [],
+    required this.onCountryBreakdownChanged,
     required this.privateEquityKind,
     required this.onPrivateEquityKindChanged,
     required this.vestingCliffController,
@@ -2486,38 +2530,60 @@ class _InvestmentStep extends StatelessWidget {
                 ),
                 if (assetClass == AssetClass.actionsEtFonds) ...[
                   const SizedBox(height: 8),
-                  Row(
+                  // `Wrap` plutôt qu'un unique `Row` : avec les 3
+                  // classements manuels (style de gestion, secteur, pays —
+                  // voir `Investment.fundStyle`/`sector`/`countryCode`), un
+                  // `Row` seul déborderait sur les fenêtres étroites.
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Select<FundStyle>(
-                        value: fundStyle,
-                        placeholder: const shadcn.Text(
-                          'Style de gestion (facultatif)',
-                        ),
-                        onChanged: (style) {
-                          if (style != null) onFundStyleChanged(style);
-                        },
-                        itemBuilder: (context, style) =>
-                            shadcn.Text(style.label),
-                        popup: (context) => SelectPopup(
-                          items: SelectItemList(
-                            children: [
-                              for (final style in FundStyle.values)
-                                SelectItemButton(
-                                  value: style,
-                                  child: shadcn.Text(style.label),
-                                ),
-                            ],
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Select<FundStyle>(
+                            value: fundStyle,
+                            placeholder: const shadcn.Text(
+                              'Style de gestion (facultatif)',
+                            ),
+                            onChanged: (style) {
+                              if (style != null) onFundStyleChanged(style);
+                            },
+                            itemBuilder: (context, style) =>
+                                shadcn.Text(style.label),
+                            popup: (context) => SelectPopup(
+                              items: SelectItemList(
+                                children: [
+                                  for (final style in FundStyle.values)
+                                    SelectItemButton(
+                                      value: style,
+                                      child: shadcn.Text(style.label),
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                          if (fundStyle != null) ...[
+                            const SizedBox(width: 4),
+                            IconButton.ghost(
+                              icon: const Icon(LucideIcons.x, size: 14),
+                              onPressed: () => onFundStyleChanged(null),
+                            ),
+                          ],
+                        ],
                       ),
-                      if (fundStyle != null) ...[
-                        const SizedBox(width: 4),
-                        IconButton.ghost(
-                          icon: const Icon(LucideIcons.x, size: 14),
-                          onPressed: () => onFundStyleChanged(null),
-                        ),
-                      ],
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  InvestmentClassificationFields(
+                    sector: sector,
+                    onSectorChanged: onSectorChanged,
+                    sectorBreakdown: sectorBreakdown,
+                    onSectorBreakdownChanged: onSectorBreakdownChanged,
+                    countryCode: countryCode,
+                    onCountryCodeChanged: onCountryCodeChanged,
+                    countryBreakdown: countryBreakdown,
+                    onCountryBreakdownChanged: onCountryBreakdownChanged,
                   ),
                 ],
               ],

@@ -25,12 +25,14 @@ void main() {
     required String id,
     required String name,
     required String path,
+    String? kind,
   }) => {
     'id': id,
     'name': name,
     'vaultPath': path,
     'bookmarkData': null,
     'bookmarkTargetsVault': false,
+    if (kind != null) 'kind': kind,
   };
 
   setUp(() async {
@@ -61,6 +63,44 @@ void main() {
     expect(vaults.map((v) => v.id), ['a', 'b']);
     expect(vaults.map((v) => v.name), ['Vault A', 'Vault B']);
   });
+
+  test('listVaults désérialise le kind quand présent', () async {
+    SharedPreferences.setMockInitialValues({
+      'saved_vaults_json': jsonEncode([
+        vaultJson(
+          id: 'a',
+          name: 'Perso',
+          path: vaultADir.path,
+          kind: 'personal',
+        ),
+        vaultJson(
+          id: 'b',
+          name: 'Pro',
+          path: vaultBDir.path,
+          kind: 'professional',
+        ),
+      ]),
+    });
+
+    final vaults = await service.listVaults();
+    expect(vaults.firstWhere((v) => v.id == 'a').kind, VaultKind.personal);
+    expect(vaults.firstWhere((v) => v.id == 'b').kind, VaultKind.professional);
+  });
+
+  test(
+    'un coffre-fort sans kind dans le JSON (créé avant cette fonctionnalité) '
+    'est traité comme personnel',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'saved_vaults_json': jsonEncode([
+          vaultJson(id: 'a', name: 'Ancien vault', path: vaultADir.path),
+        ]),
+      });
+
+      final vaults = await service.listVaults();
+      expect(vaults.single.kind, VaultKind.personal);
+    },
+  );
 
   test(
     'listVaults retombe sur une liste vide si le JSON est corrompu',
@@ -196,6 +236,24 @@ void main() {
       expect(await service.getActiveVault(), isNull);
     },
   );
+
+  group('VaultKind', () {
+    test('label distinct pour chaque valeur', () {
+      final labels = VaultKind.values.map((k) => k.label).toSet();
+      expect(labels, hasLength(VaultKind.values.length));
+    });
+
+    test('fromName : round-trip sur chaque valeur', () {
+      for (final kind in VaultKind.values) {
+        expect(VaultKind.fromName(kind.name), kind);
+      }
+    });
+
+    test('fromName : nom absent ou inconnu retombe sur personal', () {
+      expect(VaultKind.fromName(null), VaultKind.personal);
+      expect(VaultKind.fromName('inconnu'), VaultKind.personal);
+    });
+  });
 
   group('migration de renommage .opime -> Opime', () {
     late Directory parentDir;

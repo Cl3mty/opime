@@ -1,14 +1,21 @@
+import 'package:countries_world_map/countries_world_map.dart' show SimpleMap;
+import 'package:countries_world_map/data/maps/world_map.dart' show SMapWorld;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/load_error_view.dart';
-import '../dashboard/patrimoine_models.dart' show DashboardPeriod, NetWorthPoint;
+import '../dashboard/patrimoine_models.dart'
+    show DashboardPeriod, NetWorthPoint;
+import '../dashboard/widgets/allocation_blocks_view.dart' show AllocationSlice;
+import '../dashboard/widgets/allocation_donut_view.dart'
+    show AllocationDonutView;
 import '../dashboard/widgets/net_worth_chart.dart' show PeriodTabs;
 import '../investments/investments_models.dart'
-    show AssetClass, FundStyle, Investment;
+    show AssetClass, FundStyle, Investment, Sector, kInvestmentCountries;
 import '../investments/performance_calculator.dart' show PerformanceResult;
+import '../investments/sector_style.dart' show sectorColor;
 import '../investments/real_patrimoine_adapter.dart'
     show
         buildAllRealCategories,
@@ -24,6 +31,12 @@ import 'widgets/correlation_matrix.dart';
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
+
+/// Ratio largeur/hauteur de [SMapWorld.instructions] (2000×857) — nécessaire
+/// pour donner à [SimpleMap] une hauteur cohérente avec sa largeur
+/// disponible via [AspectRatio], puisqu'il ne se dimensionne pas tout seul
+/// dans des contraintes de hauteur non bornées (voir _GeographicDiversificationCard).
+const _worldMapAspectRatio = 2000 / 857;
 
 /// Écran "Analyses" : métriques avancées de portefeuille (répartition
 /// gestion active/passive, volatilité, corrélation, ratio rendement/risque,
@@ -53,6 +66,12 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
   AnalysesSnapshot? _snapshot;
   DashboardPeriod _period = DashboardPeriod.year1;
   final _benchmarkController = TextEditingController();
+
+  /// Onglet actif (Performance/Risque/Composition/Structure financière) —
+  /// voir [build]. Non persisté (pur état d'affichage, contrairement à
+  /// [_period]/au ticker du benchmark qui restent significatifs d'une
+  /// session à l'autre) : l'écran rouvre toujours sur "Performance".
+  int _tabIndex = 0;
 
   @override
   void initState() {
@@ -128,7 +147,7 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
       return LoadErrorView(
         message:
             'Impossible de charger les analyses. Vérifiez que le dossier '
-            'Vault est accessible.',
+            'Coffre-fort est accessible.',
         onRetry: _retryLoad,
       );
     }
@@ -140,6 +159,11 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
       animation: widget.amountVisibility,
       builder: (context, _) {
         final hidden = widget.amountVisibility.hidden;
+        // Période et benchmark ne concernent que Performance/Risque — les
+        // masquer sur Composition/Structure financière (des instantanés
+        // d'aujourd'hui, indépendants de la période, voir _DebtLeverageCard)
+        // évite d'afficher un sélecteur qui n'aurait aucun effet visible.
+        final periodRelevant = _tabIndex == 0 || _tabIndex == 1;
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -149,98 +173,96 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   shadcn.Text('Analyses').x2Large().bold(),
-                  PeriodTabs(
-                    labels: [for (final p in DashboardPeriod.values) p.label],
-                    index: _period.index,
-                    onChanged: (i) =>
-                        setState(() => _period = DashboardPeriod.values[i]),
-                  ),
+                  if (periodRelevant)
+                    PeriodTabs(
+                      labels: [for (final p in DashboardPeriod.values) p.label],
+                      index: _period.index,
+                      onChanged: (i) =>
+                          setState(() => _period = DashboardPeriod.values[i]),
+                    ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              TabList(
+                index: _tabIndex,
+                onChanged: (value) => setState(() => _tabIndex = value),
+                children: const [
+                  TabItem(child: shadcn.Text('Performance')),
+                  TabItem(child: shadcn.Text('Risque')),
+                  TabItem(child: shadcn.Text('Composition')),
+                  TabItem(child: shadcn.Text('Structure financière')),
+                ],
+              ),
+              const SizedBox(height: 20),
 
               // Performance : ce que le patrimoine a rapporté comparé à un
               // indice (Alpha) puis en absolu (TRI) — la question la plus
-              // immédiate ("qu'est-ce que j'ai gagné ?"), donc en premier.
-              const _SectionHeader('Performance'),
-              const SizedBox(height: 12),
-              _UnrealizedGainCard(
-                plusValueAbs: metrics.globalUnrealizedGain,
-                plusValuePercent: metrics.globalUnrealizedGainPercent,
-                hidden: hidden,
-              ),
-              const SizedBox(height: 16),
-              _AlphaCard(
-                controller: _benchmarkController,
-                onSave: _saveBenchmark,
-                snapshot: snapshot,
-                period: _period,
-                hidden: hidden,
-              ),
-              const SizedBox(height: 16),
-              _TriCard(categories: metrics.categories, total: metrics.total),
-
+              // immédiate ("qu'est-ce que j'ai gagné ?"), donc premier onglet.
+              if (_tabIndex == 0) ...[
+                _UnrealizedGainCard(
+                  plusValueAbs: metrics.globalUnrealizedGain,
+                  plusValuePercent: metrics.globalUnrealizedGainPercent,
+                  hidden: hidden,
+                ),
+                const SizedBox(height: 16),
+                _AlphaCard(
+                  controller: _benchmarkController,
+                  onSave: _saveBenchmark,
+                  snapshot: snapshot,
+                  period: _period,
+                  hidden: hidden,
+                ),
+                const SizedBox(height: 16),
+                _TriCard(categories: metrics.categories, total: metrics.total),
+              ]
               // Risque : à quel prix (volatilité, drawdown...) cette
               // performance a été obtenue, puis à quel point les
               // catégories/investissements sont corrélés entre eux — le
               // prolongement naturel de "qu'est-ce que j'ai gagné ?".
-              const SizedBox(height: 28),
-              const _SectionHeader('Risque'),
-              const SizedBox(height: 12),
-              _RiskReturnCard(categories: metrics.categories, total: metrics.total),
-              const SizedBox(height: 16),
-              _CorrelationCard(categories: metrics.categories),
-
+              else if (_tabIndex == 1) ...[
+                _RiskReturnCard(
+                  categories: metrics.categories,
+                  total: metrics.total,
+                ),
+                const SizedBox(height: 16),
+                _CorrelationCard(categories: metrics.categories),
+              ]
               // Composition : comment le patrimoine est construit — une
               // lecture différente (structure, pas performance), regardée
               // une fois qu'on sait ce que ça a rapporté et à quel risque.
-              const SizedBox(height: 28),
-              const _SectionHeader('Composition'),
-              const SizedBox(height: 12),
-              _FundStyleCard(allocation: metrics.fundStyleAllocation),
-
+              else if (_tabIndex == 2) ...[
+                _FundStyleCard(allocation: metrics.fundStyleAllocation),
+                const SizedBox(height: 16),
+                _SectorDiversificationCard(
+                  allocation: metrics.sectorAllocation,
+                  totalValue: metrics.actionsEtFondsTotalValue,
+                  hidden: hidden,
+                  investments: metrics.actionsEtFondsInvestments,
+                ),
+                const SizedBox(height: 16),
+                _GeographicDiversificationCard(
+                  allocation: metrics.countryAllocation,
+                  hidden: hidden,
+                  investments: metrics.actionsEtFondsInvestments,
+                ),
+              ]
               // Structure financière : endettement/levier — un instantané
-              // d'aujourd'hui, indépendant de la période sélectionnée
-              // (voir le libellé "Aujourd'hui" de la carte), d'où sa place
-              // à part, en dernier.
-              const SizedBox(height: 28),
-              const _SectionHeader('Structure financière'),
-              const SizedBox(height: 12),
-              _DebtLeverageCard(
-                totalAssets: metrics.totalAssets,
-                totalLiabilities: metrics.totalLiabilities,
-                debtRatioAssets: metrics.debtRatioAssets,
-                debtRatioIncome: metrics.debtRatioIncome,
-                leverage: metrics.leverage,
-                hidden: hidden,
-              ),
+              // d'aujourd'hui, indépendant de la période sélectionnée (voir
+              // le libellé "Aujourd'hui" de la carte), d'où sa place à part,
+              // dernier onglet.
+              else
+                _DebtLeverageCard(
+                  totalAssets: metrics.totalAssets,
+                  totalLiabilities: metrics.totalLiabilities,
+                  debtRatioAssets: metrics.debtRatioAssets,
+                  debtRatioIncome: metrics.debtRatioIncome,
+                  leverage: metrics.leverage,
+                  hidden: hidden,
+                ),
             ],
           ),
         );
       },
-    );
-  }
-}
-
-/// Étiquette de section ("PERFORMANCE", "RISQUE"...) suivie d'une ligne
-/// horizontale — regroupe visuellement les cartes de l'écran Analyses par
-/// thème plutôt que de les empiler sans distinction, pour que la page
-/// reste lisible malgré le nombre de cartes qu'elle contient.
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        shadcn.Text(
-          title.toUpperCase(),
-        ).xSmall().semiBold().muted(),
-        const SizedBox(width: 10),
-        Expanded(child: Divider(color: theme.colorScheme.border)),
-      ],
     );
   }
 }
@@ -327,6 +349,21 @@ class _AnalysesMetrics {
   final List<_CategoryMetric> categories;
   final _TotalMetric total;
   final Map<FundStyle?, double> fundStyleAllocation;
+  final Map<Sector?, double> sectorAllocation;
+  final Map<String?, double> countryAllocation;
+
+  /// Investissements Actions & Fonds classables (même périmètre que
+  /// [sectorAllocation]/[countryAllocation]) — exposés en plus des
+  /// pourcentages agrégés pour que [_SectorDiversificationCard]/
+  /// [_GeographicDiversificationCard] puissent lister, au survol/clic d'un
+  /// secteur ou d'un pays, les investissements qui le composent.
+  final List<Investment> actionsEtFondsInvestments;
+
+  /// Valeur totale (aujourd'hui) des investissements Actions & Fonds
+  /// classables — même périmètre que [sectorAllocation]/[countryAllocation]
+  /// (exclut les lignes à valeur nulle ou négative), affichée au centre du
+  /// donut sectoriel.
+  final double actionsEtFondsTotalValue;
   final double totalAssets;
   final double totalLiabilities;
   final double? debtRatioAssets;
@@ -346,6 +383,10 @@ class _AnalysesMetrics {
     required this.categories,
     required this.total,
     required this.fundStyleAllocation,
+    required this.sectorAllocation,
+    required this.countryAllocation,
+    required this.actionsEtFondsInvestments,
+    required this.actionsEtFondsTotalValue,
     required this.totalAssets,
     required this.totalLiabilities,
     required this.debtRatioAssets,
@@ -415,7 +456,9 @@ _AlphaMetrics _computeAlphaMetrics(
     snapshot.priceHistories,
     grid,
   );
-  final valuationAtStart = actionsPoints.isEmpty ? 0.0 : actionsPoints.first.value;
+  final valuationAtStart = actionsPoints.isEmpty
+      ? 0.0
+      : actionsPoints.first.value;
   final actionsFlowsAfterStart = [
     for (final inv in actionsEtFondsInvestments)
       for (final t in inv.transactions)
@@ -460,7 +503,6 @@ _AlphaMetrics _computeAlphaMetrics(
 
 DateTime _dateOnly(DateTime date) =>
     DateTime.utc(date.year, date.month, date.day);
-
 
 _AnalysesMetrics _computeMetrics(
   AnalysesSnapshot snapshot,
@@ -603,6 +645,17 @@ _AnalysesMetrics _computeMetrics(
     actionsEtFondsInvestments,
     valueOf: (inv) => inv.displayValue,
   );
+  final sectorAlloc = sectorAllocation(
+    actionsEtFondsInvestments,
+    valueOf: (inv) => inv.displayValue,
+  );
+  final countryAlloc = countryAllocation(
+    actionsEtFondsInvestments,
+    valueOf: (inv) => inv.displayValue,
+  );
+  final actionsEtFondsTotalValue = actionsEtFondsInvestments
+      .where((inv) => inv.displayValue > 0)
+      .fold<double>(0, (sum, inv) => sum + inv.displayValue);
 
   // Endettement/levier : instantané d'aujourd'hui, indépendant de la
   // période sélectionnée (voir libellé "Aujourd'hui" dans la carte).
@@ -653,6 +706,10 @@ _AnalysesMetrics _computeMetrics(
       tri: totalTri,
     ),
     fundStyleAllocation: allocation,
+    sectorAllocation: sectorAlloc,
+    countryAllocation: countryAlloc,
+    actionsEtFondsInvestments: actionsEtFondsInvestments,
+    actionsEtFondsTotalValue: actionsEtFondsTotalValue,
     totalAssets: totalAssets,
     totalLiabilities: totalLiabilities,
     debtRatioAssets: debtRatioAssets(
@@ -752,6 +809,486 @@ class _FundStyleCard extends StatelessWidget {
   }
 }
 
+/// Identifiant de la part/du pays "Non classé" (clé `null` des `Map`
+/// d'allocation) — partagé par [_SectorDiversificationCard] et
+/// [_GeographicDiversificationCard] pour repérer la sélection courante
+/// (survol/clic) dans un `Map<Sector?/String?, double>` dont la clé `null`
+/// ne peut pas servir directement d'identifiant de widget/état.
+const _unclassifiedSelectionId = 'non-classe';
+
+/// Investissements (avec leur contribution en €) qui composent le secteur
+/// [key] sélectionné dans [_SectorDiversificationCard] — même logique de
+/// ventilation qu'`analyses_calculations.dart`'s `sectorAllocation`
+/// (répartition pondérée via [Investment.sectorBreakdown] si renseignée,
+/// sinon [Investment.sector] unique) plutôt qu'une simple égalité, pour
+/// qu'un ETF multi-secteurs apparaisse dans chaque secteur qu'il couvre
+/// avec sa part réelle, pas sa valeur totale. Ignore toute position à
+/// valeur actuelle nulle (position soldée) — cohérent avec le camembert,
+/// qui les ignore déjà.
+List<(Investment, double)> _sectorMatches(
+  List<Investment> investments,
+  Sector? key,
+) {
+  final result = <(Investment, double)>[];
+  for (final inv in investments) {
+    if (inv.displayValue <= 0) continue;
+    if (inv.sectorBreakdown.isNotEmpty) {
+      if (key == null) {
+        final covered = inv.sectorBreakdown.fold(
+          0.0,
+          (sum, w) => sum + w.percent,
+        );
+        final remainder = inv.displayValue * (100 - covered).clamp(0, 100) / 100;
+        if (remainder > 0) result.add((inv, remainder));
+      } else {
+        final matchedPercent = inv.sectorBreakdown
+            .where((w) => w.sector == key)
+            .fold(0.0, (sum, w) => sum + w.percent);
+        if (matchedPercent > 0) {
+          result.add((inv, inv.displayValue * matchedPercent / 100));
+        }
+      }
+    } else if (inv.sector == key) {
+      result.add((inv, inv.displayValue));
+    }
+  }
+  return result;
+}
+
+/// Même principe que [_sectorMatches], pour la diversification
+/// géographique — voir [_GeographicDiversificationCard].
+List<(Investment, double)> _countryMatches(
+  List<Investment> investments,
+  String? key,
+) {
+  final result = <(Investment, double)>[];
+  for (final inv in investments) {
+    if (inv.displayValue <= 0) continue;
+    if (inv.countryBreakdown.isNotEmpty) {
+      if (key == null) {
+        final covered = inv.countryBreakdown.fold(
+          0.0,
+          (sum, w) => sum + w.percent,
+        );
+        final remainder = inv.displayValue * (100 - covered).clamp(0, 100) / 100;
+        if (remainder > 0) result.add((inv, remainder));
+      } else {
+        final matchedPercent = inv.countryBreakdown
+            .where((w) => w.countryCode == key)
+            .fold(0.0, (sum, w) => sum + w.percent);
+        if (matchedPercent > 0) {
+          result.add((inv, inv.displayValue * matchedPercent / 100));
+        }
+      }
+    } else if (inv.countryCode == key) {
+      result.add((inv, inv.displayValue));
+    }
+  }
+  return result;
+}
+
+/// Carte "Diversification sectorielle" : un donut (avec sa légende
+/// intégrée, voir [AllocationDonutView]) de la répartition de la valeur
+/// des investissements Actions & Fonds par [Sector] — même source
+/// ([sectorAllocation]) et même périmètre que [_FundStyleCard], juste une
+/// classification différente. Survoler ou cliquer une part (anneau ou
+/// légende) affiche la liste des investissements qui la composent — le
+/// survol prévisualise, le clic épingle la sélection pour qu'elle reste
+/// visible une fois la souris repartie.
+class _SectorDiversificationCard extends StatefulWidget {
+  final Map<Sector?, double> allocation;
+  final double totalValue;
+  final bool hidden;
+  final List<Investment> investments;
+
+  const _SectorDiversificationCard({
+    required this.allocation,
+    required this.totalValue,
+    required this.hidden,
+    required this.investments,
+  });
+
+  @override
+  State<_SectorDiversificationCard> createState() =>
+      _SectorDiversificationCardState();
+}
+
+class _SectorDiversificationCardState
+    extends State<_SectorDiversificationCard> {
+  String? _hoveredId;
+  String? _pinnedId;
+
+  String _labelFor(Sector? sector) => sector?.label ?? 'Non classé';
+
+  String _idFor(Sector? sector) => sector?.name ?? _unclassifiedSelectionId;
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = widget.allocation.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final selectedId = _hoveredId ?? _pinnedId;
+    final selectedEntry = selectedId == null
+        ? null
+        : sorted.where((e) => _idFor(e.key) == selectedId).firstOrNull;
+    final matching = selectedEntry == null
+        ? const <(Investment, double)>[]
+        : _sectorMatches(widget.investments, selectedEntry.key);
+
+    return FrostedCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _cardTitle(
+              context,
+              'Diversification sectorielle',
+              caption: 'Actions & Fonds · aujourd\'hui',
+              tooltip:
+                  'Répartition de la valeur des investissements Actions & '
+                  'Fonds par secteur d\'activité, en % de la valeur totale '
+                  'de cette classe. Le secteur se règle manuellement sur '
+                  'chaque investissement. Survole ou clique un secteur '
+                  'pour voir les investissements qui le composent.',
+            ),
+            const SizedBox(height: 12),
+            if (widget.allocation.isEmpty)
+              shadcn.Text(
+                'Aucun investissement Actions & Fonds classé pour l\'instant.',
+              ).muted().small()
+            else ...[
+              SizedBox(
+                height: 220,
+                child: AllocationDonutView(
+                  slices: [
+                    for (final entry in sorted)
+                      AllocationSlice(
+                        id: _idFor(entry.key),
+                        label: _labelFor(entry.key),
+                        color: sectorColor(entry.key),
+                        percent: entry.value,
+                      ),
+                  ],
+                  total: widget.totalValue,
+                  hidden: widget.hidden,
+                  onHoveredIdChanged: (id) => setState(() => _hoveredId = id),
+                  onSliceTap: (id) =>
+                      setState(() => _pinnedId = _pinnedId == id ? null : id),
+                ),
+              ),
+              if (selectedEntry != null) ...[
+                const SizedBox(height: 12),
+                _MatchingInvestmentsList(
+                  title: _labelFor(selectedEntry.key),
+                  entries: matching,
+                  hidden: widget.hidden,
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Carte "Diversification géographique" : une carte du monde colorée par
+/// pays (plus le pays pèse dans le portefeuille Actions & Fonds, plus sa
+/// couleur est intense) accompagnée de la liste des pays avec leur
+/// pourcentage — même source ([countryAllocation]) et même périmètre que
+/// [_FundStyleCard]/[_SectorDiversificationCard]. Survoler ou cliquer un
+/// pays (sur la carte ou dans la liste) affiche les investissements qui le
+/// composent — même interaction survol/clic que la carte sectorielle.
+class _GeographicDiversificationCard extends StatefulWidget {
+  final Map<String?, double> allocation;
+  final bool hidden;
+  final List<Investment> investments;
+
+  const _GeographicDiversificationCard({
+    required this.allocation,
+    required this.hidden,
+    required this.investments,
+  });
+
+  @override
+  State<_GeographicDiversificationCard> createState() =>
+      _GeographicDiversificationCardState();
+}
+
+class _GeographicDiversificationCardState
+    extends State<_GeographicDiversificationCard> {
+  String? _hoveredId;
+  String? _pinnedId;
+
+  String _idFor(String? code) => code ?? _unclassifiedSelectionId;
+
+  String _labelFor(String? code) =>
+      code == null ? 'Non classé' : (kInvestmentCountries[code] ?? code);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final sorted = widget.allocation.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final maxPercent = sorted.isEmpty
+        ? 0.0
+        : sorted.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+    final selectedId = _hoveredId ?? _pinnedId;
+    final selectedEntry = selectedId == null
+        ? null
+        : sorted.where((e) => _idFor(e.key) == selectedId).firstOrNull;
+    final matching = selectedEntry == null
+        ? const <(Investment, double)>[]
+        : _countryMatches(widget.investments, selectedEntry.key);
+
+    // `SimpleMap.colors` n'accepte qu'une entrée par pays effectivement
+    // détenu (`entry.key != null`) — les pays absents gardent `defaultColor`.
+    // Intensité proportionnelle au poids dans le portefeuille plutôt qu'une
+    // couleur binaire "détenu/non détenu", pour distinguer d'un coup d'œil
+    // une position dominante d'une position marginale.
+    final mapColors = <String, Color>{
+      for (final entry in sorted)
+        if (entry.key != null)
+          entry.key!.toLowerCase(): Color.lerp(
+            theme.colorScheme.primary.withValues(alpha: 0.25),
+            theme.colorScheme.primary,
+            maxPercent == 0 ? 0 : (entry.value / maxPercent).clamp(0.0, 1.0),
+          )!,
+    };
+
+    // Un pays survolé/cliqué sur la carte qui n'est pas effectivement
+    // détenu (`allocation` ne le contient pas) ne doit rien changer — sinon
+    // survoler des pays sans position ferait clignoter la sélection en
+    // vain en parcourant la carte.
+    void handleMapHover(String id, bool isHovering) {
+      final code = id.toUpperCase();
+      if (!isHovering) {
+        setState(() => _hoveredId = null);
+        return;
+      }
+      if (!widget.allocation.containsKey(code)) return;
+      setState(() => _hoveredId = code);
+    }
+
+    void handleMapTap(String id) {
+      final code = id.toUpperCase();
+      if (!widget.allocation.containsKey(code)) return;
+      setState(() => _pinnedId = _pinnedId == code ? null : code);
+    }
+
+    return FrostedCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _cardTitle(
+              context,
+              'Diversification géographique',
+              caption: 'Actions & Fonds · aujourd\'hui',
+              tooltip:
+                  'Répartition de la valeur des investissements Actions & '
+                  'Fonds par pays, en % de la valeur totale de cette '
+                  'classe. Le pays se règle manuellement sur chaque '
+                  'investissement. Survole ou clique un pays pour voir les '
+                  'investissements qui le composent.',
+            ),
+            const SizedBox(height: 12),
+            if (widget.allocation.isEmpty)
+              shadcn.Text(
+                'Aucun investissement Actions & Fonds classé pour l\'instant.',
+              ).muted().small()
+            else ...[
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final map = ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: AspectRatio(
+                      aspectRatio: _worldMapAspectRatio,
+                      child: SimpleMap(
+                        instructions: SMapWorld.instructions,
+                        defaultColor: theme.colorScheme.muted,
+                        colors: mapColors,
+                        onHover: (id, name, isHovering) =>
+                            handleMapHover(id, isHovering),
+                        callback: (id, name, tapDetails) => handleMapTap(id),
+                      ),
+                    ),
+                  );
+                  final list = _CountryList(
+                    entries: sorted,
+                    selectedId: selectedId,
+                    onHoveredIdChanged: (id) => setState(() => _hoveredId = id),
+                    onTap: (id) =>
+                        setState(() => _pinnedId = _pinnedId == id ? null : id),
+                  );
+                  // Sous ~480px (carte étroite, ou colonne latérale
+                  // repliée), la carte et la liste sont empilées plutôt que
+                  // côte à côte, sinon toutes deux deviendraient illisibles.
+                  if (constraints.maxWidth < 480) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [map, const SizedBox(height: 16), list],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 3, child: map),
+                      const SizedBox(width: 20),
+                      Expanded(flex: 2, child: list),
+                    ],
+                  );
+                },
+              ),
+              if (selectedEntry != null) ...[
+                const SizedBox(height: 12),
+                _MatchingInvestmentsList(
+                  title: _labelFor(selectedEntry.key),
+                  entries: matching,
+                  hidden: widget.hidden,
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Liste "pays · pourcentage" de [_GeographicDiversificationCard] — même
+/// présentation (et maintenant le même survol/clic, voir [selectedId]) que
+/// la légende intégrée d'[AllocationDonutView], puisque [SimpleMap] n'en
+/// fournit pas.
+class _CountryList extends StatelessWidget {
+  final List<MapEntry<String?, double>> entries;
+  final String? selectedId;
+  final ValueChanged<String?> onHoveredIdChanged;
+  final ValueChanged<String> onTap;
+
+  const _CountryList({
+    required this.entries,
+    required this.selectedId,
+    required this.onHoveredIdChanged,
+    required this.onTap,
+  });
+
+  String _idFor(String? code) => code ?? _unclassifiedSelectionId;
+
+  String _labelFor(String? code) =>
+      code == null ? 'Non classé' : (kInvestmentCountries[code] ?? code);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final entry in entries)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              onEnter: (_) => onHoveredIdChanged(_idFor(entry.key)),
+              onExit: (_) => onHoveredIdChanged(null),
+              child: GestureDetector(
+                onTap: () => onTap(_idFor(entry.key)),
+                child: AnimatedOpacity(
+                  duration: Duration.zero,
+                  opacity: selectedId != null && selectedId != _idFor(entry.key)
+                      ? 0.35
+                      : 1.0,
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: shadcn.Text(
+                          _labelFor(entry.key),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ).small(),
+                      ),
+                      const SizedBox(width: 6),
+                      shadcn.Text(
+                        entry.value < 1
+                            ? '${entry.value.toStringAsFixed(2)} %'
+                            : '${entry.value.toStringAsFixed(0)} %',
+                      ).muted().xSmall(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Liste des investissements composant le secteur/pays sélectionné (survol
+/// ou clic) dans [_SectorDiversificationCard]/[_GeographicDiversificationCard]
+/// — triés par contribution décroissante, comme la plupart des listes de
+/// l'écran Analyses. Chaque entrée porte la CONTRIBUTION de l'investissement
+/// à cette part (voir [_sectorMatches]/[_countryMatches]) plutôt que sa
+/// valeur totale : pour un ETF multi-pays/secteurs, seule une fraction de sa
+/// valeur compte pour la part sélectionnée.
+class _MatchingInvestmentsList extends StatelessWidget {
+  final String title;
+  final List<(Investment, double)> entries;
+  final bool hidden;
+
+  const _MatchingInvestmentsList({
+    required this.title,
+    required this.entries,
+    required this.hidden,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...entries]..sort((a, b) => b.$2.compareTo(a.$2));
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          shadcn.Text('$title (${sorted.length})').semiBold().small(),
+          const SizedBox(height: 6),
+          if (sorted.isEmpty)
+            shadcn.Text('Aucun investissement.').muted().xSmall()
+          else
+            for (final (inv, contribution) in sorted)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: shadcn.Text(
+                        inv.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ).small(),
+                    ),
+                    const SizedBox(width: 6),
+                    shadcn.Text(
+                      displayEuros(contribution, hidden),
+                    ).muted().xSmall(),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
+}
+
 /// Largeurs de colonnes partagées entre l'en-tête et chaque
 /// [_RiskReturnRow] — un ratio (Sharpe, Sortino, Skew, Omega, Bêta) n'a
 /// pas d'unité, contrairement à la volatilité et au max drawdown (%),
@@ -766,35 +1303,35 @@ const _riskReturnColumnWidth = 84.0;
 const _riskReturnExplanations = {
   'Volatilité':
       'Écart-type annualisé des rendements journaliers : plus il est '
-          'élevé, plus la valeur a fluctué au jour le jour sur la '
-          'période, dans un sens comme dans l\'autre.',
+      'élevé, plus la valeur a fluctué au jour le jour sur la '
+      'période, dans un sens comme dans l\'autre.',
   'Max drawdown':
       'Plus forte baisse subie entre un sommet et le creux suivant sur '
-          'la période — le pire passage traversé, pas la performance '
-          'finale (qui peut être positive malgré un max drawdown élevé).',
+      'la période — le pire passage traversé, pas la performance '
+      'finale (qui peut être positive malgré un max drawdown élevé).',
   'Sharpe':
       'Rendement obtenu par unité de risque total pris (la volatilité) — '
-          'plus il est élevé, meilleur est le rendement pour le risque '
-          'supporté. Pénalise autant les fluctuations à la hausse qu\'à '
-          'la baisse.',
+      'plus il est élevé, meilleur est le rendement pour le risque '
+      'supporté. Pénalise autant les fluctuations à la hausse qu\'à '
+      'la baisse.',
   'Sortino':
       'Comme le ratio de Sharpe, mais ne pénalise que les fluctuations à '
-          'la baisse (une hausse forte n\'est pas traitée comme un '
-          'risque) — plus représentatif du risque réellement subi par un '
-          'investisseur.',
+      'la baisse (une hausse forte n\'est pas traitée comme un '
+      'risque) — plus représentatif du risque réellement subi par un '
+      'investisseur.',
   'Bêta':
       'Sensibilité aux mouvements du benchmark configuré dans la carte '
-          'Alpha vs benchmark : 1 = évolue comme lui, > 1 = amplifie ses '
-          'mouvements, < 1 = les atténue, négatif = évolue à l\'inverse.',
+      'Alpha vs benchmark : 1 = évolue comme lui, > 1 = amplifie ses '
+      'mouvements, < 1 = les atténue, négatif = évolue à l\'inverse.',
   'Omega':
       'Rapport entre les gains cumulés et les pertes cumulées sur la '
-          'période (au-delà d\'un rendement nul) — au-dessus de 1, les '
-          'gains l\'emportent sur les pertes.',
+      'période (au-delà d\'un rendement nul) — au-dessus de 1, les '
+      'gains l\'emportent sur les pertes.',
   'Skew':
       'Asymétrie de la distribution des rendements journaliers : positif '
-          '= surtout de petites pertes compensées par quelques gros '
-          'gains ; négatif = surtout des gains modestes exposés à '
-          'quelques grosses pertes rares.',
+      '= surtout de petites pertes compensées par quelques gros '
+      'gains ; négatif = surtout des gains modestes exposés à '
+      'quelques grosses pertes rares.',
 };
 
 class _RiskReturnCard extends StatelessWidget {
@@ -918,10 +1455,7 @@ class _RiskReturnRow extends StatelessWidget {
             ).muted().small(),
           ),
           SizedBox(width: _riskReturnColumnWidth, child: ratio(metric.sharpe)),
-          SizedBox(
-            width: _riskReturnColumnWidth,
-            child: ratio(metric.sortino),
-          ),
+          SizedBox(width: _riskReturnColumnWidth, child: ratio(metric.sortino)),
           SizedBox(width: _riskReturnColumnWidth, child: ratio(metric.beta)),
           SizedBox(width: _riskReturnColumnWidth, child: ratio(metric.omega)),
           SizedBox(width: _riskReturnColumnWidth, child: ratio(metric.skew)),
@@ -1006,9 +1540,8 @@ class _CorrelationCardState extends State<_CorrelationCard> {
         content = CorrelationMatrix(
           labels: [for (final c in usableCategories) c.assetClass.label],
           matrix: _matrixFor(series),
-          onSelectLabel: (i) => setState(
-            () => _drilledInto = usableCategories[i].assetClass,
-          ),
+          onSelectLabel: (i) =>
+              setState(() => _drilledInto = usableCategories[i].assetClass),
         );
       }
     }
@@ -1089,10 +1622,10 @@ class _TriCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 children: [
-                  Expanded(
-                    child: shadcn.Text('Patrimoine entier').semiBold(),
-                  ),
-                  shadcn.Text(_formatPerformanceResult(total.tri)).muted().small(),
+                  Expanded(child: shadcn.Text('Patrimoine entier').semiBold()),
+                  shadcn.Text(
+                    _formatPerformanceResult(total.tri),
+                  ).muted().small(),
                 ],
               ),
             ),
@@ -1102,7 +1635,9 @@ class _TriCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(child: shadcn.Text(c.assetClass.label)),
-                    shadcn.Text(_formatPerformanceResult(c.tri)).muted().small(),
+                    shadcn.Text(
+                      _formatPerformanceResult(c.tri),
+                    ).muted().small(),
                   ],
                 ),
               ),

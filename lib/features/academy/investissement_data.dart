@@ -88,6 +88,20 @@ const investissementCards = [
         '1 % de frais annuel en plus peut représenter des dizaines de milliers d\'euros en moins à l\'arrivée.',
   ),
   AcademyStep(
+    id: 'invest_fiscalite',
+    title: 'La fiscalité',
+    level: AcademyLevel.intermediaire,
+    tagline: 'Un facteur d\'optimisation, jamais un motif d\'investir.',
+    bullets: [
+      'On choisit d\'abord un investissement pour son couple rendement/risque, cohérent avec un projet et ses propres convictions.',
+      'La fiscalité s\'optimise ensuite, à stratégie inchangée : par exemple, loger des actions européennes dans un PEA plutôt qu\'un CTO pour profiter de son cadre fiscal après 5 ans de détention.',
+      'Chaque enveloppe (PEA, assurance vie, CTO, PER...) a ses propres règles de taxation et de disponibilité de l\'argent — voir les fiches Enveloppes.',
+      'Un placement fiscalement avantageux mais mal aligné avec son horizon, son risque ou ses convictions reste un mauvais choix.',
+    ],
+    takeaway:
+        'D\'abord le bon investissement, ensuite la bonne enveloppe fiscale pour le loger — jamais l\'inverse.',
+  ),
+  AcademyStep(
     id: 'invest_pyramide',
     title: 'La pyramide de l\'investissement',
     level: AcademyLevel.avance,

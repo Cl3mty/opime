@@ -2,12 +2,15 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/privacy/amount_visibility_controller.dart';
+import 'package:opime/core/storage/vault_folder_service.dart' show VaultKind;
 import 'package:opime/features/dashboard/dashboard_screen.dart';
 import 'package:opime/features/dashboard/patrimoine_models.dart' show DashboardPeriod;
 import 'package:opime/features/dashboard/widgets/category_breakdown_card.dart';
 import 'package:opime/features/dashboard/widgets/net_worth_chart.dart' show PeriodTabs;
 import 'package:opime/features/dashboard/onboarding_highlight_controller.dart'
     show OnboardingHighlightController;
+import 'package:opime/features/entities/entities_models.dart';
+import 'package:opime/features/entities/entities_repository.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
 import 'package:opime/features/investments/patrimoine_refresh_controller.dart';
@@ -45,7 +48,10 @@ void main() {
     if (await tempDir.exists()) await tempDir.delete(recursive: true);
   });
 
-  Future<void> pump(WidgetTester tester) => tester.pumpWidget(
+  Future<void> pump(
+    WidgetTester tester, {
+    VaultKind vaultKind = VaultKind.personal,
+  }) => tester.pumpWidget(
     ShadcnApp(
       home: Scaffold(
         child: DashboardScreen(
@@ -54,6 +60,7 @@ void main() {
           refreshSignal: PatrimoineRefreshController(),
           priceSyncStatus: PriceSyncStatusController(),
           onboardingHighlight: OnboardingHighlightController(),
+          vaultKind: vaultKind,
         ),
       ),
     ),
@@ -62,9 +69,12 @@ void main() {
   /// Pompe l'écran puis sonde jusqu'à disparition du spinner de chargement
   /// plein cadre (`_loading` devenu `false`) — même zone `runAsync` que le
   /// pompage, voir la doc de tête.
-  Future<void> pumpAndWaitForLoad(WidgetTester tester) async {
+  Future<void> pumpAndWaitForLoad(
+    WidgetTester tester, {
+    VaultKind vaultKind = VaultKind.personal,
+  }) async {
     await tester.runAsync(() async {
-      await pump(tester);
+      await pump(tester, vaultKind: vaultKind);
       for (var i = 0; i < 40; i++) {
         if (find.byType(CircularProgressIndicator).evaluate().isEmpty) return;
         await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -256,4 +266,51 @@ void main() {
       expect(cardsAfter, {DashboardPeriod.month1});
     },
   );
+
+  group('Entités professionnelles (voir entities_patrimoine_adapter.dart)', () {
+    testWidgets(
+      'coffre-fort professionnel avec une entité : sa valeur nette détenue '
+      'apparaît sur la carte "Actifs"',
+      (tester) async {
+        await tester.runAsync(() async {
+          await EntityRepository(tempDir.path).saveEntity(
+            const BusinessEntity(
+              id: 'e1',
+              name: 'SCI Les Tilleuls',
+              type: EntityType.sci,
+              ownershipPercent: 100,
+              assets: [EntityLine(id: 'a1', label: 'Immeuble', amount: 150000)],
+            ),
+          );
+        });
+
+        await pumpAndWaitForLoad(tester, vaultKind: VaultKind.professional);
+
+        expect(find.text('SCI Les Tilleuls'), findsOneWidget);
+        expect(find.textContaining('150 000'), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'coffre-fort personnel : une entité déjà enregistrée (ex. après '
+      'bascule pro -> perso) n\'apparaît pas sur le Dashboard',
+      (tester) async {
+        await tester.runAsync(() async {
+          await EntityRepository(tempDir.path).saveEntity(
+            const BusinessEntity(
+              id: 'e1',
+              name: 'SCI Les Tilleuls',
+              type: EntityType.sci,
+              ownershipPercent: 100,
+              assets: [EntityLine(id: 'a1', label: 'Immeuble', amount: 150000)],
+            ),
+          );
+        });
+
+        await pumpAndWaitForLoad(tester);
+
+        expect(find.text('SCI Les Tilleuls'), findsNothing);
+      },
+    );
+  });
 }

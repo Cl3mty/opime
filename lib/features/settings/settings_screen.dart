@@ -15,6 +15,7 @@ import '../../core/ui/toggle_button_style.dart';
 import '../../core/updates/update_checker.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/responsive.dart';
+import '../../core/ui/vault_kind_selector.dart';
 import 'vault_encryption_dialogs.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -798,20 +799,22 @@ class _EncryptionCardState extends State<_EncryptionCard> {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Expanded(child: Text('Chiffrement du vault').large().medium()),
+                Expanded(
+                  child: Text('Chiffrement du coffre-fort').large().medium(),
+                ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
               enabled
-                  ? 'Les données privées de ce vault (comptes, budget, '
+                  ? 'Les données privées de ce coffre-fort (comptes, budget, '
                         'passifs, projets, notes de stratégie, simulations) '
                         'sont chiffrées. Le mot de passe est redemandé à '
                         'chaque lancement de l\'app.'
-                  : 'Chiffre les données privées de ce vault avec un mot de '
-                        'passe que tu définis. Les caches publics (cours de '
-                        'marché, données immobilières, loyers...) restent '
-                        'toujours en clair.',
+                  : 'Chiffre les données privées de ce coffre-fort avec un '
+                        'mot de passe que tu définis. Les caches publics '
+                        '(cours de marché, données immobilières, loyers...) '
+                        'restent toujours en clair.',
             ).muted().small(),
             const SizedBox(height: 12),
             if (enabled)
@@ -895,20 +898,29 @@ class _VaultCardState extends State<_VaultCard> {
   }
 
   Future<void> _addVault() async {
+    // Demandé avant d'ouvrir le sélecteur de dossier natif : ne s'applique
+    // vraiment que si le dossier choisi correspond à un coffre-fort
+    // réellement nouveau (voir `VaultFolderService.pickAndRememberVault`),
+    // mais poser la question à ce moment reste la meilleure place pour ne
+    // pas interrompre le flux une fois le dossier déjà choisi.
+    final kind = await showVaultKindDialog(context);
+    if (kind == null) return;
+
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final vault = await widget.vaultFolderService.pickAndRememberVault(
-        dialogTitle: 'Choisis ou crée un vault Opime',
+        dialogTitle: 'Choisis ou crée un coffre-fort Opime',
+        kind: kind,
       );
       if (vault != null) {
         await widget.onVaultActivated(vault.vaultPath);
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Impossible d\'ajouter un vault : $e');
+        setState(() => _error = 'Impossible d\'ajouter un coffre-fort : $e');
       }
     } finally {
       await _loadVaults();
@@ -946,7 +958,7 @@ class _VaultCardState extends State<_VaultCard> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Impossible d\'activer ce vault : $e');
+        setState(() => _error = 'Impossible d\'activer ce coffre-fort : $e');
       }
     } finally {
       await _loadVaults();
@@ -967,7 +979,7 @@ class _VaultCardState extends State<_VaultCard> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Impossible d\'oublier ce vault : $e');
+        setState(() => _error = 'Impossible d\'oublier ce coffre-fort : $e');
       }
     } finally {
       await _loadVaults();
@@ -985,10 +997,10 @@ class _VaultCardState extends State<_VaultCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Vaults').large().medium(),
+            const Text('Coffres-forts').large().medium(),
             const SizedBox(height: 8),
             const Text(
-              'Ajoute plusieurs vaults, donne-leur un nom, bascule entre eux et oublie-les sans toucher aux données sur disque.',
+              'Ajoute plusieurs coffres-forts, donne-leur un nom, bascule entre eux et oublie-les sans toucher aux données sur disque.',
             ).muted().small(),
             const SizedBox(height: 16),
             if (_loading)
@@ -1012,7 +1024,7 @@ class _VaultCardState extends State<_VaultCard> {
               OutlineButton(
                 onPressed: _addVault,
                 leading: const Icon(LucideIcons.folderPlus),
-                child: const Text('Ajouter un vault'),
+                child: const Text('Ajouter un coffre-fort'),
               ),
             ],
             if (_error != null) ...[
@@ -1118,7 +1130,7 @@ class _VaultCardState extends State<_VaultCard> {
           Expanded(
             child: TextField(
               controller: _editNameController,
-              placeholder: const Text('Nom du vault'),
+              placeholder: const Text('Nom du coffre-fort'),
               autofocus: true,
             ),
           ),
@@ -1215,7 +1227,7 @@ class _ProfilesCardState extends State<_ProfilesCard> {
                 const SizedBox(height: 8),
                 const Text(
                   'Sépare le patrimoine, le budget et les notes de stratégie '
-                  'de chaque personne du vault actif.',
+                  'de chaque personne du coffre-fort actif.',
                 ).muted().small(),
                 const SizedBox(height: 16),
                 for (final profile in profiles) ...[

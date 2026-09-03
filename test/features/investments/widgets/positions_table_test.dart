@@ -282,4 +282,109 @@ void main() {
       expect(explanation, findsOneWidget);
     },
   );
+
+  testWidgets(
+    'un investissement classé (pays + secteur) affiche son drapeau et son '
+    'icône de secteur ; un investissement non classé n\'affiche ni l\'un '
+    'ni l\'autre',
+    (tester) async {
+      final classified = Investment(
+        isin: 'US0378331005',
+        label: 'Apple',
+        countryCode: 'US',
+        sector: Sector.technologie,
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 10,
+            unitPrice: 100,
+          ),
+        ],
+      );
+      final unclassified = Investment(
+        isin: 'IE00B4L5Y983',
+        label: 'ETF non classé',
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 10,
+            unitPrice: 25,
+          ),
+        ],
+      );
+      await pump(tester, buildAccount([classified, unclassified]));
+
+      // Drapeau US : 🇺🇸 — un seul, sur la ligne Apple (Non classé n'en a
+      // pas).
+      expect(find.text('🇺🇸'), findsOneWidget);
+      expect(find.byIcon(LucideIcons.cpu), findsOneWidget);
+
+      final gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      addTearDown(gesture.removePointer);
+      await gesture.addPointer(location: Offset.zero);
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(find.text('🇺🇸')));
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('États-Unis'), findsOneWidget);
+
+      await gesture.moveTo(tester.getCenter(find.byIcon(LucideIcons.cpu)));
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('Technologie'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'un investissement multi-pays/secteurs (ETF) affiche les badges '
+    'génériques "globe"/"pie" à la place du drapeau/de l\'icône unique, '
+    'avec la répartition complète en bulle',
+    (tester) async {
+      final etf = Investment(
+        isin: 'IE00B4L5Y983',
+        label: 'MSCI World',
+        countryBreakdown: [
+          CountryWeight(countryCode: 'US', percent: 65),
+          CountryWeight(countryCode: 'FR', percent: 5),
+        ],
+        sectorBreakdown: [
+          SectorWeight(sector: Sector.technologie, percent: 25),
+        ],
+        transactions: [
+          Transaction(
+            date: DateTime(2024, 1, 1),
+            isBuy: true,
+            quantity: 10,
+            unitPrice: 100,
+          ),
+        ],
+      );
+      await pump(tester, buildAccount([etf]));
+
+      // Ni drapeau unique ni icône de secteur unique — les badges "multi"
+      // à la place.
+      expect(find.byIcon(LucideIcons.cpu), findsNothing);
+      expect(find.byIcon(LucideIcons.globe), findsOneWidget);
+      expect(find.byIcon(LucideIcons.chartPie), findsOneWidget);
+
+      final gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      addTearDown(gesture.removePointer);
+      await gesture.addPointer(location: Offset.zero);
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(find.byIcon(LucideIcons.globe)));
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.textContaining('65 % États-Unis'), findsOneWidget);
+      expect(find.textContaining('5 % France'), findsOneWidget);
+    },
+  );
 }

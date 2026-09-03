@@ -20,11 +20,25 @@ class AllocationDonutView extends StatefulWidget {
   final double total;
   final bool hidden;
 
+  /// Appelé à chaque changement de la part survolée (`null` quand la
+  /// souris quitte l'anneau/la légende) — optionnel, pour qu'un parent
+  /// affiche le détail (ex : les investissements) de la part actuellement
+  /// survolée sans dupliquer la logique de hit-test du donut.
+  final ValueChanged<String?>? onHoveredIdChanged;
+
+  /// Appelé au clic sur une part (anneau ou légende) — optionnel, pour
+  /// qu'un parent "épingle" une sélection qui reste visible même une fois
+  /// la souris repartie (contrairement à [onHoveredIdChanged], purement
+  /// transitoire).
+  final ValueChanged<String>? onSliceTap;
+
   const AllocationDonutView({
     super.key,
     required this.slices,
     required this.total,
     required this.hidden,
+    this.onHoveredIdChanged,
+    this.onSliceTap,
   });
 
   @override
@@ -35,14 +49,16 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
   String? _hoveredId;
   Offset? _pointer;
 
-  void _updateHover(Offset localPosition, Size size) {
+  /// Filtrage partagé par tout le hit-test/rendu : une part à 0 % ne
+  /// dessine rien, elle ne doit donc pas non plus compter au survol/clic.
+  List<AllocationSlice> get _visibleSlices =>
+      widget.slices.where((s) => s.percent > 0).toList();
+
+  int? _hitTest(Offset localPosition, Size size, List<AllocationSlice> slices) {
     final center = size.center(Offset.zero);
     final radius = math.min(size.width, size.height) / 2;
     final strokeWidth = radius * 0.34;
-    // Même filtrage que [build]/[_DonutPainter] (une part à 0 % ne
-    // dessine rien, elle ne doit donc pas non plus compter ici).
-    final slices = widget.slices.where((s) => s.percent > 0).toList();
-    final hoveredIndex = hitTestDonutSlice(
+    return hitTestDonutSlice(
       point: localPosition,
       center: center,
       // `_DonutPainter` dessine le trait centré sur `radius - strokeWidth /
@@ -59,10 +75,25 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
       strokeWidth: strokeWidth,
       values: [for (final s in slices) s.percent],
     );
-    setState(() {
-      _hoveredId = hoveredIndex == null ? null : slices[hoveredIndex].id;
-      _pointer = localPosition;
-    });
+  }
+
+  void _setHoveredId(String? id) {
+    if (id == _hoveredId) return;
+    setState(() => _hoveredId = id);
+    widget.onHoveredIdChanged?.call(id);
+  }
+
+  void _updateHover(Offset localPosition, Size size) {
+    final slices = _visibleSlices;
+    final hoveredIndex = _hitTest(localPosition, size, slices);
+    setState(() => _pointer = localPosition);
+    _setHoveredId(hoveredIndex == null ? null : slices[hoveredIndex].id);
+  }
+
+  void _handleTapUp(Offset localPosition, Size size) {
+    final slices = _visibleSlices;
+    final tappedIndex = _hitTest(localPosition, size, slices);
+    if (tappedIndex != null) widget.onSliceTap?.call(slices[tappedIndex].id);
   }
 
   @override
@@ -72,9 +103,7 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
     // "0 %" dans la légende, sans changer le total affiché au centre.
     final slices = widget.slices.where((s) => s.percent > 0).toList();
 
-    final hoveredSlice = slices
-        .where((s) => s.id == _hoveredId)
-        .firstOrNull;
+    final hoveredSlice = slices.where((s) => s.id == _hoveredId).firstOrNull;
 
     final ring = AspectRatio(
       aspectRatio: 1,
@@ -92,54 +121,62 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
             // dans l'anneau — d'où la "latence" au survol.
             onEnter: (event) => _updateHover(event.localPosition, size),
             onHover: (event) => _updateHover(event.localPosition, size),
-            onExit: (_) => setState(() {
-              _hoveredId = null;
-              _pointer = null;
-            }),
-            child: Stack(
-              children: [
-                CustomPaint(
-                  size: size,
-                  painter: _DonutPainter(
-                    slices: slices,
-                    hoveredId: _hoveredId,
-                  ),
-                ),
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      shadcn.Text(
-                        displayEuros(widget.total, widget.hidden),
-                      ).semiBold(),
-                      shadcn.Text('Total').muted().xSmall(),
-                    ],
-                  ),
-                ),
-                if (hoveredSlice != null && _pointer != null)
-                  Positioned(
-                    left: (_pointer!.dx - 110).clamp(
-                      0.0,
-                      math.max(0.0, size.width - 220),
+            onExit: (_) {
+              setState(() => _pointer = null);
+              _setHoveredId(null);
+            },
+            child: GestureDetector(
+              onTapUp: (details) => _handleTapUp(details.localPosition, size),
+              child: Stack(
+                children: [
+                  CustomPaint(
+                    size: size,
+                    painter: _DonutPainter(
+                      slices: slices,
+                      hoveredId: _hoveredId,
                     ),
-                    top: (_pointer!.dy + 12).clamp(
-                      0.0,
-                      math.max(0.0, size.height - 60),
+                  ),
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        shadcn.Text(
+                          displayEuros(widget.total, widget.hidden),
+                        ).semiBold(),
+                        shadcn.Text('Total').muted().xSmall(),
+                      ],
                     ),
-                    child: IgnorePointer(
-                      child: AllocationHoverTooltip(
-                        label: hoveredSlice.label,
-                        percent: hoveredSlice.percent,
+                  ),
+                  if (hoveredSlice != null && _pointer != null)
+                    Positioned(
+                      left: (_pointer!.dx - 110).clamp(
+                        0.0,
+                        math.max(0.0, size.width - 220),
+                      ),
+                      top: (_pointer!.dy + 12).clamp(
+                        0.0,
+                        math.max(0.0, size.height - 60),
+                      ),
+                      child: IgnorePointer(
+                        child: AllocationHoverTooltip(
+                          label: hoveredSlice.label,
+                          percent: hoveredSlice.percent,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           );
         },
       ),
     );
-    final legend = _Legend(slices: slices, hoveredId: _hoveredId);
+    final legend = _Legend(
+      slices: slices,
+      hoveredId: _hoveredId,
+      onHoveredIdChanged: _setHoveredId,
+      onSliceTap: widget.onSliceTap,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -220,8 +257,15 @@ class _DonutPainter extends CustomPainter {
 class _Legend extends StatelessWidget {
   final List<AllocationSlice> slices;
   final String? hoveredId;
+  final ValueChanged<String?>? onHoveredIdChanged;
+  final ValueChanged<String>? onSliceTap;
 
-  const _Legend({required this.slices, required this.hoveredId});
+  const _Legend({
+    required this.slices,
+    required this.hoveredId,
+    this.onHoveredIdChanged,
+    this.onSliceTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -232,43 +276,56 @@ class _Legend extends StatelessWidget {
         for (final slice in slices)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
-            child: AnimatedOpacity(
-              // Zéro délai : l'estompage de la légende doit suivre le
-              // survol au pixel près, comme l'arc du donut lui-même
-              // (`_DonutPainter`, un `CustomPainter` sans transition —
-              // repeint directement à chaque changement de `hoveredId`,
-              // aucune raison que la légende traîne derrière).
-              duration: Duration.zero,
-              opacity: hoveredId != null && hoveredId != slice.id ? 0.35 : 1.0,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: slice.color,
-                      shape: BoxShape.circle,
-                    ),
+            child: MouseRegion(
+              cursor: onSliceTap == null
+                  ? MouseCursor.defer
+                  : SystemMouseCursors.click,
+              onEnter: (_) => onHoveredIdChanged?.call(slice.id),
+              onExit: (_) => onHoveredIdChanged?.call(null),
+              child: GestureDetector(
+                onTap: () => onSliceTap?.call(slice.id),
+                child: AnimatedOpacity(
+                  // Zéro délai : l'estompage de la légende doit suivre le
+                  // survol au pixel près, comme l'arc du donut lui-même
+                  // (`_DonutPainter`, un `CustomPainter` sans transition —
+                  // repeint directement à chaque changement de `hoveredId`,
+                  // aucune raison que la légende traîne derrière).
+                  duration: Duration.zero,
+                  opacity: hoveredId != null && hoveredId != slice.id
+                      ? 0.35
+                      : 1.0,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: slice.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Libellé tronqué quand il est trop long : la largeur
+                      // de la légende est bornée (voir
+                      // [AllocationDonutView]) pour ne pas réduire la
+                      // taille du donut.
+                      Flexible(
+                        child: shadcn.Text(
+                          slice.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ).small(),
+                      ),
+                      const SizedBox(width: 6),
+                      shadcn.Text(
+                        slice.percent < 1
+                            ? '${slice.percent.toStringAsFixed(2)} %'
+                            : '${slice.percent.toStringAsFixed(0)} %',
+                      ).muted().xSmall(),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  // Libellé tronqué quand il est trop long : la largeur de
-                  // la légende est bornée (voir [AllocationDonutView]) pour
-                  // ne pas réduire la taille du donut.
-                  Flexible(
-                    child: shadcn.Text(
-                      slice.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ).small(),
-                  ),
-                  const SizedBox(width: 6),
-                  shadcn.Text(
-                    slice.percent < 1
-                        ? '${slice.percent.toStringAsFixed(2)} %'
-                        : '${slice.percent.toStringAsFixed(0)} %',
-                  ).muted().xSmall(),
-                ],
+                ),
               ),
             ),
           ),

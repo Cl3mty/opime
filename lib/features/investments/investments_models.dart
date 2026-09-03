@@ -136,6 +136,216 @@ enum FundStyle {
   }
 }
 
+/// Secteur d'activité d'un investissement `actionsEtFonds` (classification
+/// GICS simplifiée, 11 secteurs), renseigné manuellement par l'utilisateur —
+/// même principe que [FundStyle] : aucune heuristique automatique sur le
+/// libellé/ISIN, `null` sur [Investment.sector] tant qu'il n'est pas classé,
+/// traité comme "non classé" par `sectorAllocation`
+/// (`analyses_calculations.dart`), jamais deviné.
+enum Sector {
+  technologie,
+  sante,
+  finance,
+  consommationDiscretionnaire,
+  consommationBase,
+  industrie,
+  energie,
+  materiaux,
+  servicesPublics,
+  immobilier,
+  communication;
+
+  String get label => switch (this) {
+    Sector.technologie => 'Technologie',
+    Sector.sante => 'Santé',
+    Sector.finance => 'Finance',
+    Sector.consommationDiscretionnaire => 'Consommation discrétionnaire',
+    Sector.consommationBase => 'Consommation de base',
+    Sector.industrie => 'Industrie',
+    Sector.energie => 'Énergie',
+    Sector.materiaux => 'Matériaux',
+    Sector.servicesPublics => 'Services publics',
+    Sector.immobilier => 'Immobilier',
+    Sector.communication => 'Communication',
+  };
+
+  static Sector? fromName(String? name) {
+    if (name == null) return null;
+    for (final sector in Sector.values) {
+      if (sector.name == name) return sector;
+    }
+    return null;
+  }
+
+  /// Convertit un libellé de secteur Yahoo Finance brut (ex "Technology",
+  /// voir `YahooFinanceClient.fetchClassification`) en [Sector] — la
+  /// taxonomie de Yahoo (11 secteurs) correspond très exactement à celle
+  /// choisie ici, pas de perte d'information dans la conversion. `null` si
+  /// le libellé est absent ou non reconnu (nouvelle valeur introduite côté
+  /// Yahoo, ETF sans secteur...) plutôt qu'un repli hasardeux.
+  static Sector? fromYahooLabel(String? label) => switch (label) {
+    'Technology' => Sector.technologie,
+    'Healthcare' => Sector.sante,
+    'Financial Services' => Sector.finance,
+    'Consumer Cyclical' => Sector.consommationDiscretionnaire,
+    'Consumer Defensive' => Sector.consommationBase,
+    'Industrials' => Sector.industrie,
+    'Energy' => Sector.energie,
+    'Basic Materials' => Sector.materiaux,
+    'Utilities' => Sector.servicesPublics,
+    'Real Estate' => Sector.immobilier,
+    'Communication Services' => Sector.communication,
+    _ => null,
+  };
+}
+
+/// Pays d'un investissement `actionsEtFonds` (code ISO 3166-1 alpha-2),
+/// renseigné manuellement par l'utilisateur — même principe que
+/// [FundStyle]/[Sector] : `null` sur [Investment.countryCode] tant qu'il
+/// n'est pas classé ("non classé", jamais deviné depuis l'ISIN — le pays
+/// d'émission d'un ISIN ne correspond pas forcément au pays économique de
+/// l'entreprise, ex : beaucoup d'ETF domiciliés en Irlande/Luxembourg).
+/// Liste volontairement non exhaustive (marchés les plus courants pour un
+/// investisseur particulier) plutôt que les ~195 pays reconnus par l'ONU :
+/// [Investment.countryCode] reste un simple `String?`, prêt à accueillir
+/// n'importe quel code à l'avenir si cette liste doit s'élargir.
+const kInvestmentCountries = <String, String>{
+  'FR': 'France',
+  'DE': 'Allemagne',
+  'GB': 'Royaume-Uni',
+  'IE': 'Irlande',
+  'LU': 'Luxembourg',
+  'NL': 'Pays-Bas',
+  'BE': 'Belgique',
+  'CH': 'Suisse',
+  'ES': 'Espagne',
+  'IT': 'Italie',
+  'PT': 'Portugal',
+  'AT': 'Autriche',
+  'SE': 'Suède',
+  'NO': 'Norvège',
+  'DK': 'Danemark',
+  'FI': 'Finlande',
+  'PL': 'Pologne',
+  'GR': 'Grèce',
+  'US': 'États-Unis',
+  'CA': 'Canada',
+  'MX': 'Mexique',
+  'BR': 'Brésil',
+  'AR': 'Argentine',
+  'CL': 'Chili',
+  'JP': 'Japon',
+  'CN': 'Chine',
+  'HK': 'Hong Kong',
+  'TW': 'Taïwan',
+  'KR': 'Corée du Sud',
+  'IN': 'Inde',
+  'SG': 'Singapour',
+  'ID': 'Indonésie',
+  'TH': 'Thaïlande',
+  'MY': 'Malaisie',
+  'VN': 'Vietnam',
+  'AU': 'Australie',
+  'NZ': 'Nouvelle-Zélande',
+  'ZA': 'Afrique du Sud',
+  'AE': 'Émirats arabes unis',
+  'SA': 'Arabie saoudite',
+  'IL': 'Israël',
+  'TR': 'Turquie',
+  'RU': 'Russie',
+};
+
+/// Emoji drapeau (ex : "FR" → 🇫🇷) pour un code de [kInvestmentCountries] —
+/// construit à la volée à partir des deux "indicateurs régionaux" Unicode
+/// correspondant à chaque lettre du code (`A` → U+1F1E6 ... `Z` → U+1F1FF),
+/// plutôt qu'une table de 42 emojis à maintenir à la main : le rendu ne
+/// dépend que du support des drapeaux par la police système (present sur
+/// macOS/Windows), pas d'un asset embarqué dans l'app. `null` pour un code à
+/// deux lettres invalide (jamais le cas via [kInvestmentCountries], mais
+/// reste défensif si [Investment.countryCode] est un jour élargi).
+String? countryFlagEmoji(String? countryCode) {
+  if (countryCode == null || countryCode.length != 2) return null;
+  final upper = countryCode.toUpperCase();
+  const regionalIndicatorOffset = 0x1F1E6 - 0x41; // 'A'
+  final codeUnits = upper.codeUnits;
+  if (codeUnits[0] < 0x41 ||
+      codeUnits[0] > 0x5A ||
+      codeUnits[1] < 0x41 ||
+      codeUnits[1] > 0x5A) {
+    return null;
+  }
+  return String.fromCharCode(codeUnits[0] + regionalIndicatorOffset) +
+      String.fromCharCode(codeUnits[1] + regionalIndicatorOffset);
+}
+
+/// Une entrée de répartition géographique pondérée d'un investissement
+/// `actionsEtFonds` multi-pays — voir [Investment.countryBreakdown]. Sert
+/// à décrire un ETF/fonds diversifié (ex : un MSCI World réparti sur
+/// plusieurs dizaines de pays) qu'un simple [Investment.countryCode]
+/// unique ne peut pas représenter fidèlement. [percent] est un
+/// pourcentage (0-100) de la valeur totale de l'investissement — la
+/// somme des entrées n'est pas obligée d'atteindre 100 : la part
+/// restante tombe dans le seau "non classé" des diversifications
+/// (`analyses_calculations.dart`), exactement comme un investissement
+/// sans [Investment.countryCode] aujourd'hui.
+class CountryWeight {
+  final String id;
+  final String countryCode;
+  final double percent;
+
+  CountryWeight({String? id, required this.countryCode, required this.percent})
+    : id = id ?? generateInvestmentId('ctw');
+
+  CountryWeight copyWith({String? countryCode, double? percent}) =>
+      CountryWeight(
+        id: id,
+        countryCode: countryCode ?? this.countryCode,
+        percent: percent ?? this.percent,
+      );
+
+  factory CountryWeight.fromJson(Map<String, dynamic> json) => CountryWeight(
+    id: json['id'] as String?,
+    countryCode: json['countryCode'] as String? ?? '',
+    percent: (json['percent'] as num?)?.toDouble() ?? 0,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'countryCode': countryCode,
+    'percent': percent,
+  };
+}
+
+/// Même principe que [CountryWeight], pour la répartition sectorielle
+/// pondérée d'un ETF/fonds multi-secteurs — voir
+/// [Investment.sectorBreakdown].
+class SectorWeight {
+  final String id;
+  final Sector sector;
+  final double percent;
+
+  SectorWeight({String? id, required this.sector, required this.percent})
+    : id = id ?? generateInvestmentId('sctw');
+
+  SectorWeight copyWith({Sector? sector, double? percent}) => SectorWeight(
+    id: id,
+    sector: sector ?? this.sector,
+    percent: percent ?? this.percent,
+  );
+
+  factory SectorWeight.fromJson(Map<String, dynamic> json) => SectorWeight(
+    id: json['id'] as String?,
+    sector: Sector.fromName(json['sector'] as String?) ?? Sector.values.first,
+    percent: (json['percent'] as num?)?.toDouble() ?? 0,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'sector': sector.name,
+    'percent': percent,
+  };
+}
+
 /// Variante d'un investissement `privateEquity`, renseignée à la création et
 /// **immuable** ensuite (contrairement à [FundStyle]/[RealEstateType]) : elle
 /// détermine si une transaction représente un montant total (voir
@@ -604,6 +814,31 @@ class Investment {
   /// la classe `actionsEtFonds` — voir [FundStyle].
   final FundStyle? fundStyle;
 
+  /// Secteur d'activité, pertinent seulement pour la classe
+  /// `actionsEtFonds` — voir [Sector]. Renseigné manuellement, ou détecté
+  /// automatiquement (`YahooFinanceClient.fetchClassification` +
+  /// [Sector.fromYahooLabel]) par `price_refresh_service.dart` tant que ce
+  /// champ reste `null` — une valeur déjà présente (manuelle ou
+  /// auto-détectée) n'est jamais réécrite au rafraîchissement suivant.
+  final Sector? sector;
+
+  /// Code pays ISO 3166-1 alpha-2 (ex : "FR", "US"), pertinent seulement
+  /// pour la classe `actionsEtFonds` — voir [kInvestmentCountries]. Même
+  /// double origine (manuelle ou auto-détectée) que [sector].
+  final String? countryCode;
+
+  /// Répartition géographique pondérée pour un ETF/fonds multi-pays — voir
+  /// [CountryWeight]. Vide par défaut (cas courant : un pays unique, porté
+  /// par [countryCode]). Non vide, elle prend le pas sur [countryCode] pour
+  /// tout calcul de diversification/badge (voir `analyses_calculations
+  /// .dart`'s `countryAllocation`) — [countryCode] n'est jamais effacé pour
+  /// autant, il sert de repli si la répartition est un jour vidée.
+  final List<CountryWeight> countryBreakdown;
+
+  /// Répartition sectorielle pondérée pour un ETF/fonds multi-secteurs —
+  /// même principe que [countryBreakdown], voir [SectorWeight] et [sector].
+  final List<SectorWeight> sectorBreakdown;
+
   /// Variante d'un investissement `privateEquity`, pertinente seulement pour
   /// cette classe — voir [PrivateEquityKind] (immuable après création,
   /// contrairement à [fundStyle]/[realEstateType]).
@@ -721,6 +956,10 @@ class Investment {
     this.assetClass,
     this.realEstateType,
     this.fundStyle,
+    this.sector,
+    this.countryCode,
+    this.countryBreakdown = const [],
+    this.sectorBreakdown = const [],
     this.privateEquityKind,
     this.vestingCliffMonths,
     this.vestingDurationMonths,
@@ -754,6 +993,10 @@ class Investment {
     AssetClass? assetClass,
     RealEstateType? realEstateType,
     FundStyle? fundStyle,
+    Sector? sector,
+    String? countryCode,
+    List<CountryWeight>? countryBreakdown,
+    List<SectorWeight>? sectorBreakdown,
     PrivateEquityKind? privateEquityKind,
     int? vestingCliffMonths,
     int? vestingDurationMonths,
@@ -788,6 +1031,10 @@ class Investment {
     assetClass: assetClass ?? this.assetClass,
     realEstateType: realEstateType ?? this.realEstateType,
     fundStyle: fundStyle ?? this.fundStyle,
+    sector: sector ?? this.sector,
+    countryCode: countryCode ?? this.countryCode,
+    countryBreakdown: countryBreakdown ?? this.countryBreakdown,
+    sectorBreakdown: sectorBreakdown ?? this.sectorBreakdown,
     privateEquityKind: privateEquityKind ?? this.privateEquityKind,
     vestingCliffMonths: vestingCliffMonths ?? this.vestingCliffMonths,
     vestingDurationMonths: vestingDurationMonths ?? this.vestingDurationMonths,
@@ -932,6 +1179,14 @@ class Investment {
         : null,
     realEstateType: RealEstateType.fromName(json['realEstateType'] as String?),
     fundStyle: FundStyle.fromName(json['fundStyle'] as String?),
+    sector: Sector.fromName(json['sector'] as String?),
+    countryCode: json['countryCode'] as String?,
+    countryBreakdown: (json['countryBreakdown'] as List? ?? [])
+        .map((e) => CountryWeight.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    sectorBreakdown: (json['sectorBreakdown'] as List? ?? [])
+        .map((e) => SectorWeight.fromJson(e as Map<String, dynamic>))
+        .toList(),
     privateEquityKind: PrivateEquityKind.fromName(
       json['privateEquityKind'] as String?,
     ),
@@ -989,6 +1244,12 @@ class Investment {
     if (assetClass != null) 'assetClass': assetClass!.name,
     if (realEstateType != null) 'realEstateType': realEstateType!.name,
     if (fundStyle != null) 'fundStyle': fundStyle!.name,
+    if (sector != null) 'sector': sector!.name,
+    if (countryCode != null) 'countryCode': countryCode,
+    if (countryBreakdown.isNotEmpty)
+      'countryBreakdown': countryBreakdown.map((c) => c.toJson()).toList(),
+    if (sectorBreakdown.isNotEmpty)
+      'sectorBreakdown': sectorBreakdown.map((s) => s.toJson()).toList(),
     if (privateEquityKind != null)
       'privateEquityKind': privateEquityKind!.name,
     if (vestingCliffMonths != null) 'vestingCliffMonths': vestingCliffMonths,

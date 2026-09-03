@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../core/storage/vault_folder_service.dart';
+import '../../core/ui/vault_kind_selector.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final VaultFolderService vaultFolderService;
@@ -18,6 +19,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _loading = false;
   String? _error;
+  VaultKind _kind = VaultKind.personal;
 
   Future<void> _pick() async {
     setState(() {
@@ -25,7 +27,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _error = null;
     });
     try {
-      final path = await widget.vaultFolderService.pickAndCreateVaultFolder();
+      final path = await widget.vaultFolderService.pickAndCreateVaultFolder(
+        kind: _kind,
+      );
       if (path == null) {
         setState(() => _loading = false);
         return;
@@ -65,7 +69,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   'Choisis où seront stockées tes données. Tu peux commencer en local et déplacer ce dossier vers un service cloud (iCloud, Google Drive, Dropbox...) plus tard.',
                   textAlign: TextAlign.center,
                 ).muted(),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+                const Text('Ce coffre-fort est...').small().medium(),
+                const SizedBox(height: 8),
+                VaultKindSelector(
+                  value: _kind,
+                  onChanged: (kind) => setState(() => _kind = kind),
+                ),
+                const SizedBox(height: 24),
                 PrimaryButton(
                   onPressed: _loading ? null : _pick,
                   leading: _loading

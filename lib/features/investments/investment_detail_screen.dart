@@ -107,6 +107,10 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   final _editIsinController = TextEditingController();
   final _editLabelController = TextEditingController();
   FundStyle? _editFundStyle;
+  Sector? _editSector;
+  List<SectorWeight> _editSectorBreakdown = const [];
+  String? _editCountryCode;
+  List<CountryWeight> _editCountryBreakdown = const [];
 
   @override
   void initState() {
@@ -473,6 +477,10 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
           : widget.investment.isin;
       _editLabelController.text = widget.investment.label;
       _editFundStyle = widget.investment.fundStyle;
+      _editSector = widget.investment.sector;
+      _editSectorBreakdown = widget.investment.sectorBreakdown;
+      _editCountryCode = widget.investment.countryCode;
+      _editCountryBreakdown = widget.investment.countryBreakdown;
     });
   }
 
@@ -529,6 +537,10 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       assetClass: widget.investment.assetClass,
       realEstateType: widget.investment.realEstateType,
       fundStyle: _editFundStyle,
+      sector: _editSector,
+      sectorBreakdown: _editSectorBreakdown,
+      countryCode: _editCountryCode,
+      countryBreakdown: _editCountryBreakdown,
       surfaceM2: widget.investment.surfaceM2,
       addressLabel: widget.investment.addressLabel,
       addressCityCode: widget.investment.addressCityCode,
@@ -894,6 +906,18 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               fundStyle: _editFundStyle,
               onFundStyleChanged: (style) =>
                   setState(() => _editFundStyle = style),
+              sector: _editSector,
+              onSectorChanged: (value) =>
+                  setState(() => _editSector = value),
+              sectorBreakdown: _editSectorBreakdown,
+              onSectorBreakdownChanged: (value) =>
+                  setState(() => _editSectorBreakdown = value),
+              countryCode: _editCountryCode,
+              onCountryCodeChanged: (value) =>
+                  setState(() => _editCountryCode = value),
+              countryBreakdown: _editCountryBreakdown,
+              onCountryBreakdownChanged: (value) =>
+                  setState(() => _editCountryBreakdown = value),
               // Cet écran est réservé à l'immobilier (voir sa doc de tête) :
               // le Private Equity ne l'atteint jamais, ces callbacks ne sont
               // donc jamais appelés en pratique.
@@ -942,9 +966,20 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             ],
             if (!_isImmobilier &&
                 !_isCurrency &&
-                investment.fundStyle != null) ...[
+                (investment.fundStyle != null ||
+                    investment.sector != null ||
+                    investment.countryCode != null)) ...[
               const SizedBox(height: 4),
-              shadcn.Text(investment.fundStyle!.label).muted().small(),
+              shadcn.Text(
+                [
+                  if (investment.fundStyle != null)
+                    investment.fundStyle!.label,
+                  if (investment.sector != null) investment.sector!.label,
+                  if (investment.countryCode != null)
+                    kInvestmentCountries[investment.countryCode] ??
+                        investment.countryCode!,
+                ].join(' · '),
+              ).muted().small(),
             ],
           ],
           const SizedBox(height: 12),

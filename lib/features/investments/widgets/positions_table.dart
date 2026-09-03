@@ -12,6 +12,8 @@ import '../leveraged_position.dart';
 import '../real_patrimoine_adapter.dart'
     show periodReturnFor, periodValueChangeFor;
 import '../yahoo_finance_client.dart' show PricePoint;
+import 'asset_classification_badges.dart'
+    show CountryFlagBadge, MultiCountryBadge, MultiSectorBadge, SectorBadge;
 import 'leveraged_position_dialog.dart';
 import 'transaction_widgets.dart' show ExcludedFromPatrimoineBadge;
 
@@ -639,10 +641,28 @@ class _PositionLine extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Flexible(
-                          child: shadcn.Text(
-                            investment.label,
-                          ).medium().small(),
+                          child: shadcn.Text(investment.label).medium().small(),
                         ),
+                        if (investment.countryBreakdown.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          MultiCountryBadge(
+                            breakdown: investment.countryBreakdown,
+                          ),
+                        ] else if (investment.countryCode != null) ...[
+                          const SizedBox(width: 6),
+                          CountryFlagBadge(
+                            countryCode: investment.countryCode!,
+                          ),
+                        ],
+                        if (investment.sectorBreakdown.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          MultiSectorBadge(
+                            breakdown: investment.sectorBreakdown,
+                          ),
+                        ] else if (investment.sector != null) ...[
+                          const SizedBox(width: 4),
+                          SectorBadge(sector: investment.sector!),
+                        ],
                         if (investment.excludedFromPatrimoine) ...[
                           const SizedBox(width: 6),
                           const ExcludedFromPatrimoineBadge(),

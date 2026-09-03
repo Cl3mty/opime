@@ -558,6 +558,152 @@ void main() {
     });
   });
 
+  group('sectorAllocation', () {
+    Investment stock(String isin, Sector? sector) => Investment(
+      isin: isin,
+      label: isin,
+      transactions: const [],
+      sector: sector,
+    );
+
+    test('mix classé/non classé : les pourcentages somment à 100', () {
+      final investments = [
+        stock('A', Sector.technologie),
+        stock('B', Sector.sante),
+        stock('C', null),
+      ];
+      final values = {'A': 600.0, 'B': 300.0, 'C': 100.0};
+      final allocation = sectorAllocation(
+        investments,
+        valueOf: (i) => values[i.isin]!,
+      );
+
+      expect(allocation[Sector.technologie], closeTo(60, 1e-9));
+      expect(allocation[Sector.sante], closeTo(30, 1e-9));
+      expect(allocation[null], closeTo(10, 1e-9));
+      expect(
+        allocation.values.reduce((a, b) => a + b),
+        closeTo(100, 1e-9),
+      );
+    });
+
+    test('liste vide : répartition vide', () {
+      expect(sectorAllocation(const [], valueOf: (_) => 0), isEmpty);
+    });
+
+    test('investissement sans valorisation connue est ignoré', () {
+      final investments = [stock('A', Sector.technologie)];
+      final allocation = sectorAllocation(investments, valueOf: (_) => 0);
+      expect(allocation, isEmpty);
+    });
+
+    test(
+      'sectorBreakdown (ETF multi-secteurs) ventile sa valeur sur chaque '
+      'entrée, le reliquat non couvert tombe dans "non classé"',
+      () {
+        final etf = Investment(
+          isin: 'ETF',
+          label: 'ETF',
+          transactions: const [],
+          sectorBreakdown: [
+            SectorWeight(sector: Sector.technologie, percent: 60),
+            SectorWeight(sector: Sector.sante, percent: 20),
+          ],
+        );
+        final allocation = sectorAllocation([etf], valueOf: (_) => 1000);
+
+        expect(allocation[Sector.technologie], closeTo(60, 1e-9));
+        expect(allocation[Sector.sante], closeTo(20, 1e-9));
+        // 100 % - (60 % + 20 %) = 20 % non couvert -> "non classé".
+        expect(allocation[null], closeTo(20, 1e-9));
+        expect(
+          allocation.values.reduce((a, b) => a + b),
+          closeTo(100, 1e-9),
+        );
+      },
+    );
+
+    test(
+      'sectorBreakdown dont la somme dépasse 100 % ne produit aucun '
+      'reliquat négatif',
+      () {
+        final etf = Investment(
+          isin: 'ETF',
+          label: 'ETF',
+          transactions: const [],
+          sectorBreakdown: [
+            SectorWeight(sector: Sector.technologie, percent: 70),
+            SectorWeight(sector: Sector.sante, percent: 50),
+          ],
+        );
+        final allocation = sectorAllocation([etf], valueOf: (_) => 1000);
+
+        expect(allocation.containsKey(null), isFalse);
+      },
+    );
+  });
+
+  group('countryAllocation', () {
+    Investment stock(String isin, String? countryCode) => Investment(
+      isin: isin,
+      label: isin,
+      transactions: const [],
+      countryCode: countryCode,
+    );
+
+    test('mix classé/non classé : les pourcentages somment à 100', () {
+      final investments = [
+        stock('A', 'FR'),
+        stock('B', 'US'),
+        stock('C', null),
+      ];
+      final values = {'A': 600.0, 'B': 300.0, 'C': 100.0};
+      final allocation = countryAllocation(
+        investments,
+        valueOf: (i) => values[i.isin]!,
+      );
+
+      expect(allocation['FR'], closeTo(60, 1e-9));
+      expect(allocation['US'], closeTo(30, 1e-9));
+      expect(allocation[null], closeTo(10, 1e-9));
+      expect(
+        allocation.values.reduce((a, b) => a + b),
+        closeTo(100, 1e-9),
+      );
+    });
+
+    test('liste vide : répartition vide', () {
+      expect(countryAllocation(const [], valueOf: (_) => 0), isEmpty);
+    });
+
+    test('investissement sans valorisation connue est ignoré', () {
+      final investments = [stock('A', 'FR')];
+      final allocation = countryAllocation(investments, valueOf: (_) => 0);
+      expect(allocation, isEmpty);
+    });
+
+    test(
+      'countryBreakdown (ETF multi-pays) ventile sa valeur sur chaque '
+      'entrée, le reliquat non couvert tombe dans "non classé"',
+      () {
+        final etf = Investment(
+          isin: 'ETF',
+          label: 'ETF',
+          transactions: const [],
+          countryBreakdown: [
+            CountryWeight(countryCode: 'US', percent: 65),
+            CountryWeight(countryCode: 'FR', percent: 15),
+          ],
+        );
+        final allocation = countryAllocation([etf], valueOf: (_) => 1000);
+
+        expect(allocation['US'], closeTo(65, 1e-9));
+        expect(allocation['FR'], closeTo(15, 1e-9));
+        expect(allocation[null], closeTo(20, 1e-9));
+      },
+    );
+  });
+
   group('calculateTri', () {
     test('délègue à calculateMwr sur les transactions concaténées', () {
       final transactions = [

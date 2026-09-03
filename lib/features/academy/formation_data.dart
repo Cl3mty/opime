@@ -375,6 +375,159 @@ const _immobilierSteps = [
   ),
 ];
 
+const _structurationSteps = [
+  AcademyStep(
+    id: 'formation_structuration_statuts',
+    title: 'Les statuts d\'entreprise',
+    level: AcademyLevel.avance,
+    tagline:
+        'Le statut juridique détermine votre fiscalité, votre protection et votre régime social.',
+    bullets: [
+      'Entreprise individuelle (EI) : pas de société distincte, revenus imposés directement à l\'IR ; le patrimoine personnel reste en principe protégé depuis 2022.',
+      'EURL/SARL, SASU/SAS : sociétés à part entière, responsabilité limitée aux apports, imposées à l\'impôt sur les sociétés (IS) par défaut.',
+      'Dirigeant de SASU/SAS : régime social "assimilé salarié", plus protecteur mais plus coûteux que celui du gérant majoritaire d\'EURL/SARL (travailleur indépendant).',
+      'Le bon statut dépend du projet (seul ou à plusieurs, besoin de lever des fonds, régime social souhaité) — pas seulement de la fiscalité.',
+    ],
+    vocabulary: [
+      GlossaryTerm(
+        term: 'IS (impôt sur les sociétés)',
+        definition:
+            'Impôt prélevé sur le bénéfice d\'une société, avant toute distribution aux associés.',
+      ),
+      GlossaryTerm(
+        term: 'Assimilé salarié',
+        definition:
+            'Régime social du dirigeant de SASU/SAS, proche de celui d\'un salarié classique (hors assurance chômage).',
+      ),
+    ],
+  ),
+  AcademyStep(
+    id: 'formation_structuration_holding',
+    title: 'La holding',
+    level: AcademyLevel.avance,
+    tagline:
+        'Une société qui détient d\'autres sociétés, pour mutualiser et réinvestir sans frottement fiscal.',
+    bullets: [
+      'Une holding détient des parts ou actions d\'une ou plusieurs sociétés opérationnelles, plutôt que de les détenir en direct.',
+      'Le régime mère-fille permet de faire remonter les dividendes des filiales vers la holding avec une fiscalité très réduite.',
+      'Les bénéfices peuvent ainsi être réinvestis dans d\'autres projets sans passer d\'abord par le patrimoine personnel — et sa fiscalité immédiate.',
+      'Utile pour organiser une transmission ou mutualiser une trésorerie entre plusieurs sociétés — pas un outil pour un patrimoine simple.',
+    ],
+    vocabulary: [
+      GlossaryTerm(
+        term: 'Holding',
+        definition:
+            'Société dont l\'objet est de détenir des participations dans d\'autres sociétés.',
+      ),
+      GlossaryTerm(
+        term: 'Régime mère-fille',
+        definition:
+            'Régime fiscal réduisant fortement l\'imposition des dividendes remontés d\'une filiale vers sa société mère.',
+      ),
+    ],
+    takeaway:
+        'La holding n\'est pas un produit fiscal magique : elle a un coût de mise en place et de gestion, à mettre en regard du projet.',
+  ),
+  AcademyStep(
+    id: 'formation_structuration_sci',
+    title: 'La SCI',
+    level: AcademyLevel.avance,
+    tagline: 'Détenir et transmettre un bien immobilier à plusieurs, part par part.',
+    bullets: [
+      'Une SCI (société civile immobilière) détient un ou plusieurs biens ; les associés détiennent des parts sociales, pas le bien directement.',
+      'À l\'IR (régime par défaut) : les loyers sont imposés comme des revenus fonciers classiques, entre les mains des associés.',
+      'À l\'IS (sur option) : la société peut amortir le bien, réduisant le résultat imposable — mais la plus-value de revente devient moins favorable qu\'en détention directe.',
+      'Transmettre des parts de SCI aux enfants, progressivement, est souvent plus simple à organiser qu\'un bien détenu en indivision.',
+    ],
+    vocabulary: [
+      GlossaryTerm(
+        term: 'SCI',
+        definition:
+            'Société civile qui détient un ou plusieurs biens immobiliers pour le compte de ses associés.',
+      ),
+      GlossaryTerm(
+        term: 'Indivision',
+        definition:
+            'Situation où plusieurs personnes détiennent ensemble un même bien, sans division en parts.',
+      ),
+    ],
+  ),
+  AcademyStep(
+    id: 'formation_structuration_dutreil',
+    title: 'Le pacte Dutreil',
+    level: AcademyLevel.avance,
+    tagline: 'Transmettre une entreprise familiale avec un abattement de 75 % sur sa valeur.',
+    bullets: [
+      'Réservé à la transmission (donation ou succession) de titres d\'une société ayant une activité opérationnelle — pas une simple société de gestion de patrimoine.',
+      'Exonération de 75 % de la valeur des titres transmis, sous engagement collectif puis individuel de conservation des titres pendant plusieurs années.',
+      'L\'un des bénéficiaires doit poursuivre une fonction de direction dans la société pendant plusieurs années après la transmission.',
+      'Un dispositif puissant mais engageant : rompre l\'engagement de conservation fait perdre l\'avantage fiscal, avec rappel d\'impôt.',
+    ],
+    vocabulary: [
+      GlossaryTerm(
+        term: 'Pacte Dutreil',
+        definition:
+            'Dispositif fiscal réduisant de 75 % la valeur taxable de titres d\'entreprise transmis, sous engagement de conservation.',
+      ),
+      GlossaryTerm(
+        term: 'Engagement collectif de conservation',
+        definition:
+            'Engagement pris par plusieurs associés de conserver leurs titres pendant une durée minimale, condition du pacte Dutreil.',
+      ),
+    ],
+  ),
+  AcademyStep(
+    id: 'formation_structuration_demembrement',
+    title: 'Le démembrement de propriété',
+    level: AcademyLevel.avance,
+    tagline: 'Séparer l\'usage d\'un bien (usufruit) de sa pleine propriété (nue-propriété).',
+    bullets: [
+      'La pleine propriété se divise en usufruit (droit d\'usage et d\'en percevoir les revenus) et nue-propriété (droit de disposer du bien, sans en jouir).',
+      'Transmettre la nue-propriété tout en gardant l\'usufruit réduit fortement les droits de donation, calculés sur la seule valeur de la nue-propriété.',
+      'À l\'extinction de l\'usufruit (souvent au décès de l\'usufruitier), le nu-propriétaire récupère la pleine propriété sans droits supplémentaires.',
+      'Simulations > Transmission calcule cette répartition usufruit/nue-propriété selon l\'âge de l\'usufruitier, et son impact sur les droits de donation.',
+    ],
+    vocabulary: [
+      GlossaryTerm(
+        term: 'Usufruit',
+        definition:
+            'Droit d\'utiliser un bien et d\'en percevoir les revenus, sans en être pleinement propriétaire.',
+      ),
+      GlossaryTerm(
+        term: 'Nue-propriété',
+        definition:
+            'Droit de disposer d\'un bien (le vendre, le transmettre) sans pouvoir l\'utiliser ni en percevoir les revenus.',
+      ),
+    ],
+  ),
+  AcademyStep(
+    id: 'formation_structuration_donation',
+    title: 'Les donations',
+    level: AcademyLevel.avance,
+    tagline: 'Transmettre de son vivant, en profitant d\'abattements renouvelables.',
+    bullets: [
+      'Chaque parent peut donner jusqu\'à 100 000 € par enfant tous les 15 ans, sans droits de donation.',
+      'Des abattements spécifiques existent aussi pour les petits-enfants, le conjoint/partenaire de PACS, et entre frères et sœurs.',
+      'Une donation-partage répartit les biens entre héritiers de son vivant, en figeant leur valeur au jour de la donation pour la succession à venir.',
+      'Simulations > Transmission calcule les droits dus selon le lien de parenté et le montant donné.',
+    ],
+    vocabulary: [
+      GlossaryTerm(
+        term: 'Abattement',
+        definition:
+            'Montant déduit de la valeur transmise avant calcul des droits de donation ou de succession.',
+      ),
+      GlossaryTerm(
+        term: 'Donation-partage',
+        definition:
+            'Donation qui répartit et fige, de son vivant, la valeur des biens transmis entre plusieurs héritiers.',
+      ),
+    ],
+    takeaway:
+        'Ces dispositifs se combinent (SCI démembrée, holding avec pacte Dutreil...) : une vue d\'ensemble mérite l\'avis d\'un notaire ou d\'un conseiller patrimonial.',
+  ),
+];
+
 const formationTracks = [
   AcademyTrack(
     id: 'formation_bourse',
@@ -403,5 +556,13 @@ const formationTracks = [
     description: 'Locatif direct, SCPI, effet de levier et fiscalité.',
     icon: LucideIcons.house,
     steps: _immobilierSteps,
+  ),
+  AcademyTrack(
+    id: 'formation_structuration',
+    title: 'Structuration patrimoniale',
+    description:
+        'Statuts d\'entreprise, holding, SCI, pacte Dutreil, démembrement et donation.',
+    icon: LucideIcons.network,
+    steps: _structurationSteps,
   ),
 ];

@@ -146,4 +146,14 @@ void main() {
       expect(trigger.selected, isTrue);
     },
   );
+
+  testWidgets(
+    'le groupe "Entités" n\'a pas de nav dédiée — repliée dans le Dashboard '
+    '(voir entities_patrimoine_adapter.dart), elle n\'apparaît plus jamais '
+    'dans la sidebar',
+    (tester) async {
+      await pumpSidebar(tester, collapsed: false, onSelect: (_) {});
+      expect(find.text('Entités'), findsNothing);
+    },
+  );
 }

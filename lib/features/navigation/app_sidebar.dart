@@ -351,6 +351,14 @@ class AppSidebar extends StatelessWidget {
           ],
           children: [
             _buildGroup(context, patrimoineGroup, hiddenKeys),
+            // Le module Entités (holdings, sociétés commerciales, SCI,
+            // comptes pro — voir `features/entities/`) n'a pas de groupe de
+            // navigation propre : pour un coffre-fort professionnel, sa
+            // catégorie apparaît directement dans le Dashboard (Allocation/
+            // répartition Actifs), au même titre que les classes réelles —
+            // voir `entities_patrimoine_adapter.dart`. `entitesGroup` reste
+            // déclaré dans `nav_models.dart` pour que le fil d'Ariane/titre
+            // de la page `'entites'` continue de se résoudre en drill-down.
             const NavigationDivider(),
             _buildGroup(context, academieGroup, hiddenKeys),
             const NavigationDivider(),

@@ -33,6 +33,7 @@ import 'core/ui/load_error_view.dart';
 import 'core/ui/mobile_orientation.dart';
 import 'features/analyses/analyses_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/entities/entities_screen.dart';
 import 'features/dashboard/onboarding_highlight_controller.dart';
 import 'features/projects/projects_screen.dart';
 import 'features/investments/current_account_focus_controller.dart';
@@ -155,6 +156,13 @@ class _OpimeAppState extends State<OpimeApp> {
 
   bool _checkingVault = true;
   String? _vaultPath;
+
+  /// Personnel/professionnel du coffre-fort actif (voir [VaultKind]) —
+  /// résolu en même temps que [_vaultPath] à chaque activation/changement
+  /// de coffre-fort, transmis jusqu'à `AppShell`/`AppSidebar` pour n'y
+  /// afficher le groupe de navigation "Entités" que pour un coffre-fort
+  /// professionnel. Personnel par défaut avant toute résolution.
+  VaultKind _vaultKind = VaultKind.personal;
   ProfileController? _profileController;
   SidebarPrefsController? _sidebarPrefsController;
   Object? _profilesLoadError;
@@ -260,7 +268,7 @@ class _OpimeAppState extends State<OpimeApp> {
             leading: const Icon(LucideIcons.circlePause, size: 18),
             title: const Text('Réponse interrompue'),
             subtitle: const Text(
-              'Le profil ou le vault a changé pendant la génération.',
+              'Le profil ou le coffre-fort a changé pendant la génération.',
             ),
           ),
         ),
@@ -299,6 +307,16 @@ class _OpimeAppState extends State<OpimeApp> {
   }
 
   Future<void> _initProfiles(String vaultPath) async {
+    // Résolu séparément du reste de cette fonction (qui a plusieurs
+    // retours anticipés selon l'état du vault — migration interrompue,
+    // verrouillé...) : le type personnel/professionnel doit être à jour
+    // dans tous les cas, pas seulement le chemin "chargement normal" tout
+    // en bas.
+    final activeVault = await _vaultFolderService.getActiveVault();
+    if (mounted && activeVault?.vaultPath == vaultPath) {
+      setState(() => _vaultKind = activeVault!.kind);
+    }
+
     // Priorité absolue sur tout le reste, chiffré ou non : une migration
     // interrompue peut avoir laissé des fichiers privés dans un état mixte
     // (voir `VaultMigrationMarker`) — mieux vaut bloquer explicitement que
@@ -316,7 +334,7 @@ class _OpimeAppState extends State<OpimeApp> {
     }
 
     // Changement de vault pendant qu'une clé d'un AUTRE vault était encore
-    // posée (ex : "Changer de dossier de vault" depuis l'écran de
+    // posée (ex : "Changer de dossier du coffre-fort" depuis l'écran de
     // déverrouillage, ou changement de vault actif depuis les Réglages) :
     // sans cette invalidation, les repositories du nouveau vault
     // hériteraient de la clé de l'ancien via VaultSession.current, ce qui
@@ -459,6 +477,7 @@ class _OpimeAppState extends State<OpimeApp> {
     VaultSession.vaultPath = null;
     setState(() {
       _vaultPath = null;
+      _vaultKind = VaultKind.personal;
       _profileController = null;
       _sidebarPrefsController = null;
       _vaultEncryptionMetadata = null;
@@ -613,14 +632,14 @@ class _OpimeAppState extends State<OpimeApp> {
     final String title;
     final String subtitle;
     if (_vaultLocked) {
-      title = 'Vault verrouillé';
-      subtitle = "Déverrouille ton vault avant d'exporter.";
+      title = 'Coffre-fort verrouillé';
+      subtitle = "Déverrouille ton coffre-fort avant d'exporter.";
     } else if (_vaultMigrationInterrupted) {
       title = 'Migration en attente';
-      subtitle = "Termine la migration du vault avant d'exporter.";
+      subtitle = "Termine la migration du coffre-fort avant d'exporter.";
     } else {
       title = 'Aucun profil chargé';
-      subtitle = 'Réessaie une fois le vault chargé.';
+      subtitle = 'Réessaie une fois le coffre-fort chargé.';
     }
     showToast(
       context: context,
@@ -676,8 +695,8 @@ class _OpimeAppState extends State<OpimeApp> {
       return Scaffold(
         child: LoadErrorView(
           message:
-              'Impossible de charger les profils. Le dossier Vault est '
-              'peut-être encore en cours de synchronisation.',
+              'Impossible de charger les profils. Le dossier Coffre-fort '
+              'est peut-être encore en cours de synchronisation.',
           onRetry: _retryInitProfiles,
         ),
       );
@@ -718,6 +737,7 @@ class _OpimeAppState extends State<OpimeApp> {
                 refreshSignal: _patrimoineRefreshController,
                 priceSyncStatus: _priceSyncStatusController,
                 onboardingHighlight: _onboardingHighlightController,
+                vaultKind: _vaultKind,
               ),
               'analyses': (_) => AnalysesScreen(
                 key: ValueKey(_profileController!.activeDataPath),
@@ -725,6 +745,13 @@ class _OpimeAppState extends State<OpimeApp> {
                 amountVisibility: _amountVisibilityController,
               ),
               'projets': (_) => ProjectsScreen(
+                key: ValueKey(_profileController!.activeDataPath),
+                vaultPath: _profileController!.activeDataPath,
+              ),
+              // Toujours enregistrée — c'est l'entrée de nav
+              // (`app_sidebar.dart`) qui reste masquée pour un
+              // coffre-fort personnel, pas cette page.
+              'entites': (_) => EntitiesScreen(
                 key: ValueKey(_profileController!.activeDataPath),
                 vaultPath: _profileController!.activeDataPath,
               ),
