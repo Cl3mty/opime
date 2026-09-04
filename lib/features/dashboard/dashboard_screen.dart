@@ -172,12 +172,12 @@ class _RealDashboardState extends State<_RealDashboard> {
   }
 
   Future<void> _loadFromDisk() async {
-    final accounts = await _repo.listAll();
+    final allAccounts = await _repo.listAll();
     final priceHistories = await loadAllPriceHistories(
       widget.vaultPath,
-      accounts,
+      allAccounts,
     );
-    final liabilities = await _liabilitiesRepo.listAll();
+    final allLiabilities = await _liabilitiesRepo.listAll();
     // Uniquement pour un coffre-fort professionnel (voir `VaultKind`) — un
     // coffre-fort personnel n'a pas accès au module Entités, inutile de
     // lire un fichier qui n'existe jamais pour lui.
@@ -185,6 +185,14 @@ class _RealDashboardState extends State<_RealDashboard> {
         ? await EntityRepository(widget.vaultPath).listAll()
         : const <BusinessEntity>[];
     if (!mounted) return;
+    // Un compte/passif rattaché à une entité (`entityId` non nul) est
+    // consolidé sous "Entités professionnelles" (voir `entities_patrimoine
+    // _adapter.dart`), pas sous les catégories personnelles habituelles —
+    // sinon il compterait deux fois dans le patrimoine net affiché.
+    final accounts = allAccounts.where((a) => a.entityId == null).toList();
+    final liabilities = allLiabilities
+        .where((l) => l.entityId == null)
+        .toList();
     // Aucun compte avec au moins un investissement, aucun passif, et aucune
     // entité professionnelle : rien à montrer dans les cartes habituelles,
     // voir [DashboardOnboardingView] et [OnboardingHighlightController] —
@@ -207,10 +215,17 @@ class _RealDashboardState extends State<_RealDashboard> {
       );
       // Une seule ligne par entité (pas de distinction "par compte/par
       // investissement" comme pour les classes réelles) : la même catégorie
-      // sert aux deux vues.
+      // sert aux deux vues. Comptes/passifs rattachés à une entité
+      // (`entityId` non nul), pas ceux déjà filtrés ci-dessus.
+      final entityAccounts = allAccounts
+          .where((a) => a.entityId != null)
+          .toList();
+      final entityLiabilities = allLiabilities
+          .where((l) => l.entityId != null)
+          .toList();
       final entitiesCategory = entities.isEmpty
           ? null
-          : buildEntitiesCategory(entities);
+          : buildEntitiesCategory(entities, entityAccounts, entityLiabilities);
       _categories = [
         ...buildAllRealCategories(accounts, priceHistories, widget.vaultPath),
         ?entitiesCategory,

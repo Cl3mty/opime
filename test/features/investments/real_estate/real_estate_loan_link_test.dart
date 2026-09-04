@@ -6,6 +6,7 @@ import 'package:opime/features/investments/real_estate/real_estate_loan_link.dar
 import 'package:opime/features/liabilities/liabilities_models.dart';
 import 'package:opime/features/liabilities/liabilities_repository.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   late Directory tempDir;
@@ -18,6 +19,13 @@ void main() {
     );
     repo = LiabilitiesRepository(tempDir.path);
     refreshController = PatrimoineRefreshController();
+    // `showCompletePatrimoineDialog` (ouvert par "Créer un prêt
+    // immobilier"/"Créer un crédit travaux") résout le `VaultKind` du
+    // coffre-fort actif via `VaultFolderService`/`SharedPreferences` — sans
+    // mock, aucun coffre-fort enregistré, `_vaultKind` retombe sur
+    // `personal` (comportement inchangé ici, cette section n'ouvre jamais
+    // le wizard sur un coffre-fort pro).
+    SharedPreferences.setMockInitialValues({});
   });
 
   tearDown(() async {

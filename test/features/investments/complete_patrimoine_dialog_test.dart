@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/storage/vault_folder_service.dart';
+import 'package:opime/features/entities/entities_models.dart';
+import 'package:opime/features/entities/entities_repository.dart';
 import 'package:opime/features/investments/complete_patrimoine_dialog.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
@@ -8,6 +12,7 @@ import 'package:opime/features/liabilities/liabilities_models.dart';
 import 'package:opime/features/liabilities/liabilities_repository.dart';
 import 'package:opime/features/simulations/loan_calculator.dart' show DeferType;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   late Directory tempDir;
@@ -16,6 +21,14 @@ void main() {
     tempDir = await Directory.systemTemp.createTemp(
       'opime_complete_patrimoine_test_',
     );
+    // `_load` résout maintenant le `VaultKind` du coffre-fort actif (voir
+    // la 3e tuile "Une entité professionnelle" de `_KindStep`) via
+    // `VaultFolderService`, qui lit `SharedPreferences` — sans mock, aucun
+    // coffre-fort enregistré : `getActiveVault()` retourne `null`,
+    // `_vaultKind` retombe sur `personal` (comportement inchangé pour tous
+    // les tests qui ne testent pas explicitement un coffre-fort pro, voir
+    // ci-dessous).
+    SharedPreferences.setMockInitialValues({});
   });
 
   tearDown(() async {
@@ -1075,4 +1088,277 @@ void main() {
       );
     },
   );
+
+  group('Étape préalable "À qui appartient ceci ?" (coffre-fort pro)', () {
+    Map<String, dynamic> vaultJson({
+      required String id,
+      required String path,
+      required VaultKind kind,
+    }) => {
+      'id': id,
+      'name': 'Vault',
+      'vaultPath': path,
+      'bookmarkData': null,
+      'bookmarkTargetsVault': false,
+      'kind': kind.name,
+    };
+
+    void setProfessionalVault() {
+      SharedPreferences.setMockInitialValues({
+        'saved_vaults_json': jsonEncode([
+          vaultJson(id: 'a', path: tempDir.path, kind: VaultKind.professional),
+        ]),
+        'active_vault_id': 'a',
+      });
+    }
+
+    Future<void> pumpDialogOpen(
+      WidgetTester tester, {
+      required String awaitedText,
+    }) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          home: Scaffold(
+            child: Builder(
+              builder: (context) => GestureDetector(
+                onTap: () => showCompletePatrimoineDialog(
+                  context,
+                  vaultPath: tempDir.path,
+                  onCompleted: () {},
+                ),
+                child: const Text('OPEN'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('OPEN'));
+      await tester.pump();
+      await tester.runAsync(() async {
+        for (var i = 0; i < 40; i++) {
+          if (find.text(awaitedText).evaluate().isNotEmpty) return;
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+        }
+      });
+    }
+
+    testWidgets(
+      'coffre-fort personnel (par défaut, aucun coffre-fort enregistré) : '
+      'le flux démarre directement sur "Que voulez-vous compléter ?", pas '
+      'd\'étape préalable',
+      (tester) async {
+        await pumpDialogOpen(
+          tester,
+          awaitedText: 'Que voulez-vous compléter ?',
+        );
+
+        expect(find.text('Un actif'), findsOneWidget);
+        expect(find.text('Un passif'), findsOneWidget);
+        expect(find.text('À qui appartient ceci ?'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'coffre-fort professionnel, aucune entité encore créée : le flux '
+      'démarre sur "À qui appartient ceci ?", seule option "Nouvelle '
+      'entité"',
+      (tester) async {
+        setProfessionalVault();
+
+        await pumpDialogOpen(
+          tester,
+          awaitedText: 'À qui appartient ceci ?',
+        );
+
+        expect(find.text('Nouvelle entité'), findsOneWidget);
+        // Pas de choix "Moi (personnel)" — sur un coffre-fort pro, tout
+        // nouveau compte/passif appartient obligatoirement à une entité.
+        expect(find.text('Moi (personnel)'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'coffre-fort professionnel avec une entité existante : elle apparaît '
+      'comme tuile, la sélectionner passe directement à "Que voulez-vous '
+      'compléter ?"',
+      (tester) async {
+        setProfessionalVault();
+        await tester.runAsync(
+          () => EntityRepository(tempDir.path).saveEntity(
+            const BusinessEntity(
+              id: 'e1',
+              name: 'Holding Dupont',
+              type: EntityType.holding,
+              ownershipPercent: 100,
+            ),
+          ),
+        );
+
+        await pumpDialogOpen(
+          tester,
+          awaitedText: 'À qui appartient ceci ?',
+        );
+
+        expect(find.text('Holding Dupont'), findsOneWidget);
+
+        await tester.tap(find.text('Holding Dupont'));
+        await tester.pump();
+
+        expect(find.text('Que voulez-vous compléter ?'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'créer une nouvelle entité depuis l\'étape préalable l\'enregistre '
+      'puis continue le flux sur "Que voulez-vous compléter ?" (pas de '
+      'fermeture du wizard, contrairement à une simple création d\'entité)',
+      (tester) async {
+        setProfessionalVault();
+
+        await pumpDialogOpen(
+          tester,
+          awaitedText: 'À qui appartient ceci ?',
+        );
+        await tester.tap(find.text('Nouvelle entité'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Nouvelle entité'), findsWidgets);
+
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Nom (ex : Holding Dupont)'),
+          'Holding Dupont',
+        );
+        await tester.pump();
+
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Enregistrer'));
+          for (var i = 0; i < 20; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+        });
+
+        expect(find.text('Que voulez-vous compléter ?'), findsOneWidget);
+
+        final saved = await tester.runAsync(
+          () => EntityRepository(tempDir.path).listAll(),
+        );
+        expect(saved!.single.name, 'Holding Dupont');
+      },
+    );
+
+    testWidgets(
+      'un compte créé après avoir choisi une entité est bien rattaché à '
+      'elle (InvestmentAccount.entityId)',
+      (tester) async {
+        setProfessionalVault();
+        await tester.runAsync(
+          () => EntityRepository(tempDir.path).saveEntity(
+            const BusinessEntity(
+              id: 'e1',
+              name: 'Holding Dupont',
+              type: EntityType.holding,
+              ownershipPercent: 100,
+            ),
+          ),
+        );
+
+        await pumpDialogOpen(
+          tester,
+          awaitedText: 'À qui appartient ceci ?',
+        );
+        await tester.tap(find.text('Holding Dupont'));
+        await tester.pump();
+        await tester.tap(find.text('Un actif'));
+        await tester.pump();
+        await tester.tap(find.text('Autres'));
+        await tester.pump();
+        await tester.tap(find.text('Nouveau bien'));
+        await tester.pump();
+        await tester.enterText(find.byType(TextField), 'Rolex Submariner');
+        await tester.pump();
+
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Créer'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pump();
+
+        final saved = await tester.runAsync(
+          () => InvestmentsRepository(tempDir.path).listAll(),
+        );
+        expect(saved!.single.entityId, 'e1');
+      },
+    );
+
+    testWidgets(
+      'depuis "Que voulez-vous compléter ?" atteint via l\'entité, le '
+      'retour ramène à "À qui appartient ceci ?"',
+      (tester) async {
+        setProfessionalVault();
+        await tester.runAsync(
+          () => EntityRepository(tempDir.path).saveEntity(
+            const BusinessEntity(
+              id: 'e1',
+              name: 'Holding Dupont',
+              type: EntityType.holding,
+              ownershipPercent: 100,
+            ),
+          ),
+        );
+
+        await pumpDialogOpen(
+          tester,
+          awaitedText: 'À qui appartient ceci ?',
+        );
+        await tester.tap(find.text('Holding Dupont'));
+        await tester.pump();
+
+        await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+        await tester.pump();
+
+        expect(find.text('À qui appartient ceci ?'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'un raccourci initial* existant (ex. initialLiabilityType, utilisé '
+      'par RealEstateLoanLinkSection) saute toujours l\'étape préalable et '
+      '"Que voulez-vous compléter ?" entièrement',
+      (tester) async {
+        setProfessionalVault();
+
+        await tester.pumpWidget(
+          ShadcnApp(
+            home: Scaffold(
+              child: Builder(
+                builder: (context) => GestureDetector(
+                  onTap: () => showCompletePatrimoineDialog(
+                    context,
+                    vaultPath: tempDir.path,
+                    onCompleted: () {},
+                    initialLiabilityType: LiabilityType.pretImmobilier,
+                  ),
+                  child: const Text('OPEN'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('OPEN'));
+        await tester.pump();
+        await tester.runAsync(() async {
+          for (var i = 0; i < 40; i++) {
+            if (find.text('Créer le passif').evaluate().isNotEmpty) return;
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump();
+          }
+        });
+
+        expect(find.text('Que voulez-vous compléter ?'), findsNothing);
+        expect(find.text('À qui appartient ceci ?'), findsNothing);
+      },
+    );
+  });
 }

@@ -1,32 +1,81 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/features/entities/entities_models.dart';
 import 'package:opime/features/entities/entities_patrimoine_adapter.dart';
+import 'package:opime/features/investments/investments_models.dart';
+import 'package:opime/features/liabilities/liabilities_models.dart';
 
 void main() {
+  InvestmentAccount accountWithValue(
+    String entityId,
+    double value, {
+    String? id,
+  }) => InvestmentAccount(
+    id: id,
+    assetClass: AssetClass.epargne,
+    name: 'Compte',
+    investments: [
+      Investment(
+        isin: 'FR0000000000',
+        label: 'Position',
+        // Pas de `lastPrice` : `displayValue` retombe sur `investedAmount`
+        // (quantité × prix unitaire de cet unique achat), plus simple à
+        // maîtriser dans un test qu'une valorisation de marché avec FX.
+        transactions: [
+          Transaction(date: DateTime(2024, 1, 1), isBuy: true, quantity: 1, unitPrice: value),
+        ],
+      ),
+    ],
+    entityId: entityId,
+  );
+
+  group('entityNetValue', () {
+    test('somme les comptes, retranche les passifs, filtrés par entityId', () {
+      final accounts = [
+        accountWithValue('e1', 50000, id: 'a1'),
+        accountWithValue('e2', 10000, id: 'a2'), // autre entité, ignoré
+      ];
+      final liabilities = [
+        Liability(
+          type: LiabilityType.creditAutre,
+          name: 'Dette',
+          montantEmprunte: 20000,
+          tauxInteret: 0,
+          nbrEcheances: 1,
+          dateDebut: DateTime(2024, 1, 1),
+          entityId: 'e1',
+        ),
+      ];
+
+      expect(
+        entityNetValue('e1', accounts, liabilities),
+        closeTo(50000 - liabilities.first.remainingBalance, 1e-6),
+      );
+    });
+
+    test('aucun compte/passif pour cette entité : 0', () {
+      expect(entityNetValue('inconnu', const [], const []), 0);
+    });
+  });
+
   group('buildEntitiesCategory', () {
-    test('une ligne par entité, valeur = ownedNetValue (jamais netValue '
-        'brut)', () {
+    test('une ligne par entité, valeur = part diluée de entityNetValue', () {
       final holding = BusinessEntity(
         id: 'e1',
         name: 'Holding Petiot',
         type: EntityType.holding,
         ownershipPercent: 100,
-        assets: const [EntityLine(id: 'a1', label: 'Trésorerie', amount: 50000)],
       );
       final sci = BusinessEntity(
         id: 'e2',
         name: 'SCI Les Tilleuls',
         type: EntityType.sci,
         ownershipPercent: 60,
-        assets: const [
-          EntityLine(id: 'a2', label: 'Immeuble', amount: 300000),
-        ],
-        liabilities: const [
-          EntityLine(id: 'l1', label: 'Emprunt', amount: 100000),
-        ],
       );
-      // SCI : netValue = 300000 - 100000 = 200000, ownedNetValue = 60 %.
-      final category = buildEntitiesCategory([holding, sci]);
+      final accounts = [
+        accountWithValue('e1', 50000, id: 'a1'),
+        accountWithValue('e2', 200000, id: 'a2'),
+      ];
+      final category = buildEntitiesCategory([holding, sci], accounts, const []);
 
       expect(category.id, kEntitiesCategoryId);
       expect(category.accounts, hasLength(2));
@@ -37,36 +86,41 @@ void main() {
       expect(holdingLine.subtitle, EntityType.holding.label);
 
       final sciLine = category.accounts.firstWhere((a) => a.id == 'e2');
-      expect(sciLine.valeur, closeTo(120000, 1e-9)); // 200000 * 60 %
+      expect(sciLine.valeur, closeTo(120000, 1e-6)); // 200000 * 60 %
     });
 
-    test('montantPatrimoine = somme des ownedNetValue, sans passifs miroir '
-        '(déjà nettés)', () {
-      final entities = [
-        BusinessEntity(
-          id: 'e1',
-          name: 'A',
-          type: EntityType.societeCommerciale,
-          ownershipPercent: 100,
-          assets: const [EntityLine(id: 'a1', label: 'Actif', amount: 10000)],
-        ),
-        BusinessEntity(
-          id: 'e2',
-          name: 'B',
-          type: EntityType.comptePro,
-          ownershipPercent: 50,
-          assets: const [EntityLine(id: 'a2', label: 'Actif', amount: 20000)],
-        ),
+    test('filiale liée à un holding : valorisée à la part diluée jusqu\'à '
+        'l\'utilisateur, pas juste son % de lien local', () {
+      final holding = BusinessEntity(
+        id: 'holding',
+        name: 'Holding',
+        type: EntityType.holding,
+        ownershipPercent: 80, // 80 % détenu par l'utilisateur.
+      );
+      final filiale = BusinessEntity(
+        id: 'filiale',
+        name: 'Filiale',
+        type: EntityType.societeCommerciale,
+        ownershipPercent: 50, // 50 % détenu par le holding.
+        parentEntityId: 'holding',
+      );
+      final accounts = [
+        accountWithValue('holding', 50000, id: 'a1'),
+        accountWithValue('filiale', 100000, id: 'a2'),
       ];
-      final category = buildEntitiesCategory(entities);
+      final category = buildEntitiesCategory([holding, filiale], accounts, const []);
 
-      // 10000 (100 %) + 20000 * 50 % = 10000 + 10000 = 20000.
-      expect(category.montantPatrimoine, closeTo(20000, 1e-9));
-      expect(category.montant, closeTo(20000, 1e-9));
+      final holdingLine = category.accounts.firstWhere((a) => a.id == 'holding');
+      expect(holdingLine.valeur, closeTo(40000, 1e-6)); // 50000 * 80 %
+
+      final filialeLine = category.accounts.firstWhere((a) => a.id == 'filiale');
+      // Part réellement diluée : 100000 * 80 % * 50 % = 40000 — PAS
+      // 100000 * 50 % = 50000 (ce que donnerait le seul % de lien local).
+      expect(filialeLine.valeur, closeTo(40000, 1e-6));
     });
 
     test('liste vide : catégorie vide, montant nul', () {
-      final category = buildEntitiesCategory(const []);
+      final category = buildEntitiesCategory(const [], const [], const []);
       expect(category.accounts, isEmpty);
       expect(category.montantPatrimoine, 0);
     });
@@ -78,9 +132,9 @@ void main() {
         name: 'A',
         type: EntityType.holding,
         ownershipPercent: 100,
-        assets: const [EntityLine(id: 'a1', label: 'Actif', amount: 10000)],
       );
-      final line = buildEntitiesCategory([entity]).accounts.single;
+      final accounts = [accountWithValue('e1', 10000, id: 'a1')];
+      final line = buildEntitiesCategory([entity], accounts, const []).accounts.single;
 
       expect(line.pru, isNull);
       expect(line.quantite, isNull);

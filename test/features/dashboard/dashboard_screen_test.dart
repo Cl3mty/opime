@@ -279,7 +279,27 @@ void main() {
               name: 'SCI Les Tilleuls',
               type: EntityType.sci,
               ownershipPercent: 100,
-              assets: [EntityLine(id: 'a1', label: 'Immeuble', amount: 150000)],
+            ),
+          );
+          await InvestmentsRepository(tempDir.path).saveAccount(
+            InvestmentAccount(
+              assetClass: AssetClass.immobilier,
+              name: 'Immeuble',
+              investments: [
+                Investment(
+                  isin: 'FR0000000000',
+                  label: 'Immeuble',
+                  transactions: [
+                    Transaction(
+                      date: DateTime(2024, 1, 1),
+                      isBuy: true,
+                      quantity: 1,
+                      unitPrice: 150000,
+                    ),
+                  ],
+                ),
+              ],
+              entityId: 'e1',
             ),
           );
         });
@@ -302,7 +322,6 @@ void main() {
               name: 'SCI Les Tilleuls',
               type: EntityType.sci,
               ownershipPercent: 100,
-              assets: [EntityLine(id: 'a1', label: 'Immeuble', amount: 150000)],
             ),
           );
         });

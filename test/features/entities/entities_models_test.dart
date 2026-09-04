@@ -2,90 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/features/entities/entities_models.dart';
 
 void main() {
-  group('EntityLine', () {
-    test('toJson/fromJson round-trip', () {
-      final line = EntityLine(id: 'l1', label: 'Trésorerie', amount: 1234.5);
-      final restored = EntityLine.fromJson(line.toJson());
-
-      expect(restored.id, 'l1');
-      expect(restored.label, 'Trésorerie');
-      expect(restored.amount, 1234.5);
-    });
-
-    test('copyWith ne change que le champ demandé', () {
-      final line = EntityLine(id: 'l1', label: 'Trésorerie', amount: 100);
-      final updated = line.copyWith(amount: 200);
-
-      expect(updated.id, 'l1');
-      expect(updated.label, 'Trésorerie');
-      expect(updated.amount, 200);
-    });
-  });
-
-  group('BusinessEntity — netValue/ownedNetValue', () {
-    BusinessEntity build({
-      double ownershipPercent = 100,
-      List<EntityLine> assets = const [],
-      List<EntityLine> liabilities = const [],
-    }) => BusinessEntity(
-      id: 'e1',
-      name: 'Test',
-      type: EntityType.holding,
-      ownershipPercent: ownershipPercent,
-      assets: assets,
-      liabilities: liabilities,
-    );
-
-    test('cas standard : actifs - passifs, pondéré par le % détenu', () {
-      final entity = build(
-        ownershipPercent: 60,
-        assets: [const EntityLine(id: 'a', label: 'Immeuble', amount: 200000)],
-        liabilities: [const EntityLine(id: 'l', label: 'Emprunt', amount: 50000)],
-      );
-
-      expect(entity.grossAssets, 200000);
-      expect(entity.grossLiabilities, 50000);
-      expect(entity.netValue, 150000);
-      expect(entity.ownedNetValue, 90000);
-    });
-
-    test('100% détenu : ownedNetValue == netValue', () {
-      final entity = build(
-        ownershipPercent: 100,
-        assets: [const EntityLine(id: 'a', label: 'Trésorerie', amount: 10000)],
-      );
-
-      expect(entity.ownedNetValue, entity.netValue);
-      expect(entity.ownedNetValue, 10000);
-    });
-
-    test('sans aucune ligne : valeur nette nulle', () {
-      final entity = build();
-      expect(entity.netValue, 0);
-      expect(entity.ownedNetValue, 0);
-    });
-
-    test('passifs > actifs : valeur nette négative', () {
-      final entity = build(
-        ownershipPercent: 50,
-        assets: [const EntityLine(id: 'a', label: 'Trésorerie', amount: 10000)],
-        liabilities: [const EntityLine(id: 'l', label: 'Emprunt', amount: 30000)],
-      );
-
-      expect(entity.netValue, -20000);
-      expect(entity.ownedNetValue, -10000);
-    });
-  });
-
   group('BusinessEntity — JSON round-trip', () {
-    test('conserve tous les champs, y compris les lignes', () {
+    test('conserve tous les champs', () {
       final entity = BusinessEntity(
         id: 'e1',
         name: 'SCI Les Tilleuls',
         type: EntityType.sci,
         ownershipPercent: 60,
-        assets: [const EntityLine(id: 'a', label: 'Immeuble', amount: 200000)],
-        liabilities: [const EntityLine(id: 'l', label: 'Emprunt', amount: 50000)],
         note: 'Créée en 2020',
       );
 
@@ -95,8 +18,6 @@ void main() {
       expect(restored.name, 'SCI Les Tilleuls');
       expect(restored.type, EntityType.sci);
       expect(restored.ownershipPercent, 60);
-      expect(restored.assets.single.label, 'Immeuble');
-      expect(restored.liabilities.single.label, 'Emprunt');
       expect(restored.note, 'Créée en 2020');
     });
 
@@ -111,6 +32,171 @@ void main() {
       final json = entity.toJson();
       expect(json.containsKey('note'), isFalse);
       expect(BusinessEntity.fromJson(json).note, isNull);
+    });
+  });
+
+  group('BusinessEntity — parentEntityId', () {
+    test('absent du JSON existant : reste null, comportement inchangé', () {
+      final entity = BusinessEntity(
+        id: 'e1',
+        name: 'Test',
+        type: EntityType.holding,
+        ownershipPercent: 100,
+      );
+      final json = entity.toJson();
+      expect(json.containsKey('parentEntityId'), isFalse);
+      expect(BusinessEntity.fromJson(json).parentEntityId, isNull);
+    });
+
+    test('round-trip JSON quand renseigné', () {
+      final entity = BusinessEntity(
+        id: 'e2',
+        name: 'Filiale',
+        type: EntityType.societeCommerciale,
+        ownershipPercent: 50,
+        parentEntityId: 'e1',
+      );
+      final restored = BusinessEntity.fromJson(entity.toJson());
+      expect(restored.parentEntityId, 'e1');
+    });
+
+    test('copyWith(parentEntityId: null) efface bien le lien existant', () {
+      final entity = BusinessEntity(
+        id: 'e2',
+        name: 'Filiale',
+        type: EntityType.societeCommerciale,
+        ownershipPercent: 50,
+        parentEntityId: 'e1',
+      );
+      final updated = entity.copyWith(parentEntityId: null);
+      expect(updated.parentEntityId, isNull);
+    });
+
+    test('copyWith sans argument conserve le parentEntityId existant', () {
+      final entity = BusinessEntity(
+        id: 'e2',
+        name: 'Filiale',
+        type: EntityType.societeCommerciale,
+        ownershipPercent: 50,
+        parentEntityId: 'e1',
+      );
+      final updated = entity.copyWith(name: 'Filiale renommée');
+      expect(updated.parentEntityId, 'e1');
+    });
+  });
+
+  group('effectiveOwnershipPercents', () {
+    test('entité de tête : part effective == ownershipPercent local', () {
+      final holding = BusinessEntity(
+        id: 'e1',
+        name: 'Holding',
+        type: EntityType.holding,
+        ownershipPercent: 80,
+      );
+      final percents = effectiveOwnershipPercents([holding]);
+      expect(percents['e1'], 80);
+    });
+
+    test('chaîne à 3 niveaux : dilution multiplicative le long des liens', () {
+      final holding = BusinessEntity(
+        id: 'racine',
+        name: 'Holding',
+        type: EntityType.holding,
+        ownershipPercent: 80,
+      );
+      final fille = BusinessEntity(
+        id: 'fille',
+        name: 'Fille',
+        type: EntityType.societeCommerciale,
+        ownershipPercent: 50,
+        parentEntityId: 'racine',
+      );
+      final petiteFille = BusinessEntity(
+        id: 'petite_fille',
+        name: 'Petite-fille',
+        type: EntityType.societeCommerciale,
+        ownershipPercent: 60,
+        parentEntityId: 'fille',
+      );
+      final percents = effectiveOwnershipPercents([
+        holding,
+        fille,
+        petiteFille,
+      ]);
+
+      expect(percents['racine'], 80);
+      expect(percents['fille'], closeTo(40, 1e-9)); // 80% * 50%
+      expect(percents['petite_fille'], closeTo(24, 1e-9)); // 80% * 50% * 60%
+    });
+
+    test('cycle (2 entités se référençant l\'une l\'autre) : retombe sur le '
+        '% local plutôt que de boucler à l\'infini', () {
+      final a = BusinessEntity(
+        id: 'a',
+        name: 'A',
+        type: EntityType.holding,
+        ownershipPercent: 70,
+        parentEntityId: 'b',
+      );
+      final b = BusinessEntity(
+        id: 'b',
+        name: 'B',
+        type: EntityType.holding,
+        ownershipPercent: 40,
+        parentEntityId: 'a',
+      );
+
+      final percents = effectiveOwnershipPercents([a, b]);
+      expect(percents['a'], 70);
+      expect(percents['b'], 40);
+    });
+  });
+
+  group('effectiveOwnedNetValue', () {
+    test('applique la part diluée à une valeur nette fournie', () {
+      final percents = {'e1': 40.0};
+      expect(effectiveOwnedNetValue('e1', 100000, percents), 40000);
+    });
+
+    test('id absent de la carte : retombe sur 100 % (défensif)', () {
+      expect(effectiveOwnedNetValue('inconnu', 100000, const {}), 100000);
+    });
+  });
+
+  group('descendantEntityIds', () {
+    test('renvoie filles et petites-filles, pas les entités non liées', () {
+      final entities = [
+        BusinessEntity(
+          id: 'racine',
+          name: 'Holding',
+          type: EntityType.holding,
+          ownershipPercent: 100,
+        ),
+        BusinessEntity(
+          id: 'fille',
+          name: 'Fille',
+          type: EntityType.societeCommerciale,
+          ownershipPercent: 100,
+          parentEntityId: 'racine',
+        ),
+        BusinessEntity(
+          id: 'petite_fille',
+          name: 'Petite-fille',
+          type: EntityType.societeCommerciale,
+          ownershipPercent: 100,
+          parentEntityId: 'fille',
+        ),
+        BusinessEntity(
+          id: 'sans_lien',
+          name: 'Sans lien',
+          type: EntityType.comptePro,
+          ownershipPercent: 100,
+        ),
+      ];
+
+      final descendants = descendantEntityIds('racine', entities);
+      expect(descendants, {'fille', 'petite_fille'});
+      expect(descendantEntityIds('sans_lien', entities), isEmpty);
     });
   });
 

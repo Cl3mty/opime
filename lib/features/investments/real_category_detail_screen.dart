@@ -120,7 +120,13 @@ class _RealCategoryDetailScreenState extends State<RealCategoryDetailScreen> {
   /// les deux cas, remplacer tout l'écran par un spinner ferait perdre la
   /// sélection compte/investissement en cours et tout formulaire ouvert.
   Future<void> _reload() async {
-    final accounts = await _repo.listAll();
+    // Cet écran affiche une des 7 classes d'actif personnelles (jamais la
+    // catégorie "Entités professionnelles", qui route directement vers
+    // `EntitiesScreen` — voir `entities_patrimoine_adapter.dart`) : un
+    // compte rattaché à une entité (`entityId` non nul) n'a rien à y faire.
+    final accounts = (await _repo.listAll())
+        .where((a) => a.entityId == null)
+        .toList();
     final priceHistories = await loadAllPriceHistories(
       widget.vaultPath,
       accounts,

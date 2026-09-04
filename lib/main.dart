@@ -755,6 +755,9 @@ class _OpimeAppState extends State<OpimeApp> {
               'entites': (_) => EntitiesScreen(
                 key: ValueKey(_profileController!.activeDataPath),
                 vaultPath: _profileController!.activeDataPath,
+                amountVisibility: _amountVisibilityController,
+                patrimoineRefreshController: _patrimoineRefreshController,
+                profileName: _profileController!.active?.name ?? '',
               ),
               for (final assetClass in AssetClass.values)
                 assetClass.categoryId: (_) => RealCategoryDetailScreen(

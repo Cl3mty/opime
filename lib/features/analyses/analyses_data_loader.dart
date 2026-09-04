@@ -41,8 +41,17 @@ class AnalysesSnapshot {
 }
 
 Future<AnalysesSnapshot> loadAnalysesSnapshot(String vaultPath) async {
-  final accounts = await InvestmentsRepository(vaultPath).listAll();
-  final liabilities = await LiabilitiesRepository(vaultPath).listAll();
+  // Un compte/passif rattaché à une entité professionnelle (`entityId` non
+  // nul) est hors du patrimoine personnel analysé ici (risque, diversification,
+  // comparaison à un benchmark...) — même filtre que `dashboard_screen.dart`,
+  // pour rester cohérent avec ce que le Dashboard compte dans le
+  // "Patrimoine net" personnel.
+  final accounts = (await InvestmentsRepository(vaultPath).listAll())
+      .where((a) => a.entityId == null)
+      .toList();
+  final liabilities = (await LiabilitiesRepository(vaultPath).listAll())
+      .where((l) => l.entityId == null)
+      .toList();
   final priceHistories = await loadAllPriceHistories(vaultPath, accounts);
   final settings = await AnalysesSettingsRepository(vaultPath).load();
 

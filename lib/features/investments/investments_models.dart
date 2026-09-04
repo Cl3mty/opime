@@ -1916,6 +1916,20 @@ class InvestmentAccount {
   /// Dashboard l'ignorent.
   final bool excludedFromPatrimoine;
 
+  /// Id de la [BusinessEntity] (`features/entities/entities_models.dart`)
+  /// propriétaire de ce compte, sur un coffre-fort professionnel — `null`
+  /// pour un compte personnel (le seul cas possible sur un coffre-fort
+  /// personnel). Sur un coffre-fort professionnel, tout nouveau compte créé
+  /// via `complete_patrimoine_dialog.dart` doit obligatoirement appartenir
+  /// à une entité (voir sa nouvelle étape "À qui appartient ceci ?", avant
+  /// même le choix actif/passif) — un compte avec `entityId` renseigné est
+  /// exclu des catégories "patrimoine personnel" du Dashboard (voir les
+  /// appelants de `real_patrimoine_adapter.dart`, qui filtrent
+  /// `entityId == null` avant de construire leurs catégories) et consolidé
+  /// à la place sous sa propre catégorie "Entités professionnelles" (voir
+  /// `entities_patrimoine_adapter.dart`).
+  final String? entityId;
+
   /// Valeur sentinelle privée de [InvestmentAccount.copyWith] : distingue
   /// "paramètre non fourni" (conserve la valeur existante) de "`null`
   /// explicite" (efface le champ) — `copyWith` ne pouvant pas exprimer
@@ -1924,6 +1938,7 @@ class InvestmentAccount {
   static const Object _unsetDescription = Object();
   static const Object _unsetOpeningDate = Object();
   static const Object _unsetCustomOtherCategory = Object();
+  static const Object _unsetEntityId = Object();
 
   InvestmentAccount({
     String? id,
@@ -1938,6 +1953,7 @@ class InvestmentAccount {
     this.documents = const [],
     this.customOtherCategory,
     this.excludedFromPatrimoine = false,
+    this.entityId,
   }) : id = id ?? generateInvestmentId('account');
 
   InvestmentAccount copyWith({
@@ -1951,6 +1967,7 @@ class InvestmentAccount {
     Object? openingDate = _unsetOpeningDate,
     Object? customOtherCategory = _unsetCustomOtherCategory,
     bool? excludedFromPatrimoine,
+    Object? entityId = _unsetEntityId,
   }) => InvestmentAccount(
     id: id,
     assetClass: assetClass,
@@ -1974,6 +1991,9 @@ class InvestmentAccount {
         : customOtherCategory as String?,
     excludedFromPatrimoine:
         excludedFromPatrimoine ?? this.excludedFromPatrimoine,
+    entityId: identical(entityId, _unsetEntityId)
+        ? this.entityId
+        : entityId as String?,
   );
 
   /// Total réel du compte, tous investissements confondus — n'ignore jamais
@@ -2028,6 +2048,7 @@ class InvestmentAccount {
           .toList(),
       customOtherCategory: json['customOtherCategory'] as String?,
       excludedFromPatrimoine: json['excludedFromPatrimoine'] as bool? ?? false,
+      entityId: json['entityId'] as String?,
     );
   }
 
@@ -2053,5 +2074,6 @@ class InvestmentAccount {
     if (customOtherCategory != null) 'customOtherCategory': customOtherCategory,
     if (excludedFromPatrimoine)
       'excludedFromPatrimoine': excludedFromPatrimoine,
+    if (entityId != null) 'entityId': entityId,
   };
 }

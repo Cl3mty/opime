@@ -98,7 +98,12 @@ class _RealPassifDetailScreenState extends State<RealPassifDetailScreen> {
   /// les deux cas, remplacer tout l'écran par un spinner ferait perdre le
   /// passif actuellement sélectionné ou tout formulaire ouvert.
   Future<void> _reload() async {
-    final liabilities = await _repo.listAll();
+    // Même filtre que `dashboard_screen.dart` : un passif rattaché à une
+    // entité professionnelle (`entityId` non nul) n'appartient pas aux
+    // catégories de passifs personnels affichées ici.
+    final liabilities = (await _repo.listAll())
+        .where((l) => l.entityId == null)
+        .toList();
     if (!mounted) return;
     final categories = buildRealPassifCategories(liabilities);
     PatrimoineCategory? found;

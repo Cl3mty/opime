@@ -4,9 +4,13 @@ import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
+import '../../core/storage/vault_folder_service.dart' show VaultFolderService, VaultKind;
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/opime_date_picker.dart';
 import '../../core/ui/toggle_button_style.dart';
+import '../entities/entities_models.dart';
+import '../entities/entities_repository.dart';
+import '../entities/entities_screen.dart' show showEntityEditorDialog;
 import '../liabilities/liabilities_models.dart';
 import '../liabilities/liabilities_repository.dart';
 import '../liabilities/liability_form_fields.dart';
@@ -39,6 +43,13 @@ const _noCustomOtherCategoryValue = '__none__';
 const _noLinkedInvestmentValue = '__none__';
 
 enum _Step {
+  // Coffre-fort professionnel uniquement (voir `_load`) : à qui appartient
+  // ce qui va être créé — une entité existante, ou une toute nouvelle.
+  // Toujours la toute première étape dans ce cas (avant même `kind`), sauf
+  // si un raccourci `initial*` fait déjà démarrer le flux plus loin (voir
+  // la doc de [showCompletePatrimoineDialog]) — ces raccourcis restent des
+  // flux personnels, cohérents avec la page d'où ils sont ouverts.
+  owner,
   kind,
   assetClass,
   account,
@@ -145,8 +156,28 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   late final LiabilitiesRepository _liabilitiesRepo = LiabilitiesRepository(
     widget.vaultPath,
   );
+  late final EntityRepository _entityRepo = EntityRepository(widget.vaultPath);
   bool _loading = true;
   List<InvestmentAccount> _accounts = [];
+
+  /// Type du coffre-fort actif (`personal`/`professional`), résolu dans
+  /// [_load] via `VaultFolderService` — pas transmis par les appelants (voir
+  /// la doc de tête de [showCompletePatrimoineDialog]). Un coffre-fort
+  /// professionnel démarre par [_Step.owner] (voir [_load]). `null` tant que
+  /// non résolu, gate déjà par [_loading].
+  VaultKind? _vaultKind;
+
+  /// Entités déjà créées (coffre-fort pro uniquement — reste vide sinon),
+  /// proposées à [_Step.owner] et utilisées pour peupler le sélecteur
+  /// "Détenue par" de l'éditeur ouvert depuis là.
+  List<BusinessEntity> _entities = [];
+
+  /// Entité choisie à [_Step.owner] — propriétaire du compte/passif que ce
+  /// flux va créer. `null` sur un coffre-fort personnel (aucune étape
+  /// [_Step.owner] n'existe alors), ou quand le flux a été ouvert via un
+  /// raccourci `initial*` (reste un flux personnel, voir la doc de l'enum
+  /// `_Step`).
+  String? _selectedEntityId;
 
   _Step _step = _Step.kind;
   AssetClass? _assetClass;
@@ -329,10 +360,32 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
 
   Future<void> _load() async {
     final accounts = await _repo.listAll();
+    // La 3e tuile "Une entité professionnelle" de [_KindStep] (coffre-fort
+    // pro uniquement) dépend de ce type, résolu ici plutôt que transmis par
+    // les appelants (voir la doc de [showCompletePatrimoineDialog] — ni
+    // `AddMenuButton` ni `RealEstateLoanLinkSection` ne connaissent
+    // `VaultKind` aujourd'hui). Résolu avant `_loading = false` pour éviter
+    // que la tuile n'apparaisse après coup, une fois `_KindStep` déjà
+    // affiché.
+    final activeVault = await VaultFolderService().getActiveVault();
+    final vaultKind = activeVault?.kind ?? VaultKind.personal;
+    final entities = vaultKind == VaultKind.professional
+        ? await _entityRepo.listAll()
+        : const <BusinessEntity>[];
     if (!mounted) return;
     setState(() {
       _accounts = accounts;
+      _vaultKind = vaultKind;
+      _entities = entities;
       _loading = false;
+      // Sur un coffre-fort pro, le flux "vierge" (aucun raccourci `initial*`
+      // — `_step` encore à sa valeur par défaut `_Step.kind` à ce stade,
+      // `initState` s'exécutant avant `_load`) démarre par le choix de
+      // l'entité propriétaire plutôt que directement sur "Que voulez-vous
+      // compléter ?" — voir la doc de l'enum `_Step`.
+      if (vaultKind == VaultKind.professional && _step == _Step.kind) {
+        _step = _Step.owner;
+      }
     });
     final accountId = widget.initialAccountId;
     final initialAccount = accountId == null
@@ -368,6 +421,27 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     }
     await _loadBankLogos();
     await _loadCustomOtherCategories();
+  }
+
+  /// Ouvre l'éditeur d'entité (`entities_screen.dart`) depuis [_Step.owner]
+  /// — une fois sauvegardée, la nouvelle entité devient l'entité choisie et
+  /// le flux continue normalement sur [_Step.kind] (contrairement à un
+  /// compte/investissement, une entité n'a pas de sous-flux dédié : sa
+  /// seule raison d'être créée ici est d'avoir un propriétaire pour ce qui
+  /// va suivre).
+  Future<void> _createEntityAndSelect() async {
+    final result = await showEntityEditorDialog(
+      context,
+      allEntities: _entities,
+    );
+    if (result == null) return;
+    await _entityRepo.saveEntity(result);
+    if (!mounted) return;
+    setState(() {
+      _entities = [..._entities, result];
+      _selectedEntityId = result.id;
+      _step = _Step.kind;
+    });
   }
 
   Future<void> _loadCustomOtherCategories() async {
@@ -668,6 +742,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       customOtherCategory: assetClass == AssetClass.autres
           ? _customOtherCategory
           : null,
+      entityId: _selectedEntityId,
     );
     await _repo.saveAccount(account);
     _accountNameController.clear();
@@ -818,6 +893,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         openingDate: openingDate,
         investments: const [],
         customOtherCategory: customCategory,
+        entityId: _selectedEntityId,
       );
       await _repo.saveAccount(account);
     }
@@ -1190,6 +1266,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       dureeDiffereMois: _liabDifereActif ? dureeDiffere : 0,
       typeDiffere: _liabTypeDiffere,
       linkedInvestmentId: _liabLinkedInvestmentId,
+      entityId: _selectedEntityId,
     );
     await _liabilitiesRepo.saveLiability(liability);
     _finish();
@@ -1265,10 +1342,27 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
 
   Widget _buildStep() {
     switch (_step) {
+      case _Step.owner:
+        return _OwnerStep(
+          entities: _entities,
+          onSelectEntity: (id) => setState(() {
+            _selectedEntityId = id;
+            _step = _Step.kind;
+          }),
+          onCreateEntity: _createEntityAndSelect,
+        );
       case _Step.kind:
         return _KindStep(
           onSelectActif: () => setState(() => _step = _Step.assetClass),
           onSelectPassif: () => setState(() => _step = _Step.liabilityType),
+          // Retour possible vers le choix du propriétaire seulement quand
+          // cette étape a réellement été précédée de [_Step.owner] (coffre-
+          // fort pro sans raccourci `initial*`) — sur un coffre-fort
+          // personnel, ou via un raccourci, [_Step.kind] reste la toute
+          // première étape comme avant.
+          onBack: _vaultKind == VaultKind.professional
+              ? () => setState(() => _step = _Step.owner)
+              : null,
         );
       case _Step.assetClass:
         return _AssetClassStep(
@@ -1609,11 +1703,21 @@ class _DialogHeader extends StatelessWidget {
   }
 }
 
-class _KindStep extends StatelessWidget {
-  final VoidCallback onSelectActif;
-  final VoidCallback onSelectPassif;
+/// Toute première étape sur un coffre-fort professionnel (voir `_load`) :
+/// choisir l'entité propriétaire de ce qui va être créé, avant même de
+/// choisir "Un actif"/"Un passif" — aucune option "Moi (personnel)" ici,
+/// sur un coffre-fort pro tout nouveau compte/passif appartient à une
+/// entité (voir la doc de tête de [showCompletePatrimoineDialog]).
+class _OwnerStep extends StatelessWidget {
+  final List<BusinessEntity> entities;
+  final ValueChanged<String> onSelectEntity;
+  final VoidCallback onCreateEntity;
 
-  const _KindStep({required this.onSelectActif, required this.onSelectPassif});
+  const _OwnerStep({
+    required this.entities,
+    required this.onSelectEntity,
+    required this.onCreateEntity,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1622,8 +1726,55 @@ class _KindStep extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         const _DialogHeader(
+          step: 'Étape préalable',
+          title: 'À qui appartient ceci ?',
+        ),
+        const SizedBox(height: 16),
+        for (final entity in entities) ...[
+          _OptionTile(
+            leading: const Icon(LucideIcons.building2, size: 18),
+            label: entity.name,
+            sublabel: entity.type.label,
+            onTap: () => onSelectEntity(entity.id),
+          ),
+          const SizedBox(height: 8),
+        ],
+        _OptionTile(
+          leading: const Icon(LucideIcons.plus, size: 18),
+          label: 'Nouvelle entité',
+          sublabel: 'Holding, société commerciale, SCI, compte pro...',
+          onTap: onCreateEntity,
+        ),
+      ],
+    );
+  }
+}
+
+class _KindStep extends StatelessWidget {
+  final VoidCallback onSelectActif;
+  final VoidCallback onSelectPassif;
+
+  /// Retour vers [_Step.owner] — seulement quand cette étape a réellement
+  /// été précédée de ce choix (coffre-fort pro, flux non raccourci), voir
+  /// l'appelant dans `_buildStep`.
+  final VoidCallback? onBack;
+
+  const _KindStep({
+    required this.onSelectActif,
+    required this.onSelectPassif,
+    this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _DialogHeader(
           step: 'Étape 1',
           title: 'Que voulez-vous compléter ?',
+          onBack: onBack,
         ),
         const SizedBox(height: 16),
         _OptionTile(

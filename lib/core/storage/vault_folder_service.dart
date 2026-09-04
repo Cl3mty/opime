@@ -11,10 +11,11 @@ import 'package:uuid/uuid.dart';
 /// fonctionnalités patrimoniales habituelles ; un coffre-fort
 /// **professionnel** donne en plus accès au module Entités (holdings,
 /// sociétés commerciales, SCI, comptes pro — voir
-/// `features/entities/entities_models.dart`), dont la valeur n'est jamais
-/// consolidée dans le patrimoine personnel. Choisi une seule fois, à la
-/// création du coffre-fort (voir `OnboardingScreen`/`SettingsScreen`'s
-/// bouton "Ajouter un coffre-fort").
+/// `features/entities/entities_models.dart`), consolidé comme une
+/// catégorie de Dashboard à part entière (voir
+/// `entities_patrimoine_adapter.dart`'s `buildEntitiesCategory`). Choisi
+/// une seule fois, à la création du coffre-fort (voir
+/// `OnboardingScreen`/`SettingsScreen`'s bouton "Ajouter un coffre-fort").
 enum VaultKind {
   personal,
   professional;

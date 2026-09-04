@@ -61,30 +61,19 @@ void main() {
     expect(await repo.find('introuvable'), isNull);
   });
 
-  test(
-    'les lignes d\'actif/passif survivent au round-trip disque',
-    () async {
-      final repo = EntityRepository(tempDir.path);
-      final e = BusinessEntity(
-        id: generateEntityId(),
-        name: 'SCI Les Tilleuls',
-        type: EntityType.sci,
-        ownershipPercent: 60,
-        assets: [
-          EntityLine(id: generateEntityLineId(), label: 'Immeuble', amount: 200000),
-        ],
-        liabilities: [
-          EntityLine(id: generateEntityLineId(), label: 'Emprunt', amount: 50000),
-        ],
-      );
-      await repo.saveEntity(e);
+  test('le lien vers un parent (holding) survit au round-trip disque', () async {
+    final repo = EntityRepository(tempDir.path);
+    final e = BusinessEntity(
+      id: generateEntityId(),
+      name: 'Filiale',
+      type: EntityType.societeCommerciale,
+      ownershipPercent: 60,
+      parentEntityId: 'holding-1',
+    );
+    await repo.saveEntity(e);
 
-      final reloaded = await repo.find(e.id);
-      expect(reloaded!.assets.single.label, 'Immeuble');
-      expect(reloaded.assets.single.amount, 200000);
-      expect(reloaded.liabilities.single.label, 'Emprunt');
-      expect(reloaded.netValue, 150000);
-      expect(reloaded.ownedNetValue, 90000);
-    },
-  );
+    final reloaded = await repo.find(e.id);
+    expect(reloaded!.parentEntityId, 'holding-1');
+    expect(reloaded.ownershipPercent, 60);
+  });
 }

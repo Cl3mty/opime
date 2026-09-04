@@ -152,6 +152,14 @@ class Liability {
   /// saisie manuelle dans le simulateur autonome.
   final String? linkedInvestmentId;
 
+  /// Id de la [BusinessEntity] (`features/entities/entities_models.dart`)
+  /// propriétaire de ce passif, sur un coffre-fort professionnel — même
+  /// principe que [InvestmentAccount.entityId]
+  /// (`features/investments/investments_models.dart`) : `null` pour un
+  /// passif personnel, obligatoirement renseigné pour tout nouveau passif
+  /// créé sur un coffre-fort professionnel.
+  final String? entityId;
+
   Liability({
     String? id,
     required this.type,
@@ -171,6 +179,7 @@ class Liability {
     List<AmortissementEntry>? amortissement,
     this.documents = const [],
     this.linkedInvestmentId,
+    this.entityId,
   }) : id = id ?? generateInvestmentId('liab'),
        amortissement =
            amortissement ??
@@ -249,6 +258,7 @@ class Liability {
     DeferType? typeDiffere,
     List<VaultDocument>? documents,
     Object? linkedInvestmentId = _unset,
+    Object? entityId = _unset,
   }) {
     final scheduleChanged =
         montantEmprunte != null ||
@@ -283,6 +293,9 @@ class Liability {
       linkedInvestmentId: identical(linkedInvestmentId, _unset)
           ? this.linkedInvestmentId
           : linkedInvestmentId as String?,
+      entityId: identical(entityId, _unset)
+          ? this.entityId
+          : entityId as String?,
     );
   }
 
@@ -388,6 +401,7 @@ class Liability {
           .map((e) => VaultDocument.fromJson(e as Map<String, dynamic>))
           .toList(),
       linkedInvestmentId: json['linkedInvestmentId'] as String?,
+      entityId: json['entityId'] as String?,
     );
   }
 
@@ -410,5 +424,6 @@ class Liability {
     if (documents.isNotEmpty)
       'documents': documents.map((d) => d.toJson()).toList(),
     if (linkedInvestmentId != null) 'linkedInvestmentId': linkedInvestmentId,
+    if (entityId != null) 'entityId': entityId,
   };
 }

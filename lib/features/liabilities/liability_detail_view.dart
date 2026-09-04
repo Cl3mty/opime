@@ -160,6 +160,14 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
       dureeDiffereMois: _differeActif ? dureeDiffere : 0,
       typeDiffere: _typeDiffere,
       documents: widget.liability.documents,
+      // Construction via le constructeur brut (pas `copyWith`, qui
+      // régénère `amortissement` sans savoir doser correctement les
+      // champs à recalculer ici) : les champs non montrés par ce
+      // formulaire d'édition doivent être reportés explicitement, sous
+      // peine d'être effacés silencieusement à chaque modification —
+      // `linkedInvestmentId` avait ce bug avant ce correctif.
+      linkedInvestmentId: widget.liability.linkedInvestmentId,
+      entityId: widget.liability.entityId,
     );
     await _repo.saveLiability(updated);
     setState(() => _editing = false);

@@ -65,10 +65,16 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
   }
 
   Future<void> _load() async {
-    final accounts = await InvestmentsRepository(widget.vaultPath).listAll();
-    final liabilities = await LiabilitiesRepository(
-      widget.vaultPath,
-    ).listAll();
+    // Un compte/passif rattaché à une entité professionnelle (`entityId`
+    // non nul) est hors du patrimoine personnel exporté ici — même filtre
+    // que `dashboard_screen.dart`/`analyses_data_loader.dart`.
+    final accounts = (await InvestmentsRepository(widget.vaultPath).listAll())
+        .where((a) => a.entityId == null)
+        .toList();
+    final liabilities =
+        (await LiabilitiesRepository(widget.vaultPath).listAll())
+            .where((l) => l.entityId == null)
+            .toList();
     // Prix historiques jamais utilisés par cet arbre "par compte" (voir
     // `real_patrimoine_adapter.dart` : `_buildAccountLeaf`/`_buildLeaf` ne
     // s'appuient que sur `Investment.marketValue`/`lastPrice`) — la carte
