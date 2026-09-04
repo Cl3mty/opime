@@ -1,5 +1,7 @@
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:opime/features/dashboard/widgets/allocation_blocks_view.dart'
     show AllocationSlice;
 import 'package:opime/features/dashboard/widgets/allocation_donut_view.dart';
@@ -18,6 +20,13 @@ void main() {
   ];
 
   Widget buildDonut() => ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
     home: Scaffold(
       child: Center(
         child: SizedBox(
@@ -52,7 +61,14 @@ void main() {
       // ensuite, reproduisant "la souris est déjà là quand le widget
       // apparaît".
       await tester.pumpWidget(
-        ShadcnApp(home: Scaffold(child: Center(child: SizedBox(width: 400, height: 400)))),
+        ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      home: Scaffold(child: Center(child: SizedBox(width: 400, height: 400)))),
       );
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       addTearDown(gesture.removePointer);

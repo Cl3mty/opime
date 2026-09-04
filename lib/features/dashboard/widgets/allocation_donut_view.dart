@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/donut_hover.dart';
+import '../../../l10n/app_localizations.dart';
 import 'allocation_blocks_view.dart';
 import 'allocation_hover_tooltip.dart';
 
@@ -32,6 +33,13 @@ class AllocationDonutView extends StatefulWidget {
   /// transitoire).
   final ValueChanged<String>? onSliceTap;
 
+  /// Affiche (`true`, défaut) ou masque (`false`) la légende intégrée à
+  /// côté de l'anneau. Quand elle est masquée, seul l'anneau est rendu,
+  /// centré — utile quand l'appelant veut placer sa propre liste (par
+  /// exemple une colonne centrale dans une carte à trois colonnes) tout en
+  /// gardant le survol/clic de l'anneau fourni par ce widget.
+  final bool showLegend;
+
   const AllocationDonutView({
     super.key,
     required this.slices,
@@ -39,6 +47,7 @@ class AllocationDonutView extends StatefulWidget {
     required this.hidden,
     this.onHoveredIdChanged,
     this.onSliceTap,
+    this.showLegend = true,
   });
 
   @override
@@ -143,7 +152,9 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
                         shadcn.Text(
                           displayEuros(widget.total, widget.hidden),
                         ).semiBold(),
-                        shadcn.Text('Total').muted().xSmall(),
+                        shadcn.Text(
+                          AppLocalizations.of(context).dashboard_donut_total,
+                        ).muted().xSmall(),
                       ],
                     ),
                   ),
@@ -171,6 +182,12 @@ class _AllocationDonutViewState extends State<AllocationDonutView> {
         },
       ),
     );
+    // Légende intégrée — optionnelle : certains appelants (carte de
+    // diversification sectorielle réorganisée en trois colonnes) placent
+    // leur propre liste à côté de l'anneau et n'en veulent pas d'ici.
+    if (!widget.showLegend) {
+      return Center(child: ring);
+    }
     final legend = _Legend(
       slices: slices,
       hoveredId: _hoveredId,

@@ -4413,4 +4413,251 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get investments_error_pru_must_be_positive =>
       'Le PRU doit être un nombre supérieur à 0.';
+
+  @override
+  String get dashboard_donut_total => 'Total';
+
+  @override
+  String get analyses_title => 'Analyses';
+
+  @override
+  String get analyses_tab_performance => 'Performance';
+
+  @override
+  String get analyses_tab_risk => 'Risque';
+
+  @override
+  String get analyses_tab_composition => 'Composition';
+
+  @override
+  String get analyses_tab_financial_structure => 'Structure financière';
+
+  @override
+  String get analyses_load_error =>
+      'Impossible de charger les analyses. Vérifiez que le dossier Coffre-fort est accessible.';
+
+  @override
+  String get analyses_not_calculable => 'Non calculable';
+
+  @override
+  String get analyses_unclassified => 'Non classé';
+
+  @override
+  String get analyses_fund_style_title => 'Style de gestion';
+
+  @override
+  String get analyses_scope_caption => 'Actions & Fonds · aujourd\'hui';
+
+  @override
+  String get analyses_fund_style_tooltip =>
+      'Répartition de la valeur des investissements Actions & Fonds par style de gestion (gestion active, indicielle...), en % de la valeur totale de cette classe.';
+
+  @override
+  String get analyses_no_classified_investments =>
+      'Aucun investissement Actions & Fonds classé pour l\'instant.';
+
+  @override
+  String get analyses_sector_drop_hint =>
+      'Survole ou clique un secteur pour voir les investissements qui le composent.';
+
+  @override
+  String get analyses_sector_diversification_title =>
+      'Diversification sectorielle';
+
+  @override
+  String get analyses_sector_diversification_tooltip =>
+      'Répartition de la valeur des investissements Actions & Fonds par secteur d\'activité, en % de la valeur totale de cette classe. Le secteur se règle manuellement sur chaque investissement. Survole ou clique un secteur pour voir les investissements qui le composent.';
+
+  @override
+  String get analyses_country_drop_hint =>
+      'Survole ou clique un pays pour voir les investissements qui le composent.';
+
+  @override
+  String get analyses_geo_diversification_title =>
+      'Diversification géographique';
+
+  @override
+  String get analyses_geo_diversification_tooltip =>
+      'Répartition de la valeur des investissements Actions & Fonds par pays, en % de la valeur totale de cette classe. Le pays se règle manuellement sur chaque investissement. Survole ou clique un pays pour voir les investissements qui le composent.';
+
+  @override
+  String get analyses_no_investments => 'Aucun investissement.';
+
+  @override
+  String get analyses_risk_return_title => 'Risque et rendement';
+
+  @override
+  String get analyses_risk_return_subtitle =>
+      'Bêta face au benchmark configuré dans la carte Alpha vs benchmark, si renseigné. Survolez un en-tête de colonne pour le détail de chaque métrique.';
+
+  @override
+  String get analyses_risk_metric_volatility => 'Volatilité';
+
+  @override
+  String get analyses_risk_metric_volatility_desc =>
+      'Écart-type annualisé des rendements journaliers : plus il est élevé, plus la valeur a fluctué au jour le jour sur la période, dans un sens comme dans l\'autre.';
+
+  @override
+  String get analyses_risk_metric_max_drawdown => 'Max drawdown';
+
+  @override
+  String get analyses_risk_metric_max_drawdown_desc =>
+      'Plus forte baisse subie entre un sommet et le creux suivant sur la période — le pire passage traversé, pas la performance finale (qui peut être positive malgré un max drawdown élevé).';
+
+  @override
+  String get analyses_risk_metric_sharpe => 'Sharpe';
+
+  @override
+  String get analyses_risk_metric_sharpe_desc =>
+      'Rendement obtenu par unité de risque total pris (la volatilité) — plus il est élevé, meilleur est le rendement pour le risque supporté. Pénalise autant les fluctuations à la hausse qu\'à la baisse.';
+
+  @override
+  String get analyses_risk_metric_sortino => 'Sortino';
+
+  @override
+  String get analyses_risk_metric_sortino_desc =>
+      'Comme le ratio de Sharpe, mais ne pénalise que les fluctuations à la baisse (une hausse forte n\'est pas traitée comme un risque) — plus représentatif du risque réellement subi par un investisseur.';
+
+  @override
+  String get analyses_risk_metric_beta => 'Bêta';
+
+  @override
+  String get analyses_risk_metric_beta_desc =>
+      'Sensibilité aux mouvements du benchmark configuré dans la carte Alpha vs benchmark : 1 = évolue comme lui, > 1 = amplifie ses mouvements, < 1 = les atténue, négatif = évolue à l\'inverse.';
+
+  @override
+  String get analyses_risk_metric_omega => 'Omega';
+
+  @override
+  String get analyses_risk_metric_omega_desc =>
+      'Rapport entre les gains cumulés et les pertes cumulées sur la période (au-delà d\'un rendement nul) — au-dessus de 1, les gains l\'emportent sur les pertes.';
+
+  @override
+  String get analyses_risk_metric_skew => 'Skew';
+
+  @override
+  String get analyses_risk_metric_skew_desc =>
+      'Asymétrie de la distribution des rendements journaliers : positif = surtout de petites pertes compensées par quelques gros gains ; négatif = surtout des gains modestes exposés à quelques grosses pertes rares.';
+
+  @override
+  String get analyses_whole_portfolio => 'Patrimoine entier';
+
+  @override
+  String analyses_correlation_title_category(String category) {
+    return 'Corrélation — $category';
+  }
+
+  @override
+  String get analyses_avg_correlation_within_category =>
+      'Corrélation moyenne entre les actifs de cette catégorie';
+
+  @override
+  String get analyses_correlation_not_enough_investments =>
+      'Pas assez d\'investissements avec un historique de cours suffisant dans cette catégorie sur cette période pour calculer une corrélation.';
+
+  @override
+  String get analyses_correlation_between_categories_title =>
+      'Corrélation entre catégories';
+
+  @override
+  String get analyses_avg_correlation_between_categories =>
+      'Corrélation moyenne entre catégories';
+
+  @override
+  String get analyses_correlation_not_enough_categories =>
+      'Pas assez de catégories avec un historique de cours suffisant sur cette période pour calculer une corrélation.';
+
+  @override
+  String get analyses_correlation_tooltip =>
+      'Indique si les lignes affichées évoluent ensemble : proche de 0 (ou négatif) = bien diversifié, proche de 1 = elles bougent presque toutes ensemble.';
+
+  @override
+  String analyses_performance_per_year(String percent) {
+    return '$percent / an';
+  }
+
+  @override
+  String analyses_performance_since_start(String percent) {
+    return '$percent depuis le début';
+  }
+
+  @override
+  String get analyses_tri_title => 'TRI (rendement money-weighted)';
+
+  @override
+  String get analyses_tri_tooltip =>
+      'Rendement calculé en tenant compte du montant et de la date de chaque versement (méthode MWR) : il reflète le rendement réellement perçu.';
+
+  @override
+  String get analyses_unrealized_gain_title => 'Plus-value latente';
+
+  @override
+  String get analyses_today => 'Aujourd\'hui';
+
+  @override
+  String get analyses_unrealized_gain_tooltip =>
+      'Ce que la vente immédiate de tout le patrimoine rapporterait au-delà du coût d\'acquisition — indépendant de la période sélectionnée.';
+
+  @override
+  String get analyses_alpha_title => 'Alpha vs benchmark';
+
+  @override
+  String get analyses_alpha_tooltip =>
+      'Le portefeuille réel est comparé à ce que les mêmes versements (mêmes dates, mêmes montants) auraient donné investis dans le benchmark à la place, plutôt qu\'un indice supposé investi à 100 % dès le début de la période — un apport récent n\'est jamais jugé comme s\'il avait fructifié depuis toujours. Alpha = rendement réel du portefeuille − rendement que ces mêmes flux auraient fait dans le benchmark (deux MWR).';
+
+  @override
+  String get analyses_alpha_ticker_placeholder =>
+      'Ticker Yahoo Finance (ex: URTH pour un indice monde)';
+
+  @override
+  String get analyses_alpha_common_indices => 'Indices courants';
+
+  @override
+  String get analyses_alpha_no_ticker =>
+      'Renseignez un indice de référence pour calculer l\'alpha.';
+
+  @override
+  String get analyses_alpha_no_history =>
+      'Historique du benchmark introuvable ou pas encore synchronisé — réessayez plus tard.';
+
+  @override
+  String get analyses_portfolio_label => 'Portefeuille';
+
+  @override
+  String get analyses_alpha_label => 'Alpha';
+
+  @override
+  String get analyses_debt_leverage_title => 'Endettement et levier';
+
+  @override
+  String get analyses_total_assets_label => 'Actifs totaux';
+
+  @override
+  String get analyses_total_liabilities_label => 'Passifs totaux';
+
+  @override
+  String get analyses_debt_ratio_assets_label => 'Taux d\'endettement (actifs)';
+
+  @override
+  String get analyses_debt_ratio_assets_tooltip =>
+      'Dette totale rapportée aux actifs totaux — plus il est élevé, plus le patrimoine est financé par l\'emprunt.';
+
+  @override
+  String get analyses_debt_ratio_income_label =>
+      'Taux d\'endettement (revenus)';
+
+  @override
+  String get analyses_debt_ratio_income_missing =>
+      'Renseignez vos revenus du mois dans Budget > Suivi';
+
+  @override
+  String get analyses_debt_ratio_income_tooltip =>
+      'Mensualités de crédit rapportées aux revenus mensuels renseignés dans Budget > Suivi.';
+
+  @override
+  String get analyses_leverage_label => 'Levier';
+
+  @override
+  String get analyses_leverage_tooltip =>
+      'Actifs totaux rapportés au patrimoine net — au-dessus de 1, une partie des actifs est financée par la dette.';
 }

@@ -6,6 +6,7 @@ import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/load_error_view.dart';
+import '../../l10n/app_localizations.dart';
 import '../dashboard/patrimoine_models.dart'
     show DashboardPeriod, NetWorthPoint;
 import '../dashboard/widgets/allocation_blocks_view.dart' show AllocationSlice;
@@ -145,9 +146,7 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_loadError) {
       return LoadErrorView(
-        message:
-            'Impossible de charger les analyses. Vérifiez que le dossier '
-            'Coffre-fort est accessible.',
+        message: AppLocalizations.of(context).analyses_load_error,
         onRetry: _retryLoad,
       );
     }
@@ -158,6 +157,7 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
     return AnimatedBuilder(
       animation: widget.amountVisibility,
       builder: (context, _) {
+        final l10n = AppLocalizations.of(context);
         final hidden = widget.amountVisibility.hidden;
         // Période et benchmark ne concernent que Performance/Risque — les
         // masquer sur Composition/Structure financière (des instantanés
@@ -172,7 +172,7 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  shadcn.Text('Analyses').x2Large().bold(),
+                  shadcn.Text(l10n.analyses_title).x2Large().bold(),
                   if (periodRelevant)
                     PeriodTabs(
                       labels: [for (final p in DashboardPeriod.values) p.label],
@@ -186,11 +186,13 @@ class _AnalysesScreenState extends State<AnalysesScreen> {
               TabList(
                 index: _tabIndex,
                 onChanged: (value) => setState(() => _tabIndex = value),
-                children: const [
-                  TabItem(child: shadcn.Text('Performance')),
-                  TabItem(child: shadcn.Text('Risque')),
-                  TabItem(child: shadcn.Text('Composition')),
-                  TabItem(child: shadcn.Text('Structure financière')),
+                children: [
+                  TabItem(child: shadcn.Text(l10n.analyses_tab_performance)),
+                  TabItem(child: shadcn.Text(l10n.analyses_tab_risk)),
+                  TabItem(child: shadcn.Text(l10n.analyses_tab_composition)),
+                  TabItem(
+                    child: shadcn.Text(l10n.analyses_tab_financial_structure),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
@@ -728,8 +730,15 @@ _AnalysesMetrics _computeMetrics(
   );
 }
 
-String _naOr(double? value, String Function(double) format) =>
-    value == null ? 'Non calculable' : format(value);
+// `notCalculableLabel` est passé explicitement (plutôt qu'un `BuildContext`)
+// car cette fonction est utilisée dans des contextes où récupérer
+// `AppLocalizations.of(context)` à chaque appel serait redondant — les
+// appelants la calculent déjà une fois pour tout leur `build`.
+String _naOr(
+  double? value,
+  String Function(double) format,
+  String notCalculableLabel,
+) => value == null ? notCalculableLabel : format(value);
 
 String _percent(double value) => displayPercent(value * 100);
 
@@ -766,10 +775,12 @@ class _FundStyleCard extends StatelessWidget {
   final Map<FundStyle?, double> allocation;
   const _FundStyleCard({required this.allocation});
 
-  String _labelFor(FundStyle? style) => style?.label ?? 'Non classé';
+  String _labelFor(FundStyle? style, AppLocalizations l10n) =>
+      style?.label ?? l10n.analyses_unclassified;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -778,17 +789,14 @@ class _FundStyleCard extends StatelessWidget {
           children: [
             _cardTitle(
               context,
-              'Style de gestion',
-              caption: 'Actions & Fonds · aujourd\'hui',
-              tooltip:
-                  'Répartition de la valeur des investissements Actions & '
-                  'Fonds par style de gestion (gestion active, indicielle...), '
-                  'en % de la valeur totale de cette classe.',
+              l10n.analyses_fund_style_title,
+              caption: l10n.analyses_scope_caption,
+              tooltip: l10n.analyses_fund_style_tooltip,
             ),
             const SizedBox(height: 12),
             if (allocation.isEmpty)
               shadcn.Text(
-                'Aucun investissement Actions & Fonds classé pour l\'instant.',
+                l10n.analyses_no_classified_investments,
               ).muted().small()
             else
               Wrap(
@@ -797,7 +805,7 @@ class _FundStyleCard extends StatelessWidget {
                 children: [
                   for (final entry in allocation.entries)
                     _StatChip(
-                      label: _labelFor(entry.key),
+                      label: _labelFor(entry.key, l10n),
                       value: '${entry.value.toStringAsFixed(1)} %',
                     ),
                 ],
@@ -838,7 +846,8 @@ List<(Investment, double)> _sectorMatches(
           0.0,
           (sum, w) => sum + w.percent,
         );
-        final remainder = inv.displayValue * (100 - covered).clamp(0, 100) / 100;
+        final remainder =
+            inv.displayValue * (100 - covered).clamp(0, 100) / 100;
         if (remainder > 0) result.add((inv, remainder));
       } else {
         final matchedPercent = inv.sectorBreakdown
@@ -870,7 +879,8 @@ List<(Investment, double)> _countryMatches(
           0.0,
           (sum, w) => sum + w.percent,
         );
-        final remainder = inv.displayValue * (100 - covered).clamp(0, 100) / 100;
+        final remainder =
+            inv.displayValue * (100 - covered).clamp(0, 100) / 100;
         if (remainder > 0) result.add((inv, remainder));
       } else {
         final matchedPercent = inv.countryBreakdown
@@ -918,12 +928,14 @@ class _SectorDiversificationCardState
   String? _hoveredId;
   String? _pinnedId;
 
-  String _labelFor(Sector? sector) => sector?.label ?? 'Non classé';
+  String _labelFor(Sector? sector, AppLocalizations l10n) =>
+      sector?.label ?? l10n.analyses_unclassified;
 
   String _idFor(Sector? sector) => sector?.name ?? _unclassifiedSelectionId;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final sorted = widget.allocation.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final selectedId = _hoveredId ?? _pinnedId;
@@ -934,6 +946,32 @@ class _SectorDiversificationCardState
         ? const <(Investment, double)>[]
         : _sectorMatches(widget.investments, selectedEntry.key);
 
+    // Les trois colonnes de la carte : l'anneau à gauche, la liste des
+    // secteurs (légende avec pastille de couleur) au centre, et le détail
+    // des investissements de la part survolée/cliquée à droite.
+    final chart = _SectorDonut(
+      allocation: widget.allocation,
+      totalValue: widget.totalValue,
+      hidden: widget.hidden,
+      onHoveredIdChanged: (id) => setState(() => _hoveredId = id),
+      onSliceTap: (id) =>
+          setState(() => _pinnedId = _pinnedId == id ? null : id),
+    );
+    final list = _SectorList(
+      entries: sorted,
+      selectedId: selectedId,
+      onHoveredIdChanged: (id) => setState(() => _hoveredId = id),
+      onTap: (id) => setState(() => _pinnedId = _pinnedId == id ? null : id),
+    );
+    final detail = _SelectionDetailColumn(
+      title: selectedEntry?.key == null
+          ? null
+          : _labelFor(selectedEntry!.key, l10n),
+      entries: matching,
+      hidden: widget.hidden,
+      dropHint: l10n.analyses_sector_drop_hint,
+    );
+
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -942,49 +980,17 @@ class _SectorDiversificationCardState
           children: [
             _cardTitle(
               context,
-              'Diversification sectorielle',
-              caption: 'Actions & Fonds · aujourd\'hui',
-              tooltip:
-                  'Répartition de la valeur des investissements Actions & '
-                  'Fonds par secteur d\'activité, en % de la valeur totale '
-                  'de cette classe. Le secteur se règle manuellement sur '
-                  'chaque investissement. Survole ou clique un secteur '
-                  'pour voir les investissements qui le composent.',
+              l10n.analyses_sector_diversification_title,
+              caption: l10n.analyses_scope_caption,
+              tooltip: l10n.analyses_sector_diversification_tooltip,
             ),
             const SizedBox(height: 12),
             if (widget.allocation.isEmpty)
               shadcn.Text(
-                'Aucun investissement Actions & Fonds classé pour l\'instant.',
+                l10n.analyses_no_classified_investments,
               ).muted().small()
-            else ...[
-              SizedBox(
-                height: 220,
-                child: AllocationDonutView(
-                  slices: [
-                    for (final entry in sorted)
-                      AllocationSlice(
-                        id: _idFor(entry.key),
-                        label: _labelFor(entry.key),
-                        color: sectorColor(entry.key),
-                        percent: entry.value,
-                      ),
-                  ],
-                  total: widget.totalValue,
-                  hidden: widget.hidden,
-                  onHoveredIdChanged: (id) => setState(() => _hoveredId = id),
-                  onSliceTap: (id) =>
-                      setState(() => _pinnedId = _pinnedId == id ? null : id),
-                ),
-              ),
-              if (selectedEntry != null) ...[
-                const SizedBox(height: 12),
-                _MatchingInvestmentsList(
-                  title: _labelFor(selectedEntry.key),
-                  entries: matching,
-                  hidden: widget.hidden,
-                ),
-              ],
-            ],
+            else
+              _ThreeColumnLayout(chart: chart, list: list, detail: detail),
           ],
         ),
       ),
@@ -1022,11 +1028,13 @@ class _GeographicDiversificationCardState
 
   String _idFor(String? code) => code ?? _unclassifiedSelectionId;
 
-  String _labelFor(String? code) =>
-      code == null ? 'Non classé' : (kInvestmentCountries[code] ?? code);
+  String _labelFor(String? code, AppLocalizations l10n) => code == null
+      ? l10n.analyses_unclassified
+      : (kInvestmentCountries[code] ?? code);
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final sorted = widget.allocation.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -1076,6 +1084,37 @@ class _GeographicDiversificationCardState
       setState(() => _pinnedId = _pinnedId == code ? null : code);
     }
 
+    // Les trois colonnes de la carte : le planisphère à gauche, la liste
+    // des pays au centre, et le détail des investissements du pays
+    // survolé/cliqué à droite.
+    final chart = ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: AspectRatio(
+        aspectRatio: _worldMapAspectRatio,
+        child: SimpleMap(
+          instructions: SMapWorld.instructions,
+          defaultColor: theme.colorScheme.muted,
+          colors: mapColors,
+          onHover: (id, name, isHovering) => handleMapHover(id, isHovering),
+          callback: (id, name, tapDetails) => handleMapTap(id),
+        ),
+      ),
+    );
+    final list = _CountryList(
+      entries: sorted,
+      selectedId: selectedId,
+      onHoveredIdChanged: (id) => setState(() => _hoveredId = id),
+      onTap: (id) => setState(() => _pinnedId = _pinnedId == id ? null : id),
+    );
+    final detail = _SelectionDetailColumn(
+      title: selectedEntry?.key == null
+          ? null
+          : _labelFor(selectedEntry!.key, l10n),
+      entries: matching,
+      hidden: widget.hidden,
+      dropHint: l10n.analyses_country_drop_hint,
+    );
+
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1084,72 +1123,17 @@ class _GeographicDiversificationCardState
           children: [
             _cardTitle(
               context,
-              'Diversification géographique',
-              caption: 'Actions & Fonds · aujourd\'hui',
-              tooltip:
-                  'Répartition de la valeur des investissements Actions & '
-                  'Fonds par pays, en % de la valeur totale de cette '
-                  'classe. Le pays se règle manuellement sur chaque '
-                  'investissement. Survole ou clique un pays pour voir les '
-                  'investissements qui le composent.',
+              l10n.analyses_geo_diversification_title,
+              caption: l10n.analyses_scope_caption,
+              tooltip: l10n.analyses_geo_diversification_tooltip,
             ),
             const SizedBox(height: 12),
             if (widget.allocation.isEmpty)
               shadcn.Text(
-                'Aucun investissement Actions & Fonds classé pour l\'instant.',
+                l10n.analyses_no_classified_investments,
               ).muted().small()
-            else ...[
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final map = ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: AspectRatio(
-                      aspectRatio: _worldMapAspectRatio,
-                      child: SimpleMap(
-                        instructions: SMapWorld.instructions,
-                        defaultColor: theme.colorScheme.muted,
-                        colors: mapColors,
-                        onHover: (id, name, isHovering) =>
-                            handleMapHover(id, isHovering),
-                        callback: (id, name, tapDetails) => handleMapTap(id),
-                      ),
-                    ),
-                  );
-                  final list = _CountryList(
-                    entries: sorted,
-                    selectedId: selectedId,
-                    onHoveredIdChanged: (id) => setState(() => _hoveredId = id),
-                    onTap: (id) =>
-                        setState(() => _pinnedId = _pinnedId == id ? null : id),
-                  );
-                  // Sous ~480px (carte étroite, ou colonne latérale
-                  // repliée), la carte et la liste sont empilées plutôt que
-                  // côte à côte, sinon toutes deux deviendraient illisibles.
-                  if (constraints.maxWidth < 480) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [map, const SizedBox(height: 16), list],
-                    );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 3, child: map),
-                      const SizedBox(width: 20),
-                      Expanded(flex: 2, child: list),
-                    ],
-                  );
-                },
-              ),
-              if (selectedEntry != null) ...[
-                const SizedBox(height: 12),
-                _MatchingInvestmentsList(
-                  title: _labelFor(selectedEntry.key),
-                  entries: matching,
-                  hidden: widget.hidden,
-                ),
-              ],
-            ],
+            else
+              _ThreeColumnLayout(chart: chart, list: list, detail: detail),
           ],
         ),
       ),
@@ -1176,8 +1160,171 @@ class _CountryList extends StatelessWidget {
 
   String _idFor(String? code) => code ?? _unclassifiedSelectionId;
 
-  String _labelFor(String? code) =>
-      code == null ? 'Non classé' : (kInvestmentCountries[code] ?? code);
+  String _labelFor(String? code, AppLocalizations l10n) => code == null
+      ? l10n.analyses_unclassified
+      : (kInvestmentCountries[code] ?? code);
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final entry in entries)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              onEnter: (_) => onHoveredIdChanged(_idFor(entry.key)),
+              onExit: (_) => onHoveredIdChanged(null),
+              child: GestureDetector(
+                onTap: () => onTap(_idFor(entry.key)),
+                child: AnimatedOpacity(
+                  duration: Duration.zero,
+                  opacity: selectedId != null && selectedId != _idFor(entry.key)
+                      ? 0.35
+                      : 1.0,
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: shadcn.Text(
+                          _labelFor(entry.key, l10n),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ).small(),
+                      ),
+                      const SizedBox(width: 6),
+                      shadcn.Text(
+                        entry.value < 1
+                            ? '${entry.value.toStringAsFixed(2)} %'
+                            : '${entry.value.toStringAsFixed(0)} %',
+                      ).muted().xSmall(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Mise en page responsive à trois colonnes (tableau, liste, détail)
+/// utilisée par [_SectorDiversificationCard] et
+/// [_GeographicDiversificationCard]. Sous une largeur seuil, les trois
+/// colonnes sont empilées verticalement.
+class _ThreeColumnLayout extends StatelessWidget {
+  final Widget chart;
+  final Widget list;
+  final Widget detail;
+
+  /// Seuil en dessous duquel les trois colonnes passent en empilement
+  /// vertical — en dessous, l'affichage horizontal est illisible.
+  static const double _stackThreshold = 700;
+
+  const _ThreeColumnLayout({
+    required this.chart,
+    required this.list,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < _stackThreshold) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: chart),
+              const SizedBox(height: 16),
+              list,
+              const SizedBox(height: 16),
+              detail,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: chart),
+            const SizedBox(width: 16),
+            Expanded(child: list),
+            const SizedBox(width: 16),
+            Expanded(child: detail),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Anneau donut de la diversification sectorielle, réduit à l'anneau seul
+/// (sans légende intégrée — la liste des secteurs est dans la colonne
+/// centrale [_SectorList]). Étend [AllocationDonutView] avec
+/// `showLegend: false`.
+class _SectorDonut extends StatelessWidget {
+  final Map<Sector?, double> allocation;
+  final double totalValue;
+  final bool hidden;
+  final ValueChanged<String?> onHoveredIdChanged;
+  final ValueChanged<String> onSliceTap;
+
+  const _SectorDonut({
+    required this.allocation,
+    required this.totalValue,
+    required this.hidden,
+    required this.onHoveredIdChanged,
+    required this.onSliceTap,
+  });
+
+  String _idFor(Sector? sector) => sector?.name ?? _unclassifiedSelectionId;
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = allocation.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return AllocationDonutView(
+      slices: [
+        for (final entry in sorted)
+          AllocationSlice(
+            id: _idFor(entry.key),
+            label:
+                entry.key?.label ??
+                AppLocalizations.of(context).analyses_unclassified,
+            color: sectorColor(entry.key),
+            percent: entry.value,
+          ),
+      ],
+      total: totalValue,
+      hidden: hidden,
+      showLegend: false,
+      onHoveredIdChanged: onHoveredIdChanged,
+      onSliceTap: onSliceTap,
+    );
+  }
+}
+
+/// Liste « pastille de couleur · secteur · pourcentage » de la colonne
+/// centrale de [_SectorDiversificationCard] — même structure que la légende
+/// intégrée d'[AllocationDonutView] ([_Legend]), mais widget indépendant
+/// avec survol/clic propres pour piloter la colonne de détail.
+class _SectorList extends StatelessWidget {
+  final List<MapEntry<Sector?, double>> entries;
+  final String? selectedId;
+  final ValueChanged<String?> onHoveredIdChanged;
+  final ValueChanged<String> onTap;
+
+  const _SectorList({
+    required this.entries,
+    required this.selectedId,
+    required this.onHoveredIdChanged,
+    required this.onTap,
+  });
+
+  String _idFor(Sector? sector) => sector?.name ?? _unclassifiedSelectionId;
 
   @override
   Widget build(BuildContext context) {
@@ -1201,9 +1348,21 @@ class _CountryList extends StatelessWidget {
                       : 1.0,
                   child: Row(
                     children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: sectorColor(entry.key),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Flexible(
                         child: shadcn.Text(
-                          _labelFor(entry.key),
+                          entry.key?.label ??
+                              AppLocalizations.of(
+                                context,
+                              ).analyses_unclassified,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ).small(),
@@ -1225,28 +1384,42 @@ class _CountryList extends StatelessWidget {
   }
 }
 
-/// Liste des investissements composant le secteur/pays sélectionné (survol
-/// ou clic) dans [_SectorDiversificationCard]/[_GeographicDiversificationCard]
-/// — triés par contribution décroissante, comme la plupart des listes de
-/// l'écran Analyses. Chaque entrée porte la CONTRIBUTION de l'investissement
-/// à cette part (voir [_sectorMatches]/[_countryMatches]) plutôt que sa
-/// valeur totale : pour un ETF multi-pays/secteurs, seule une fraction de sa
-/// valeur compte pour la part sélectionnée.
-class _MatchingInvestmentsList extends StatelessWidget {
-  final String title;
+/// Colonne de droite des cartes de diversification (sous l'en-tête) :
+/// affiche la liste des investissements correspondant à la sélection
+/// (survol ou clic) ou un texte indicatif ("Survole ou clique ...") quand
+/// rien n'est sélectionné. Réutilisée par la carte sectorielle et la
+/// carte géographique pour éviter de dupliquer la présentation.
+class _SelectionDetailColumn extends StatelessWidget {
+  final String? title;
   final List<(Investment, double)> entries;
   final bool hidden;
 
-  const _MatchingInvestmentsList({
-    required this.title,
+  /// Texte indicatif affiché quand aucune sélection n'est active.
+  final String dropHint;
+
+  const _SelectionDetailColumn({
+    this.title,
     required this.entries,
     required this.hidden,
+    required this.dropHint,
   });
 
   @override
   Widget build(BuildContext context) {
     final sorted = [...entries]..sort((a, b) => b.$2.compareTo(a.$2));
+    if (title == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: shadcn.Text(dropHint).muted().xSmall(),
+      );
+    }
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.5),
@@ -1258,7 +1431,9 @@ class _MatchingInvestmentsList extends StatelessWidget {
           shadcn.Text('$title (${sorted.length})').semiBold().small(),
           const SizedBox(height: 6),
           if (sorted.isEmpty)
-            shadcn.Text('Aucun investissement.').muted().xSmall()
+            shadcn.Text(
+              AppLocalizations.of(context).analyses_no_investments,
+            ).muted().xSmall()
           else
             for (final (inv, contribution) in sorted)
               Padding(
@@ -1285,54 +1460,12 @@ class _MatchingInvestmentsList extends StatelessWidget {
   }
 }
 
-extension<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
-}
-
 /// Largeurs de colonnes partagées entre l'en-tête et chaque
 /// [_RiskReturnRow] — un ratio (Sharpe, Sortino, Skew, Omega, Bêta) n'a
 /// pas d'unité, contrairement à la volatilité et au max drawdown (%),
 /// d'où le formatage différent par colonne mais la même largeur partout.
 const _riskReturnLabelWidth = 160.0;
 const _riskReturnColumnWidth = 84.0;
-
-/// Explication de chaque métrique de [_RiskReturnCard], affichée au survol
-/// de son en-tête de colonne — sans ça, "Sortino", "Omega" ou "Skew" ne
-/// disent rien à qui ne les connaît pas déjà, contrairement à "Volatilité"
-/// ou "Max drawdown", plus parlants d'eux-mêmes.
-const _riskReturnExplanations = {
-  'Volatilité':
-      'Écart-type annualisé des rendements journaliers : plus il est '
-      'élevé, plus la valeur a fluctué au jour le jour sur la '
-      'période, dans un sens comme dans l\'autre.',
-  'Max drawdown':
-      'Plus forte baisse subie entre un sommet et le creux suivant sur '
-      'la période — le pire passage traversé, pas la performance '
-      'finale (qui peut être positive malgré un max drawdown élevé).',
-  'Sharpe':
-      'Rendement obtenu par unité de risque total pris (la volatilité) — '
-      'plus il est élevé, meilleur est le rendement pour le risque '
-      'supporté. Pénalise autant les fluctuations à la hausse qu\'à '
-      'la baisse.',
-  'Sortino':
-      'Comme le ratio de Sharpe, mais ne pénalise que les fluctuations à '
-      'la baisse (une hausse forte n\'est pas traitée comme un '
-      'risque) — plus représentatif du risque réellement subi par un '
-      'investisseur.',
-  'Bêta':
-      'Sensibilité aux mouvements du benchmark configuré dans la carte '
-      'Alpha vs benchmark : 1 = évolue comme lui, > 1 = amplifie ses '
-      'mouvements, < 1 = les atténue, négatif = évolue à l\'inverse.',
-  'Omega':
-      'Rapport entre les gains cumulés et les pertes cumulées sur la '
-      'période (au-delà d\'un rendement nul) — au-dessus de 1, les '
-      'gains l\'emportent sur les pertes.',
-  'Skew':
-      'Asymétrie de la distribution des rendements journaliers : positif '
-      '= surtout de petites pertes compensées par quelques gros '
-      'gains ; négatif = surtout des gains modestes exposés à '
-      'quelques grosses pertes rares.',
-};
 
 class _RiskReturnCard extends StatelessWidget {
   final List<_CategoryMetric> categories;
@@ -1341,19 +1474,51 @@ class _RiskReturnCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    // En-têtes de colonne et leur explication au survol — construits ici
+    // (plutôt qu'une `const Map` au niveau fichier comme auparavant) car ils
+    // dépendent désormais de `l10n`, qui n'est disponible que dans un
+    // `build`. Du plus courant/lisible au plus pointu — Skew et Omega sont
+    // les moins familiers, en dernier.
+    final riskReturnMetrics = [
+      (
+        header: l10n.analyses_risk_metric_volatility,
+        tooltip: l10n.analyses_risk_metric_volatility_desc,
+      ),
+      (
+        header: l10n.analyses_risk_metric_max_drawdown,
+        tooltip: l10n.analyses_risk_metric_max_drawdown_desc,
+      ),
+      (
+        header: l10n.analyses_risk_metric_sharpe,
+        tooltip: l10n.analyses_risk_metric_sharpe_desc,
+      ),
+      (
+        header: l10n.analyses_risk_metric_sortino,
+        tooltip: l10n.analyses_risk_metric_sortino_desc,
+      ),
+      (
+        header: l10n.analyses_risk_metric_beta,
+        tooltip: l10n.analyses_risk_metric_beta_desc,
+      ),
+      (
+        header: l10n.analyses_risk_metric_omega,
+        tooltip: l10n.analyses_risk_metric_omega_desc,
+      ),
+      (
+        header: l10n.analyses_risk_metric_skew,
+        tooltip: l10n.analyses_risk_metric_skew_desc,
+      ),
+    ];
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _cardTitle(context, 'Risque et rendement'),
+            _cardTitle(context, l10n.analyses_risk_return_title),
             const SizedBox(height: 4),
-            shadcn.Text(
-              'Bêta face au benchmark configuré dans la carte Alpha vs '
-              'benchmark, si renseigné. Survolez un en-tête de colonne '
-              'pour le détail de chaque métrique.',
-            ).muted().xSmall(),
+            shadcn.Text(l10n.analyses_risk_return_subtitle).muted().xSmall(),
             const SizedBox(height: 12),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -1363,35 +1528,23 @@ class _RiskReturnCard extends StatelessWidget {
                   Row(
                     children: [
                       const SizedBox(width: _riskReturnLabelWidth),
-                      // Du plus courant/lisible au plus pointu — Skew et
-                      // Omega sont les moins familiers, en dernier.
-                      for (final header in const [
-                        'Volatilité',
-                        'Max drawdown',
-                        'Sharpe',
-                        'Sortino',
-                        'Bêta',
-                        'Omega',
-                        'Skew',
-                      ])
+                      for (final metric in riskReturnMetrics)
                         SizedBox(
                           width: _riskReturnColumnWidth,
                           child: Tooltip(
                             tooltip: (context) => TooltipContainer(
                               child: SizedBox(
                                 width: 260,
-                                child: shadcn.Text(
-                                  _riskReturnExplanations[header]!,
-                                ),
+                                child: shadcn.Text(metric.tooltip),
                               ),
                             ),
-                            child: shadcn.Text(header).muted().xSmall(),
+                            child: shadcn.Text(metric.header).muted().xSmall(),
                           ),
                         ),
                     ],
                   ),
                   _RiskReturnRow(
-                    label: 'Patrimoine entier',
+                    label: l10n.analyses_whole_portfolio,
                     bold: true,
                     metric: total,
                   ),
@@ -1434,6 +1587,9 @@ class _RiskReturnRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = bold ? shadcn.Text(label).semiBold() : shadcn.Text(label);
+    final notCalculableLabel = AppLocalizations.of(
+      context,
+    ).analyses_not_calculable;
     Widget ratio(double? value) => shadcn.Text(
       value == null ? '—' : value.toStringAsFixed(2),
     ).muted().small();
@@ -1445,13 +1601,13 @@ class _RiskReturnRow extends StatelessWidget {
           SizedBox(
             width: _riskReturnColumnWidth,
             child: shadcn.Text(
-              _naOr(metric.volatility, _percent),
+              _naOr(metric.volatility, _percent, notCalculableLabel),
             ).muted().small(),
           ),
           SizedBox(
             width: _riskReturnColumnWidth,
             child: shadcn.Text(
-              _naOr(metric.maxDrawdown, _percent),
+              _naOr(metric.maxDrawdown, _percent, notCalculableLabel),
             ).muted().small(),
           ),
           SizedBox(width: _riskReturnColumnWidth, child: ratio(metric.sharpe)),
@@ -1490,6 +1646,7 @@ class _CorrelationCardState extends State<_CorrelationCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final usableCategories = [
       for (final c in widget.categories)
         if (c.returns.length >= 3) c,
@@ -1509,14 +1666,13 @@ class _CorrelationCardState extends State<_CorrelationCard> {
         for (final entry in selected.investmentReturns)
           if (entry.$2.length >= 3) entry,
       ];
-      title = 'Corrélation — ${selected.assetClass.label}';
-      avgCorrelationLabel =
-          'Corrélation moyenne entre les actifs de cette catégorie';
+      title = l10n.analyses_correlation_title_category(
+        selected.assetClass.label,
+      );
+      avgCorrelationLabel = l10n.analyses_avg_correlation_within_category;
       if (usableInvestments.length < 2) {
         content = shadcn.Text(
-          'Pas assez d\'investissements avec un historique de cours '
-          'suffisant dans cette catégorie sur cette période pour '
-          'calculer une corrélation.',
+          l10n.analyses_correlation_not_enough_investments,
         ).muted().small();
       } else {
         final series = [for (final entry in usableInvestments) entry.$2];
@@ -1527,12 +1683,11 @@ class _CorrelationCardState extends State<_CorrelationCard> {
         );
       }
     } else {
-      title = 'Corrélation entre catégories';
-      avgCorrelationLabel = 'Corrélation moyenne entre catégories';
+      title = l10n.analyses_correlation_between_categories_title;
+      avgCorrelationLabel = l10n.analyses_avg_correlation_between_categories;
       if (usableCategories.length < 2) {
         content = shadcn.Text(
-          'Pas assez de catégories avec un historique de cours suffisant '
-          'sur cette période pour calculer une corrélation.',
+          l10n.analyses_correlation_not_enough_categories,
         ).muted().small();
       } else {
         final series = [for (final c in usableCategories) c.returns];
@@ -1562,10 +1717,7 @@ class _CorrelationCardState extends State<_CorrelationCard> {
                 _cardTitle(
                   context,
                   title,
-                  tooltip:
-                      'Indique si les lignes affichées évoluent ensemble : '
-                      'proche de 0 (ou négatif) = bien diversifié, proche '
-                      'de 1 = elles bougent presque toutes ensemble.',
+                  tooltip: l10n.analyses_correlation_tooltip,
                 ),
               ],
             ),
@@ -1590,10 +1742,15 @@ class _CorrelationCardState extends State<_CorrelationCard> {
 /// — même libellé pour tout MWR/TWR affiché sur cet écran (TRI, ainsi que
 /// le portefeuille/benchmark de la carte Alpha), pour rester cohérent
 /// plutôt que d'avoir un format différent par carte.
-String _formatPerformanceResult(PerformanceResult? result) {
-  if (result == null) return 'Non calculable';
+String _formatPerformanceResult(
+  PerformanceResult? result,
+  AppLocalizations l10n,
+) {
+  if (result == null) return l10n.analyses_not_calculable;
   final percent = displayPercent(result.rate * 100);
-  return result.annualized ? '$percent / an' : '$percent depuis le début';
+  return result.annualized
+      ? l10n.analyses_performance_per_year(percent)
+      : l10n.analyses_performance_since_start(percent);
 }
 
 class _TriCard extends StatelessWidget {
@@ -1603,6 +1760,7 @@ class _TriCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1611,20 +1769,21 @@ class _TriCard extends StatelessWidget {
           children: [
             _cardTitle(
               context,
-              'TRI (rendement money-weighted)',
-              tooltip:
-                  'Rendement calculé en tenant compte du montant et de la '
-                  'date de chaque versement (méthode MWR) : il reflète le '
-                  'rendement réellement perçu.',
+              l10n.analyses_tri_title,
+              tooltip: l10n.analyses_tri_tooltip,
             ),
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 children: [
-                  Expanded(child: shadcn.Text('Patrimoine entier').semiBold()),
+                  Expanded(
+                    child: shadcn.Text(
+                      l10n.analyses_whole_portfolio,
+                    ).semiBold(),
+                  ),
                   shadcn.Text(
-                    _formatPerformanceResult(total.tri),
+                    _formatPerformanceResult(total.tri, l10n),
                   ).muted().small(),
                 ],
               ),
@@ -1636,7 +1795,7 @@ class _TriCard extends StatelessWidget {
                   children: [
                     Expanded(child: shadcn.Text(c.assetClass.label)),
                     shadcn.Text(
-                      _formatPerformanceResult(c.tri),
+                      _formatPerformanceResult(c.tri, l10n),
                     ).muted().small(),
                   ],
                 ),
@@ -1667,6 +1826,7 @@ class _UnrealizedGainCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final color = plusValueAbs >= 0 ? _green : _red;
     return FrostedCard(
       child: Padding(
@@ -1675,12 +1835,9 @@ class _UnrealizedGainCard extends StatelessWidget {
           children: [
             _cardTitle(
               context,
-              'Plus-value latente',
-              caption: 'Aujourd\'hui',
-              tooltip:
-                  'Ce que la vente immédiate de tout le patrimoine '
-                  'rapporterait au-delà du coût d\'acquisition — '
-                  'indépendant de la période sélectionnée.',
+              l10n.analyses_unrealized_gain_title,
+              caption: l10n.analyses_today,
+              tooltip: l10n.analyses_unrealized_gain_tooltip,
             ),
             const Spacer(),
             shadcn.Text(
@@ -1768,6 +1925,7 @@ class _AlphaCardState extends State<_AlphaCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final ticker = widget.controller.text.trim();
     final hasHistory = widget.snapshot.benchmarkHistory.isNotEmpty;
@@ -1780,17 +1938,9 @@ class _AlphaCardState extends State<_AlphaCard> {
           children: [
             _cardTitle(
               context,
-              'Alpha vs benchmark',
-              caption: 'Actions & Fonds',
-              tooltip:
-                  'Le portefeuille réel est comparé à ce que les mêmes '
-                  'versements (mêmes dates, mêmes montants) auraient donné '
-                  'investis dans le benchmark à la place, plutôt qu\'un '
-                  'indice supposé investi à 100 % dès le début de la '
-                  'période — un apport récent n\'est jamais jugé comme '
-                  's\'il avait fructifié depuis toujours. Alpha = rendement '
-                  'réel du portefeuille − rendement que ces mêmes flux '
-                  'auraient fait dans le benchmark (deux MWR).',
+              l10n.analyses_alpha_title,
+              caption: l10n.analyses_stocks_funds_label,
+              tooltip: l10n.analyses_alpha_tooltip,
             ),
             const SizedBox(height: 12),
             Row(
@@ -1798,8 +1948,8 @@ class _AlphaCardState extends State<_AlphaCard> {
                 Expanded(
                   child: TextField(
                     controller: widget.controller,
-                    placeholder: const shadcn.Text(
-                      'Ticker Yahoo Finance (ex: URTH pour un indice monde)',
+                    placeholder: shadcn.Text(
+                      l10n.analyses_alpha_ticker_placeholder,
                     ),
                   ),
                 ),
@@ -1808,47 +1958,52 @@ class _AlphaCardState extends State<_AlphaCard> {
                   builder: (context) => OutlineButton(
                     onPressed: () => _openBenchmarkPresetsMenu(context),
                     trailing: const Icon(LucideIcons.chevronDown, size: 14),
-                    child: const shadcn.Text('Indices courants'),
+                    child: shadcn.Text(l10n.analyses_alpha_common_indices),
                   ),
                 ),
                 const SizedBox(width: 8),
                 OutlineButton(
                   onPressed: widget.onSave,
-                  child: const shadcn.Text('Enregistrer'),
+                  child: shadcn.Text(l10n.common_save),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             if (ticker.isEmpty)
-              shadcn.Text(
-                'Renseignez un indice de référence pour calculer l\'alpha.',
-              ).muted().small()
+              shadcn.Text(l10n.analyses_alpha_no_ticker).muted().small()
             else if (!hasHistory)
-              shadcn.Text(
-                'Historique du benchmark introuvable ou pas encore '
-                'synchronisé — réessayez plus tard.',
-              ).muted().small()
+              shadcn.Text(l10n.analyses_alpha_no_history).muted().small()
             else ...[
               Row(
                 children: [
                   Expanded(
                     child: _StatChip(
-                      label: 'Portefeuille',
-                      value: _formatPerformanceResult(metrics.portfolioReturn),
+                      label: l10n.analyses_portfolio_label,
+                      value: _formatPerformanceResult(
+                        metrics.portfolioReturn,
+                        l10n,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _StatChip(
                       label: ticker,
-                      value: _formatPerformanceResult(metrics.benchmarkReturn),
+                      value: _formatPerformanceResult(
+                        metrics.benchmarkReturn,
+                        l10n,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _StatChip(
-                      label: 'Alpha',
-                      value: _naOr(metrics.alpha, _percent),
+                      label: l10n.analyses_alpha_label,
+                      value: _naOr(
+                        metrics.alpha,
+                        _percent,
+                        l10n.analyses_not_calculable,
+                      ),
                     ),
                   ),
                 ],
@@ -1900,6 +2055,7 @@ class _DebtLeverageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1908,8 +2064,8 @@ class _DebtLeverageCard extends StatelessWidget {
           children: [
             _cardTitle(
               context,
-              'Endettement et levier',
-              caption: 'Aujourd\'hui',
+              l10n.analyses_debt_leverage_title,
+              caption: l10n.analyses_today,
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -1917,37 +2073,37 @@ class _DebtLeverageCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 _StatChip(
-                  label: 'Actifs totaux',
+                  label: l10n.analyses_total_assets_label,
                   value: displayEuros(totalAssets, hidden),
                 ),
                 _StatChip(
-                  label: 'Passifs totaux',
+                  label: l10n.analyses_total_liabilities_label,
                   value: displayEuros(totalLiabilities, hidden),
                 ),
                 _StatChip(
-                  label: 'Taux d\'endettement (actifs)',
-                  value: _naOr(debtRatioAssets, _percent),
-                  tooltip:
-                      'Dette totale rapportée aux actifs totaux — plus il '
-                      'est élevé, plus le patrimoine est financé par '
-                      'l\'emprunt.',
+                  label: l10n.analyses_debt_ratio_assets_label,
+                  value: _naOr(
+                    debtRatioAssets,
+                    _percent,
+                    l10n.analyses_not_calculable,
+                  ),
+                  tooltip: l10n.analyses_debt_ratio_assets_tooltip,
                 ),
                 _StatChip(
-                  label: 'Taux d\'endettement (revenus)',
+                  label: l10n.analyses_debt_ratio_income_label,
                   value: debtRatioIncome == null
-                      ? 'Renseignez vos revenus du mois dans Budget > Suivi'
+                      ? l10n.analyses_debt_ratio_income_missing
                       : _percent(debtRatioIncome!),
-                  tooltip:
-                      'Mensualités de crédit rapportées aux revenus '
-                      'mensuels renseignés dans Budget > Suivi.',
+                  tooltip: l10n.analyses_debt_ratio_income_tooltip,
                 ),
                 _StatChip(
-                  label: 'Levier',
-                  value: _naOr(leverage, (v) => v.toStringAsFixed(2)),
-                  tooltip:
-                      'Actifs totaux rapportés au patrimoine net — '
-                      'au-dessus de 1, une partie des actifs est financée '
-                      'par la dette.',
+                  label: l10n.analyses_leverage_label,
+                  value: _naOr(
+                    leverage,
+                    (v) => v.toStringAsFixed(2),
+                    l10n.analyses_not_calculable,
+                  ),
+                  tooltip: l10n.analyses_leverage_tooltip,
                 ),
               ],
             ),

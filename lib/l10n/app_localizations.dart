@@ -7478,6 +7478,420 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'Le PRU doit être un nombre supérieur à 0.'**
   String get investments_error_pru_must_be_positive;
+
+  /// No description provided for @dashboard_donut_total.
+  ///
+  /// In fr, this message translates to:
+  /// **'Total'**
+  String get dashboard_donut_total;
+
+  /// No description provided for @analyses_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'Analyses'**
+  String get analyses_title;
+
+  /// No description provided for @analyses_tab_performance.
+  ///
+  /// In fr, this message translates to:
+  /// **'Performance'**
+  String get analyses_tab_performance;
+
+  /// No description provided for @analyses_tab_risk.
+  ///
+  /// In fr, this message translates to:
+  /// **'Risque'**
+  String get analyses_tab_risk;
+
+  /// No description provided for @analyses_tab_composition.
+  ///
+  /// In fr, this message translates to:
+  /// **'Composition'**
+  String get analyses_tab_composition;
+
+  /// No description provided for @analyses_tab_financial_structure.
+  ///
+  /// In fr, this message translates to:
+  /// **'Structure financière'**
+  String get analyses_tab_financial_structure;
+
+  /// No description provided for @analyses_load_error.
+  ///
+  /// In fr, this message translates to:
+  /// **'Impossible de charger les analyses. Vérifiez que le dossier Coffre-fort est accessible.'**
+  String get analyses_load_error;
+
+  /// No description provided for @analyses_not_calculable.
+  ///
+  /// In fr, this message translates to:
+  /// **'Non calculable'**
+  String get analyses_not_calculable;
+
+  /// No description provided for @analyses_unclassified.
+  ///
+  /// In fr, this message translates to:
+  /// **'Non classé'**
+  String get analyses_unclassified;
+
+  /// No description provided for @analyses_fund_style_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'Style de gestion'**
+  String get analyses_fund_style_title;
+
+  /// No description provided for @analyses_scope_caption.
+  ///
+  /// In fr, this message translates to:
+  /// **'Actions & Fonds · aujourd\'hui'**
+  String get analyses_scope_caption;
+
+  /// No description provided for @analyses_fund_style_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Répartition de la valeur des investissements Actions & Fonds par style de gestion (gestion active, indicielle...), en % de la valeur totale de cette classe.'**
+  String get analyses_fund_style_tooltip;
+
+  /// No description provided for @analyses_no_classified_investments.
+  ///
+  /// In fr, this message translates to:
+  /// **'Aucun investissement Actions & Fonds classé pour l\'instant.'**
+  String get analyses_no_classified_investments;
+
+  /// No description provided for @analyses_sector_drop_hint.
+  ///
+  /// In fr, this message translates to:
+  /// **'Survole ou clique un secteur pour voir les investissements qui le composent.'**
+  String get analyses_sector_drop_hint;
+
+  /// No description provided for @analyses_sector_diversification_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'Diversification sectorielle'**
+  String get analyses_sector_diversification_title;
+
+  /// No description provided for @analyses_sector_diversification_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Répartition de la valeur des investissements Actions & Fonds par secteur d\'activité, en % de la valeur totale de cette classe. Le secteur se règle manuellement sur chaque investissement. Survole ou clique un secteur pour voir les investissements qui le composent.'**
+  String get analyses_sector_diversification_tooltip;
+
+  /// No description provided for @analyses_country_drop_hint.
+  ///
+  /// In fr, this message translates to:
+  /// **'Survole ou clique un pays pour voir les investissements qui le composent.'**
+  String get analyses_country_drop_hint;
+
+  /// No description provided for @analyses_geo_diversification_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'Diversification géographique'**
+  String get analyses_geo_diversification_title;
+
+  /// No description provided for @analyses_geo_diversification_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Répartition de la valeur des investissements Actions & Fonds par pays, en % de la valeur totale de cette classe. Le pays se règle manuellement sur chaque investissement. Survole ou clique un pays pour voir les investissements qui le composent.'**
+  String get analyses_geo_diversification_tooltip;
+
+  /// No description provided for @analyses_no_investments.
+  ///
+  /// In fr, this message translates to:
+  /// **'Aucun investissement.'**
+  String get analyses_no_investments;
+
+  /// No description provided for @analyses_risk_return_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'Risque et rendement'**
+  String get analyses_risk_return_title;
+
+  /// No description provided for @analyses_risk_return_subtitle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Bêta face au benchmark configuré dans la carte Alpha vs benchmark, si renseigné. Survolez un en-tête de colonne pour le détail de chaque métrique.'**
+  String get analyses_risk_return_subtitle;
+
+  /// No description provided for @analyses_risk_metric_volatility.
+  ///
+  /// In fr, this message translates to:
+  /// **'Volatilité'**
+  String get analyses_risk_metric_volatility;
+
+  /// No description provided for @analyses_risk_metric_volatility_desc.
+  ///
+  /// In fr, this message translates to:
+  /// **'Écart-type annualisé des rendements journaliers : plus il est élevé, plus la valeur a fluctué au jour le jour sur la période, dans un sens comme dans l\'autre.'**
+  String get analyses_risk_metric_volatility_desc;
+
+  /// No description provided for @analyses_risk_metric_max_drawdown.
+  ///
+  /// In fr, this message translates to:
+  /// **'Max drawdown'**
+  String get analyses_risk_metric_max_drawdown;
+
+  /// No description provided for @analyses_risk_metric_max_drawdown_desc.
+  ///
+  /// In fr, this message translates to:
+  /// **'Plus forte baisse subie entre un sommet et le creux suivant sur la période — le pire passage traversé, pas la performance finale (qui peut être positive malgré un max drawdown élevé).'**
+  String get analyses_risk_metric_max_drawdown_desc;
+
+  /// No description provided for @analyses_risk_metric_sharpe.
+  ///
+  /// In fr, this message translates to:
+  /// **'Sharpe'**
+  String get analyses_risk_metric_sharpe;
+
+  /// No description provided for @analyses_risk_metric_sharpe_desc.
+  ///
+  /// In fr, this message translates to:
+  /// **'Rendement obtenu par unité de risque total pris (la volatilité) — plus il est élevé, meilleur est le rendement pour le risque supporté. Pénalise autant les fluctuations à la hausse qu\'à la baisse.'**
+  String get analyses_risk_metric_sharpe_desc;
+
+  /// No description provided for @analyses_risk_metric_sortino.
+  ///
+  /// In fr, this message translates to:
+  /// **'Sortino'**
+  String get analyses_risk_metric_sortino;
+
+  /// No description provided for @analyses_risk_metric_sortino_desc.
+  ///
+  /// In fr, this message translates to:
+  /// **'Comme le ratio de Sharpe, mais ne pénalise que les fluctuations à la baisse (une hausse forte n\'est pas traitée comme un risque) — plus représentatif du risque réellement subi par un investisseur.'**
+  String get analyses_risk_metric_sortino_desc;
+
+  /// No description provided for @analyses_risk_metric_beta.
+  ///
+  /// In fr, this message translates to:
+  /// **'Bêta'**
+  String get analyses_risk_metric_beta;
+
+  /// No description provided for @analyses_risk_metric_beta_desc.
+  ///
+  /// In fr, this message translates to:
+  /// **'Sensibilité aux mouvements du benchmark configuré dans la carte Alpha vs benchmark : 1 = évolue comme lui, > 1 = amplifie ses mouvements, < 1 = les atténue, négatif = évolue à l\'inverse.'**
+  String get analyses_risk_metric_beta_desc;
+
+  /// No description provided for @analyses_risk_metric_omega.
+  ///
+  /// In fr, this message translates to:
+  /// **'Omega'**
+  String get analyses_risk_metric_omega;
+
+  /// No description provided for @analyses_risk_metric_omega_desc.
+  ///
+  /// In fr, this message translates to:
+  /// **'Rapport entre les gains cumulés et les pertes cumulées sur la période (au-delà d\'un rendement nul) — au-dessus de 1, les gains l\'emportent sur les pertes.'**
+  String get analyses_risk_metric_omega_desc;
+
+  /// No description provided for @analyses_risk_metric_skew.
+  ///
+  /// In fr, this message translates to:
+  /// **'Skew'**
+  String get analyses_risk_metric_skew;
+
+  /// No description provided for @analyses_risk_metric_skew_desc.
+  ///
+  /// In fr, this message translates to:
+  /// **'Asymétrie de la distribution des rendements journaliers : positif = surtout de petites pertes compensées par quelques gros gains ; négatif = surtout des gains modestes exposés à quelques grosses pertes rares.'**
+  String get analyses_risk_metric_skew_desc;
+
+  /// No description provided for @analyses_whole_portfolio.
+  ///
+  /// In fr, this message translates to:
+  /// **'Patrimoine entier'**
+  String get analyses_whole_portfolio;
+
+  /// No description provided for @analyses_correlation_title_category.
+  ///
+  /// In fr, this message translates to:
+  /// **'Corrélation — {category}'**
+  String analyses_correlation_title_category(String category);
+
+  /// No description provided for @analyses_avg_correlation_within_category.
+  ///
+  /// In fr, this message translates to:
+  /// **'Corrélation moyenne entre les actifs de cette catégorie'**
+  String get analyses_avg_correlation_within_category;
+
+  /// No description provided for @analyses_correlation_not_enough_investments.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pas assez d\'investissements avec un historique de cours suffisant dans cette catégorie sur cette période pour calculer une corrélation.'**
+  String get analyses_correlation_not_enough_investments;
+
+  /// No description provided for @analyses_correlation_between_categories_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'Corrélation entre catégories'**
+  String get analyses_correlation_between_categories_title;
+
+  /// No description provided for @analyses_avg_correlation_between_categories.
+  ///
+  /// In fr, this message translates to:
+  /// **'Corrélation moyenne entre catégories'**
+  String get analyses_avg_correlation_between_categories;
+
+  /// No description provided for @analyses_correlation_not_enough_categories.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pas assez de catégories avec un historique de cours suffisant sur cette période pour calculer une corrélation.'**
+  String get analyses_correlation_not_enough_categories;
+
+  /// No description provided for @analyses_correlation_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Indique si les lignes affichées évoluent ensemble : proche de 0 (ou négatif) = bien diversifié, proche de 1 = elles bougent presque toutes ensemble.'**
+  String get analyses_correlation_tooltip;
+
+  /// No description provided for @analyses_performance_per_year.
+  ///
+  /// In fr, this message translates to:
+  /// **'{percent} / an'**
+  String analyses_performance_per_year(String percent);
+
+  /// No description provided for @analyses_performance_since_start.
+  ///
+  /// In fr, this message translates to:
+  /// **'{percent} depuis le début'**
+  String analyses_performance_since_start(String percent);
+
+  /// No description provided for @analyses_tri_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'TRI (rendement money-weighted)'**
+  String get analyses_tri_title;
+
+  /// No description provided for @analyses_tri_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Rendement calculé en tenant compte du montant et de la date de chaque versement (méthode MWR) : il reflète le rendement réellement perçu.'**
+  String get analyses_tri_tooltip;
+
+  /// No description provided for @analyses_unrealized_gain_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'Plus-value latente'**
+  String get analyses_unrealized_gain_title;
+
+  /// No description provided for @analyses_today.
+  ///
+  /// In fr, this message translates to:
+  /// **'Aujourd\'hui'**
+  String get analyses_today;
+
+  /// No description provided for @analyses_unrealized_gain_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Ce que la vente immédiate de tout le patrimoine rapporterait au-delà du coût d\'acquisition — indépendant de la période sélectionnée.'**
+  String get analyses_unrealized_gain_tooltip;
+
+  /// No description provided for @analyses_alpha_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'Alpha vs benchmark'**
+  String get analyses_alpha_title;
+
+  /// No description provided for @analyses_alpha_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Le portefeuille réel est comparé à ce que les mêmes versements (mêmes dates, mêmes montants) auraient donné investis dans le benchmark à la place, plutôt qu\'un indice supposé investi à 100 % dès le début de la période — un apport récent n\'est jamais jugé comme s\'il avait fructifié depuis toujours. Alpha = rendement réel du portefeuille − rendement que ces mêmes flux auraient fait dans le benchmark (deux MWR).'**
+  String get analyses_alpha_tooltip;
+
+  /// No description provided for @analyses_alpha_ticker_placeholder.
+  ///
+  /// In fr, this message translates to:
+  /// **'Ticker Yahoo Finance (ex: URTH pour un indice monde)'**
+  String get analyses_alpha_ticker_placeholder;
+
+  /// No description provided for @analyses_alpha_common_indices.
+  ///
+  /// In fr, this message translates to:
+  /// **'Indices courants'**
+  String get analyses_alpha_common_indices;
+
+  /// No description provided for @analyses_alpha_no_ticker.
+  ///
+  /// In fr, this message translates to:
+  /// **'Renseignez un indice de référence pour calculer l\'alpha.'**
+  String get analyses_alpha_no_ticker;
+
+  /// No description provided for @analyses_alpha_no_history.
+  ///
+  /// In fr, this message translates to:
+  /// **'Historique du benchmark introuvable ou pas encore synchronisé — réessayez plus tard.'**
+  String get analyses_alpha_no_history;
+
+  /// No description provided for @analyses_portfolio_label.
+  ///
+  /// In fr, this message translates to:
+  /// **'Portefeuille'**
+  String get analyses_portfolio_label;
+
+  /// No description provided for @analyses_alpha_label.
+  ///
+  /// In fr, this message translates to:
+  /// **'Alpha'**
+  String get analyses_alpha_label;
+
+  /// No description provided for @analyses_debt_leverage_title.
+  ///
+  /// In fr, this message translates to:
+  /// **'Endettement et levier'**
+  String get analyses_debt_leverage_title;
+
+  /// No description provided for @analyses_total_assets_label.
+  ///
+  /// In fr, this message translates to:
+  /// **'Actifs totaux'**
+  String get analyses_total_assets_label;
+
+  /// No description provided for @analyses_total_liabilities_label.
+  ///
+  /// In fr, this message translates to:
+  /// **'Passifs totaux'**
+  String get analyses_total_liabilities_label;
+
+  /// No description provided for @analyses_debt_ratio_assets_label.
+  ///
+  /// In fr, this message translates to:
+  /// **'Taux d\'endettement (actifs)'**
+  String get analyses_debt_ratio_assets_label;
+
+  /// No description provided for @analyses_debt_ratio_assets_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Dette totale rapportée aux actifs totaux — plus il est élevé, plus le patrimoine est financé par l\'emprunt.'**
+  String get analyses_debt_ratio_assets_tooltip;
+
+  /// No description provided for @analyses_debt_ratio_income_label.
+  ///
+  /// In fr, this message translates to:
+  /// **'Taux d\'endettement (revenus)'**
+  String get analyses_debt_ratio_income_label;
+
+  /// No description provided for @analyses_debt_ratio_income_missing.
+  ///
+  /// In fr, this message translates to:
+  /// **'Renseignez vos revenus du mois dans Budget > Suivi'**
+  String get analyses_debt_ratio_income_missing;
+
+  /// No description provided for @analyses_debt_ratio_income_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Mensualités de crédit rapportées aux revenus mensuels renseignés dans Budget > Suivi.'**
+  String get analyses_debt_ratio_income_tooltip;
+
+  /// No description provided for @analyses_leverage_label.
+  ///
+  /// In fr, this message translates to:
+  /// **'Levier'**
+  String get analyses_leverage_label;
+
+  /// No description provided for @analyses_leverage_tooltip.
+  ///
+  /// In fr, this message translates to:
+  /// **'Actifs totaux rapportés au patrimoine net — au-dessus de 1, une partie des actifs est financée par la dette.'**
+  String get analyses_leverage_tooltip;
 }
 
 class _AppLocalizationsDelegate

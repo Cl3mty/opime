@@ -4359,4 +4359,248 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get investments_error_pru_must_be_positive =>
       'Avg. cost must be a number greater than 0.';
+
+  @override
+  String get dashboard_donut_total => 'Total';
+
+  @override
+  String get analyses_title => 'Analyses';
+
+  @override
+  String get analyses_tab_performance => 'Performance';
+
+  @override
+  String get analyses_tab_risk => 'Risk';
+
+  @override
+  String get analyses_tab_composition => 'Composition';
+
+  @override
+  String get analyses_tab_financial_structure => 'Financial structure';
+
+  @override
+  String get analyses_load_error =>
+      'Unable to load analytics. Check that the Vault folder is accessible.';
+
+  @override
+  String get analyses_not_calculable => 'Not available';
+
+  @override
+  String get analyses_unclassified => 'Unclassified';
+
+  @override
+  String get analyses_fund_style_title => 'Management style';
+
+  @override
+  String get analyses_scope_caption => 'Stocks & Funds · today';
+
+  @override
+  String get analyses_fund_style_tooltip =>
+      'Breakdown of the value of Stocks & Funds investments by management style (active, index...), as a % of this asset class\'s total value.';
+
+  @override
+  String get analyses_no_classified_investments =>
+      'No Stocks & Funds investments classified yet.';
+
+  @override
+  String get analyses_sector_drop_hint =>
+      'Hover or click a sector to see the investments that make it up.';
+
+  @override
+  String get analyses_sector_diversification_title => 'Sector diversification';
+
+  @override
+  String get analyses_sector_diversification_tooltip =>
+      'Breakdown of the value of Stocks & Funds investments by industry sector, as a % of this asset class\'s total value. The sector is set manually on each investment. Hover or click a sector to see the investments that make it up.';
+
+  @override
+  String get analyses_country_drop_hint =>
+      'Hover or click a country to see the investments that make it up.';
+
+  @override
+  String get analyses_geo_diversification_title => 'Geographic diversification';
+
+  @override
+  String get analyses_geo_diversification_tooltip =>
+      'Breakdown of the value of Stocks & Funds investments by country, as a % of this asset class\'s total value. The country is set manually on each investment. Hover or click a country to see the investments that make it up.';
+
+  @override
+  String get analyses_no_investments => 'No investments.';
+
+  @override
+  String get analyses_risk_return_title => 'Risk and return';
+
+  @override
+  String get analyses_risk_return_subtitle =>
+      'Beta versus the benchmark set in the Alpha vs benchmark card, if provided. Hover a column header for details on each metric.';
+
+  @override
+  String get analyses_risk_metric_volatility => 'Volatility';
+
+  @override
+  String get analyses_risk_metric_volatility_desc =>
+      'Annualized standard deviation of daily returns: the higher it is, the more the value fluctuated day to day over the period, in either direction.';
+
+  @override
+  String get analyses_risk_metric_max_drawdown => 'Max drawdown';
+
+  @override
+  String get analyses_risk_metric_max_drawdown_desc =>
+      'The largest drop suffered between a peak and the following trough over the period — the worst stretch endured, not the final performance (which can be positive despite a high max drawdown).';
+
+  @override
+  String get analyses_risk_metric_sharpe => 'Sharpe';
+
+  @override
+  String get analyses_risk_metric_sharpe_desc =>
+      'Return earned per unit of total risk taken (volatility) — the higher it is, the better the return for the risk borne. Penalizes upward fluctuations just as much as downward ones.';
+
+  @override
+  String get analyses_risk_metric_sortino => 'Sortino';
+
+  @override
+  String get analyses_risk_metric_sortino_desc =>
+      'Like the Sharpe ratio, but only penalizes downward fluctuations (a strong rise is not treated as risk) — more representative of the risk actually borne by an investor.';
+
+  @override
+  String get analyses_risk_metric_beta => 'Beta';
+
+  @override
+  String get analyses_risk_metric_beta_desc =>
+      'Sensitivity to movements of the benchmark set in the Alpha vs benchmark card: 1 = moves like it, > 1 = amplifies its movements, < 1 = dampens them, negative = moves the opposite way.';
+
+  @override
+  String get analyses_risk_metric_omega => 'Omega';
+
+  @override
+  String get analyses_risk_metric_omega_desc =>
+      'Ratio between cumulative gains and cumulative losses over the period (beyond a zero return) — above 1, gains outweigh losses.';
+
+  @override
+  String get analyses_risk_metric_skew => 'Skew';
+
+  @override
+  String get analyses_risk_metric_skew_desc =>
+      'Skewness of the daily return distribution: positive = mostly small losses offset by a few large gains; negative = mostly modest gains exposed to a few rare large losses.';
+
+  @override
+  String get analyses_whole_portfolio => 'Whole portfolio';
+
+  @override
+  String analyses_correlation_title_category(String category) {
+    return 'Correlation — $category';
+  }
+
+  @override
+  String get analyses_avg_correlation_within_category =>
+      'Average correlation between the assets in this category';
+
+  @override
+  String get analyses_correlation_not_enough_investments =>
+      'Not enough investments with sufficient price history in this category over this period to calculate a correlation.';
+
+  @override
+  String get analyses_correlation_between_categories_title =>
+      'Correlation between categories';
+
+  @override
+  String get analyses_avg_correlation_between_categories =>
+      'Average correlation between categories';
+
+  @override
+  String get analyses_correlation_not_enough_categories =>
+      'Not enough categories with sufficient price history over this period to calculate a correlation.';
+
+  @override
+  String get analyses_correlation_tooltip =>
+      'Shows whether the displayed rows move together: close to 0 (or negative) = well diversified, close to 1 = they nearly all move together.';
+
+  @override
+  String analyses_performance_per_year(String percent) {
+    return '$percent / year';
+  }
+
+  @override
+  String analyses_performance_since_start(String percent) {
+    return '$percent since inception';
+  }
+
+  @override
+  String get analyses_tri_title => 'IRR (money-weighted return)';
+
+  @override
+  String get analyses_tri_tooltip =>
+      'Return calculated by accounting for the amount and date of each payment (MWR method): it reflects the return actually earned.';
+
+  @override
+  String get analyses_unrealized_gain_title => 'Unrealized gain';
+
+  @override
+  String get analyses_today => 'Today';
+
+  @override
+  String get analyses_unrealized_gain_tooltip =>
+      'What immediately selling the entire portfolio would yield above the acquisition cost — independent of the selected period.';
+
+  @override
+  String get analyses_alpha_title => 'Alpha vs benchmark';
+
+  @override
+  String get analyses_alpha_tooltip =>
+      'The actual portfolio is compared to what the same payments (same dates, same amounts) would have returned if invested in the benchmark instead, rather than an index assumed to be 100% invested from the start of the period — a recent contribution is never judged as if it had been growing all along. Alpha = actual portfolio return − the return these same flows would have made in the benchmark (two MWRs).';
+
+  @override
+  String get analyses_alpha_ticker_placeholder =>
+      'Yahoo Finance ticker (e.g. URTH for a world index)';
+
+  @override
+  String get analyses_alpha_common_indices => 'Common indices';
+
+  @override
+  String get analyses_alpha_no_ticker =>
+      'Enter a reference index to calculate alpha.';
+
+  @override
+  String get analyses_alpha_no_history =>
+      'Benchmark history not found or not yet synced — try again later.';
+
+  @override
+  String get analyses_portfolio_label => 'Portfolio';
+
+  @override
+  String get analyses_alpha_label => 'Alpha';
+
+  @override
+  String get analyses_debt_leverage_title => 'Debt and leverage';
+
+  @override
+  String get analyses_total_assets_label => 'Total assets';
+
+  @override
+  String get analyses_total_liabilities_label => 'Total liabilities';
+
+  @override
+  String get analyses_debt_ratio_assets_label => 'Debt ratio (assets)';
+
+  @override
+  String get analyses_debt_ratio_assets_tooltip =>
+      'Total debt relative to total assets — the higher it is, the more the portfolio is financed by borrowing.';
+
+  @override
+  String get analyses_debt_ratio_income_label => 'Debt ratio (income)';
+
+  @override
+  String get analyses_debt_ratio_income_missing =>
+      'Enter your monthly income in Budget > Tracking';
+
+  @override
+  String get analyses_debt_ratio_income_tooltip =>
+      'Loan installments relative to the monthly income entered in Budget > Tracking.';
+
+  @override
+  String get analyses_leverage_label => 'Leverage';
+
+  @override
+  String get analyses_leverage_tooltip =>
+      'Total assets relative to net worth — above 1, part of the assets is financed by debt.';
 }
