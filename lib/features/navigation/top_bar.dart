@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/notifications/notifications_settings_controller.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/profiles/profile_controller.dart';
+import '../../l10n/app_localizations.dart';
 import '../dashboard/onboarding_highlight_controller.dart';
 import '../investments/current_account_focus_controller.dart';
 import '../investments/patrimoine_refresh_controller.dart';
@@ -65,7 +66,7 @@ class TopBar extends StatelessWidget {
           // Fil d'Ariane de la page sélectionnée : pour un sous-menu (ex :
           // « Simulation > Transmission »), le parent précède la page ; une
           // page de premier niveau n'affiche que son libellé.
-          _buildBreadcrumb(theme),
+          _buildBreadcrumb(context, theme),
           const SizedBox(width: 16),
           // Reconstruit l'index de recherche quand le profil actif change :
           // le patrimoine réel indexé dépend de ProfileController.activeDataPath.
@@ -102,8 +103,11 @@ class TopBar extends StatelessWidget {
 
   /// Fil d'Ariane de la page courante : chaque segment du parcours sauf le
   /// dernier est grisé et précédé d'une chevron (« Simulation › Transmission »).
-  Widget _buildBreadcrumb(ThemeData theme) {
-    final crumbs = navBreadcrumbForKey(currentPageKey);
+  Widget _buildBreadcrumb(BuildContext context, ThemeData theme) {
+    final crumbs = navLocalizedBreadcrumb(
+      AppLocalizations.of(context),
+      currentPageKey,
+    );
     final lastIndex = crumbs.length - 1;
     return Row(
       mainAxisSize: MainAxisSize.min,

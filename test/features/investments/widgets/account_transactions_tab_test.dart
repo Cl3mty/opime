@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
 import 'package:opime/features/investments/widgets/account_transactions_tab.dart';
@@ -16,6 +18,13 @@ void main() {
   }) {
     return tester.pumpWidget(
       ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
         home: Scaffold(
           child: AccountTransactionsTab(
             vaultPath: vaultPath,

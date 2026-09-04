@@ -754,6 +754,29 @@ void main() {
         expect(FundStyle.fromName(null), isNull);
       },
     );
+
+    test(
+      'FundStyle.fromYahooQuoteType : EQUITY -> action individuelle, ETF -> '
+      'indiciel, seuls cas sans ambiguïté',
+      () {
+        expect(
+          FundStyle.fromYahooQuoteType('EQUITY'),
+          FundStyle.actionIndividuelle,
+        );
+        expect(FundStyle.fromYahooQuoteType('ETF'), FundStyle.indiciel);
+      },
+    );
+
+    test(
+      'FundStyle.fromYahooQuoteType : MUTUALFUND, absent ou inconnu renvoie '
+      'null — un fonds commun de placement peut être actif ou indiciel, pas '
+      'de repli hasardeux',
+      () {
+        expect(FundStyle.fromYahooQuoteType('MUTUALFUND'), isNull);
+        expect(FundStyle.fromYahooQuoteType(null), isNull);
+        expect(FundStyle.fromYahooQuoteType('INDEX'), isNull);
+      },
+    );
   });
 
   group('Sector (secteur d\'activité)', () {

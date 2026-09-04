@@ -1,9 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
 import 'package:opime/features/investments/widgets/merge_investment_dialog.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
@@ -28,6 +31,15 @@ void main() {
     required Future<void> Function() onChanged,
   }) {
     return ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: const [Locale('fr'), Locale('en')],
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
       home: Scaffold(
         child: Builder(
           builder: (context) => OutlineButton(

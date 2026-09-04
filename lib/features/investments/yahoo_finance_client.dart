@@ -176,22 +176,26 @@ class YahooFinanceClient {
 
   /// Secteur d'activité (vocabulaire Yahoo brut, ex "Technology" — à
   /// convertir en [Sector] via `Sector.fromYahooLabel` côté appelant,
-  /// `investments_models.dart` n'étant pas une dépendance de ce fichier) et
-  /// pays de cotation (voir [countryCodeForSymbol]) pour [symbol], déjà
-  /// résolu au préalable (ex : par [resolveSymbol]). Chaque champ est
-  /// `null` indépendamment de l'autre si l'info manque — la plupart des
-  /// ETF/fonds n'ont par exemple pas de secteur chez Yahoo, contrairement
-  /// aux actions individuelles, mais ont bien un suffixe de place de
-  /// cotation exploitable.
+  /// `investments_models.dart` n'étant pas une dépendance de ce fichier),
+  /// pays de cotation (voir [countryCodeForSymbol]), et type d'instrument
+  /// brut Yahoo (ex "EQUITY", "ETF", "MUTUALFUND" — à convertir en
+  /// [FundStyle] via `FundStyle.fromYahooQuoteType` côté appelant, même
+  /// raison) pour [symbol], déjà résolu au préalable (ex : par
+  /// [resolveSymbol]). Chaque champ est `null` indépendamment des autres si
+  /// l'info manque — la plupart des ETF/fonds n'ont par exemple pas de
+  /// secteur chez Yahoo, contrairement aux actions individuelles, mais ont
+  /// bien un suffixe de place de cotation exploitable.
   ///
   /// Même philosophie défensive que le reste du client : jamais
   /// d'exception propagée, un échec (réseau, symbole inconnu, réponse
-  /// inattendue) renvoie simplement deux champs `null` — l'investissement
+  /// inattendue) renvoie simplement des champs `null` — l'investissement
   /// reste alors "non classé" comme avant cet appel, à retenter au
   /// prochain rafraîchissement plutôt que d'être marqué en échec permanent
   /// (voir `price_refresh_service.dart`, qui ne retente que tant que
-  /// [Investment.sector]/[Investment.countryCode] restent `null`).
-  Future<({String? sector, String? countryCode})> fetchClassification(
+  /// [Investment.sector]/[Investment.countryCode]/[Investment.fundStyle]
+  /// restent `null`).
+  Future<({String? sector, String? countryCode, String? quoteType})>
+  fetchClassification(
     String symbol, {
     void Function()? onNetworkError,
     void Function()? onNetworkSuccess,
@@ -205,12 +209,12 @@ class YahooFinanceClient {
       );
       onNetworkSuccess?.call();
       if (response.statusCode != 200) {
-        return (sector: null, countryCode: null);
+        return (sector: null, countryCode: null, quoteType: null);
       }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final quotes = json['quotes'] as List?;
       if (quotes == null || quotes.isEmpty) {
-        return (sector: null, countryCode: null);
+        return (sector: null, countryCode: null, quoteType: null);
       }
       // Le symbole cherché est déjà connu avec certitude (contrairement à
       // [resolveSymbol], parti d'un ISIN) : on cherche sa propre entrée
@@ -225,18 +229,19 @@ class YahooFinanceClient {
       return (
         sector: match['sector'] as String?,
         countryCode: countryCodeForSymbol(symbol),
+        quoteType: match['quoteType'] as String?,
       );
     } on SocketException catch (_) {
       onNetworkError?.call();
-      return (sector: null, countryCode: null);
+      return (sector: null, countryCode: null, quoteType: null);
     } on http.ClientException catch (_) {
       onNetworkError?.call();
-      return (sector: null, countryCode: null);
+      return (sector: null, countryCode: null, quoteType: null);
     } on TimeoutException catch (_) {
       onNetworkError?.call();
-      return (sector: null, countryCode: null);
+      return (sector: null, countryCode: null, quoteType: null);
     } catch (_) {
-      return (sector: null, countryCode: null);
+      return (sector: null, countryCode: null, quoteType: null);
     }
   }
 

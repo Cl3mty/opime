@@ -5,6 +5,7 @@ import '../../core/money_format.dart' show formatEuros, parseDecimal;
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/load_error_view.dart';
+import '../../l10n/app_localizations.dart';
 import '../investments/confirm_delete_dialog.dart' show confirmDelete;
 import '../investments/investments_models.dart' show InvestmentAccount;
 import '../investments/investments_repository.dart';
@@ -120,13 +121,11 @@ class _EntitiesScreenState extends State<EntitiesScreen> {
   }
 
   Future<void> _delete(BusinessEntity entity) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${entity.name}" ?',
-      message:
-          'Cette entité sera définitivement supprimée. Ses comptes/passifs '
-          'existants ne sont pas supprimés, mais ne seront plus rattachés à '
-          'aucune entité.',
+      title: l10n.liabilities_delete_confirm_title(entity.name),
+      message: l10n.entities_delete_confirm_message,
     );
     if (!confirmed) return;
     await _repo.deleteEntity(entity.id);
@@ -135,12 +134,11 @@ class _EntitiesScreenState extends State<EntitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_loadError) {
       return LoadErrorView(
-        message:
-            'Impossible de charger les entités. Vérifiez que le dossier '
-            'Coffre-fort est accessible.',
+        message: l10n.entities_load_error,
         onRetry: _load,
       );
     }
@@ -205,11 +203,11 @@ class _EntitiesScreenState extends State<EntitiesScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              shadcn.Text('Entités').x2Large().bold(),
+              shadcn.Text(l10n.nav_entities).x2Large().bold(),
               PrimaryButton(
                 onPressed: () => _openEditor(),
                 leading: const Icon(LucideIcons.plus),
-                child: const shadcn.Text('Ajouter une entité'),
+                child: shadcn.Text(l10n.entities_add_button),
               ),
             ],
           ),
@@ -221,14 +219,13 @@ class _EntitiesScreenState extends State<EntitiesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   shadcn.Text(
-                    'Valeur nette détenue via les entités professionnelles',
+                    l10n.entities_total_net_value_label,
                   ).muted().small(),
                   const SizedBox(height: 4),
                   shadcn.Text(formatEuros(total)).x2Large().bold(),
                   const SizedBox(height: 4),
                   shadcn.Text(
-                    'Inclus dans votre patrimoine net (Tableau de bord, '
-                    'Analyses).',
+                    l10n.entities_included_in_net_worth_hint,
                   ).muted().xSmall(),
                 ],
               ),
@@ -236,10 +233,7 @@ class _EntitiesScreenState extends State<EntitiesScreen> {
           ),
           const SizedBox(height: 24),
           if (ordered.isEmpty)
-            shadcn.Text(
-              'Aucune entité pour l\'instant — ajoute un holding, une '
-              'société commerciale, une SCI ou un compte pro.',
-            ).muted().small()
+            shadcn.Text(l10n.entities_empty_list_hint).muted().small()
           else
             for (final (entity, depth) in ordered) ...[
               Padding(
@@ -301,7 +295,22 @@ class _EntityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final diluted = (effectivePercent - entity.ownershipPercent).abs() > 0.01;
+    final ownershipLine = parentName == null
+        ? l10n.entities_card_ownership_direct(
+            entity.type.label,
+            _formatPercent(entity.ownershipPercent),
+          )
+        : l10n.entities_card_ownership_via_parent(
+                entity.type.label,
+                _formatPercent(entity.ownershipPercent),
+                parentName!,
+              ) +
+              (diluted
+                  ? ' · '
+                        '${l10n.entities_card_diluted_suffix(_formatPercent(effectivePercent))}'
+                  : '');
     return FrostedCard(
       child: GestureDetector(
         onTap: onTap,
@@ -315,13 +324,7 @@ class _EntityCard extends StatelessWidget {
                   children: [
                     shadcn.Text(entity.name).large().medium(),
                     const SizedBox(height: 2),
-                    shadcn.Text(
-                      parentName == null
-                          ? '${entity.type.label} · ${_formatPercent(entity.ownershipPercent)} % détenu'
-                          : '${entity.type.label} · ${_formatPercent(entity.ownershipPercent)} % '
-                                'détenu par $parentName'
-                                '${diluted ? ' · ${_formatPercent(effectivePercent)} % vous revient au final' : ''}',
-                    ).muted().small(),
+                    shadcn.Text(ownershipLine).muted().small(),
                   ],
                 ),
               ),
@@ -332,7 +335,7 @@ class _EntityCard extends StatelessWidget {
                     formatEuros(netValue * effectivePercent / 100),
                   ).large().semiBold(),
                   shadcn.Text(
-                    'sur ${formatEuros(netValue)} net',
+                    l10n.entities_card_net_total(formatEuros(netValue)),
                   ).muted().xSmall(),
                 ],
               ),
@@ -427,7 +430,9 @@ class _EntityEditorDialogState extends State<_EntityEditorDialog> {
   void _save() {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Le nom est obligatoire.');
+      setState(
+        () => _error = AppLocalizations.of(context).entities_name_required_error,
+      );
       return;
     }
     final percent = parseDecimal(_percentController.text) ?? 100;
@@ -444,6 +449,7 @@ class _EntityEditorDialogState extends State<_EntityEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isEditing = widget.existing != null;
     return Center(
       child: ConstrainedBox(
@@ -460,18 +466,18 @@ class _EntityEditorDialogState extends State<_EntityEditorDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   shadcn.Text(
-                    isEditing ? 'Modifier l\'entité' : 'Nouvelle entité',
+                    isEditing
+                        ? l10n.entities_editor_edit_title
+                        : l10n.entities_editor_new_title,
                   ).large().semiBold(),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _nameController,
-                    placeholder: const shadcn.Text(
-                      'Nom (ex : Holding Dupont)',
-                    ),
+                    placeholder: shadcn.Text(l10n.entities_name_hint),
                     autofocus: true,
                   ),
                   const SizedBox(height: 12),
-                  const shadcn.Text('Type').muted().small(),
+                  shadcn.Text(l10n.entities_type_label).muted().small(),
                   const SizedBox(height: 6),
                   Select<EntityType>(
                     value: _type,
@@ -492,7 +498,7 @@ class _EntityEditorDialogState extends State<_EntityEditorDialog> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const shadcn.Text('Détenue par').muted().small(),
+                  shadcn.Text(l10n.entities_owned_by_label).muted().small(),
                   const SizedBox(height: 6),
                   Select<String>(
                     value: _parentEntityId ?? _noParentValue,
@@ -501,7 +507,7 @@ class _EntityEditorDialogState extends State<_EntityEditorDialog> {
                     ),
                     itemBuilder: (context, v) => shadcn.Text(
                       v == _noParentValue
-                          ? 'Moi (directement)'
+                          ? l10n.entities_owned_by_self
                           : _eligibleParents
                                 .where((e) => e.id == v)
                                 .firstOrNull
@@ -511,9 +517,9 @@ class _EntityEditorDialogState extends State<_EntityEditorDialog> {
                     popup: (context) => SelectPopup(
                       items: SelectItemList(
                         children: [
-                          const SelectItemButton(
+                          SelectItemButton(
                             value: _noParentValue,
-                            child: shadcn.Text('Moi (directement)'),
+                            child: shadcn.Text(l10n.entities_owned_by_self),
                           ),
                           for (final parent in _eligibleParents)
                             SelectItemButton(
@@ -529,9 +535,14 @@ class _EntityEditorDialogState extends State<_EntityEditorDialog> {
                     controller: _percentController,
                     placeholder: shadcn.Text(
                       _parentEntityId == null
-                          ? '% détenu directement par vous'
-                          : '% détenu par '
-                                '${_eligibleParents.where((e) => e.id == _parentEntityId).firstOrNull?.name ?? ''}',
+                          ? l10n.entities_percent_direct_hint
+                          : l10n.entities_percent_via_parent_hint(
+                              _eligibleParents
+                                      .where((e) => e.id == _parentEntityId)
+                                      .firstOrNull
+                                      ?.name ??
+                                  '',
+                            ),
                     ),
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
@@ -540,10 +551,13 @@ class _EntityEditorDialogState extends State<_EntityEditorDialog> {
                   if (_parentEntityId != null) ...[
                     const SizedBox(height: 6),
                     shadcn.Text(
-                      'Ne comptez pas la valeur de cette entité dans le '
-                      'bilan de '
-                      '${_eligibleParents.where((e) => e.id == _parentEntityId).firstOrNull?.name ?? 'sa société mère'}'
-                      ' — le lien de possession s\'en charge.',
+                      l10n.entities_dilution_note(
+                        _eligibleParents
+                                .where((e) => e.id == _parentEntityId)
+                                .firstOrNull
+                                ?.name ??
+                            l10n.entities_parent_company_fallback,
+                      ),
                     ).muted().xSmall(),
                   ],
                   if (_error != null) ...[
@@ -560,12 +574,12 @@ class _EntityEditorDialogState extends State<_EntityEditorDialog> {
                     children: [
                       PrimaryButton(
                         onPressed: _save,
-                        child: const shadcn.Text('Enregistrer'),
+                        child: shadcn.Text(l10n.common_save),
                       ),
                       const SizedBox(width: 8),
                       OutlineButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
+                        child: shadcn.Text(l10n.common_cancel),
                       ),
                     ],
                   ),

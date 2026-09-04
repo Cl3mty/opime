@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../l10n/app_localizations.dart';
 
 /// Écran bloquant affiché quand `VaultMigrationMarker` détecte qu'une
 /// opération "activer/désactiver le chiffrement" a été interrompue avant
@@ -22,6 +23,7 @@ class VaultMigrationInterruptedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       child: Center(
         child: ConstrainedBox(
@@ -37,18 +39,13 @@ class VaultMigrationInterruptedScreen extends StatelessWidget {
                   color: Theme.of(context).colorScheme.destructive,
                 ),
                 const SizedBox(height: 24),
-                const shadcn.Text(
-                  'Chiffrement interrompu',
+                shadcn.Text(
+                  l10n.onboarding_migration_interrupted_title,
                   textAlign: TextAlign.center,
                 ).large().large().medium(),
                 const SizedBox(height: 12),
-                const shadcn.Text(
-                  'Une opération de chiffrement ou déchiffrement de ce '
-                  'coffre-fort a été interrompue avant sa fin (l\'app a '
-                  'peut-être été '
-                  'fermée pendant l\'opération). Certains fichiers privés '
-                  'peuvent être restés dans un ancien état pendant que '
-                  'd\'autres sont déjà à jour.',
+                shadcn.Text(
+                  l10n.onboarding_migration_interrupted_description,
                   textAlign: TextAlign.center,
                 ).muted(),
                 const SizedBox(height: 12),
@@ -57,18 +54,16 @@ class VaultMigrationInterruptedScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ).muted().xSmall(),
                 const SizedBox(height: 24),
-                const shadcn.Text(
-                  'Recommandé : recommence l\'opération depuis les Réglages '
-                  '(Activer/Désactiver le chiffrement) une fois averti — elle '
-                  'remettra tous les fichiers dans le même état. Si un '
-                  'fichier précis refuse ensuite de se charger, ce sera le '
-                  'signe qu\'il faut le restaurer depuis une sauvegarde.',
+                shadcn.Text(
+                  l10n.onboarding_migration_interrupted_recommendation,
                   textAlign: TextAlign.center,
                 ).muted().small(),
                 const SizedBox(height: 24),
                 OutlineButton(
                   onPressed: onContinueAnyway,
-                  child: const shadcn.Text('J\'ai compris, continuer quand même'),
+                  child: shadcn.Text(
+                    l10n.onboarding_migration_interrupted_continue,
+                  ),
                 ),
               ],
             ),

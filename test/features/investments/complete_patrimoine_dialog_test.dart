@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/core/storage/vault_folder_service.dart';
 import 'package:opime/features/entities/entities_models.dart';
 import 'package:opime/features/entities/entities_repository.dart';
@@ -38,6 +40,13 @@ void main() {
   Future<void> pumpDialog(WidgetTester tester, {required AssetClass initialAssetClass}) async {
     await tester.pumpWidget(
       ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
         home: Scaffold(
           child: Builder(
             builder: (context) => GestureDetector(
@@ -172,6 +181,13 @@ void main() {
     }) async {
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: Builder(
               builder: (context) => GestureDetector(
@@ -596,6 +612,13 @@ void main() {
     Future<void> pumpImmobilierDialog(WidgetTester tester) async {
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: Builder(
               builder: (context) => GestureDetector(
@@ -741,6 +764,13 @@ void main() {
       Future<void> pumpPassifTypeStep(WidgetTester tester) async {
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: Builder(
                 builder: (context) => GestureDetector(
@@ -942,6 +972,13 @@ void main() {
 
           await tester.pumpWidget(
             ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
               home: Scaffold(
                 child: Builder(
                   builder: (context) => GestureDetector(
@@ -1118,6 +1155,13 @@ void main() {
     }) async {
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: Builder(
               builder: (context) => GestureDetector(
@@ -1331,6 +1375,13 @@ void main() {
 
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: Builder(
                 builder: (context) => GestureDetector(

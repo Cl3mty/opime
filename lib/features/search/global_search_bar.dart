@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../l10n/app_localizations.dart';
 import 'global_search_index.dart';
 
 /// Champ de recherche globale de la TopBar (desktop/tablette), qui remplace
@@ -187,6 +188,7 @@ class _GlobalSearchBarState extends State<GlobalSearchBar> {
 
   Widget _buildPanel(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return ConstrainedBox(
       // Largeur plafonnée même si le champ est très large (TopBar étendue) ;
       // hauteur plafonnée pour que la liste défile à l'intérieur du panneau.
@@ -198,7 +200,7 @@ class _GlobalSearchBarState extends State<GlobalSearchBar> {
           builder: (context, _) {
             final results = _results.value;
             if (results.isEmpty) {
-              return shadcn.Text('Aucun résultat').muted.small.withPadding(
+              return shadcn.Text(l10n.search_no_results).muted.small.withPadding(
                 vertical: theme.density.baseContainerPadding * theme.scaling,
               );
             }
@@ -215,10 +217,9 @@ class _GlobalSearchBarState extends State<GlobalSearchBar> {
               final entries = groups[category];
               if (entries == null) continue;
               children.add(
-                shadcn.Text(category.label).muted.small.withPadding(
-                  horizontal: 8,
-                  vertical: 6,
-                ),
+                shadcn.Text(
+                  searchCategoryLabel(l10n, category),
+                ).muted.small.withPadding(horizontal: 8, vertical: 6),
               );
               for (final entry in entries) {
                 final index = rowIndex++;
@@ -291,7 +292,7 @@ class _GlobalSearchBarState extends State<GlobalSearchBar> {
       child: TextField(
         controller: _controller,
         focusNode: _focusNode,
-        placeholder: const shadcn.Text('Rechercher dans Opime...'),
+        placeholder: shadcn.Text(AppLocalizations.of(context).search_placeholder),
         border: Border.all(color: Colors.transparent),
         features: [
           InputFeature.leading(

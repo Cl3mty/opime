@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/date_format.dart';
 import '../../../core/money_format.dart';
+import '../../../l10n/app_localizations.dart';
 import '../investments_models.dart';
 import '../performance_calculator.dart';
 import 'fiscal_milestone_bar.dart';
@@ -43,6 +44,7 @@ class AccountSummaryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final investments = _investments;
     final pricedInvestments = investments
         .where((i) => i.marketValue != null)
@@ -85,13 +87,15 @@ class AccountSummaryHeader extends StatelessWidget {
         if (account.openingDate != null) ...[
           const SizedBox(height: 2),
           shadcn.Text(
-            'Ouvert le ${formatDateDdMmYyyy(account.openingDate!)}',
+            l10n.investments_opened_on(
+              formatDateDdMmYyyy(account.openingDate!),
+            ),
           ).muted().xSmall(),
         ],
         if (fiscalMilestone != null) ...[
           const SizedBox(height: 2),
           shadcn.Text(
-            _fiscalMilestoneLabel(fiscalMilestone),
+            _fiscalMilestoneLabel(l10n, fiscalMilestone),
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: fiscalMilestone.reached
@@ -128,9 +132,8 @@ class AccountSummaryHeader extends StatelessWidget {
         shadcn.Text(
           pricedInvestments.length == investments.length &&
                   investments.isNotEmpty
-              ? 'Valorisation au dernier cours connu'
-              : 'Montant net investi (cours pas encore disponible pour '
-                    'tous les investissements)',
+              ? l10n.investments_valuation_last_known_price
+              : l10n.investments_net_invested_amount_pending_price,
         ).muted().xSmall(),
         if (mwr != null) ...[
           const SizedBox(height: 8),
@@ -147,10 +150,12 @@ class AccountSummaryHeader extends StatelessWidget {
               const SizedBox(width: 4),
               shadcn.Text(
                 mwr.annualized
-                    ? '${displayPercent(mwr.rate * 100)} par an (MWR, '
-                          'rendement pondéré par vos apports)'
-                    : '${displayPercent(mwr.rate * 100)} depuis le début '
-                          '(MWR, moins d\'un an de recul)',
+                    ? l10n.investments_mwr_annualized(
+                        displayPercent(mwr.rate * 100),
+                      )
+                    : l10n.investments_mwr_since_start(
+                        displayPercent(mwr.rate * 100),
+                      ),
                 style: TextStyle(
                   color: mwr.rate >= 0 ? _green : _red,
                   fontWeight: FontWeight.w600,
@@ -194,16 +199,18 @@ class AccountSummaryHeader extends StatelessWidget {
   /// et le détail des règles (5 ans PEA, 8 ans assurance vie). Ne concerne
   /// pas PEG/PEE, dont le déblocage se calcule par versement — voir
   /// [PegPeeUnlockCard].
-  String _fiscalMilestoneLabel(FiscalMilestone milestone) {
+  String _fiscalMilestoneLabel(AppLocalizations l10n, FiscalMilestone milestone) {
     final date = formatDateDdMmYyyy(milestone.date);
-    if (milestone.reached) return 'Avantage fiscal actif depuis le $date';
+    if (milestone.reached) {
+      return l10n.investments_fiscal_advantage_active_since(date);
+    }
 
     final days = milestone.date.difference(DateTime.now()).inDays;
     final delay = days < 31
-        ? '$days jour${days > 1 ? 's' : ''}'
+        ? l10n.investments_delay_days(days)
         : days < 365
-        ? '${(days / 30).round()} mois'
-        : '${(days / 365).round()} ans';
-    return 'Avantage fiscal le $date (dans $delay)';
+        ? l10n.investments_delay_months((days / 30).round())
+        : l10n.investments_delay_years((days / 365).round());
+    return l10n.investments_fiscal_advantage_upcoming(date, delay);
   }
 }

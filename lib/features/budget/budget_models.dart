@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../../core/date_format.dart';
+import '../../l10n/app_localizations.dart';
 
 String generateItemId(String prefix) {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -150,9 +151,12 @@ class BudgetSnapshot {
     required this.data,
   });
 
-  String get displayName => name?.isNotEmpty == true
+  /// [l10n] est requis pour formatter le nom par défaut ("Budget du ...")
+  /// quand aucun nom explicite n'a été donné au budget — voir
+  /// `budget_screen.dart` pour les points d'appel.
+  String displayName(AppLocalizations l10n) => name?.isNotEmpty == true
       ? name!
-      : 'Budget du ${formatDateDdMmYyyy(savedAt)}';
+      : l10n.budget_default_snapshot_name(formatDateDdMmYyyy(savedAt));
 
   factory BudgetSnapshot.fromJson(Map<String, dynamic> json) => BudgetSnapshot(
     id: json['id'] as String,

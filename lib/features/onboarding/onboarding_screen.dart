@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../core/storage/vault_folder_service.dart';
 import '../../core/ui/vault_kind_selector.dart';
+import '../../l10n/app_localizations.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final VaultFolderService vaultFolderService;
@@ -37,7 +38,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       widget.onVaultReady(path);
     } catch (e) {
       setState(() {
-        _error = 'Impossible de créer le dossier de données : $e';
+        _error = AppLocalizations.of(
+          context,
+        ).onboarding_create_folder_failed(e.toString());
         _loading = false;
       });
     }
@@ -45,6 +48,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       child: Center(
         child: ConstrainedBox(
@@ -60,17 +64,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'Bienvenue sur Opime',
+                Text(
+                  l10n.onboarding_welcome_title,
                   textAlign: TextAlign.center,
                 ).large().large().medium(),
                 const SizedBox(height: 12),
-                const Text(
-                  'Choisis où seront stockées tes données. Tu peux commencer en local et déplacer ce dossier vers un service cloud (iCloud, Google Drive, Dropbox...) plus tard.',
+                Text(
+                  l10n.onboarding_description,
                   textAlign: TextAlign.center,
                 ).muted(),
                 const SizedBox(height: 24),
-                const Text('Ce coffre-fort est...').small().medium(),
+                Text(l10n.onboarding_vault_kind_prompt).small().medium(),
                 const SizedBox(height: 8),
                 VaultKindSelector(
                   value: _kind,
@@ -87,7 +91,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         )
                       : const Icon(LucideIcons.folder),
                   child: Text(
-                    _loading ? 'Création...' : 'Choisir un emplacement',
+                    _loading
+                        ? l10n.onboarding_creating
+                        : l10n.onboarding_pick_location,
                   ),
                 ),
                 if (_error != null) ...[

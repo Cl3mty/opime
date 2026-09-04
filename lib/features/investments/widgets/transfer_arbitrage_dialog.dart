@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../../l10n/app_localizations.dart';
 import '../../../core/money_format.dart' show displayEuros, parseDecimal;
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/opime_date_picker.dart';
@@ -389,29 +390,32 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
   /// unique : c'est ce qui permet à l'analyseur de promouvoir `quantity`/
   /// `price`/`destAccount` en non-nuls dans le reste de la méthode une fois
   /// la validation passée).
-  String _transferValidationError({
+  String _transferValidationError(
+    AppLocalizations l10n, {
     required double? quantity,
     required double? price,
     required InvestmentAccount? destAccount,
   }) {
     if (quantity == null || quantity <= 0) {
-      return 'La quantité doit être un nombre supérieur à 0.';
+      return l10n.investments_error_quantity_must_be_positive;
     }
     if (quantity > widget.sourceInvestment.quantityHeld + 1e-9) {
-      return 'La quantité (${_formatNumber(quantity)}) dépasse la '
-          'quantité détenue '
-          '(${_formatNumber(widget.sourceInvestment.quantityHeld)}).';
+      return l10n.investments_error_quantity_exceeds_sellable(
+        _formatNumber(quantity),
+        _formatNumber(widget.sourceInvestment.quantityHeld),
+      );
     }
     if (price == null || price <= 0) {
-      return 'Le PRU doit être un nombre supérieur à 0.';
+      return l10n.investments_error_pru_must_be_positive;
     }
     if (destAccount == null) {
-      return 'Choisis un compte de destination.';
+      return l10n.investments_error_dest_account_required;
     }
-    return 'La date est requise.';
+    return l10n.investments_error_date_required;
   }
 
   Future<void> _commitTransfer() async {
+    final l10n = AppLocalizations.of(context);
     final date = _date;
     final quantity = parseDecimal(_quantityController.text);
     final price = parseDecimal(_sellPriceController.text);
@@ -424,8 +428,9 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
         price <= 0 ||
         destAccount == null) {
       _showToast(
-        title: 'Transfert impossible',
+        title: l10n.investments_transfer_impossible_title,
         subtitle: _transferValidationError(
+          l10n,
           quantity: quantity,
           price: price,
           destAccount: destAccount,
@@ -459,9 +464,8 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
     );
     if (updatedDestInvestment == null) {
       _showToast(
-        title: 'Transfert impossible',
-        subtitle: 'Renseigne le libellé (et l\'identifiant si nécessaire) '
-            'de la nouvelle position.',
+        title: l10n.investments_transfer_impossible_title,
+        subtitle: l10n.investments_error_new_position_fields_required,
       );
       return;
     }
@@ -488,8 +492,8 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
     } catch (e) {
       if (!mounted) return;
       _showToast(
-        title: 'Transfert impossible',
-        subtitle: 'Erreur lors de l\'enregistrement : $e',
+        title: l10n.investments_transfer_impossible_title,
+        subtitle: l10n.investments_save_error(e.toString()),
       );
       return;
     }
@@ -500,30 +504,32 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
 
   /// Voir [_transferValidationError] : même principe, évalué seulement sur
   /// l'échec du garde-fou unique de [_commitArbitrage].
-  String _arbitrageValidationError({
+  String _arbitrageValidationError(
+    AppLocalizations l10n, {
     required double? quantity,
     required double? sellPrice,
     required double? buyPrice,
   }) {
     if (quantity == null || quantity <= 0) {
-      return 'La quantité doit être un nombre supérieur à 0.';
+      return l10n.investments_error_quantity_must_be_positive;
     }
     if (quantity > widget.sourceInvestment.quantityHeld + 1e-9) {
-      return 'La quantité (${_formatNumber(quantity)}) dépasse la '
-          'quantité détenue '
-          '(${_formatNumber(widget.sourceInvestment.quantityHeld)}).';
+      return l10n.investments_error_quantity_exceeds_sellable(
+        _formatNumber(quantity),
+        _formatNumber(widget.sourceInvestment.quantityHeld),
+      );
     }
     if (sellPrice == null || sellPrice <= 0) {
-      return 'Le prix de vente doit être un nombre supérieur à 0.';
+      return l10n.investments_error_sell_price_must_be_positive;
     }
     if (buyPrice == null || buyPrice <= 0) {
-      return 'Le prix d\'achat de la destination doit être un nombre '
-          'supérieur à 0.';
+      return l10n.investments_error_buy_price_must_be_positive;
     }
-    return 'La date est requise.';
+    return l10n.investments_error_date_required;
   }
 
   Future<void> _commitArbitrage() async {
+    final l10n = AppLocalizations.of(context);
     final date = _date;
     final quantity = parseDecimal(_quantityController.text);
     final sellPrice = parseDecimal(_sellPriceController.text);
@@ -537,8 +543,9 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
         buyPrice == null ||
         buyPrice <= 0) {
       _showToast(
-        title: 'Arbitrage impossible',
+        title: l10n.investments_arbitrage_impossible_title,
         subtitle: _arbitrageValidationError(
+          l10n,
           quantity: quantity,
           sellPrice: sellPrice,
           buyPrice: buyPrice,
@@ -576,9 +583,8 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
     );
     if (updatedDestInvestment == null) {
       _showToast(
-        title: 'Arbitrage impossible',
-        subtitle: 'Renseigne le libellé (et l\'identifiant si nécessaire) '
-            'de la nouvelle position.',
+        title: l10n.investments_arbitrage_impossible_title,
+        subtitle: l10n.investments_error_new_position_fields_required,
       );
       return;
     }
@@ -608,8 +614,8 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
     } catch (e) {
       if (!mounted) return;
       _showToast(
-        title: 'Arbitrage impossible',
-        subtitle: 'Erreur lors de l\'enregistrement : $e',
+        title: l10n.investments_arbitrage_impossible_title,
+        subtitle: l10n.investments_save_error(e.toString()),
       );
       return;
     }
@@ -651,10 +657,11 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
   }
 
   Widget _buildDestinationPicker(List<Investment> candidates) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        shadcn.Text('Position').muted().xSmall(),
+        shadcn.Text(l10n.investments_field_position).muted().xSmall(),
         const SizedBox(height: 4),
         Select<String>(
           value: _destSelection,
@@ -668,7 +675,7 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
           },
           itemBuilder: (context, value) => shadcn.Text(
             value == _newPositionValue
-                ? '+ Nouvelle position'
+                ? l10n.investments_new_position_option
                 : candidates.firstWhere((i) => i.id == value).label,
           ),
           popup: (context) => SelectPopup(
@@ -679,9 +686,9 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
                     value: investment.id,
                     child: shadcn.Text(investment.label),
                   ),
-                const SelectItemButton(
+                SelectItemButton(
                   value: _newPositionValue,
-                  child: shadcn.Text('+ Nouvelle position'),
+                  child: shadcn.Text(l10n.investments_new_position_option),
                 ),
               ],
             ),
@@ -704,6 +711,7 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -723,8 +731,12 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
                       Expanded(
                         child: shadcn.Text(
                           _isTransfer
-                              ? 'Transférer "${widget.sourceInvestment.label}"'
-                              : 'Arbitrer "${widget.sourceInvestment.label}"',
+                              ? l10n.investments_transfer_title(
+                                  widget.sourceInvestment.label,
+                                )
+                              : l10n.investments_arbitrage_title(
+                                  widget.sourceInvestment.label,
+                                ),
                         ).large().semiBold(),
                       ),
                       IconButton.ghost(
@@ -736,32 +748,32 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
                   const SizedBox(height: 4),
                   shadcn.Text(
                     _isTransfer
-                        ? 'Le PRU est conservé : la vente ici et l\'achat sur '
-                              'le compte de destination utilisent tous deux '
-                              'le PRU actuel — aucune plus-value n\'est '
-                              'réalisée par le transfert lui-même.'
-                        : 'La vente se fait au cours du marché (réalise la '
-                              'plus/moins-value latente) ; le produit finance '
-                              'exactement l\'achat du nouveau titre.',
+                        ? l10n.investments_transfer_description
+                        : l10n.investments_arbitrage_description,
                   ).muted().xSmall(),
                   const SizedBox(height: 16),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: _labeledField('Quantité', _quantityController),
+                        child: _labeledField(
+                          l10n.investments_field_quantity,
+                          _quantityController,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _labeledField(
-                          _isTransfer ? 'PRU conservé' : 'Prix de vente',
+                          _isTransfer
+                              ? l10n.investments_field_pru_kept
+                              : l10n.investments_field_sell_price,
                           _sellPriceController,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  shadcn.Text('Date').muted().xSmall(),
+                  shadcn.Text(l10n.common_date).muted().xSmall(),
                   const SizedBox(height: 4),
                   OpimeDatePicker(
                     value: _date,
@@ -776,10 +788,12 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
                       )
                     else if (_otherAccounts.isEmpty)
                       shadcn.Text(
-                        'Aucun autre compte disponible pour un transfert.',
+                        l10n.investments_no_other_account_for_transfer,
                       ).muted().small()
                     else ...[
-                      shadcn.Text('Vers le compte').muted().xSmall(),
+                      shadcn.Text(
+                        l10n.investments_field_dest_account,
+                      ).muted().xSmall(),
                       const SizedBox(height: 4),
                       Select<String>(
                         value: _destAccountId,
@@ -811,7 +825,7 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
                     _buildDestinationPicker(_destCandidates),
                     const SizedBox(height: 12),
                     _labeledField(
-                      'Prix d\'achat de la destination',
+                      l10n.investments_field_dest_buy_price,
                       _buyPriceController,
                     ),
                     const SizedBox(height: 4),
@@ -836,12 +850,17 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
                             : null;
                         return shadcn.Text(
                           amount == null
-                              ? 'Montant obtenu : —'
+                              ? l10n.investments_amount_obtained_placeholder
                               : destQuantity == null
-                              ? 'Montant obtenu : ${displayEuros(amount, false)}'
-                              : 'Montant obtenu : ${displayEuros(amount, false)} '
-                                    '→ quantité achetée : '
-                                    '${_formatNumber(_roundForDisplay(destQuantity))}',
+                              ? l10n.investments_amount_obtained_value(
+                                  displayEuros(amount, false),
+                                )
+                              : l10n.investments_amount_obtained_with_bought_quantity(
+                                  displayEuros(amount, false),
+                                  _formatNumber(
+                                    _roundForDisplay(destQuantity),
+                                  ),
+                                ),
                         ).muted().xSmall();
                       },
                     ),
@@ -872,13 +891,15 @@ class _TransferArbitrageDialogState extends State<_TransferArbitrageDialog> {
                             ? _commitTransfer
                             : _commitArbitrage,
                         child: shadcn.Text(
-                          _isTransfer ? 'Transférer' : 'Arbitrer',
+                          _isTransfer
+                              ? l10n.investments_transfer_button
+                              : l10n.investments_arbitrage_button,
                         ),
                       ),
                       const SizedBox(width: 8),
                       OutlineButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
+                        child: shadcn.Text(l10n.common_cancel),
                       ),
                     ],
                   ),

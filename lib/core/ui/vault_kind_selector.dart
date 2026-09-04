@@ -1,9 +1,24 @@
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
 import '../storage/vault_folder_service.dart' show VaultKind;
 import 'frosted_card.dart';
 import 'toggle_button_style.dart';
+
+/// Libellé localisé d'un [VaultKind] — `VaultKind.label` (défini dans
+/// `vault_folder_service.dart`, hors périmètre i18n car réutilisé ailleurs
+/// tel quel) reste fixé en français ; ce sélecteur affiche donc sa propre
+/// traduction plutôt que ce libellé brut. `nav_professional` est réutilisé
+/// pour "Professionnel" : même mot que le libellé du groupe de navigation
+/// "Entités" ([entitesGroup] dans `nav_models.dart`), déjà traduit.
+String _kindLabel(BuildContext context, VaultKind kind) {
+  final l10n = AppLocalizations.of(context);
+  return switch (kind) {
+    VaultKind.personal => l10n.core_ui_vault_kind_personal,
+    VaultKind.professional => l10n.nav_professional,
+  };
+}
 
 const _toggleButtonSize = ButtonSize(0.9);
 
@@ -32,7 +47,7 @@ class VaultKindSelector extends StatelessWidget {
             selectedStyle: const ButtonStyle.primary(size: _toggleButtonSize),
             style: toggleUnselectedStyle(context, size: _toggleButtonSize),
             onChanged: (_) => onChanged(kind),
-            child: shadcn.Text(kind.label),
+            child: shadcn.Text(_kindLabel(context, kind)),
           ),
       ],
     );
@@ -62,6 +77,7 @@ class _VaultKindDialogState extends State<_VaultKindDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -72,11 +88,9 @@ class _VaultKindDialogState extends State<_VaultKindDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const shadcn.Text('Nouveau coffre-fort').large().semiBold(),
+                shadcn.Text(l10n.core_ui_new_vault_title).large().semiBold(),
                 const SizedBox(height: 8),
-                const shadcn.Text(
-                  'Ce coffre-fort est...',
-                ).muted().small(),
+                shadcn.Text(l10n.core_ui_new_vault_kind_prompt).muted().small(),
                 const SizedBox(height: 12),
                 VaultKindSelector(
                   value: _kind,
@@ -87,12 +101,12 @@ class _VaultKindDialogState extends State<_VaultKindDialog> {
                   children: [
                     PrimaryButton(
                       onPressed: () => Navigator.of(context).pop(_kind),
-                      child: const shadcn.Text('Continuer'),
+                      child: shadcn.Text(l10n.common_continue),
                     ),
                     const SizedBox(width: 8),
                     OutlineButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const shadcn.Text('Annuler'),
+                      child: shadcn.Text(l10n.common_cancel),
                     ),
                   ],
                 ),

@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/load_error_view.dart';
 import '../../core/ui/slide_page_route.dart';
+import '../../l10n/app_localizations.dart';
 import '../investments/investments_models.dart' show InvestmentAccount;
 import '../investments/investments_repository.dart';
 import '../liabilities/liabilities_models.dart' show Liability;
@@ -122,10 +123,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   void _openEditorMobile(BuildContext context, {Project? project}) {
+    final l10n = AppLocalizations.of(context);
     Navigator.of(context).push(
       slidePageRoute(
         (context) => _ProjectEditorPage(
-          title: project == null ? 'Nouveau projet' : project.name,
+          title: project == null ? l10n.projects_new_project : project.name,
           vaultPath: widget.vaultPath,
           project: project,
           onSaved: () async {
@@ -152,11 +154,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
+    final l10n = AppLocalizations.of(context);
     if (_loadError) {
       return LoadErrorView(
-        message:
-            'Impossible de charger les projets. Vérifiez que le dossier '
-            'Coffre-fort est accessible.',
+        message: l10n.projects_load_error,
         onRetry: _retryLoad,
       );
     }
@@ -206,8 +207,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         const VerticalDivider(width: 1),
         Expanded(
           child: (selected == null && !_creatingNew)
-              ? const Center(
-                  child: shadcn.Text('Sélectionne ou crée un projet'),
+              ? Center(
+                  child: shadcn.Text(
+                    AppLocalizations.of(context).projects_select_or_create,
+                  ),
                 )
               : ProjectEditor(
                   key: ValueKey(_creatingNew ? 'new' : _selectedId),
@@ -253,6 +256,7 @@ class _ProjectsListPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final today = DateTime.now();
     return Column(
       children: [
@@ -260,7 +264,7 @@ class _ProjectsListPanel extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              const Expanded(child: shadcn.Text('Projets')),
+              Expanded(child: shadcn.Text(l10n.nav_projects)),
               IconButton.ghost(
                 icon: const Icon(LucideIcons.plus),
                 onPressed: onCreate,
@@ -275,7 +279,7 @@ class _ProjectsListPanel extends StatelessWidget {
             builder: (context, all, _) {
               if (all.isEmpty) {
                 return Center(
-                  child: shadcn.Text('Aucun projet').muted().small(),
+                  child: shadcn.Text(l10n.projects_empty).muted().small(),
                 );
               }
               return ListView.separated(
@@ -351,6 +355,7 @@ class _ProjectsListPanel extends StatelessWidget {
                                     ).medium(),
                                     shadcn.Text(
                                       formatEcheanceRelative(
+                                        l10n,
                                         project.echeance,
                                         today,
                                       ),

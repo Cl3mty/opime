@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:opime/features/strategy/note_editor.dart';
 import 'package:opime/features/strategy/strategy_documents_repository.dart';
 import 'package:opime/features/strategy/strategy_repository.dart';
@@ -26,9 +28,15 @@ void main() {
 
   Widget buildEditor() {
     return ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
       // Sans ces délégués (voir `main.dart`), `QuillSimpleToolbar` lève
       // `MissingFlutterQuillLocalizationException` dès son premier build.
-      localizationsDelegates: FlutterQuillLocalizations.localizationsDelegates,
+      localizationsDelegates: [
+        ...FlutterQuillLocalizations.localizationsDelegates,
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
       home: Scaffold(
         child: NoteEditor(repository: repo, noteId: noteId, onSaved: () {}),
       ),

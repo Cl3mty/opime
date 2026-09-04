@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/gold_progress_bar.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Barre de progression "objectif" — montant actuel à gauche, montant
 /// cible à droite, remplissage doré dégradé entre les deux (même teinte
@@ -68,8 +69,11 @@ class ProjectOnTrackBadge extends StatelessWidget {
     final onTrack = this.onTrack;
     if (onTrack == null) return const SizedBox.shrink();
 
+    final l10n = AppLocalizations.of(context);
     final color = onTrack ? const Color(0xFF22C55E) : const Color(0xFFF59E0B);
-    final label = onTrack ? 'En bonne voie' : 'En retard';
+    final label = onTrack
+        ? l10n.projects_on_track_label
+        : l10n.projects_off_track_label;
     final icon = onTrack ? LucideIcons.circleCheck : LucideIcons.triangleAlert;
 
     return Container(

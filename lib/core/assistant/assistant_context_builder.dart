@@ -5,8 +5,18 @@ import '../../features/investments/investments_models.dart';
 import '../../features/investments/investments_repository.dart';
 import '../../features/investments/performance_calculator.dart';
 import '../../features/strategy/strategy_repository.dart';
-import '../../core/money_format.dart' show formatEuros;
+import '../../core/money_format.dart' show formatEuros, formatEurosCompact;
 import '../../core/simulations/simulation_state_repository.dart';
+
+/// Sections du contexte patrimoine, chacune activable indépendamment
+/// via le filtrage par mots-clés (voir [AssistantContextBuilder]).
+enum _ContextSection {
+  investments,
+  budget,
+  budgetTracking,
+  strategy,
+  simulations,
+}
 
 /// Construit une synthèse texte (en français) des données du profil actif,
 /// destinée au contexte de l'assistant IA.
@@ -36,6 +46,41 @@ class AssistantContextBuilder {
     'transmission_heritage',
   ];
 
+  /// Mots-clés par section : quand [buildPatrimoineContext] reçoit une
+  /// question, seules les sections dont un mot-clé apparaît dans la question
+  /// (insensible à la casse) sont incluses. Sans correspondance, toutes les
+  /// sections sont envoyées (comportement d'origine).
+  static const _sectionKeywords = {
+    _ContextSection.investments: [
+      'investissement', 'placement', 'pea', 'cto', 'compte-titre',
+      'actions', 'obligations', 'etf', 'fonds', 'valorisation',
+      'plus-value', 'performance', 'allocation', 'patrimoine', 'isin',
+      'rendement', 'portefeuille', 'actif', 'classe d\'actif',
+      'pru', 'cours', 'quantité', 'marché', 'bourse',
+    ],
+    _ContextSection.budget: [
+      'budget', 'dépense', 'dépenses', 'revenu', 'revenus', 'épargne',
+      'solde', 'poste', 'catégorie', 'facture', 'factures',
+      'charges', 'prélèvement', 'salaire', 'loyer', 'impot', 'impôts',
+    ],
+    _ContextSection.budgetTracking: [
+      'suivi', 'réel', 'réalité', 'constaté', 'historique',
+      'mois', 'amazon', 'abonnement', 'mensuel', 'chronique',
+      'régulier', 'habituel', 'dépense nommée',
+    ],
+    _ContextSection.strategy: [
+      'stratégie', 'strategie', 'note', 'plan', 'objectif', 'objectifs',
+      'projet', 'projets', 'feuille de route', 'diagnostic',
+    ],
+    _ContextSection.simulations: [
+      'simulation', 'scénario', 'scenario', 'projection', 'crédit',
+      'credit', 'prêt', 'pret', 'ifi', 'impôt', 'impots', 'ir',
+      'quotient', 'familial', 'transmission', 'démembrement',
+      'demembrement', 'donation', 'héritage', 'heritage', 'succession',
+      'wealth', 'patrimoine net',
+    ],
+  };
+
   /// Longueurs maximales, pour garder le contexte raisonnable (et donc la
   /// consommation mémoire/tokens du modèle) même avec beaucoup de données.
   static const _maxStrategyNotes = 3;
@@ -48,18 +93,64 @@ class AssistantContextBuilder {
   static const _maxTrackingMonths = 12;
   static const _maxBudgetTrackingChars = 4000;
 
-  /// Synthèse complète du profil : investissements, budget (prévisionnel
-  /// puis suivi mensuel réel), notes de stratégie et simulations.
-  Future<String> buildPatrimoineContext() async {
-    final sections = <String>[
-      '## Synthèse du patrimoine',
-      await _buildInvestmentsSection(),
-      await _buildBudgetSection(),
-      await _buildBudgetTrackingSection(),
-      await _buildStrategySection(),
-      await _buildSimulationsSection(),
-    ];
+  /// Synthèse du profil : investissements, budget, suivi, stratégie et
+  /// simulations.
+  ///
+  /// Quand [question] est fourni, seules les sections dont un mot-clé
+  /// apparaît dans la question sont incluses — les autres sont omises pour
+  /// réduire la consommation de tokens. Les totaux investissements (3 lignes
+  /// de résumé) sont toujours inclus comme vue d'ensemble. Sans question ou
+  /// sans correspondance, toutes les sections sont envoyées.
+  Future<String> buildPatrimoineContext({String? question}) async {
+    final active = _activeSectionsFor(question);
+    final sections = <String>['## Synthèse du patrimoine'];
+
+    // Totaux investissements toujours inclus comme résumé rapide — même
+    // quand le détail investissements n'est pas pertinent, ces 3 lignes
+    // donnent au modèle une vue d'ensemble du patrimoine.
+    final totals = await _buildInvestmentsSummary();
+    if (totals != null) sections.add(totals);
+
+    if (active.contains(_ContextSection.investments)) {
+      sections.add(await _buildInvestmentsSection());
+    }
+    if (active.contains(_ContextSection.budget)) {
+      sections.add(await _buildBudgetSection());
+    }
+    if (active.contains(_ContextSection.budgetTracking)) {
+      sections.add(await _buildBudgetTrackingSection());
+    }
+    if (active.contains(_ContextSection.strategy)) {
+      sections.add(await _buildStrategySection());
+    }
+    if (active.contains(_ContextSection.simulations)) {
+      sections.add(await _buildSimulationsSection());
+    }
     return sections.join('\n\n');
+  }
+
+  /// Détermine quelles sections inclure en fonction de la question posée.
+  /// Retourne toutes les sections si [question] est `null` ou ne correspond
+  /// à aucun mot-clé (conservatisme : mieux vaut trop de contexte que pas
+  /// assez).
+  Set<_ContextSection> _activeSectionsFor(String? question) {
+    if (question == null || question.trim().isEmpty) {
+      return _ContextSection.values.toSet();
+    }
+    final lower = question.toLowerCase();
+    final matched = <_ContextSection>{};
+    for (final entry in _sectionKeywords.entries) {
+      for (final keyword in entry.value) {
+        if (lower.contains(keyword)) {
+          matched.add(entry.key);
+          break;
+        }
+      }
+    }
+    // Pas de correspondance → on garde tout (comportement d'origine) pour
+    // ne jamais priver le modèle de contexte pertinent.
+    if (matched.isEmpty) return _ContextSection.values.toSet();
+    return matched;
   }
 
   Future<String> _buildInvestmentsSection() async {
@@ -86,12 +177,6 @@ class AssistantContextBuilder {
         final value = investment.displayValue;
         final gain = investment.unrealizedGain ?? 0;
         final invested = investment.investedAmount;
-        // Un investissement exclu du patrimoine (voir
-        // Investment.excludedFromPatrimoine) compte quand même ici : cette
-        // exclusion ne porte que sur les agrégats globaux du Dashboard
-        // ("Patrimoine net/brut", carte Allocation) — voir l'annotation
-        // `excludedText` plus bas, qui prévient l'assistant de cette nuance
-        // plutôt que de fausser ses propres totaux.
         totalValue += value;
         totalInvested += invested;
         totalGain += gain;
@@ -104,53 +189,82 @@ class AssistantContextBuilder {
                 currentValue: value,
                 asOf: now,
               );
-        final mwrText = mwr == null
+        final gainPercent = invested == 0 ? 0.0 : gain / invested;
+        final gainPctText = investment.unrealizedGain == null
             ? ''
-            : ', rendement ${_percent(mwr.rate)} ${mwr.annualized ? '/ an' : 'depuis le début'}';
-        final gainText = investment.unrealizedGain == null
-            ? ''
-            : ', plus-value ${formatEuros(gain)} (${_percent(invested == 0 ? 0 : gain / invested)})';
-        final transactions = investment.transactions;
-        final txnInfo = transactions.isEmpty
-            ? 'aucune transaction'
-            : '${transactions.length} transaction(s) '
-                  '(${_formatDate(transactions.map((t) => t.date).reduce((a, b) => a.isBefore(b) ? a : b))} → '
-                  '${_formatDate(transactions.map((t) => t.date).reduce((a, b) => a.isAfter(b) ? a : b))})';
+            : _percent(gainPercent);
+        final mwrText = mwr == null ? '' : ' MWR ${_percent(mwr.rate)}';
         final lastPrice = investment.lastPrice;
-        final lastPriceText = lastPrice == null
-            ? ''
-            : ', dernier cours '
-                  '${formatEuros(lastPrice * (investment.lastFxRateToEur ?? 1.0))}';
+        final lastPriceComp = lastPrice == null
+            ? '?'
+            : formatEurosCompact(
+                lastPrice * (investment.lastFxRateToEur ?? 1.0),
+              );
         final excludedText = investment.excludedFromPatrimoine
-            ? ' [exclu par l\'utilisateur du "Patrimoine net/brut" et de '
-                  'l\'allocation affichés sur le tableau de bord]'
+            ? ' [exclu]'
             : '';
-        lines.add(
-          '- ${investment.label} (${investment.isin}) — ${effectiveClass.label}'
-          ', quantité ${_formatQuantity(investment.quantityHeld)}, '
-          'PRU ${formatEuros(investment.pru)}'
-          '$lastPriceText, '
-          'valeur ${formatEuros(value)}$gainText$mwrText, $txnInfo$excludedText',
+
+        // Format compact : nom (ISIN) Classe: qty × PRU → cours = valeur
+        // (+gainPct, MWR) — ~60% plus court que la prose verbose.
+        final parts = StringBuffer(
+          '- ${investment.label} (${investment.isin}) '
+          '${effectiveClass.label}: '
+          '${_formatQuantity(investment.quantityHeld)} × '
+          '${formatEurosCompact(investment.pru)} → '
+          '$lastPriceComp = '
+          '${formatEurosCompact(value)}',
         );
+        if (investment.unrealizedGain != null) {
+          parts.write(' (=$gainPctText');
+          if (mwr != null) parts.write(', $mwrText');
+          parts.write(')');
+        } else if (mwr != null) {
+          parts.write(' (MWR ${_percent(mwr.rate)})');
+        }
+        parts.write(excludedText);
+        lines.add(parts.toString());
       }
     }
 
-    // Répartition par classe d'actif (la valeur d'une classe est la somme
-    // de ses investissements, quelle que soit la classe du compte porteur).
-    final allocation = [
+    // Allocation en une ligne compacte : "Actions 12 k€ (50%) · Obligations 8 k€ (30%)"
+    final allocationParts = [
       for (final entry in perClass.entries)
-        '- ${entry.key.label} : ${formatEuros(entry.value)}'
+        '${entry.key.label} ${formatEurosCompact(entry.value)}'
             ' (${totalValue == 0 ? '0' : _percent(entry.value / totalValue)})',
-    ].join('\n');
+    ];
+    final allocation = allocationParts.join(' · ');
 
     return [
-      'Total valorisé : ${formatEuros(totalValue)}',
-      'Total investi : ${formatEuros(totalInvested)}',
-      'Plus-value latente totale : ${formatEuros(totalGain)}',
-      'Répartition par classe d\'actif :',
-      allocation,
+      'Total valorisé : ${formatEuros(totalValue)}'
+      ' · Investi : ${formatEuros(totalInvested)}'
+      ' · Plus-value : ${formatEuros(totalGain)}',
+      'Allocation : $allocation',
       ...lines,
     ].join('\n');
+  }
+
+  /// Résumé ultra-compact (3 lignes) des totaux investissements — toujours
+  /// inclus dans le contexte comme vue d'ensemble, même quand le détail
+  /// investissements n'est pas pertinent pour la question posée. Retourne
+  /// `null` s'il n'y a aucun investissement.
+  Future<String?> _buildInvestmentsSummary() async {
+    final accounts = await InvestmentsRepository(vaultPath).listAll();
+    if (accounts.isEmpty) return null;
+
+    var totalValue = 0.0;
+    var totalInvested = 0.0;
+    var totalGain = 0.0;
+    for (final account in accounts) {
+      for (final investment in account.investments) {
+        totalValue += investment.displayValue;
+        totalInvested += investment.investedAmount;
+        totalGain += investment.unrealizedGain ?? 0;
+      }
+    }
+    return 'Résumé patrimoine : '
+        'valorisé ${formatEuros(totalValue)} · '
+        'investi ${formatEuros(totalInvested)} · '
+        'plus-value ${formatEuros(totalGain)}';
   }
 
   Future<String> _buildBudgetSection() async {
@@ -259,8 +373,8 @@ class AssistantContextBuilder {
         if (item.realite != 0 || item.budget != 0)
           '${item.name.isEmpty ? '(sans nom)' : item.name}'
           '${item.category.isEmpty ? '' : ' [${item.category}]'}'
-          ' : réalité ${formatEuros(item.realite)}'
-          '${item.budget != 0 ? ', budget ${formatEuros(item.budget)}' : ''}',
+          ' ${formatEuros(item.realite)}'
+          '${item.budget != 0 ? '/${formatEuros(item.budget)}' : ''}',
     ];
     if (parts.isEmpty) return;
     buffer.writeln('- $label : ${parts.join(' ; ')}');
@@ -331,9 +445,6 @@ class AssistantContextBuilder {
     }
     return buffer.toString();
   }
-
-  String _formatDate(DateTime date) =>
-      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 
   String _percent(double ratio) => '${(ratio * 100).toStringAsFixed(2)} %';
 

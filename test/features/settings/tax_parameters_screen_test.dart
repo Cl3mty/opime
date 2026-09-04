@@ -1,8 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/settings/tax_parameters_screen.dart';
 import 'package:opime/features/simulations/tax_parameters.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -22,6 +24,12 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(
         ShadcnApp(
+          locale: const Locale('fr'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: [
+            shadcnLocalizationsFrDelegate,
+            ...AppLocalizations.localizationsDelegates,
+          ],
           home: Scaffold(
             child: TaxParametersScreen(vaultPath: tempDir.path),
           ),

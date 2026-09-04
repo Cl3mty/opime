@@ -1,9 +1,21 @@
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/ui/asset_table_header_cell.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/dashboard/widgets/category_breakdown_card.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+Widget wrap(Widget child) => ShadcnApp(
+  locale: const Locale('fr'),
+  supportedLocales: AppLocalizations.supportedLocales,
+  localizationsDelegates: [
+    shadcnLocalizationsFrDelegate,
+    ...AppLocalizations.localizationsDelegates,
+  ],
+  home: Scaffold(child: child),
+);
 
 void main() {
   PatrimoineCategory category() => PatrimoineCategory(
@@ -28,14 +40,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      ShadcnApp(
-        home: Scaffold(
-          child: CategoryBreakdownCard(
-            title: 'Actifs',
-            categories: [category()],
-            hidden: false,
-            period: DashboardPeriod.all,
-          ),
+      wrap(
+        CategoryBreakdownCard(
+          title: 'Actifs',
+          categories: [category()],
+          hidden: false,
+          period: DashboardPeriod.all,
         ),
       ),
     );
@@ -51,14 +61,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      ShadcnApp(
-        home: Scaffold(
-          child: CategoryBreakdownCard(
-            title: 'Actifs',
-            categories: [category()],
-            hidden: false,
-            period: DashboardPeriod.all,
-          ),
+      wrap(
+        CategoryBreakdownCard(
+          title: 'Actifs',
+          categories: [category()],
+          hidden: false,
+          period: DashboardPeriod.all,
         ),
       ),
     );
@@ -98,14 +106,12 @@ void main() {
       );
 
       await tester.pumpWidget(
-        ShadcnApp(
-          home: Scaffold(
-            child: CategoryBreakdownCard(
-              title: 'Actifs',
-              categories: [excludedCategory],
-              hidden: false,
-              period: DashboardPeriod.all,
-            ),
+        wrap(
+          CategoryBreakdownCard(
+            title: 'Actifs',
+            categories: [excludedCategory],
+            hidden: false,
+            period: DashboardPeriod.all,
           ),
         ),
       );
@@ -164,14 +170,12 @@ void main() {
       'sans categoriesByInvestment : pas de switch, vue par compte seule',
       (tester) async {
         await tester.pumpWidget(
-          ShadcnApp(
-            home: Scaffold(
-              child: CategoryBreakdownCard(
-                title: 'Actifs',
-                categories: [categoryByAccount()],
-                hidden: false,
-                period: DashboardPeriod.all,
-              ),
+          wrap(
+            CategoryBreakdownCard(
+              title: 'Actifs',
+              categories: [categoryByAccount()],
+              hidden: false,
+              period: DashboardPeriod.all,
             ),
           ),
         );
@@ -192,15 +196,13 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
 
         await tester.pumpWidget(
-          ShadcnApp(
-            home: Scaffold(
-              child: CategoryBreakdownCard(
-                title: 'Actifs',
-                categories: [categoryByAccount()],
-                categoriesByInvestment: [categoryByInvestment()],
-                hidden: false,
-                period: DashboardPeriod.all,
-              ),
+          wrap(
+            CategoryBreakdownCard(
+              title: 'Actifs',
+              categories: [categoryByAccount()],
+              categoriesByInvestment: [categoryByInvestment()],
+              hidden: false,
+              period: DashboardPeriod.all,
             ),
           ),
         );
@@ -231,14 +233,12 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          home: Scaffold(
-            child: CategoryBreakdownCard(
-              title: 'Actifs',
-              categories: [category()],
-              hidden: false,
-              period: DashboardPeriod.all,
-            ),
+        wrap(
+          CategoryBreakdownCard(
+            title: 'Actifs',
+            categories: [category()],
+            hidden: false,
+            period: DashboardPeriod.all,
           ),
         ),
       );
@@ -277,14 +277,12 @@ void main() {
         );
 
         await tester.pumpWidget(
-          ShadcnApp(
-            home: Scaffold(
-              child: CategoryBreakdownCard(
-                title: 'Actifs',
-                categories: [categoryWithPeriod],
-                hidden: false,
-                period: DashboardPeriod.all,
-              ),
+          wrap(
+            CategoryBreakdownCard(
+              title: 'Actifs',
+              categories: [categoryWithPeriod],
+              hidden: false,
+              period: DashboardPeriod.all,
             ),
           ),
         );
@@ -293,14 +291,12 @@ void main() {
         expect(find.textContaining('888'), findsWidgets);
 
         await tester.pumpWidget(
-          ShadcnApp(
-            home: Scaffold(
-              child: CategoryBreakdownCard(
-                title: 'Actifs',
-                categories: [categoryWithPeriod],
-                hidden: false,
-                period: DashboardPeriod.month1,
-              ),
+          wrap(
+            CategoryBreakdownCard(
+              title: 'Actifs',
+              categories: [categoryWithPeriod],
+              hidden: false,
+              period: DashboardPeriod.month1,
             ),
           ),
         );
@@ -334,15 +330,13 @@ void main() {
         );
 
         await tester.pumpWidget(
-          ShadcnApp(
-            home: Scaffold(
-              child: CategoryBreakdownCard(
-                title: 'Passifs',
-                categories: [liabilityCategory],
-                hidden: false,
-                showPru: false,
-                period: DashboardPeriod.all,
-              ),
+          wrap(
+            CategoryBreakdownCard(
+              title: 'Passifs',
+              categories: [liabilityCategory],
+              hidden: false,
+              showPru: false,
+              period: DashboardPeriod.all,
             ),
           ),
         );
@@ -358,14 +352,12 @@ void main() {
       'partagée — voir asset_table_header_cell_test.dart)',
       (tester) async {
         await tester.pumpWidget(
-          ShadcnApp(
-            home: Scaffold(
-              child: CategoryBreakdownCard(
-                title: 'Actifs',
-                categories: [category()],
-                hidden: false,
-                period: DashboardPeriod.all,
-              ),
+          wrap(
+            CategoryBreakdownCard(
+              title: 'Actifs',
+              categories: [category()],
+              hidden: false,
+              period: DashboardPeriod.all,
             ),
           ),
         );

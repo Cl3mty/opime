@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import '../../l10n/app_localizations.dart';
 import 'budget_models.dart';
 import 'sankey_diagram.dart';
 
@@ -28,6 +29,7 @@ class BudgetSankeyChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final totalRevenues = data.totalRevenues;
     final totalExpenses = data.totalExpenses;
     final totalInvestments = data.totalInvestments;
@@ -37,9 +39,7 @@ class BudgetSankeyChart extends StatelessWidget {
         nodes: const [],
         links: const [],
         hidden: hidden,
-        emptyMessage:
-            'Ajoute des revenus, dépenses ou investissements pour voir le '
-            'flux.',
+        emptyMessage: l10n.budget_sankey_empty_message,
       );
     }
 
@@ -76,7 +76,7 @@ class BudgetSankeyChart extends StatelessWidget {
     // affiché, avec le déficit signalé à part.
     final totalOut = totalExpenses + totalInvestments;
     final revenusNode = SankeyNode(
-      label: 'Revenus',
+      label: l10n.budget_tab_revenues,
       column: revenueColumnOffset,
       color: green,
       minValue: totalRevenues,
@@ -89,7 +89,9 @@ class BudgetSankeyChart extends StatelessWidget {
       for (var i = 0; i < positiveRevenues.length; i++) {
         final revenue = positiveRevenues[i];
         final revenueNode = SankeyNode(
-          label: revenue.name.isEmpty ? 'Revenu' : revenue.name,
+          label: revenue.name.isEmpty
+              ? l10n.budget_sankey_revenue_fallback
+              : revenue.name,
           column: 0,
           color: _revenuePalette[i % _revenuePalette.length],
         );
@@ -106,7 +108,7 @@ class BudgetSankeyChart extends StatelessWidget {
 
     if (totalExpenses > 0) {
       final depensesNode = SankeyNode(
-        label: 'Dépenses',
+        label: l10n.budget_tab_expenses,
         column: 1 + revenueColumnOffset,
         color: red,
       );
@@ -123,16 +125,22 @@ class BudgetSankeyChart extends StatelessWidget {
         final sum = category.items.fold<double>(0, (s, i) => s + i.amount);
         if (sum <= 0) continue;
         final catNode = SankeyNode(
-          label: category.name.isEmpty ? 'Sans catégorie' : category.name,
+          label: category.name.isEmpty
+              ? l10n.budget_sankey_uncategorized
+              : category.name,
           column: 2 + revenueColumnOffset,
           color: red,
         );
         nodes.add(catNode);
-        links.add(SankeyLink(source: depensesNode, target: catNode, value: sum));
+        links.add(
+          SankeyLink(source: depensesNode, target: catNode, value: sum),
+        );
         for (final item in category.items) {
           if (item.amount <= 0) continue;
           final itemNode = SankeyNode(
-            label: item.name.isEmpty ? 'Dépense' : item.name,
+            label: item.name.isEmpty
+                ? l10n.budget_sankey_expense_fallback
+                : item.name,
             column: 3 + revenueColumnOffset,
             color: red,
           );
@@ -146,7 +154,7 @@ class BudgetSankeyChart extends StatelessWidget {
 
     if (totalInvestments > 0) {
       final investNode = SankeyNode(
-        label: 'Investissements',
+        label: l10n.budget_tab_investments,
         column: 1 + revenueColumnOffset,
         color: accent,
       );
@@ -163,7 +171,9 @@ class BudgetSankeyChart extends StatelessWidget {
         final sum = category.items.fold<double>(0, (s, i) => s + i.amount);
         if (sum <= 0) continue;
         final catNode = SankeyNode(
-          label: category.name.isEmpty ? 'Sans catégorie' : category.name,
+          label: category.name.isEmpty
+              ? l10n.budget_sankey_uncategorized
+              : category.name,
           column: 2 + revenueColumnOffset,
           color: accent,
         );
@@ -172,7 +182,9 @@ class BudgetSankeyChart extends StatelessWidget {
         for (final item in category.items) {
           if (item.amount <= 0) continue;
           final itemNode = SankeyNode(
-            label: item.name.isEmpty ? 'Investissement' : item.name,
+            label: item.name.isEmpty
+                ? l10n.budget_sankey_investment_fallback
+                : item.name,
             column: 3 + revenueColumnOffset,
             color: accent,
           );

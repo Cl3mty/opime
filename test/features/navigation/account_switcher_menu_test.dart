@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/profiles/profile_controller.dart';
 import 'package:opime/core/profiles/profile_repository.dart';
 import 'package:opime/core/storage/vault_folder_service.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/navigation/account_switcher_menu.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,6 +77,12 @@ void main() {
   }) async {
     await tester.pumpWidget(
       ShadcnApp(
+        locale: const Locale('fr'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: [
+          shadcnLocalizationsFrDelegate,
+          ...AppLocalizations.localizationsDelegates,
+        ],
         home: Scaffold(
           child: Builder(
             builder: (context) => GestureDetector(

@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../liabilities/liabilities_models.dart';
 import '../../liabilities/liabilities_repository.dart';
 import '../../simulations/loan_calculator.dart';
@@ -130,10 +131,10 @@ class _RealEstateProfitabilitySectionState
   @override
   Widget build(BuildContext context) {
     if (_loading) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
     if (widget.investment.rentPeriods.isEmpty) {
       return shadcn.Text(
-        'Ajoutez des loyers (onglet Loyers) pour calculer la rentabilité '
-        'de ce bien.',
+        l10n.real_estate_profitability_no_rent_hint,
       ).muted().small();
     }
     final result = _simulate();
@@ -143,8 +144,9 @@ class _RealEstateProfitabilitySectionState
         Row(
           children: [
             shadcn.Text(
-              'Cash-flow mensuel : '
-              '${displaySignedEuros(result.cashFlowMensuel, false)}',
+              l10n.real_estate_monthly_cashflow_label(
+                displaySignedEuros(result.cashFlowMensuel, false),
+              ),
               style: TextStyle(
                 color: result.autofinance ? _green : _red,
                 fontWeight: FontWeight.w600,
@@ -153,7 +155,9 @@ class _RealEstateProfitabilitySectionState
             const SizedBox(width: 8),
             OutlineBadge(
               child: shadcn.Text(
-                result.autofinance ? 'Autofinancé' : 'Non autofinancé',
+                result.autofinance
+                    ? l10n.real_estate_self_financed
+                    : l10n.real_estate_not_self_financed,
               ).xSmall(),
             ),
           ],
@@ -161,10 +165,10 @@ class _RealEstateProfitabilitySectionState
         const SizedBox(height: 4),
         shadcn.Text(
           _linkedLiability == null
-              ? 'Sans prêt lié (voir ci-dessus) : cash-flow calculé achat '
-                    'comptant, sans mensualité de crédit.'
-              : 'Mensualité de crédit déduite : '
-                    '${displayEuros(result.mensualiteCredit, false)}.',
+              ? l10n.real_estate_cashflow_no_loan_note
+              : l10n.real_estate_cashflow_with_loan_note(
+                  displayEuros(result.mensualiteCredit, false),
+                ),
         ).muted().xSmall(),
         const SizedBox(height: 16),
         Wrap(
@@ -172,19 +176,19 @@ class _RealEstateProfitabilitySectionState
           runSpacing: 12,
           children: [
             _StatCard(
-              label: 'Rendement brut',
+              label: l10n.real_estate_gross_yield_label,
               value: displayPercent(result.rendementBrutPercent),
             ),
             _StatCard(
-              label: 'Rendement net',
+              label: l10n.real_estate_net_yield_label,
               value: displayPercent(result.rendementNetPercent),
             ),
             _StatCard(
-              label: 'Revenu locatif annuel',
+              label: l10n.real_estate_annual_rental_income_label,
               value: displayEuros(result.revenuLocatifAnnuelBrut, false),
             ),
             _StatCard(
-              label: 'Coût total du projet',
+              label: l10n.real_estate_total_project_cost_label,
               value: displayEuros(result.coutTotalProjet, false),
             ),
           ],
@@ -192,14 +196,14 @@ class _RealEstateProfitabilitySectionState
         if (widget.investment.workItems.isNotEmpty) ...[
           const SizedBox(height: 8),
           shadcn.Text(
-            'Dont ${displayEuros(_totalWorkItems, false)} de travaux '
-            '(onglet Travaux).',
+            l10n.real_estate_work_items_included_note(
+              displayEuros(_totalWorkItems, false),
+            ),
           ).muted().xSmall(),
         ],
         const SizedBox(height: 8),
         shadcn.Text(
-          'Charges annuelles (taxe foncière, assurance, gestion...) pas '
-          'encore suivies : le rendement net est identique au brut.',
+          l10n.real_estate_annual_charges_not_tracked_note,
         ).muted().xSmall(),
       ],
     );

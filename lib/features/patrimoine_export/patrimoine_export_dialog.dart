@@ -7,6 +7,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 import '../dashboard/patrimoine_models.dart';
 import '../investments/investments_repository.dart';
 import '../investments/real_patrimoine_adapter.dart'
@@ -147,6 +148,7 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
 
   Future<void> _generate() async {
     setState(() => _generating = true);
+    final l10n = AppLocalizations.of(context);
     try {
       final data = buildPatrimoineExportData(
         profileName: widget.profileName,
@@ -161,7 +163,7 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
       final fileName =
           'patrimoine-${now.year}${_pad2(now.month)}${_pad2(now.day)}.pdf';
       final savePath = await FilePicker.saveFile(
-        dialogTitle: 'Enregistrer le patrimoine (PDF)',
+        dialogTitle: l10n.patrimoine_export_save_dialog_title,
         fileName: fileName,
         bytes: bytes,
       );
@@ -175,16 +177,16 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
       await File(path).writeAsBytes(bytes);
       if (!mounted) return;
       _showToast(
-        title: 'Export réussi',
-        subtitle: 'Le PDF a été enregistré : $path',
+        title: l10n.transactions_export_success_title,
+        subtitle: l10n.patrimoine_export_success_subtitle(path),
       );
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       setState(() => _generating = false);
       _showToast(
-        title: 'Échec de l\'export',
-        subtitle: 'Le PDF n\'a pas pu être généré ou enregistré : $e',
+        title: l10n.transactions_export_failed_title,
+        subtitle: l10n.patrimoine_export_failed_subtitle(e.toString()),
       );
     }
   }
@@ -256,6 +258,7 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
   }
 
   Widget _buildHeader() {
+    final l10n = AppLocalizations.of(context);
     return Row(
       children: [
         Expanded(
@@ -263,10 +266,8 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              shadcn.Text('Télécharger mon patrimoine').large().semiBold(),
-              shadcn.Text(
-                'Sélectionnez les actifs et passifs à inclure dans le PDF.',
-              ).muted().small(),
+              shadcn.Text(l10n.patrimoine_export_title).large().semiBold(),
+              shadcn.Text(l10n.patrimoine_export_subtitle).muted().small(),
             ],
           ),
         ),
@@ -368,7 +369,11 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
           children: [
             const Icon(LucideIcons.landmark, size: 16),
             const SizedBox(width: 8),
-            Expanded(child: shadcn.Text('Passifs').semiBold().small()),
+            Expanded(
+              child: shadcn.Text(
+                AppLocalizations.of(context).nav_liabilities,
+              ).semiBold().small(),
+            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -440,6 +445,7 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
   }
 
   Widget _buildFooter() {
+    final l10n = AppLocalizations.of(context);
     return Row(
       children: [
         TextButton(
@@ -447,14 +453,14 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
             _selectAllAssets(true);
             _selectAllLiabilities(true);
           },
-          child: const shadcn.Text('Tout sélectionner'),
+          child: shadcn.Text(l10n.transactions_export_select_all),
         ),
         TextButton(
           onPressed: () {
             _selectAllAssets(false);
             _selectAllLiabilities(false);
           },
-          child: const shadcn.Text('Tout désélectionner'),
+          child: shadcn.Text(l10n.transactions_export_deselect_all),
         ),
         const Spacer(),
         PrimaryButton(
@@ -466,7 +472,7 @@ class _PatrimoineExportDialogState extends State<_PatrimoineExportDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(LucideIcons.arrowDownToLine),
-          child: const shadcn.Text('Générer le PDF'),
+          child: shadcn.Text(l10n.patrimoine_export_generate_pdf),
         ),
       ],
     );

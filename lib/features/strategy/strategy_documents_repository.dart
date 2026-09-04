@@ -97,7 +97,8 @@ class StrategyDocumentsRepository {
     await _documentStorage.delete(document);
     final all = await _readAll();
     all[noteId] = [
-      for (final d in all[noteId] ?? const []) if (d.id != document.id) d,
+      for (final d in all[noteId] ?? const [])
+        if (d.id != document.id) d,
     ];
     await _writeAll(all);
     return all[noteId] ?? const [];

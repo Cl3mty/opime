@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/widgets/account_summary_header.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -7,6 +9,13 @@ void main() {
   Future<void> pump(WidgetTester tester, InvestmentAccount account) {
     return tester.pumpWidget(
       ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
         home: Scaffold(
           child: AccountSummaryHeader(account: account, hidden: false),
         ),

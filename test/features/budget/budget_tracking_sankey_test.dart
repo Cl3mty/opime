@@ -1,4 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:opime/features/budget/budget_tracking_models.dart';
 import 'package:opime/features/budget/budget_tracking_sankey.dart';
 import 'package:opime/features/budget/sankey_diagram.dart';
@@ -20,6 +23,15 @@ void main() {
   Future<void> pump(WidgetTester tester, BudgetTrackingMonth data) =>
       tester.pumpWidget(
         ShadcnApp(
+          locale: const Locale('fr'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: [
+            shadcnLocalizationsFrDelegate,
+            ...AppLocalizations.localizationsDelegates,
+            GlobalMaterialLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
           home: Scaffold(
             child: SizedBox(
               width: 900,

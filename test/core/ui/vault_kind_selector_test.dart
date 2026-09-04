@@ -1,17 +1,33 @@
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/storage/vault_folder_service.dart' show VaultKind;
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/core/ui/vault_kind_selector.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
+  Widget wrap(Widget child) => ShadcnApp(
+    locale: const Locale('fr'),
+    supportedLocales: const [Locale('fr'), Locale('en')],
+    localizationsDelegates: [
+      shadcnLocalizationsFrDelegate,
+      ...AppLocalizations.localizationsDelegates,
+      GlobalMaterialLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+    ],
+    home: child,
+  );
+
   group('VaultKindSelector', () {
     testWidgets(
       'affiche les deux options, celle passée en value est sélectionnée',
       (tester) async {
         VaultKind selected = VaultKind.personal;
         await tester.pumpWidget(
-          ShadcnApp(
-            home: Scaffold(
+          wrap(
+            Scaffold(
               child: StatefulBuilder(
                 builder: (context, setState) => VaultKindSelector(
                   value: selected,
@@ -39,8 +55,8 @@ void main() {
       (tester) async {
         VaultKind? result;
         await tester.pumpWidget(
-          ShadcnApp(
-            home: Scaffold(
+          wrap(
+            Scaffold(
               child: Builder(
                 builder: (context) => PrimaryButton(
                   onPressed: () async {
@@ -67,8 +83,8 @@ void main() {
       (tester) async {
         VaultKind? result;
         await tester.pumpWidget(
-          ShadcnApp(
-            home: Scaffold(
+          wrap(
+            Scaffold(
               child: Builder(
                 builder: (context) => PrimaryButton(
                   onPressed: () async {

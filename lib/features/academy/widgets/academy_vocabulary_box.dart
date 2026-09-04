@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/academy/academy_models.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Encadré "Vocabulaire" expliquant les termes techniques utilisés dans une
 /// leçon, affiché directement au fil du contenu plutôt que dans un glossaire
@@ -31,7 +32,9 @@ class AcademyVocabularyBox extends StatelessWidget {
                 color: theme.colorScheme.mutedForeground,
               ),
               const SizedBox(width: 6),
-              shadcn.Text('Vocabulaire').semiBold().small(),
+              shadcn.Text(
+                AppLocalizations.of(context).academy_vocabulary_title,
+              ).semiBold().small(),
             ],
           ),
           const SizedBox(height: 10),

@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/notifications/notifications_settings_controller.dart';
+import '../../l10n/app_localizations.dart';
 import 'notification_models.dart';
 import 'notifications_controller.dart';
 
@@ -74,6 +75,7 @@ class _NotificationsPanelState extends State<_NotificationsPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
@@ -89,7 +91,7 @@ class _NotificationsPanelState extends State<_NotificationsPanel> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                  child: shadcn.Text('Actualités').semiBold().large(),
+                  child: shadcn.Text(l10n.notifications_title).semiBold().large(),
                 ),
                 Expanded(
                   child: widget.controller.loading && items.isEmpty
@@ -97,7 +99,7 @@ class _NotificationsPanelState extends State<_NotificationsPanel> {
                       : items.isEmpty
                       ? Center(
                           child: shadcn.Text(
-                            'Aucune actualité pour le moment.',
+                            l10n.notifications_empty,
                           ).muted(),
                         )
                       : ListView.separated(
@@ -160,7 +162,7 @@ class _NotificationCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _content(theme)),
+                  Expanded(child: _content(context, theme)),
                   const SizedBox(width: 10),
                   _avatar(theme),
                 ],
@@ -177,7 +179,8 @@ class _NotificationCard extends StatelessWidget {
     );
   }
 
-  Widget _content(ThemeData theme) {
+  Widget _content(BuildContext context, ThemeData theme) {
+    final l10n = AppLocalizations.of(context);
     if (item is NewsArticleItem) {
       final news = item as NewsArticleItem;
       return Column(
@@ -191,7 +194,10 @@ class _NotificationCard extends StatelessWidget {
           ).semiBold().small(),
           const SizedBox(height: 4),
           shadcn.Text(
-            '${news.publisher} · ${_relativeTime(news.publishedAt)}',
+            l10n.notifications_news_publisher_line(
+              news.publisher,
+              _relativeTime(l10n, news.publishedAt),
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ).muted().xSmall(),
@@ -206,13 +212,19 @@ class _NotificationCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         shadcn.Text(
-          '${alert.symbol} ${up ? '+' : ''}${change.toStringAsFixed(1)} % sur 24h',
+          l10n.notifications_crypto_alert_24h(
+            alert.symbol,
+            '${up ? '+' : ''}${change.toStringAsFixed(1)}',
+          ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ).semiBold().small(),
         const SizedBox(height: 4),
         shadcn.Text(
-          '${alert.name} · ${alert.currentPrice.toStringAsFixed(2)} €',
+          l10n.notifications_crypto_price_line(
+            alert.name,
+            alert.currentPrice.toStringAsFixed(2),
+          ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ).muted().xSmall(),
@@ -303,10 +315,10 @@ class _DismissButton extends StatelessWidget {
 /// Temps relatif court ("à l'instant" / "il y a Xh" / "il y a Xj") pour
 /// l'horodatage d'un article — pas d'utilitaire équivalent ailleurs dans ce
 /// code, écrit ici plutôt qu'extrait vu son unique site d'usage.
-String _relativeTime(DateTime date) {
+String _relativeTime(AppLocalizations l10n, DateTime date) {
   final diff = DateTime.now().difference(date);
-  if (diff.inMinutes < 1) return 'à l\'instant';
-  if (diff.inHours < 1) return 'il y a ${diff.inMinutes} min';
-  if (diff.inDays < 1) return 'il y a ${diff.inHours} h';
-  return 'il y a ${diff.inDays} j';
+  if (diff.inMinutes < 1) return l10n.notifications_relative_now;
+  if (diff.inHours < 1) return l10n.notifications_relative_minutes(diff.inMinutes);
+  if (diff.inDays < 1) return l10n.notifications_relative_hours(diff.inHours);
+  return l10n.notifications_relative_days(diff.inDays);
 }

@@ -7,10 +7,14 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/opime_date_picker.dart';
+import '../../../l10n/app_localizations.dart';
 import '../confirm_delete_dialog.dart';
 import 'quittance_pdf_builder.dart';
 import 'rent_models.dart';
 
+// Reste en français : mécanisme de formatage de date (même famille que
+// `frenchMonths` dans `core/date_format.dart`), hors périmètre de la
+// traduction de texte d'UI — voir le rapport de traduction pour le détail.
 const _monthLabels = [
   'Janvier',
   'Février',
@@ -96,12 +100,13 @@ class RentPeriodsSection extends StatelessWidget {
   }
 
   Future<void> _confirmAndDelete(BuildContext context, RentPeriod period) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer cette période ?',
-      message:
-          'La période ${_monthYearLabel(period.periodStart)} sera '
-          'définitivement retirée de l\'historique des loyers.',
+      title: l10n.real_estate_delete_rent_period_title,
+      message: l10n.real_estate_delete_rent_period_message(
+        _monthYearLabel(period.periodStart),
+      ),
     );
     if (!confirmed) return;
     await onDelete(period);
@@ -120,13 +125,14 @@ class RentPeriodsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final sorted = _sorted;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const shadcn.Text('Loyers').large().medium(),
+            shadcn.Text(l10n.real_estate_rent_periods_title).large().medium(),
             const Spacer(),
             Builder(
               builder: (context) => GestureDetector(
@@ -141,7 +147,7 @@ class RentPeriodsSection extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     shadcn.Text(
-                      'Ajouter une période',
+                      l10n.real_estate_add_rent_period_button,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.primary,
                       ),
@@ -154,7 +160,7 @@ class RentPeriodsSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (sorted.isEmpty)
-          shadcn.Text('Aucun loyer suivi pour l\'instant.').muted().small()
+          shadcn.Text(l10n.real_estate_no_rent_periods_yet).muted().small()
         else
           for (final period in sorted) ...[
             _RentPeriodRow(
@@ -186,6 +192,7 @@ class _RentPeriodRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -216,7 +223,11 @@ class _RentPeriodRow extends StatelessWidget {
                     ? const Color(0xFF22C55E)
                     : theme.colorScheme.mutedForeground,
               ),
-              child: shadcn.Text(period.isPaid ? 'Payé' : 'Impayé').xSmall(),
+              child: shadcn.Text(
+                period.isPaid
+                    ? l10n.real_estate_rent_paid
+                    : l10n.real_estate_rent_unpaid,
+              ).xSmall(),
             ),
             // Une quittance n'a de sens qu'une fois le paiement réellement
             // reçu (voir `RentPeriod.isPaid`) — pas de bouton pour une
@@ -279,6 +290,7 @@ class _AddRentPeriodDialogState extends State<_AddRentPeriodDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 380),
@@ -289,16 +301,18 @@ class _AddRentPeriodDialogState extends State<_AddRentPeriodDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const shadcn.Text('Ajouter une période').large().semiBold(),
+                shadcn.Text(
+                  l10n.real_estate_add_rent_period_button,
+                ).large().semiBold(),
                 const SizedBox(height: 12),
-                shadcn.Text('Mois').muted().xSmall(),
+                shadcn.Text(l10n.real_estate_month_label).muted().xSmall(),
                 const SizedBox(height: 4),
                 OpimeDatePicker(
                   value: _month,
                   onChanged: (date) => setState(() => _month = date),
                 ),
                 const SizedBox(height: 12),
-                shadcn.Text('Montant dû (loyer + charges)').muted().xSmall(),
+                shadcn.Text(l10n.real_estate_amount_due_label).muted().xSmall(),
                 const SizedBox(height: 4),
                 TextField(
                   controller: _amountController,
@@ -307,11 +321,15 @@ class _AddRentPeriodDialogState extends State<_AddRentPeriodDialog> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                shadcn.Text('Locataire (facultatif)').muted().xSmall(),
+                shadcn.Text(
+                  l10n.real_estate_tenant_optional_label,
+                ).muted().xSmall(),
                 const SizedBox(height: 4),
                 TextField(controller: _tenantController),
                 const SizedBox(height: 12),
-                shadcn.Text('Note (facultative)').muted().xSmall(),
+                shadcn.Text(
+                  l10n.real_estate_note_optional_label,
+                ).muted().xSmall(),
                 const SizedBox(height: 4),
                 TextField(controller: _noteController),
                 const SizedBox(height: 16),
@@ -319,12 +337,12 @@ class _AddRentPeriodDialogState extends State<_AddRentPeriodDialog> {
                   children: [
                     PrimaryButton(
                       onPressed: _commit,
-                      child: const shadcn.Text('Ajouter'),
+                      child: shadcn.Text(l10n.common_add),
                     ),
                     const SizedBox(width: 8),
                     OutlineButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const shadcn.Text('Annuler'),
+                      child: shadcn.Text(l10n.common_cancel),
                     ),
                   ],
                 ),
@@ -371,6 +389,7 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 340),
@@ -382,11 +401,14 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 shadcn.Text(
-                  'Marquer ${_monthYearLabel(widget.period.periodStart)} '
-                  'payé',
+                  l10n.real_estate_mark_period_paid_title(
+                    _monthYearLabel(widget.period.periodStart),
+                  ),
                 ).large().semiBold(),
                 const SizedBox(height: 12),
-                shadcn.Text('Montant perçu').muted().xSmall(),
+                shadcn.Text(
+                  l10n.real_estate_amount_received_label,
+                ).muted().xSmall(),
                 const SizedBox(height: 4),
                 TextField(
                   controller: _amountController,
@@ -395,7 +417,7 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                shadcn.Text('Date de paiement').muted().xSmall(),
+                shadcn.Text(l10n.real_estate_payment_date_label).muted().xSmall(),
                 const SizedBox(height: 4),
                 OpimeDatePicker(
                   value: _paidAt,
@@ -406,12 +428,12 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
                   children: [
                     PrimaryButton(
                       onPressed: _commit,
-                      child: const shadcn.Text('Confirmer'),
+                      child: shadcn.Text(l10n.common_confirm),
                     ),
                     const SizedBox(width: 8),
                     OutlineButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const shadcn.Text('Annuler'),
+                      child: shadcn.Text(l10n.common_cancel),
                     ),
                   ],
                 ),

@@ -9,6 +9,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/date_format.dart';
 import '../../../core/ui/frosted_card.dart';
+import '../../../l10n/app_localizations.dart';
 import '../investments_models.dart';
 import '../investments_repository.dart';
 import 'ibkr_import_service.dart';
@@ -56,15 +57,22 @@ class _IbkrImportPreviewDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final rows = <(String, int)>[
-      ('Achats / ventes de titres', summary.securityTradesAdded),
-      ('Conversions de devise', summary.currencyConversionsAdded),
-      ('Dividendes', summary.dividendsAdded),
-      ('Retenues à la source', summary.withholdingTaxAdded),
-      ('Frais', summary.feesAdded),
-      ('Dépôts', summary.depositsAdded),
-      ('Retraits', summary.withdrawalsAdded),
-      ('Autres mouvements', summary.otherFlowsAdded),
+      (l10n.investments_ibkr_row_security_trades, summary.securityTradesAdded),
+      (
+        l10n.investments_ibkr_row_currency_conversions,
+        summary.currencyConversionsAdded,
+      ),
+      (l10n.investments_ibkr_row_dividends, summary.dividendsAdded),
+      (
+        l10n.investments_ibkr_row_withholding_tax,
+        summary.withholdingTaxAdded,
+      ),
+      (l10n.investments_ibkr_row_fees, summary.feesAdded),
+      (l10n.investments_ibkr_row_deposits, summary.depositsAdded),
+      (l10n.investments_ibkr_row_withdrawals, summary.withdrawalsAdded),
+      (l10n.investments_ibkr_row_other_flows, summary.otherFlowsAdded),
     ].where((row) => row.$2 > 0).toList();
 
     return Center(
@@ -77,14 +85,16 @@ class _IbkrImportPreviewDialog extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const shadcn.Text('Importer le relevé IBKR')
+                shadcn.Text(l10n.investments_ibkr_import_dialog_title)
                     .large()
                     .semiBold(),
                 const SizedBox(height: 4),
                 if (summary.periodStart != null && summary.periodEnd != null)
                   shadcn.Text(
-                    'Période : ${formatDateDdMmYyyy(summary.periodStart!)} '
-                    '→ ${formatDateDdMmYyyy(summary.periodEnd!)}',
+                    l10n.investments_ibkr_period_label(
+                      formatDateDdMmYyyy(summary.periodStart!),
+                      formatDateDdMmYyyy(summary.periodEnd!),
+                    ),
                   ).muted().small(),
                 const SizedBox(height: 16),
                 Flexible(
@@ -93,10 +103,8 @@ class _IbkrImportPreviewDialog extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (rows.isEmpty)
-                          const shadcn.Text(
-                            'Aucune nouvelle transaction à importer — ce '
-                            'fichier a déjà été importé, ou ne contient '
-                            'aucune ligne reconnue.',
+                          shadcn.Text(
+                            l10n.investments_ibkr_empty_state,
                           ).small()
                         else ...[
                           for (final row in rows)
@@ -116,18 +124,17 @@ class _IbkrImportPreviewDialog extends StatelessWidget {
                           if (summary.duplicatesSkipped > 0) ...[
                             const SizedBox(height: 8),
                             shadcn.Text(
-                              '${summary.duplicatesSkipped} ligne'
-                              '${summary.duplicatesSkipped > 1 ? 's' : ''} '
-                              'déjà importée'
-                              '${summary.duplicatesSkipped > 1 ? 's' : ''} '
-                              '— ignorée'
-                              '${summary.duplicatesSkipped > 1 ? 's' : ''}.',
+                              l10n.investments_ibkr_duplicates_skipped(
+                                summary.duplicatesSkipped,
+                              ),
                             ).muted().xSmall(),
                           ],
                         ],
                         if (summary.warnings.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          const shadcn.Text('Avertissements').semiBold().xSmall(),
+                          shadcn.Text(
+                            l10n.investments_ibkr_warnings_title,
+                          ).semiBold().xSmall(),
                           const SizedBox(height: 6),
                           for (final warning in summary.warnings)
                             Padding(
@@ -146,12 +153,12 @@ class _IbkrImportPreviewDialog extends StatelessWidget {
                       onPressed: summary.isEmpty
                           ? null
                           : () => Navigator.of(context).pop(true),
-                      child: const shadcn.Text('Importer'),
+                      child: shadcn.Text(l10n.investments_ibkr_import_button),
                     ),
                     const SizedBox(width: 8),
                     OutlineButton(
                       onPressed: () => Navigator.of(context).pop(false),
-                      child: const shadcn.Text('Annuler'),
+                      child: shadcn.Text(l10n.common_cancel),
                     ),
                   ],
                 ),

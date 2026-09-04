@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/toggle_button_style.dart';
+import '../../l10n/app_localizations.dart';
 import '../dashboard/widgets/net_worth_chart.dart';
 import '../investments/confirm_delete_dialog.dart';
 import '../investments/document_storage.dart';
@@ -175,10 +176,11 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
   }
 
   Future<void> _delete() async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${widget.liability.name}" ?',
-      message: 'Ce passif sera définitivement supprimé.',
+      title: l10n.liabilities_delete_confirm_title(widget.liability.name),
+      message: l10n.liabilities_delete_confirm_message,
     );
     if (!confirmed) return;
     await _repo.deleteLiability(widget.liability.id);
@@ -187,6 +189,7 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
   }
 
   void _openMenu(BuildContext anchorContext) {
+    final l10n = AppLocalizations.of(anchorContext);
     showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.topEnd,
@@ -198,12 +201,12 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
           children: [
             MenuButton(
               leading: const Icon(LucideIcons.pencil, size: 14),
-              child: const shadcn.Text('Modifier'),
+              child: shadcn.Text(l10n.common_edit),
               onPressed: (_) => _startEdit(),
             ),
             MenuButton(
               leading: const Icon(LucideIcons.trash2, size: 14),
-              child: const shadcn.Text('Supprimer'),
+              child: shadcn.Text(l10n.common_delete),
               onPressed: (_) => _delete(),
             ),
           ],
@@ -247,6 +250,7 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
   Widget build(BuildContext context) {
     final liability = widget.liability;
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final points = remainingBalanceHistoryFor([liability]);
 
     return SingleChildScrollView(
@@ -310,10 +314,10 @@ class _LiabilityDetailViewState extends State<LiabilityDetailView> {
             const SizedBox(height: 2),
             shadcn.Text(
               liability.isPaidOff
-                  ? 'Soldé'
-                  : 'Capital restant dû, sur '
-                        '${displayEuros(liability.montantEmprunte, widget.hidden)} '
-                        'empruntés',
+                  ? l10n.liabilities_paid_off
+                  : l10n.liabilities_remaining_balance_subtitle(
+                      displayEuros(liability.montantEmprunte, widget.hidden),
+                    ),
               style: TextStyle(color: _red),
             ).muted().xSmall(),
             const SizedBox(height: 12),

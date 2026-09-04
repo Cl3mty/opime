@@ -246,7 +246,7 @@ class AssistantChatController extends ChangeNotifier {
     if (config.includePatrimoine) {
       try {
         context = await AssistantContextBuilder(_activeDataPath())
-            .buildPatrimoineContext();
+            .buildPatrimoineContext(question: userEntry.content);
         // Sans ce diagnostic visible, une réponse qui semble ignorer le
         // patrimoine était indiscernable entre "le contexte n'est jamais
         // arrivé jusqu'au modèle" (bug à corriger) et "le modèle local

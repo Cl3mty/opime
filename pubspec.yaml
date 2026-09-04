@@ -51,6 +51,7 @@ dependencies:
   flutter_math_fork: ^0.7.4
   flutter_localizations:
     sdk: flutter
+  intl: any
   dart_quill_delta: ^10.8.3
   sankey_flutter: ^0.0.3
   uuid: ^4.6.0
@@ -99,6 +100,8 @@ dependency_overrides:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
+
   assets:
     - assets/icon/icon.png
     - assets/fonts/Roboto-Variable.ttf

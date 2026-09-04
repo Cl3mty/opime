@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
 import '../../core/money_format.dart';
 import '../../core/storage/vault_folder_service.dart' show VaultFolderService, VaultKind;
 import '../../core/ui/frosted_card.dart';
@@ -667,28 +668,40 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   }
 
   String get _quantityFieldLabel {
+    final l10n = AppLocalizations.of(context);
     final investment = _investment;
     final account = _account;
-    if (investment == null || account == null) return 'Quantité';
+    if (investment == null || account == null) {
+      return l10n.investments_field_quantity;
+    }
     final effectiveClass = investment.assetClass ?? account.assetClass;
-    if (effectiveClass == AssetClass.immobilier) return 'Montant total (€)';
+    if (effectiveClass == AssetClass.immobilier) {
+      return l10n.investments_field_total_amount_eur;
+    }
     if (effectiveClass == AssetClass.privateEquity &&
         investment.privateEquityKind != PrivateEquityKind.actionsSalarie) {
-      return 'Montant versé (€)';
+      return l10n.investments_field_amount_paid_eur;
     }
-    if (effectiveClass == AssetClass.privateEquity) return 'Nombre de titres/options';
+    if (effectiveClass == AssetClass.privateEquity) {
+      return l10n.investments_field_shares_options_count;
+    }
     if (_investmentIsCurrency) {
-      return _isEurCurrency ? 'Montant (€)' : 'Montant (${investment.isin})';
+      return _isEurCurrency
+          ? l10n.investments_field_amount_eur
+          : l10n.investments_field_amount_currency(investment.isin);
     }
-    return 'Quantité';
+    return l10n.investments_field_quantity;
   }
 
   String get _priceFieldLabel {
+    final l10n = AppLocalizations.of(context);
     final investment = _investment;
     final account = _account;
-    if (investment == null || account == null) return 'Prix unitaire';
-    if (_investmentIsCurrency) return 'Cours de la paire de devise';
-    return 'Prix unitaire';
+    if (investment == null || account == null) {
+      return l10n.investments_field_unit_price;
+    }
+    if (_investmentIsCurrency) return l10n.investments_field_currency_pair_rate;
+    return l10n.investments_field_unit_price;
   }
 
   /// Le sélecteur de devise s'affiche sur le champ prix dès qu'il est
@@ -930,46 +943,50 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: FrostedCard(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const shadcn.Text('Nouveau type').large().semiBold(),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: controller,
-                    placeholder: const shadcn.Text('Ex : Vins de collection'),
-                    autofocus: true,
-                    onSubmitted: (value) =>
-                        Navigator.of(context).pop(value.trim()),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      PrimaryButton(
-                        onPressed: () =>
-                            Navigator.of(context).pop(controller.text.trim()),
-                        child: const shadcn.Text('Créer'),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlineButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
-                      ),
-                    ],
-                  ),
-                ],
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: FrostedCard(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    shadcn.Text(l10n.investments_new_custom_type_title).large().semiBold(),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: controller,
+                      placeholder: shadcn.Text(l10n.investments_new_custom_type_hint),
+                      autofocus: true,
+                      onSubmitted: (value) =>
+                          Navigator.of(context).pop(value.trim()),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        PrimaryButton(
+                          onPressed: () => Navigator.of(
+                            context,
+                          ).pop(controller.text.trim()),
+                          child: shadcn.Text(l10n.common_create),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlineButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: shadcn.Text(l10n.common_cancel),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
     if (name == null || name.isEmpty) return null;
     final categories = await CustomOtherCategoriesRepository(
@@ -1341,6 +1358,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
   int get _totalSteps => _isEstablishmentFlow ? 6 : 5;
 
   Widget _buildStep() {
+    final l10n = AppLocalizations.of(context);
     switch (_step) {
       case _Step.owner:
         return _OwnerStep(
@@ -1366,7 +1384,7 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         );
       case _Step.assetClass:
         return _AssetClassStep(
-          stepLabel: 'Étape 2 sur $_totalSteps',
+          stepLabel: l10n.investments_wizard_step_of_total('2', '$_totalSteps'),
           onSelect: _selectAssetClass,
           onBack: () => setState(() => _step = _Step.kind),
         );
@@ -1385,7 +1403,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
           establishments.putIfAbsent(key, () => []).add(account);
         }
         return _EstablishmentStep(
-          stepLabel: 'Étape 3 sur $_totalSteps · ${_assetClass!.label}',
+          stepLabel:
+              '${l10n.investments_wizard_step_of_total('3', '$_totalSteps')} · '
+              '${_assetClass!.label}',
           establishments: establishments,
           creating: _creatingAccount,
           nameController: _accountNameController,
@@ -1421,7 +1441,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
                     account,
               ];
         return _AccountEnvelopeStep(
-          stepLabel: 'Étape 4 sur $_totalSteps · $establishment',
+          stepLabel:
+              '${l10n.investments_wizard_step_of_total('4', '$_totalSteps')} · '
+              '$establishment',
           establishmentName: establishment,
           assetClass: _assetClass!,
           existingAccounts: existingAccounts,
@@ -1451,7 +1473,9 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
         );
       case _Step.account:
         return _AccountStep(
-          stepLabel: 'Étape 3 sur $_totalSteps · ${_assetClass!.label}',
+          stepLabel:
+              '${l10n.investments_wizard_step_of_total('3', '$_totalSteps')} · '
+              '${_assetClass!.label}',
           assetClass: _assetClass!,
           accounts: _accounts
               .where(
@@ -1509,31 +1533,34 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
             assetClass == AssetClass.crypto;
         return _InvestmentStep(
           stepLabel:
-              'Étape ${_isEstablishmentFlow ? 5 : 4} sur $_totalSteps · '
+              '${l10n.investments_wizard_step_of_total(
+                _isEstablishmentFlow ? '5' : '4',
+                '$_totalSteps',
+              )} · '
               '${account.name}',
           title: _isEpargneFlow
-              ? 'Quelle devise ?'
+              ? l10n.investments_wizard_currency_title
               : allowsDevises
-              ? 'Quel investissement ou devise ?'
+              ? l10n.investments_wizard_investment_or_currency_title
               // "Autres" (montres, voitures de collection, art...) n'a pas
               // de notion d'investissement financier : "pièce" désigne
               // l'objet précis à l'intérieur du bien/de la collection
               // nommée à l'étape précédente.
               : assetClass == AssetClass.autres
-              ? 'Quelle pièce ?'
-              : 'Quel investissement ?',
+              ? l10n.investments_wizard_item_title
+              : l10n.investments_wizard_investment_title,
           addLabel: _isEpargneFlow
-              ? 'Nouvelle devise'
+              ? l10n.investments_wizard_new_currency_label
               : allowsDevises
-              ? 'Nouvel investissement ou devise'
+              ? l10n.investments_wizard_new_investment_or_currency_label
               : assetClass == AssetClass.autres
-              ? 'Nouvelle pièce'
-              : 'Nouvel investissement',
+              ? l10n.investments_wizard_new_item_label
+              : l10n.investments_wizard_new_investment_label,
           createLabel: _creatingDevise
-              ? 'Créer la devise'
+              ? l10n.investments_wizard_create_currency_label
               : assetClass == AssetClass.autres
-              ? 'Ajouter la pièce'
-              : 'Créer l\'investissement',
+              ? l10n.investments_wizard_add_item_label
+              : l10n.investments_create_investment_label,
           allowsDevises: allowsDevises,
           creatingDevise: _creatingDevise,
           onDeviseModeChanged: (v) => setState(() => _creatingDevise = v),
@@ -1586,7 +1613,8 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
       case _Step.transaction:
         return _TransactionStep(
           stepLabel:
-              'Étape $_totalSteps sur $_totalSteps · ${_investment!.label}',
+              '${l10n.investments_wizard_step_of_total('$_totalSteps', '$_totalSteps')} · '
+              '${_investment!.label}',
           investment: _investment!,
           isBuy: _newIsBuy,
           date: _txnDate,
@@ -1721,13 +1749,14 @@ class _OwnerStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const _DialogHeader(
-          step: 'Étape préalable',
-          title: 'À qui appartient ceci ?',
+        _DialogHeader(
+          step: l10n.investments_wizard_step_preliminary,
+          title: l10n.investments_wizard_owner_title,
         ),
         const SizedBox(height: 16),
         for (final entity in entities) ...[
@@ -1741,8 +1770,8 @@ class _OwnerStep extends StatelessWidget {
         ],
         _OptionTile(
           leading: const Icon(LucideIcons.plus, size: 18),
-          label: 'Nouvelle entité',
-          sublabel: 'Holding, société commerciale, SCI, compte pro...',
+          label: l10n.investments_wizard_new_entity_label,
+          sublabel: l10n.investments_wizard_new_entity_sublabel,
           onTap: onCreateEntity,
         ),
       ],
@@ -1767,27 +1796,28 @@ class _KindStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         _DialogHeader(
-          step: 'Étape 1',
-          title: 'Que voulez-vous compléter ?',
+          step: l10n.investments_wizard_step_number('1'),
+          title: l10n.investments_wizard_kind_title,
           onBack: onBack,
         ),
         const SizedBox(height: 16),
         _OptionTile(
           leading: const Icon(LucideIcons.trendingUp, size: 18),
-          label: 'Un actif',
-          sublabel: 'Immobilier, bourse, épargne, crypto...',
+          label: l10n.investments_wizard_asset_label,
+          sublabel: l10n.investments_wizard_asset_sublabel,
           onTap: onSelectActif,
         ),
         const SizedBox(height: 8),
         _OptionTile(
           leading: const Icon(LucideIcons.trendingDown, size: 18),
-          label: 'Un passif',
-          sublabel: 'Prêt immobilier, crédit à la consommation...',
+          label: l10n.investments_wizard_liability_label,
+          sublabel: l10n.investments_wizard_liability_sublabel,
           onTap: onSelectPassif,
         ),
       ],
@@ -1814,7 +1844,7 @@ class _AssetClassStep extends StatelessWidget {
       children: [
         _DialogHeader(
           step: stepLabel,
-          title: 'Quelle classe d\'actif ?',
+          title: AppLocalizations.of(context).investments_wizard_asset_class_title,
           onBack: onBack,
         ),
         const SizedBox(height: 16),
@@ -1838,22 +1868,23 @@ class _AssetClassStep extends StatelessWidget {
 /// Texte d'exemple du champ "Nom du compte" de [_AccountStep], adapté à la
 /// classe d'actif choisie à l'étape précédente — "Autres" garde son propre
 /// libellé de champ ("Nom"), géré séparément par l'appelant.
-String _accountNamePlaceholderFor(AssetClass assetClass) {
+String _accountNamePlaceholderFor(BuildContext context, AssetClass assetClass) {
+  final l10n = AppLocalizations.of(context);
   switch (assetClass) {
     case AssetClass.actionsEtFonds:
-      return 'Nom du compte (ex: PEA Boursorama)';
+      return l10n.investments_account_name_hint_stocks;
     case AssetClass.epargne:
-      return 'Nom du compte (ex: Livret A)';
+      return l10n.investments_account_name_hint_savings;
     case AssetClass.crypto:
-      return 'Nom du compte (ex: Coinbase)';
+      return l10n.investments_account_name_hint_crypto;
     case AssetClass.privateEquity:
-      return 'Nom du compte (ex: Moonfare)';
+      return l10n.investments_account_name_hint_private_equity;
     case AssetClass.metauxPrecieux:
-      return 'Nom du compte (ex: Coffre personnel)';
+      return l10n.investments_account_name_hint_precious_metals;
     case AssetClass.immobilier:
-      return 'Nom du compte (ex: Résidence principale)';
+      return l10n.investments_account_name_hint_real_estate;
     case AssetClass.autres:
-      return 'Nom du compte';
+      return l10n.investments_account_name_hint_generic;
   }
 }
 
@@ -1910,6 +1941,7 @@ class _AccountStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -1921,8 +1953,8 @@ class _AccountStep extends StatelessWidget {
           // précis qu'une collection (plusieurs pièces regroupées, voir
           // `customOtherCategory`).
           title: assetClass == AssetClass.autres
-              ? 'Quel bien ?'
-              : 'Quel compte ?',
+              ? l10n.investments_wizard_asset_item_title
+              : l10n.investments_wizard_account_title,
           onBack: onBack,
         ),
         const SizedBox(height: 16),
@@ -1987,15 +2019,15 @@ class _AccountStep extends StatelessWidget {
                   ),
                   itemBuilder: (context, value) => shadcn.Text(
                     value == _noCustomOtherCategoryValue
-                        ? 'Aucun type précis'
+                        ? l10n.investments_wizard_no_precise_type
                         : value,
                   ),
                   popup: (context) => SelectPopup(
                     items: SelectItemList(
                       children: [
-                        const SelectItemButton(
+                        SelectItemButton(
                           value: _noCustomOtherCategoryValue,
-                          child: shadcn.Text('Aucun type précis'),
+                          child: shadcn.Text(l10n.investments_wizard_no_precise_type),
                         ),
                         for (final category in customOtherCategories)
                           SelectItemButton(
@@ -2008,7 +2040,7 @@ class _AccountStep extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 _AddOptionButton(
-                  label: 'Nouveau type',
+                  label: l10n.investments_new_custom_type_title,
                   onTap: onAddCustomOtherCategory,
                 ),
               ],
@@ -2018,7 +2050,9 @@ class _AccountStep extends StatelessWidget {
                 // Exemple adapté à la classe d'actif choisie à l'étape
                 // précédente, plutôt qu'un unique "PEA Boursorama" qui ne
                 // parle qu'à "Actions & Fonds".
-                placeholder: shadcn.Text(_accountNamePlaceholderFor(assetClass)),
+                placeholder: shadcn.Text(
+                  _accountNamePlaceholderFor(context, assetClass),
+                ),
                 autofocus: true,
               ),
               // Le champ "Banque" s'affiche pour toute classe détenue chez
@@ -2031,21 +2065,21 @@ class _AccountStep extends StatelessWidget {
                 const SizedBox(height: 8),
                 TextField(
                   controller: bankController,
-                  placeholder: const shadcn.Text('Banque (ex: Boursorama)'),
+                  placeholder: shadcn.Text(l10n.investments_bank_name_hint),
                 ),
               ],
             ],
             onCreate: onCreate,
             onCancel: onCancelCreate,
             createLabel: assetClass == AssetClass.autres
-                ? 'Créer'
-                : 'Créer le compte',
+                ? l10n.common_create
+                : l10n.investments_create_account_label,
           )
         else
           _AddOptionButton(
             label: assetClass == AssetClass.autres
-                ? 'Nouveau bien'
-                : 'Nouveau compte',
+                ? l10n.investments_wizard_new_asset_item_label
+                : l10n.investments_wizard_new_account_label,
             onTap: onStartCreate,
           ),
       ],
@@ -2131,7 +2165,9 @@ class _EstablishmentStep extends StatelessWidget {
     if (onDelete == null) return;
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => Center(
+      builder: (dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext);
+        return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: FrostedCard(
@@ -2141,11 +2177,10 @@ class _EstablishmentStep extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  shadcn.Text('Supprimer un compte').large().semiBold(),
+                  shadcn.Text(l10n.investments_delete_account_dialog_title).large().semiBold(),
                   const SizedBox(height: 4),
                   shadcn.Text(
-                    'Comptes de $establishment — seuls ceux sans transaction '
-                    'sont supprimables.',
+                    l10n.investments_delete_account_dialog_subtitle(establishment),
                   ).muted().small(),
                   const SizedBox(height: 16),
                   for (final account in accounts) ...[
@@ -2185,21 +2220,21 @@ class _EstablishmentStep extends StatelessWidget {
                               Navigator.of(dialogContext).pop();
                               final confirmed = await confirmDelete(
                                 context,
-                                title:
-                                    'Supprimer « '
-                                    '${account.customOtherCategory ?? account.envelope?.label ?? account.name} » ?',
+                                title: l10n.investments_delete_account_confirm_title(
+                                  account.customOtherCategory ??
+                                      account.envelope?.label ??
+                                      account.name,
+                                ),
                                 message:
-                                    'Ce compte et ses investissements '
-                                    '(sans transaction) seront '
-                                    'définitivement supprimés.',
+                                    l10n.investments_delete_account_confirm_message,
                               );
                               if (confirmed) await onDelete(account);
                             },
-                            child: const shadcn.Text('Supprimer'),
+                            child: shadcn.Text(l10n.common_delete),
                           )
                         else
                           shadcn.Text(
-                            'contient des transactions',
+                            l10n.investments_account_has_transactions,
                           ).muted().xSmall(),
                       ],
                     ),
@@ -2210,7 +2245,7 @@ class _EstablishmentStep extends StatelessWidget {
                     children: [
                       OutlineButton(
                         onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: const shadcn.Text('Fermer'),
+                        child: shadcn.Text(l10n.common_close),
                       ),
                     ],
                   ),
@@ -2219,19 +2254,21 @@ class _EstablishmentStep extends StatelessWidget {
             ),
           ),
         ),
-      ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         _DialogHeader(
           step: stepLabel,
-          title: 'Quel établissement ?',
+          title: l10n.investments_wizard_establishment_title,
           onBack: onBack,
         ),
         const SizedBox(height: 16),
@@ -2267,18 +2304,19 @@ class _EstablishmentStep extends StatelessWidget {
             fields: [
               TextField(
                 controller: nameController,
-                placeholder: const shadcn.Text(
-                  'Nom de l\'établissement (ex: Boursorama)',
-                ),
+                placeholder: shadcn.Text(l10n.investments_establishment_name_hint),
                 autofocus: true,
               ),
             ],
             onCreate: onCreate,
             onCancel: onCancelCreate,
-            createLabel: 'Continuer',
+            createLabel: l10n.investments_wizard_continue_label,
           )
         else
-          _AddOptionButton(label: 'Nouvel établissement', onTap: onStartCreate),
+          _AddOptionButton(
+            label: l10n.investments_wizard_new_establishment_label,
+            onTap: onStartCreate,
+          ),
       ],
     );
   }
@@ -2349,17 +2387,20 @@ class _AccountEnvelopeStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _DialogHeader(step: stepLabel, title: 'Quel compte ?', onBack: onBack),
+        _DialogHeader(
+          step: stepLabel,
+          title: l10n.investments_wizard_account_title,
+          onBack: onBack,
+        ),
         const SizedBox(height: 16),
         TextField(
           controller: descriptionController,
-          placeholder: const shadcn.Text(
-            'Description (facultative, ex: Épargne vacances)',
-          ),
+          placeholder: shadcn.Text(l10n.investments_account_description_hint),
         ),
         const SizedBox(height: 8),
         OpimeDatePicker(
@@ -2371,11 +2412,11 @@ class _AccountEnvelopeStep extends StatelessWidget {
                 // `_liabDateDebut` (voir `initState`).
                 : DateTime(date.year, date.month, date.day),
           ),
-          placeholder: const shadcn.Text('Date d\'ouverture (facultative)'),
+          placeholder: shadcn.Text(l10n.investments_opening_date_hint),
         ),
         if (existingAccounts.isNotEmpty) ...[
           const SizedBox(height: 16),
-          shadcn.Text('Comptes existants').medium(),
+          shadcn.Text(l10n.investments_existing_accounts_label).medium(),
           const SizedBox(height: 8),
           for (final account in existingAccounts) ...[
             _OptionTile(
@@ -2389,7 +2430,7 @@ class _AccountEnvelopeStep extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          shadcn.Text('Nouveau compte').medium(),
+          shadcn.Text(l10n.investments_new_account_section_label).medium(),
           const SizedBox(height: 8),
         ] else
           const SizedBox(height: 12),
@@ -2418,7 +2459,7 @@ class _AccountEnvelopeStep extends StatelessWidget {
               size: 18,
               color: Theme.of(context).colorScheme.primary,
             ),
-            label: '+ Nouveau type',
+            label: l10n.investments_add_custom_type_label,
             sublabel: null,
             onTap: onAddCustomOtherCategory,
           ),
@@ -2483,9 +2524,9 @@ class _InvestmentStep extends StatelessWidget {
 
   const _InvestmentStep({
     required this.stepLabel,
-    this.title = 'Quel investissement ?',
-    this.addLabel = 'Nouvel investissement',
-    this.createLabel = 'Créer l\'investissement',
+    required this.title,
+    required this.addLabel,
+    required this.createLabel,
     required this.account,
     required this.assetClass,
     required this.creating,
@@ -2522,6 +2563,7 @@ class _InvestmentStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -2566,14 +2608,14 @@ class _InvestmentStep extends StatelessWidget {
                       selectedStyle: const ButtonStyle.primary(),
                       style: toggleUnselectedStyle(context),
                       onChanged: (_) => onDeviseModeChanged?.call(false),
-                      child: const shadcn.Text('Investissement'),
+                      child: shadcn.Text(l10n.investments_wizard_toggle_investment),
                     ),
                     SelectedButton(
                       value: creatingDevise,
                       selectedStyle: const ButtonStyle.primary(),
                       style: toggleUnselectedStyle(context),
                       onChanged: (_) => onDeviseModeChanged?.call(true),
-                      child: const shadcn.Text('Devise'),
+                      child: shadcn.Text(l10n.investments_wizard_toggle_currency),
                     ),
                   ],
                 ),
@@ -2601,9 +2643,7 @@ class _InvestmentStep extends StatelessWidget {
                 const SizedBox(height: 8),
                 TextField(
                   controller: labelController,
-                  placeholder: const shadcn.Text(
-                    'Nom du bien (ex: Appartement Lyon 6e)',
-                  ),
+                  placeholder: shadcn.Text(l10n.investments_real_estate_name_hint),
                 ),
               ] else if (creatingDevise) ...[
                 // Une devise se choisit dans la liste des codes connus
@@ -2623,7 +2663,7 @@ class _InvestmentStep extends StatelessWidget {
                 // série...) — voir `InvestmentIdentifierField`.
                 TextField(
                   controller: labelController,
-                  placeholder: const shadcn.Text('Nom (ex : Rolex Submariner)'),
+                  placeholder: shadcn.Text(l10n.investments_item_name_hint),
                   autofocus: true,
                 ),
                 const SizedBox(height: 8),
@@ -2651,10 +2691,10 @@ class _InvestmentStep extends StatelessWidget {
                     // qui exclut les autres avec une liste déroulante connue).
                     placeholder: shadcn.Text(
                       assetClass == AssetClass.privateEquity
-                          ? 'Libellé (ex: Ardian Expansion Fund)'
+                          ? l10n.investments_label_hint_private_equity
                           : assetClass == AssetClass.metauxPrecieux
-                          ? 'Libellé (ex: Amundi Physical Gold ETC)'
-                          : 'Libellé (ex: TotalEnergies)',
+                          ? l10n.investments_label_hint_precious_metals
+                          : l10n.investments_label_hint_stocks,
                     ),
                     autofocus: true,
                   ),
@@ -2686,17 +2726,15 @@ class _InvestmentStep extends StatelessWidget {
                         Expanded(
                           child: TextField(
                             controller: vestingCliffController,
-                            placeholder: const shadcn.Text(
-                              'Cliff (mois, facultatif)',
-                            ),
+                            placeholder: shadcn.Text(l10n.investments_vesting_cliff_hint),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
                             controller: vestingDurationController,
-                            placeholder: const shadcn.Text(
-                              'Durée de vesting (mois, facultatif)',
+                            placeholder: shadcn.Text(
+                              l10n.investments_vesting_duration_hint,
                             ),
                           ),
                         ),
@@ -2706,8 +2744,8 @@ class _InvestmentStep extends StatelessWidget {
                     OpimeDatePicker(
                       value: exerciseDeadline,
                       onChanged: onExerciseDeadlineChanged,
-                      placeholder: const shadcn.Text(
-                        'Date limite d\'exercice (facultative)',
+                      placeholder: shadcn.Text(
+                        l10n.investments_exercise_deadline_hint,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -2738,9 +2776,7 @@ class _InvestmentStep extends StatelessWidget {
                         children: [
                           Select<FundStyle>(
                             value: fundStyle,
-                            placeholder: const shadcn.Text(
-                              'Style de gestion (facultatif)',
-                            ),
+                            placeholder: shadcn.Text(l10n.investments_fund_style_hint),
                             onChanged: (style) {
                               if (style != null) onFundStyleChanged(style);
                             },
@@ -2792,7 +2828,7 @@ class _InvestmentStep extends StatelessWidget {
           if (onAddLeveraged != null) ...[
             const SizedBox(height: 8),
             _AddOptionButton(
-              label: 'Position à effet de levier',
+              label: l10n.investments_leveraged_position_label,
               onTap: onAddLeveraged!,
             ),
           ],
@@ -2859,8 +2895,8 @@ class _TransactionStep extends StatelessWidget {
     required this.quantityController,
     required this.priceController,
     required this.noteController,
-    this.quantityLabel = 'Quantité',
-    this.priceLabel = 'Prix unitaire',
+    required this.quantityLabel,
+    required this.priceLabel,
     this.showPriceField = true,
     this.showCurrencySelector = false,
     this.priceCurrencyController,
@@ -2877,13 +2913,14 @@ class _TransactionStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         _DialogHeader(
           step: stepLabel,
-          title: 'Ajouter une transaction',
+          title: l10n.investments_add_transaction_title,
           onBack: onBack,
         ),
         const SizedBox(height: 16),
@@ -2899,21 +2936,21 @@ class _TransactionStep extends StatelessWidget {
                   selectedStyle: const ButtonStyle.primary(),
                   style: toggleUnselectedStyle(context),
                   onChanged: (_) => onIsBuyChanged(true),
-                  child: const shadcn.Text('Achat'),
+                  child: shadcn.Text(l10n.investments_transaction_buy_label),
                 ),
                 SelectedButton(
                   value: !isBuy,
                   selectedStyle: const ButtonStyle.primary(),
                   style: toggleUnselectedStyle(context),
                   onChanged: (_) => onIsBuyChanged(false),
-                  child: const shadcn.Text('Vente'),
+                  child: shadcn.Text(l10n.investments_transaction_sell_label),
                 ),
               ],
             ),
             OpimeDatePicker(
               value: date,
               onChanged: onDateChanged,
-              placeholder: const shadcn.Text('Date'),
+              placeholder: shadcn.Text(l10n.common_date),
             ),
           ],
         ),
@@ -2921,12 +2958,12 @@ class _TransactionStep extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              shadcn.Text('Débloqué le').muted().xSmall(),
+              shadcn.Text(l10n.investments_unlocked_on_label).muted().xSmall(),
               const SizedBox(width: 8),
               OpimeDatePicker(
                 value: unlockDate,
                 onChanged: onUnlockDateChanged,
-                placeholder: const shadcn.Text('Date de déblocage'),
+                placeholder: shadcn.Text(l10n.investments_unlock_date_hint),
               ),
             ],
           ),
@@ -2973,7 +3010,7 @@ class _TransactionStep extends StatelessWidget {
         const SizedBox(height: 8),
         TextField(
           controller: noteController,
-          placeholder: const shadcn.Text('Commentaire (facultatif)'),
+          placeholder: shadcn.Text(l10n.investments_comment_hint),
         ),
         if (documentsSection != null) ...[
           const SizedBox(height: 16),
@@ -2984,12 +3021,12 @@ class _TransactionStep extends StatelessWidget {
           children: [
             PrimaryButton(
               onPressed: onCreate,
-              child: const shadcn.Text('Ajouter la transaction'),
+              child: shadcn.Text(l10n.investments_add_transaction_submit),
             ),
             const SizedBox(width: 8),
             OutlineButton(
               onPressed: onSkip,
-              child: const shadcn.Text('Terminer sans transaction'),
+              child: shadcn.Text(l10n.investments_finish_without_transaction_label),
             ),
           ],
         ),
@@ -3006,13 +3043,14 @@ class _LiabilityTypeStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         _DialogHeader(
-          step: 'Étape 2 sur 3',
-          title: 'Quel type de passif ?',
+          step: l10n.investments_wizard_step_of_total('2', '3'),
+          title: l10n.investments_wizard_liability_type_title,
           onBack: onBack,
         ),
         const SizedBox(height: 16),
@@ -3093,13 +3131,16 @@ class _LiabilityFormStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         _DialogHeader(
-          step: 'Étape 3 sur 3 · ${type.label}',
-          title: 'Nouveau passif',
+          step:
+              '${l10n.investments_wizard_step_of_total('3', '3')} · '
+              '${type.label}',
+          title: l10n.investments_wizard_new_liability_title,
           onBack: onBack,
         ),
         const SizedBox(height: 16),
@@ -3128,7 +3169,7 @@ class _LiabilityFormStep extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const shadcn.Text('Bien financé (facultatif)').medium(),
+              shadcn.Text(l10n.investments_linked_asset_label).medium(),
               const SizedBox(height: 6),
               Select<String>(
                 value: linkedInvestmentId ?? _noLinkedInvestmentValue,
@@ -3145,7 +3186,7 @@ class _LiabilityFormStep extends StatelessWidget {
                       break;
                     }
                   }
-                  return shadcn.Text(match?.label ?? 'Aucun');
+                  return shadcn.Text(match?.label ?? l10n.common_none);
                 },
                 onChanged: (v) => onLinkedInvestmentIdChanged(
                   v == null || v == _noLinkedInvestmentValue ? null : v,
@@ -3153,9 +3194,9 @@ class _LiabilityFormStep extends StatelessWidget {
                 popup: (context) => SelectPopup(
                   items: SelectItemList(
                     children: [
-                      const SelectItemButton(
+                      SelectItemButton(
                         value: _noLinkedInvestmentValue,
-                        child: shadcn.Text('Aucun'),
+                        child: shadcn.Text(l10n.common_none),
                       ),
                       for (final inv in realEstateInvestments)
                         SelectItemButton(
@@ -3172,7 +3213,7 @@ class _LiabilityFormStep extends StatelessWidget {
         const SizedBox(height: 16),
         PrimaryButton(
           onPressed: onCreate,
-          child: const shadcn.Text('Créer le passif'),
+          child: shadcn.Text(l10n.investments_create_liability_label),
         ),
       ],
     );
@@ -3304,7 +3345,7 @@ class _InlineCreateForm extends StatelessWidget {
               const SizedBox(width: 8),
               OutlineButton(
                 onPressed: onCancel,
-                child: const shadcn.Text('Annuler'),
+                child: shadcn.Text(AppLocalizations.of(context).common_cancel),
               ),
             ],
           ),

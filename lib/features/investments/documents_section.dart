@@ -6,6 +6,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 import 'confirm_delete_dialog.dart';
 import 'currency_format.dart';
 import 'document_storage.dart';
@@ -97,15 +98,15 @@ class DocumentsSection extends StatelessWidget {
 
     if (fixedTransactionId == null && linkedTransactions != null) {
       if (linkedTransactions.isEmpty) {
+        final l10n = AppLocalizations.of(context);
         showToast(
           context: context,
           location: ToastLocation.bottomRight,
           builder: (context, overlay) => SurfaceCard(
             child: Basic(
-              title: const shadcn.Text('Aucune transaction'),
-              subtitle: const shadcn.Text(
-                'Ajoute d\'abord une transaction pour pouvoir y '
-                'rattacher un document.',
+              title: shadcn.Text(l10n.investments_documents_no_transaction_title),
+              subtitle: shadcn.Text(
+                l10n.investments_documents_no_transaction_message,
               ),
             ),
           ),
@@ -143,7 +144,9 @@ class DocumentsSection extends StatelessWidget {
     final nameController = TextEditingController();
     return showDialog<({String? name, String? transactionId})>(
       context: context,
-      builder: (context) => Center(
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+        return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 380),
           child: FrostedCard(
@@ -153,19 +156,19 @@ class DocumentsSection extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const shadcn.Text('Ajouter un document').large().semiBold(),
+                  shadcn.Text(l10n.real_estate_add_document_title).large().semiBold(),
                   const SizedBox(height: 12),
                   TextField(
                     controller: nameController,
-                    placeholder: const shadcn.Text(
-                      'Nom du document (optionnel)',
+                    placeholder: shadcn.Text(
+                      l10n.real_estate_document_name_hint,
                     ),
                     autofocus: true,
                   ),
                   if (transactionOptions != null) ...[
                     const SizedBox(height: 16),
-                    const shadcn.Text(
-                      'Rattacher à quelle transaction ?',
+                    shadcn.Text(
+                      l10n.investments_documents_link_transaction_label,
                     ).small().semiBold(),
                     const SizedBox(height: 8),
                     for (final transaction in transactionOptions.reversed) ...[
@@ -208,12 +211,12 @@ class DocumentsSection extends StatelessWidget {
                                 : nameController.text.trim(),
                             transactionId: null,
                           )),
-                          child: const shadcn.Text('Continuer'),
+                          child: shadcn.Text(l10n.common_continue),
                         ),
                       if (transactionOptions == null) const SizedBox(width: 8),
                       OutlineButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
+                        child: shadcn.Text(l10n.common_cancel),
                       ),
                     ],
                   ),
@@ -222,7 +225,8 @@ class DocumentsSection extends StatelessWidget {
             ),
           ),
         ),
-      ),
+      );
+      },
     );
   }
 
@@ -250,10 +254,11 @@ class DocumentsSection extends StatelessWidget {
     BuildContext context,
     VaultDocument document,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${document.fileName}" ?',
-      message: 'Le fichier sera définitivement supprimé du coffre-fort.',
+      title: l10n.real_estate_delete_document_title(document.fileName),
+      message: l10n.real_estate_delete_document_message,
     );
     if (!confirmed) return;
     onDelete(document);
@@ -261,12 +266,13 @@ class DocumentsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const shadcn.Text('Documents').large().medium(),
+            shadcn.Text(l10n.real_estate_documents_title).large().medium(),
             const Spacer(),
             GestureDetector(
               onTap: () => _pickAndAdd(context),
@@ -280,7 +286,7 @@ class DocumentsSection extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   shadcn.Text(
-                    'Ajouter',
+                    l10n.common_add,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                     ),
@@ -292,7 +298,7 @@ class DocumentsSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (documents.isEmpty)
-          shadcn.Text('Aucun document pour l\'instant.').muted().small()
+          shadcn.Text(l10n.investments_documents_empty).muted().small()
         else
           for (final document in documents) ...[
             _DocumentRow(
@@ -332,7 +338,9 @@ Future<void> showDocumentViewDialog(
 
   return showDialog<void>(
     context: context,
-    builder: (context) => Center(
+    builder: (context) {
+      final l10n = AppLocalizations.of(context);
+      return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420, maxHeight: 480),
         child: FrostedCard(
@@ -342,11 +350,14 @@ Future<void> showDocumentViewDialog(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                shadcn.Text('Documents de la transaction').large().semiBold(),
+                shadcn.Text(
+                  l10n.investments_documents_view_dialog_title,
+                ).large().semiBold(),
                 const SizedBox(height: 4),
                 shadcn.Text(
-                  '${documents.length} document'
-                  '${documents.length > 1 ? 's' : ''} — cliquez pour ouvrir.',
+                  l10n.investments_documents_view_dialog_subtitle(
+                    documents.length,
+                  ),
                 ).muted().small(),
                 const SizedBox(height: 12),
                 Flexible(
@@ -369,7 +380,7 @@ Future<void> showDocumentViewDialog(
                   alignment: Alignment.centerRight,
                   child: OutlineButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const shadcn.Text('Fermer'),
+                    child: shadcn.Text(l10n.common_close),
                   ),
                 ),
               ],
@@ -377,7 +388,8 @@ Future<void> showDocumentViewDialog(
           ),
         ),
       ),
-    ),
+      );
+    },
   );
 }
 

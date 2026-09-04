@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../../l10n/app_localizations.dart';
 import '../../../core/date_format.dart';
 import '../../../core/money_format.dart';
 import '../../../core/ui/copyable_identifier.dart';
@@ -270,20 +271,27 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
       !_isEurCurrency && !_usesTotalAmount && !_isCurrency;
 
   String get _quantityFieldLabel {
-    if (_isImmobilier) return 'Montant total (€)';
+    final l10n = AppLocalizations.of(context);
+    if (_isImmobilier) return l10n.investments_field_total_amount_eur;
     if (_effectiveClass == AssetClass.privateEquity) {
       return _investment.privateEquityKind == PrivateEquityKind.actionsSalarie
-          ? 'Nombre de titres/options'
-          : 'Montant versé (€)';
+          ? l10n.investments_field_shares_options_count
+          : l10n.investments_field_amount_paid_eur;
     }
     if (_isCurrency) {
-      return _isEurCurrency ? 'Montant (€)' : 'Montant (${_investment.isin})';
+      return _isEurCurrency
+          ? l10n.investments_field_amount_eur
+          : l10n.investments_field_amount_currency(_investment.isin);
     }
-    return 'Quantité';
+    return l10n.investments_field_quantity;
   }
 
-  String get _priceFieldLabel =>
-      _isCurrency ? 'Cours de la paire de devise' : 'Prix unitaire';
+  String get _priceFieldLabel {
+    final l10n = AppLocalizations.of(context);
+    return _isCurrency
+        ? l10n.investments_field_currency_pair_rate
+        : l10n.investments_field_unit_price;
+  }
 
   String get _txnCurrency =>
       _isCurrency ? 'EUR' : _priceCurrencyController.currency;
@@ -509,16 +517,13 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
     // une position déséquilibrée (ex : un titre "arrivé" nulle part) sur
     // l'autre compte/position, une erreur silencieuse difficile à repérer.
     final linkedId = transaction.linkedTransactionId;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer cette transaction ?',
+      title: l10n.investments_delete_transaction_title,
       message: linkedId == null
-          ? 'Cette action est irréversible et modifiera la quantité '
-                'détenue et le PRU de cette position.'
-          : 'Cette transaction fait partie d\'un transfert/arbitrage : sa '
-                'contrepartie sera aussi supprimée. Cette action est '
-                'irréversible et modifiera la quantité détenue et le PRU '
-                'des deux positions concernées.',
+          ? l10n.investments_delete_transaction_message(_investment.label)
+          : l10n.investments_delete_linked_transaction_message,
     );
     if (!confirmed) return;
     final orphanedDocuments = [
@@ -608,6 +613,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
           : _formatNumber(_investment.manualPrice!),
     );
     final quantity = _investment.quantityHeld;
+    final l10n = AppLocalizations.of(context);
     final value = await showDialog<double>(
       context: context,
       builder: (context) => Center(
@@ -620,24 +626,21 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const shadcn.Text('Cours actuel estimé').large().semiBold(),
+                  shadcn.Text(
+                    l10n.investments_manual_price_dialog_title,
+                  ).large().semiBold(),
                   const SizedBox(height: 8),
                   shadcn.Text(
                     quantity > 1
-                        ? 'Prix estimé par unité — à mettre à jour toi-même '
-                              'quand tu le juges utile, aucune source de '
-                              'cours automatique n\'existe pour ce '
-                              'placement. La valeur affichée sera ce cours × '
-                              '${formatQuantity(quantity, _effectiveClass)} '
-                              'unités détenues.'
-                        : 'À mettre à jour toi-même quand tu le juges utile '
-                              '— aucune source de cours automatique '
-                              'n\'existe pour ce placement.',
+                        ? l10n.investments_manual_price_hint_multi_unit(
+                            formatQuantity(quantity, _effectiveClass),
+                          )
+                        : l10n.investments_manual_price_hint_single_unit,
                   ).muted().small(),
                   const SizedBox(height: 12),
                   TextField(
                     controller: controller,
-                    placeholder: const shadcn.Text('Cours (€)'),
+                    placeholder: shadcn.Text(l10n.investments_field_price_eur),
                     keyboardType: TextInputType.number,
                     autofocus: true,
                   ),
@@ -649,12 +652,12 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                           final parsed = parseDecimal(controller.text);
                           Navigator.of(context).pop(parsed);
                         },
-                        child: const shadcn.Text('Enregistrer'),
+                        child: shadcn.Text(l10n.common_save),
                       ),
                       const SizedBox(width: 8),
                       OutlineButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
+                        child: shadcn.Text(l10n.common_cancel),
                       ),
                     ],
                   ),
@@ -683,6 +686,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
           ? ''
           : _formatNumber(_investment.manualValuation!),
     );
+    final l10n = AppLocalizations.of(context);
     final value = await showDialog<double>(
       context: context,
       builder: (context) => Center(
@@ -695,18 +699,19 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const shadcn.Text('Valorisation actuelle').large().semiBold(),
+                  shadcn.Text(
+                    l10n.investments_pe_valuation_dialog_title,
+                  ).large().semiBold(),
                   const SizedBox(height: 8),
                   shadcn.Text(
-                    'Dernier NAV/valorisation communiqué par le gérant du '
-                    'fonds — à mettre à jour toi-même quand tu le reçois, '
-                    'aucune source de cours automatique n\'existe pour ce '
-                    'placement.',
+                    l10n.investments_pe_valuation_hint,
                   ).muted().small(),
                   const SizedBox(height: 12),
                   TextField(
                     controller: controller,
-                    placeholder: const shadcn.Text('Valorisation (€)'),
+                    placeholder: shadcn.Text(
+                      l10n.investments_field_valuation_eur,
+                    ),
                     keyboardType: TextInputType.number,
                     autofocus: true,
                   ),
@@ -718,12 +723,12 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                           final parsed = parseDecimal(controller.text);
                           Navigator.of(context).pop(parsed);
                         },
-                        child: const shadcn.Text('Enregistrer'),
+                        child: shadcn.Text(l10n.common_save),
                       ),
                       const SizedBox(width: 8),
                       OutlineButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
+                        child: shadcn.Text(l10n.common_cancel),
                       ),
                     ],
                   ),
@@ -747,10 +752,11 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
 
   Future<void> _deleteInvestment() async {
     if (!_canDelete) return;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${_investment.label}" ?',
-      message: 'Cette position sera définitivement supprimée.',
+      title: l10n.investments_delete_position_confirm_title(_investment.label),
+      message: l10n.investments_delete_position_confirm_message,
     );
     if (!confirmed) return;
     final updatedAccount = widget.account.copyWith(
@@ -852,6 +858,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
   }
 
   void _openInvestmentMenu(BuildContext anchorContext) {
+    final l10n = AppLocalizations.of(anchorContext);
     showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.topEnd,
@@ -863,26 +870,28 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
           children: [
             MenuButton(
               leading: const Icon(LucideIcons.pencil, size: 14),
-              child: const shadcn.Text('Modifier'),
+              child: shadcn.Text(l10n.common_edit),
               onPressed: (_) => _startEditInvestment(),
             ),
             if (_effectiveClass == AssetClass.privateEquity &&
                 _investment.privateEquityKind != PrivateEquityKind.actionsSalarie)
               MenuButton(
                 leading: const Icon(LucideIcons.tag, size: 14),
-                child: const shadcn.Text('Réestimer la valorisation'),
+                child: shadcn.Text(
+                  l10n.investments_reestimate_pe_valuation_menu_item,
+                ),
                 onPressed: (_) => _openPrivateEquityValuationDialog(),
               )
             else if (_allowsManualCours)
               MenuButton(
                 leading: const Icon(LucideIcons.tag, size: 14),
-                child: const shadcn.Text('Réestimer le cours'),
+                child: shadcn.Text(l10n.investments_reestimate_price_menu_item),
                 onPressed: (_) => _showManualEstimateDialog(),
               ),
             if (_isImmobilier)
               MenuButton(
                 leading: const Icon(LucideIcons.mapPin, size: 14),
-                child: const shadcn.Text('Réestimer la valeur (€/m²)'),
+                child: shadcn.Text(l10n.investments_reestimate_dialog_title),
                 onPressed: (_) => _openReestimateDialog(),
               ),
             MenuButton(
@@ -894,27 +903,33 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
               ),
               child: shadcn.Text(
                 _investment.excludedFromPatrimoine
-                    ? 'Réintégrer au patrimoine'
-                    : 'Exclure du patrimoine',
+                    ? l10n.investments_reinclude_in_net_worth_menu_item
+                    : l10n.investments_exclude_from_net_worth_menu_item,
               ),
               onPressed: (_) => _toggleExcludedFromPatrimoine(),
             ),
             MenuButton(
               enabled: _investment.quantityHeld > 0,
               leading: const Icon(LucideIcons.arrowRightLeft, size: 14),
-              child: const shadcn.Text('Transférer vers un autre compte'),
+              child: shadcn.Text(
+                l10n.investments_transfer_to_other_account_menu_item,
+              ),
               onPressed: (_) => _openTransferDialog(),
             ),
             MenuButton(
               enabled: _investment.quantityHeld > 0,
               leading: const Icon(LucideIcons.shuffle, size: 14),
-              child: const shadcn.Text('Arbitrer vers un autre titre'),
+              child: shadcn.Text(
+                l10n.investments_arbitrage_to_other_security_menu_item,
+              ),
               onPressed: (_) => _openArbitrageDialog(),
             ),
             MenuButton(
               enabled: widget.account.investments.length > 1,
               leading: const Icon(LucideIcons.combine, size: 14),
-              child: const shadcn.Text('Fusionner avec une autre position'),
+              child: shadcn.Text(
+                l10n.investments_merge_with_other_position_menu_item,
+              ),
               onPressed: (_) => _openMergeDialog(),
             ),
             MenuButton(
@@ -922,10 +937,10 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
               leading: const Icon(LucideIcons.trash2, size: 14),
               trailing: _canDelete
                   ? null
-                  : const shadcn.Text(
-                      'Supprime d\'abord ses transactions',
+                  : shadcn.Text(
+                      l10n.investments_delete_position_requires_no_transactions_hint,
                     ).muted().xSmall(),
-              child: const shadcn.Text('Supprimer la position'),
+              child: shadcn.Text(l10n.investments_delete_position_menu_item),
               onPressed: (_) => _deleteInvestment(),
             ),
           ],
@@ -1138,14 +1153,20 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                             CopyableIdentifier(
                               value: investment.isin,
                               toastTitle: _isRealIsin
-                                  ? 'ISIN copié'
-                                  : 'Identifiant copié',
+                                  ? AppLocalizations.of(
+                                      context,
+                                    ).investments_isin_copied_toast
+                                  : AppLocalizations.of(
+                                      context,
+                                    ).investments_identifier_copied_toast,
                             ),
                           if (investment.symbol != null &&
                               investment.symbol!.isNotEmpty)
                             CopyableIdentifier(
                               value: investment.symbol!,
-                              toastTitle: 'Ticker copié',
+                              toastTitle: AppLocalizations.of(
+                                context,
+                              ).investments_ticker_copied_toast,
                             ),
                         ],
                       ),
@@ -1193,7 +1214,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                           _investment.privateEquityKind !=
                               PrivateEquityKind.actionsSalarie)
                         InvestmentStatChip(
-                          label: 'Capital net investi',
+                          label: AppLocalizations.of(
+                            context,
+                          ).investments_stat_net_invested_capital,
                           value: displayEuros(
                             investment.investedAmount,
                             widget.hidden,
@@ -1201,14 +1224,16 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         )
                       else ...[
                         InvestmentStatChip(
-                          label: 'Quantité détenue',
+                          label: AppLocalizations.of(
+                            context,
+                          ).investments_stat_quantity_held,
                           value: formatQuantity(
                             investment.quantityHeld,
                             _effectiveClass,
                           ),
                         ),
                         InvestmentStatChip(
-                          label: 'PRU',
+                          label: AppLocalizations.of(context).dashboard_column_pru,
                           value: _isCurrency
                               ? '${investment.pru.toStringAsFixed(4)} €'
                               : displayEuros(investment.pru, widget.hidden),
@@ -1221,7 +1246,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         if (investment.vestingCliffMonths != null &&
                             investment.vestingDurationMonths != null)
                           InvestmentStatChip(
-                            label: 'Acquis',
+                            label: AppLocalizations.of(
+                              context,
+                            ).investments_stat_vested,
                             value: formatQuantity(
                               vestedQuantityFor(investment),
                               _effectiveClass,
@@ -1230,7 +1257,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                       ],
                       if (hasPrice)
                         InvestmentStatChip(
-                          label: 'Dernier cours',
+                          label: AppLocalizations.of(
+                            context,
+                          ).investments_stat_last_price,
                           value: investmentLastPriceDisplay(
                             widget.account,
                             investment,
@@ -1242,7 +1271,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         )
                       else if (investment.manualPrice != null)
                         InvestmentStatChip(
-                          label: 'Cours estimé',
+                          label: AppLocalizations.of(
+                            context,
+                          ).investments_stat_estimated_price,
                           value: displayEuros(
                             investment.manualPrice!,
                             widget.hidden,
@@ -1255,7 +1286,9 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         )
                       else if (investment.manualValuation != null)
                         InvestmentStatChip(
-                          label: 'Valorisation',
+                          label: AppLocalizations.of(
+                            context,
+                          ).investments_stat_valuation,
                           value: displayEuros(
                             investment.manualValuation!,
                             widget.hidden,
@@ -1303,9 +1336,16 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         if (performance != null)
                           shadcn.Text(
                             performance.annualized
-                                ? '${displayPercent(performance.rate * 100)} / an'
-                                : '${displayPercent(performance.rate * 100)} depuis '
-                                      'le début',
+                                ? AppLocalizations.of(
+                                    context,
+                                  ).investments_performance_annualized(
+                                    displayPercent(performance.rate * 100),
+                                  )
+                                : AppLocalizations.of(
+                                    context,
+                                  ).investments_performance_since_start(
+                                    displayPercent(performance.rate * 100),
+                                  ),
                             style: TextStyle(
                               color: performance.rate >= 0 ? _green : _red,
                               fontWeight: FontWeight.w600,
@@ -1314,45 +1354,55 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                         else
                           shadcn.Text(
                             _perfMode == _PerfMode.twr && hasPrice
-                                ? 'Pas assez d\'historique de cours pour ce '
-                                      'calcul.'
-                                : 'Pas assez d\'historique de transactions '
-                                      'pour ce calcul.',
+                                ? AppLocalizations.of(
+                                    context,
+                                  ).investments_insufficient_price_history
+                                : AppLocalizations.of(
+                                    context,
+                                  ).investments_insufficient_transaction_history,
                           ).muted().xSmall(),
                       ],
                     ),
                   ] else if (_effectiveClass == AssetClass.privateEquity)
                     shadcn.Text(
                       investment.manualValuationAt != null
-                          ? 'Valorisation estimée le '
-                                '${formatDateDdMmYyyy(investment.manualValuationAt!)} '
-                                '(menu « ⋮ » pour la mettre à jour).'
-                          : 'Aucune valorisation renseignée : le montant '
-                                'ci-dessus correspond au capital net investi '
-                                '— menu « ⋮ » pour renseigner le dernier NAV '
-                                'communiqué par le gérant.',
+                          ? AppLocalizations.of(
+                              context,
+                            ).investments_pe_valuation_estimated_on(
+                              formatDateDdMmYyyy(
+                                investment.manualValuationAt!,
+                              ),
+                            )
+                          : AppLocalizations.of(
+                              context,
+                            ).investments_pe_no_valuation_hint,
                     ).muted().xSmall()
                   else if (_allowsManualCours)
                     shadcn.Text(
                       investment.manualPriceAt != null
-                          ? 'Cours estimé le '
-                                '${formatDateDdMmYyyy(investment.manualPriceAt!)} '
-                                '(menu « ⋮ » pour le mettre à jour).'
-                          : 'Aucun cours renseigné : la valorisation '
-                                'ci-dessus correspond au montant net investi '
-                                '— menu « ⋮ » pour en ajouter un.',
+                          ? AppLocalizations.of(
+                              context,
+                            ).investments_manual_price_estimated_on_menu_hint(
+                              formatDateDdMmYyyy(investment.manualPriceAt!),
+                            )
+                          : AppLocalizations.of(
+                              context,
+                            ).investments_no_manual_price_hint,
                     ).muted().xSmall()
                   else
                     shadcn.Text(
                       investment.priceUnavailable == true
-                          ? 'Cours introuvable sur Yahoo Finance pour '
-                                '« ${investment.isin} ».'
-                          : 'Cours en temps réel pas encore disponible : la '
-                                'valorisation ci-dessus correspond au montant '
-                                'net investi.',
+                          ? AppLocalizations.of(
+                              context,
+                            ).investments_price_not_found_yahoo(investment.isin)
+                          : AppLocalizations.of(
+                              context,
+                            ).investments_price_not_available_yet,
                     ).muted().xSmall(),
                   const SizedBox(height: 24),
-                  const shadcn.Text('Transactions').large().medium(),
+                  shadcn.Text(
+                    AppLocalizations.of(context).investments_tab_transactions,
+                  ).large().medium(),
                   const SizedBox(height: 12),
                   for (final txn in investment.transactions.reversed) ...[
                     if (txn.id == _editingTransactionId)
@@ -1379,7 +1429,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                             : null,
                         onCreate: _commitEditTransaction,
                         onCancel: _cancelEdit,
-                        submitLabel: 'Enregistrer',
+                        submitLabel: AppLocalizations.of(context).common_save,
                         documentsSection: _usesTransactionScopedDocuments
                             ? DocumentsSection(
                                 vaultPath: widget.vaultPath,
@@ -1425,7 +1475,7 @@ class _PositionDetailDialogState extends State<_PositionDetailDialog> {
                   ],
                   if (investment.transactions.isEmpty)
                     shadcn.Text(
-                      'Aucune transaction pour l\'instant.',
+                      AppLocalizations.of(context).investments_no_transactions_yet,
                     ).muted().small(),
                   const SizedBox(height: 8),
                   if (_creating)

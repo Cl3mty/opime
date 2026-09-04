@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart' show displayEuros, parseDecimal;
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/opime_date_picker.dart';
+import '../../../l10n/app_localizations.dart';
 import '../investments_models.dart';
 import '../investments_repository.dart';
 
@@ -131,28 +132,32 @@ class _EditArbitrageDialogState extends State<_EditArbitrageDialog> {
     );
   }
 
-  String _validationError({
+  String _validationError(
+    AppLocalizations l10n, {
     required double? quantity,
     required double? sellPrice,
     required double? buyPrice,
   }) {
     if (quantity == null || quantity <= 0) {
-      return 'La quantité doit être un nombre supérieur à 0.';
+      return l10n.investments_error_quantity_must_be_positive;
     }
     if (quantity > _maxSellable + 1e-9) {
-      return 'La quantité (${_formatNumber(quantity)}) dépasse la quantité '
-          'qui serait détenue (${_formatNumber(_maxSellable)}).';
+      return l10n.investments_error_quantity_exceeds_sellable(
+        _formatNumber(quantity),
+        _formatNumber(_maxSellable),
+      );
     }
     if (sellPrice == null || sellPrice <= 0) {
-      return 'Le prix de vente doit être un nombre supérieur à 0.';
+      return l10n.investments_error_sell_price_must_be_positive;
     }
     if (buyPrice == null || buyPrice <= 0) {
-      return 'Le prix d\'achat doit être un nombre supérieur à 0.';
+      return l10n.investments_error_buy_price_must_be_positive;
     }
-    return 'La date est requise.';
+    return l10n.investments_error_date_required;
   }
 
   Future<void> _commit() async {
+    final l10n = AppLocalizations.of(context);
     final date = _date;
     final quantity = parseDecimal(_quantityController.text);
     final sellPrice = parseDecimal(_sellPriceController.text);
@@ -166,8 +171,9 @@ class _EditArbitrageDialogState extends State<_EditArbitrageDialog> {
         buyPrice == null ||
         buyPrice <= 0) {
       _showToast(
-        title: 'Modification impossible',
+        title: l10n.investments_edit_impossible_title,
         subtitle: _validationError(
+          l10n,
           quantity: quantity,
           sellPrice: sellPrice,
           buyPrice: buyPrice,
@@ -232,8 +238,8 @@ class _EditArbitrageDialogState extends State<_EditArbitrageDialog> {
     } catch (e) {
       if (!mounted) return;
       _showToast(
-        title: 'Modification impossible',
-        subtitle: 'Erreur lors de l\'enregistrement : $e',
+        title: l10n.investments_edit_impossible_title,
+        subtitle: l10n.investments_save_error(e.toString()),
       );
       return;
     }
@@ -258,6 +264,7 @@ class _EditArbitrageDialogState extends State<_EditArbitrageDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -276,7 +283,7 @@ class _EditArbitrageDialogState extends State<_EditArbitrageDialog> {
                     children: [
                       Expanded(
                         child: shadcn.Text(
-                          'Modifier l\'arbitrage',
+                          l10n.investments_edit_arbitrage_title,
                         ).large().semiBold(),
                       ),
                       IconButton.ghost(
@@ -295,19 +302,25 @@ class _EditArbitrageDialogState extends State<_EditArbitrageDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: _labeledField('Quantité', _quantityController),
+                        child: _labeledField(
+                          l10n.investments_field_quantity,
+                          _quantityController,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _labeledField(
-                          'Prix de vente',
+                          l10n.investments_field_sell_price,
                           _sellPriceController,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  _labeledField('Prix d\'achat', _buyPriceController),
+                  _labeledField(
+                    l10n.investments_field_buy_price,
+                    _buyPriceController,
+                  ),
                   const SizedBox(height: 4),
                   ListenableBuilder(
                     listenable: Listenable.merge([
@@ -330,17 +343,22 @@ class _EditArbitrageDialogState extends State<_EditArbitrageDialog> {
                           : null;
                       return shadcn.Text(
                         amount == null
-                            ? 'Montant : —'
+                            ? l10n.investments_amount_placeholder
                             : destQuantity == null
-                            ? 'Montant : ${displayEuros(amount, false)}'
-                            : 'Montant : ${displayEuros(amount, false)} '
-                                  '→ quantité achetée : '
-                                  '${_formatNumber(_roundForDisplay(destQuantity))}',
+                            ? l10n.investments_amount_value(
+                                displayEuros(amount, false),
+                              )
+                            : l10n.investments_amount_with_bought_quantity(
+                                displayEuros(amount, false),
+                                _formatNumber(
+                                  _roundForDisplay(destQuantity),
+                                ),
+                              ),
                       ).muted().xSmall();
                     },
                   ),
                   const SizedBox(height: 8),
-                  shadcn.Text('Date').muted().xSmall(),
+                  shadcn.Text(l10n.common_date).muted().xSmall(),
                   const SizedBox(height: 4),
                   OpimeDatePicker(
                     value: _date,
@@ -351,12 +369,12 @@ class _EditArbitrageDialogState extends State<_EditArbitrageDialog> {
                     children: [
                       PrimaryButton(
                         onPressed: _commit,
-                        child: const shadcn.Text('Enregistrer'),
+                        child: shadcn.Text(l10n.common_save),
                       ),
                       const SizedBox(width: 8),
                       OutlineButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
+                        child: shadcn.Text(l10n.common_cancel),
                       ),
                     ],
                   ),

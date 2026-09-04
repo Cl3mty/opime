@@ -6,6 +6,7 @@ import '../../core/ui/frosted_card.dart';
 import '../../core/ui/load_error_view.dart';
 import '../../core/ui/slide_page_route.dart';
 import '../../core/date_format.dart';
+import '../../l10n/app_localizations.dart';
 import '../investments/confirm_delete_dialog.dart';
 import 'strategy_documents_repository.dart';
 import 'strategy_folders_repository.dart';
@@ -269,9 +270,7 @@ class _StrategyScreenState extends State<StrategyScreen> {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_loadError) {
       return LoadErrorView(
-        message:
-            'Impossible de charger les notes. Vérifiez que le dossier '
-            'Coffre-fort est accessible.',
+        message: AppLocalizations.of(context).strategy_load_error,
         onRetry: _retryLoad,
       );
     }
@@ -329,7 +328,11 @@ class _StrategyScreenState extends State<StrategyScreen> {
         const VerticalDivider(width: 1),
         Expanded(
           child: _selectedId == null
-              ? const Center(child: shadcn.Text('Sélectionne ou crée une note'))
+              ? Center(
+                  child: shadcn.Text(
+                    AppLocalizations.of(context).strategy_select_or_create,
+                  ),
+                )
               : NoteEditor(
                   key: ValueKey(_selectedId),
                   repository: _repo,
@@ -408,14 +411,15 @@ class _NotesListPanelState extends State<_NotesListPanel> {
   }
 
   Future<void> _promptCreateFolder(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final nameController = TextEditingController();
     final result = await showDialog<({String name, int color})>(
       context: context,
       builder: (context) => _FolderEditDialog(
-        title: 'Nouveau dossier',
+        title: l10n.strategy_new_folder_title,
         nameController: nameController,
         initialColor: _folderColorPalette.first,
-        submitLabel: 'Créer',
+        submitLabel: l10n.common_create,
       ),
     );
     nameController.dispose();
@@ -427,6 +431,7 @@ class _NotesListPanelState extends State<_NotesListPanel> {
     BuildContext context,
     StrategyFolder folder,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final nameController = TextEditingController(text: folder.name);
     final name = await showDialog<String>(
       context: context,
@@ -440,11 +445,15 @@ class _NotesListPanelState extends State<_NotesListPanel> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const shadcn.Text('Renommer le dossier').large().semiBold(),
+                  shadcn.Text(
+                    l10n.strategy_rename_folder_title,
+                  ).large().semiBold(),
                   const SizedBox(height: 12),
                   TextField(
                     controller: nameController,
-                    placeholder: const shadcn.Text('Nom du dossier'),
+                    placeholder: shadcn.Text(
+                      l10n.strategy_folder_name_placeholder,
+                    ),
                     autofocus: true,
                   ),
                   const SizedBox(height: 16),
@@ -456,12 +465,12 @@ class _NotesListPanelState extends State<_NotesListPanel> {
                           if (trimmed.isEmpty) return;
                           Navigator.of(context).pop(trimmed);
                         },
-                        child: const shadcn.Text('Renommer'),
+                        child: shadcn.Text(l10n.common_rename),
                       ),
                       const SizedBox(width: 8),
                       OutlineButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
+                        child: shadcn.Text(l10n.common_cancel),
                       ),
                     ],
                   ),
@@ -481,6 +490,7 @@ class _NotesListPanelState extends State<_NotesListPanel> {
     BuildContext context,
     StrategyFolder folder,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final color = await showDialog<int>(
       context: context,
       builder: (context) => Center(
@@ -493,7 +503,9 @@ class _NotesListPanelState extends State<_NotesListPanel> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const shadcn.Text('Couleur du dossier').large().semiBold(),
+                  shadcn.Text(
+                    l10n.strategy_folder_color_title,
+                  ).large().semiBold(),
                   const SizedBox(height: 12),
                   _ColorSwatchPicker(
                     selected: folder.color,
@@ -506,7 +518,7 @@ class _NotesListPanelState extends State<_NotesListPanel> {
                     alignment: Alignment.centerRight,
                     child: OutlineButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const shadcn.Text('Annuler'),
+                      child: shadcn.Text(l10n.common_cancel),
                     ),
                   ),
                 ],
@@ -524,12 +536,11 @@ class _NotesListPanelState extends State<_NotesListPanel> {
     BuildContext context,
     StrategyFolder folder,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${folder.name}" ?',
-      message:
-          'Les notes qu\'il contient ne seront pas supprimées, seulement '
-          'rangées de nouveau hors dossier.',
+      title: l10n.strategy_delete_folder_confirm_title(folder.name),
+      message: l10n.strategy_delete_folder_confirm_message,
     );
     if (!confirmed) return;
     await widget.onDeleteFolder(folder.id);
@@ -540,6 +551,7 @@ class _NotesListPanelState extends State<_NotesListPanel> {
     StrategyNote note,
     List<StrategyFolder> folders,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final result = await showDialog<String>(
       context: context,
       builder: (context) => Center(
@@ -552,8 +564,8 @@ class _NotesListPanelState extends State<_NotesListPanel> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const shadcn.Text(
-                    'Déplacer vers un dossier',
+                  shadcn.Text(
+                    l10n.strategy_move_to_folder_title,
                   ).large().semiBold(),
                   const SizedBox(height: 12),
                   Flexible(
@@ -561,7 +573,7 @@ class _NotesListPanelState extends State<_NotesListPanel> {
                       child: Column(
                         children: [
                           _FolderOptionTile(
-                            label: 'Sans dossier',
+                            label: l10n.strategy_no_folder_label,
                             color: null,
                             onTap: () =>
                                 Navigator.of(context).pop(_noFolderSentinel),
@@ -583,7 +595,7 @@ class _NotesListPanelState extends State<_NotesListPanel> {
                     alignment: Alignment.centerRight,
                     child: OutlineButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const shadcn.Text('Annuler'),
+                      child: shadcn.Text(l10n.common_cancel),
                     ),
                   ),
                 ],
@@ -610,28 +622,31 @@ class _NotesListPanelState extends State<_NotesListPanel> {
       anchorAlignment: AlignmentDirectional.topEnd,
       alignment: AlignmentDirectional.topStart,
       offset: const Offset(0, 4),
-      builder: (context) => ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 220),
-        child: DropdownMenu(
-          children: [
-            MenuButton(
-              leading: const Icon(LucideIcons.folderInput, size: 14),
-              child: const shadcn.Text('Déplacer vers un dossier'),
-              onPressed: (_) => _promptMoveToFolder(context, note, folders),
-            ),
-            MenuButton(
-              leading: const Icon(LucideIcons.copyPlus, size: 14),
-              child: const shadcn.Text('Dupliquer'),
-              onPressed: (_) => widget.onDuplicate(note.id),
-            ),
-            MenuButton(
-              leading: const Icon(LucideIcons.trash2, size: 14),
-              child: const shadcn.Text('Supprimer'),
-              onPressed: (_) => widget.onDelete(note.id),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+        return ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 220),
+          child: DropdownMenu(
+            children: [
+              MenuButton(
+                leading: const Icon(LucideIcons.folderInput, size: 14),
+                child: shadcn.Text(l10n.strategy_move_to_folder_title),
+                onPressed: (_) => _promptMoveToFolder(context, note, folders),
+              ),
+              MenuButton(
+                leading: const Icon(LucideIcons.copyPlus, size: 14),
+                child: shadcn.Text(l10n.strategy_duplicate_note_menu_item),
+                onPressed: (_) => widget.onDuplicate(note.id),
+              ),
+              MenuButton(
+                leading: const Icon(LucideIcons.trash2, size: 14),
+                child: shadcn.Text(l10n.common_delete),
+                onPressed: (_) => widget.onDelete(note.id),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -680,13 +695,14 @@ class _NotesListPanelState extends State<_NotesListPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              const Expanded(child: shadcn.Text('Notes')),
+              Expanded(child: shadcn.Text(l10n.strategy_notes_panel_title)),
               IconButton.ghost(
                 icon: const Icon(LucideIcons.folderPlus),
                 onPressed: () => _promptCreateFolder(context),
@@ -702,7 +718,7 @@ class _NotesListPanelState extends State<_NotesListPanel> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: TextField(
-              placeholder: const shadcn.Text('Rechercher une note...'),
+              placeholder: shadcn.Text(l10n.strategy_search_placeholder),
               features: const [
                 InputFeature.leading(Icon(LucideIcons.search, size: 16)),
               ],
@@ -722,7 +738,7 @@ class _NotesListPanelState extends State<_NotesListPanel> {
                     .toList();
                 if (filtered.isEmpty) {
                   return Center(
-                    child: shadcn.Text('Aucun résultat').muted().small(),
+                    child: shadcn.Text(l10n.search_no_results).muted().small(),
                   );
                 }
                 return ValueListenableBuilder<_FolderState>(
@@ -739,7 +755,7 @@ class _NotesListPanelState extends State<_NotesListPanel> {
 
               if (notes.isEmpty) {
                 return Center(
-                  child: shadcn.Text('Aucune note').muted().small(),
+                  child: shadcn.Text(l10n.strategy_no_notes).muted().small(),
                 );
               }
 
@@ -787,7 +803,9 @@ class _NotesListPanelState extends State<_NotesListPanel> {
                       if (folders.isNotEmpty && unfiled.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                          child: shadcn.Text('Sans dossier').muted().xSmall(),
+                          child: shadcn.Text(
+                            l10n.strategy_no_folder_label,
+                          ).muted().xSmall(),
                         ),
                       for (final note in unfiled)
                         _noteRow(context, note, folders: folders),
@@ -835,28 +853,31 @@ class _FolderHeader extends StatelessWidget {
       anchorAlignment: AlignmentDirectional.topEnd,
       alignment: AlignmentDirectional.topStart,
       offset: const Offset(0, 4),
-      builder: (context) => ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 220),
-        child: DropdownMenu(
-          children: [
-            MenuButton(
-              leading: const Icon(LucideIcons.pencil, size: 14),
-              child: const shadcn.Text('Renommer'),
-              onPressed: (_) => onRename(),
-            ),
-            MenuButton(
-              leading: const Icon(LucideIcons.palette, size: 14),
-              child: const shadcn.Text('Changer la couleur'),
-              onPressed: (_) => onChangeColor(),
-            ),
-            MenuButton(
-              leading: const Icon(LucideIcons.trash2, size: 14),
-              child: const shadcn.Text('Supprimer'),
-              onPressed: (_) => onDelete(),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+        return ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 220),
+          child: DropdownMenu(
+            children: [
+              MenuButton(
+                leading: const Icon(LucideIcons.pencil, size: 14),
+                child: shadcn.Text(l10n.common_rename),
+                onPressed: (_) => onRename(),
+              ),
+              MenuButton(
+                leading: const Icon(LucideIcons.palette, size: 14),
+                child: shadcn.Text(l10n.strategy_change_color_menu_item),
+                onPressed: (_) => onChangeColor(),
+              ),
+              MenuButton(
+                leading: const Icon(LucideIcons.trash2, size: 14),
+                child: shadcn.Text(l10n.common_delete),
+                onPressed: (_) => onDelete(),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1025,6 +1046,7 @@ class _FolderEditDialogState extends State<_FolderEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
@@ -1039,7 +1061,9 @@ class _FolderEditDialogState extends State<_FolderEditDialog> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: widget.nameController,
-                  placeholder: const shadcn.Text('Nom du dossier'),
+                  placeholder: shadcn.Text(
+                    l10n.strategy_folder_name_placeholder,
+                  ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 12),
@@ -1061,7 +1085,7 @@ class _FolderEditDialogState extends State<_FolderEditDialog> {
                     const SizedBox(width: 8),
                     OutlineButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const shadcn.Text('Annuler'),
+                      child: shadcn.Text(l10n.common_cancel),
                     ),
                   ],
                 ),

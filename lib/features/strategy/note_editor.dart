@@ -7,6 +7,7 @@ import 'package:markdown_quill/markdown_quill.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 import '../investments/documents_section.dart';
 import '../investments/investments_models.dart' show VaultDocument;
 import 'note_delta_normalizer.dart';
@@ -119,6 +120,7 @@ class _NoteEditorState extends State<NoteEditor> {
   /// contenu au moment de l'ouverture — ne se redessinerait pas pour
   /// autant tant qu'elle reste ouverte.
   Future<void> _openDocumentsDialog() async {
+    final l10n = AppLocalizations.of(context);
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -164,7 +166,7 @@ class _NoteEditorState extends State<NoteEditor> {
                         alignment: Alignment.centerRight,
                         child: OutlineButton(
                           onPressed: () => Navigator.of(dialogContext).pop(),
-                          child: const shadcn.Text('Fermer'),
+                          child: shadcn.Text(l10n.common_close),
                         ),
                       ),
                     ],
@@ -206,6 +208,7 @@ class _NoteEditorState extends State<NoteEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final controller = _controller;
     final accentColor = Theme.of(context).colorScheme.primary;
     // flutter_quill code en dur la couleur des blocs de code
@@ -294,9 +297,7 @@ class _NoteEditorState extends State<NoteEditor> {
                       ),
                       const SizedBox(width: 4),
                       shadcn.Text(
-                        _documents.isEmpty
-                            ? 'Documents'
-                            : 'Documents (${_documents.length})',
+                        l10n.strategy_documents_button_label(_documents.length),
                       ).muted().small(),
                     ],
                   ),
@@ -313,7 +314,7 @@ class _NoteEditorState extends State<NoteEditor> {
               controller: controller,
               focusNode: _focusNode,
               config: QuillEditorConfig(
-                placeholder: 'Écris ta stratégie...',
+                placeholder: l10n.strategy_editor_placeholder,
                 customStyles: DefaultStyles(
                   h1: headingStyle(defaultStyles.h1, 0, color: headingColor100),
                   h2: headingStyle(defaultStyles.h2, 10, color: headingColor80),

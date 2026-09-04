@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/notifications/notifications_settings_controller.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
 import 'package:opime/features/investments/yahoo_finance_client.dart';
@@ -9,6 +10,7 @@ import 'package:opime/features/notifications/coingecko_client.dart';
 import 'package:opime/features/notifications/news_button.dart';
 import 'package:opime/features/notifications/notification_models.dart';
 import 'package:opime/features/notifications/notifications_controller.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -109,6 +111,12 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+          locale: const Locale('fr'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: [
+            shadcnLocalizationsFrDelegate,
+            ...AppLocalizations.localizationsDelegates,
+          ],
           home: Scaffold(
             child: NewsButton(
               settings: settings,

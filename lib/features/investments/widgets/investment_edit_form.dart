@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/opime_date_picker.dart';
 import '../investment_identifier_field.dart';
@@ -31,10 +32,11 @@ class InvestmentIdentityFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (assetClass == AssetClass.immobilier) {
       return TextField(
         controller: labelController,
-        placeholder: const shadcn.Text('Nom du bien (ex: Appartement Lyon 6e)'),
+        placeholder: shadcn.Text(l10n.investments_real_estate_name_hint),
       );
     }
     if (!requiresLabelFieldFor(assetClass, accountEnvelope: accountEnvelope)) {
@@ -53,7 +55,7 @@ class InvestmentIdentityFields extends StatelessWidget {
         Expanded(
           child: TextField(
             controller: labelController,
-            placeholder: const shadcn.Text('Libellé (ex: TotalEnergies)'),
+            placeholder: shadcn.Text(l10n.investments_label_hint_stocks),
             // Le libellé d'abord, l'identifiant ensuite : on connaît
             // généralement le nom d'un titre avant son ISIN, plus intuitif à
             // saisir dans cet ordre.
@@ -136,6 +138,7 @@ class InvestmentEditForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -145,9 +148,7 @@ class InvestmentEditForm extends StatelessWidget {
             if (isImmobilier)
               TextField(
                 controller: labelController,
-                placeholder: const shadcn.Text(
-                  'Nom du bien (ex: Appartement Lyon 6e)',
-                ),
+                placeholder: shadcn.Text(l10n.investments_real_estate_name_hint),
               )
             else
               Row(
@@ -155,9 +156,7 @@ class InvestmentEditForm extends StatelessWidget {
                   Expanded(
                     child: TextField(
                       controller: labelController,
-                      placeholder: const shadcn.Text(
-                        'Libellé (ex: TotalEnergies)',
-                      ),
+                      placeholder: shadcn.Text(l10n.investments_label_hint_stocks),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -187,7 +186,7 @@ class InvestmentEditForm extends StatelessWidget {
                     children: [
                       Select<FundStyle>(
                         value: fundStyle,
-                        placeholder: const shadcn.Text('Style de gestion'),
+                        placeholder: shadcn.Text(l10n.investments_fund_style_placeholder),
                         onChanged: (style) {
                           if (style != null) onFundStyleChanged(style);
                         },
@@ -236,9 +235,7 @@ class InvestmentEditForm extends StatelessWidget {
                   Expanded(
                     child: TextField(
                       initialValue: vestingCliffMonths?.toString() ?? '',
-                      placeholder: const shadcn.Text(
-                        'Cliff (mois, facultatif)',
-                      ),
+                      placeholder: shadcn.Text(l10n.investments_vesting_cliff_hint),
                       onChanged: (v) =>
                           onVestingCliffMonthsChanged(int.tryParse(v.trim())),
                     ),
@@ -247,8 +244,8 @@ class InvestmentEditForm extends StatelessWidget {
                   Expanded(
                     child: TextField(
                       initialValue: vestingDurationMonths?.toString() ?? '',
-                      placeholder: const shadcn.Text(
-                        'Durée de vesting (mois, facultatif)',
+                      placeholder: shadcn.Text(
+                        l10n.investments_vesting_duration_hint,
                       ),
                       onChanged: (v) => onVestingDurationMonthsChanged(
                         int.tryParse(v.trim()),
@@ -261,8 +258,8 @@ class InvestmentEditForm extends StatelessWidget {
               OpimeDatePicker(
                 value: exerciseDeadline,
                 onChanged: onExerciseDeadlineChanged,
-                placeholder: const shadcn.Text(
-                  'Date limite d\'exercice (facultative)',
+                placeholder: shadcn.Text(
+                  l10n.investments_exercise_deadline_hint,
                 ),
               ),
             ],
@@ -271,12 +268,12 @@ class InvestmentEditForm extends StatelessWidget {
               children: [
                 PrimaryButton(
                   onPressed: onSave,
-                  child: const shadcn.Text('Enregistrer'),
+                  child: shadcn.Text(l10n.common_save),
                 ),
                 const SizedBox(width: 8),
                 OutlineButton(
                   onPressed: onCancel,
-                  child: const shadcn.Text('Annuler'),
+                  child: shadcn.Text(l10n.common_cancel),
                 ),
               ],
             ),

@@ -37,8 +37,8 @@ class BudgetCategoriesRepository {
 
   static List<String> defaultsFor(BudgetCategoryScope scope) =>
       scope == BudgetCategoryScope.factures
-          ? facturesDefaults
-          : depensesDefaults;
+      ? facturesDefaults
+      : depensesDefaults;
 
   /// Ancien emplacement, une seule liste partagée entre Factures et
   /// Dépenses avant leur séparation — encore lu par [load] pour amorcer
@@ -111,10 +111,7 @@ class BudgetCategoriesRepository {
   }
 
   Future<void> save(BudgetCategoryScope scope, List<String> categories) async {
-    await _storage.writeString(
-      _relativePathFor(scope),
-      jsonEncode(categories),
-    );
+    await _storage.writeString(_relativePathFor(scope), jsonEncode(categories));
   }
 
   Future<List<String>> addCategory(

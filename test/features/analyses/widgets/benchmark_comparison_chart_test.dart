@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/analyses/widgets/benchmark_comparison_chart.dart';
 import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -21,6 +23,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: SizedBox(
               width: 400,
@@ -70,6 +79,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: SizedBox(
               width: 400,
@@ -100,6 +116,13 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: SizedBox(
               width: 400,

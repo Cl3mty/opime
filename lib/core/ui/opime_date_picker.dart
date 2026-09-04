@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
 import '../date_format.dart';
 
 /// Remplace `DatePicker` de shadcn_flutter — le paquet code en dur une
@@ -30,7 +31,9 @@ class OpimeDatePicker extends StatelessWidget {
     return ObjectFormField<DateTime>(
       value: value,
       onChanged: onChanged,
-      placeholder: placeholder ?? const shadcn.Text('Choisir une date'),
+      placeholder:
+          placeholder ??
+          shadcn.Text(AppLocalizations.of(context).core_ui_pick_date),
       trailing: const Icon(LucideIcons.calendarDays),
       builder: (context, date) => shadcn.Text(formatDateFrLong(date)),
       editorBuilder: (context, handler) => OpimeCalendarGrid(

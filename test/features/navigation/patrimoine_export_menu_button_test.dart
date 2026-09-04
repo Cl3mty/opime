@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/profiles/profile_controller.dart';
 import 'package:opime/core/profiles/profile_repository.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/navigation/patrimoine_export_menu_button.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -35,6 +37,12 @@ void main() {
   Future<void> pumpButton(WidgetTester tester) async {
     await tester.pumpWidget(
       ShadcnApp(
+        locale: const Locale('fr'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: [
+          shadcnLocalizationsFrDelegate,
+          ...AppLocalizations.localizationsDelegates,
+        ],
         home: Scaffold(
           child: Center(
             child: PatrimoineExportMenuButton(

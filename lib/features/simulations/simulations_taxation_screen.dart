@@ -7,6 +7,9 @@ import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
+import '../investments/investments_models.dart';
+import '../investments/investments_repository.dart';
 import 'tax_parameters.dart';
 
 class TaxationSimulationScreen extends StatefulWidget {
@@ -40,9 +43,9 @@ class _TaxationScreenState extends State<TaxationSimulationScreen> {
     setState(() {
       final tabValue = data['tabIndex'];
       if (tabValue is int) {
-        _tabIndex = tabValue.clamp(0, 1);
+        _tabIndex = tabValue.clamp(0, 2);
       } else if (tabValue is num) {
-        _tabIndex = tabValue.round().clamp(0, 1);
+        _tabIndex = tabValue.round().clamp(0, 2);
       }
     });
   }
@@ -53,6 +56,7 @@ class _TaxationScreenState extends State<TaxationSimulationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -67,24 +71,30 @@ class _TaxationScreenState extends State<TaxationSimulationScreen> {
                   setState(() => _tabIndex = value);
                   _saveState();
                 },
-                children: const [
-                  TabItem(child: shadcn.Text('IR')),
-                  TabItem(child: shadcn.Text('IFI')),
+                children: [
+                  TabItem(child: shadcn.Text(l10n.simulations_taxation_tab_ir)),
+                  TabItem(child: shadcn.Text(l10n.simulations_taxation_tab_ifi)),
+                  TabItem(child: shadcn.Text(l10n.simulations_taxation_tab_pfu)),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: _tabIndex == 0
-                ? _IRTab(
-                    vaultPath: widget.vaultPath,
-                    amountVisibility: widget.amountVisibility,
-                  )
-                : _IFITab(
-                    vaultPath: widget.vaultPath,
-                    amountVisibility: widget.amountVisibility,
-                  ),
+            child: switch (_tabIndex) {
+              0 => _IRTab(
+                  vaultPath: widget.vaultPath,
+                  amountVisibility: widget.amountVisibility,
+                ),
+              1 => _IFITab(
+                  vaultPath: widget.vaultPath,
+                  amountVisibility: widget.amountVisibility,
+                ),
+              _ => _PFUTab(
+                  vaultPath: widget.vaultPath,
+                  amountVisibility: widget.amountVisibility,
+                ),
+            },
           ),
         ],
       ),
@@ -111,9 +121,7 @@ class _IFIDisclaimer extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: shadcn.Text(
-              "Simulation IFI indicative basée sur un barème 2026 simplifié, hors dispositifs spécifiques "
-              "(décote, exonérations particulières, cas de démembrement, plafonnement selon revenus, etc.). "
-              "Les règles fiscales évoluent régulièrement : vérifiez toujours avec un professionnel avant décision.",
+              AppLocalizations.of(context).simulations_taxation_ifi_disclaimer,
             ).muted().small(),
           ),
         ],
@@ -141,9 +149,7 @@ class _IRDisclaimer extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: shadcn.Text(
-              "Simulation d'impôt sur le revenu indicative avec quotient familial simplifié. "
-              "Elle n'intègre pas toutes les situations réelles (charges déductibles, crédits/réductions d'impôt, "
-              "revenus spécifiques, plafonnements et règles particulières). Vérifiez le résultat final avec un expert.",
+              AppLocalizations.of(context).simulations_taxation_ir_disclaimer,
             ).muted().small(),
           ),
         ],
@@ -491,6 +497,184 @@ IFIResult computeIFI(
   return IFIResult(tauxMax: tauxMax, total: total, chartData: chartData);
 }
 
+// ---------------------------------------------------------------------
+// Onglet PFU (Prélèvement Foritaire Unique) — retrait PEA / AV
+// ---------------------------------------------------------------------
+
+/// Résultat de la simulation de retrait PFU sur un compte PEA ou
+/// Assurance-Vie. Pour l'AV, le comparatif avec le barème progressif est
+/// également fourni ([baremeIr], [baremePs], [netAfterBareme]).
+class PFUResult {
+  /// Montant total du gain latent (valeur actuelle − montant investi).
+  final double gain;
+
+  /// Part du gain imposée au PFU (gain proportionnel au retrait, abattement
+  /// déduit pour l'AV).
+  final double gainImposable;
+
+  /// Composante IR du PFU (12.8 % par défaut).
+  final double pfuIr;
+
+  /// Composante prélèvements sociaux du PFU (18.6 % par défaut).
+  final double pfuPs;
+
+  /// pfuIr + pfuPs.
+  final double pfuTotal;
+
+  /// Montant réellement reçu par l'investisseur après PFU.
+  final double netAfterPfu;
+
+  /// Impôt sur le revenu selon le barème progressif (uniquement pour l'AV,
+  /// `null` pour le PEA).
+  final double? baremeIr;
+
+  /// Prélèvements sociaux selon le barème (uniquement pour l'AV).
+  final double? baremePs;
+
+  /// baremeIr + baremePs.
+  final double? baremeTotal;
+
+  /// Montant réellement reçu après barème progressif (uniquement pour l'AV).
+  final double? netAfterBareme;
+
+  /// Libellé de l'enveloppe affiché dans le résultat.
+  final String envelopeLabel;
+
+  /// `true` si le retrait est totalement exonéré (PEA > 5 ans).
+  final bool isExempt;
+
+  const PFUResult({
+    required this.gain,
+    required this.gainImposable,
+    required this.pfuIr,
+    required this.pfuPs,
+    required this.pfuTotal,
+    required this.netAfterPfu,
+    this.baremeIr,
+    this.baremePs,
+    this.baremeTotal,
+    this.netAfterBareme,
+    required this.envelopeLabel,
+    required this.isExempt,
+  });
+}
+
+/// Simule l'impact fiscal d'un retrait sur un PEA ou une Assurance-Vie au
+/// Prélèvement Forfaitaire Unique (PFU / flat tax).
+///
+/// Pour le PEA :
+/// - Avant 5 ans → PFU sur les gains (IR + PS)
+/// - Après 5 ans → exonération totale
+///
+/// Pour l'Assurance-Vie :
+/// - Abattement de 4 600 € (contrat < 8 ans) ou 9 200 € (≥ 8 ans)
+/// - PFU sur le gain dépassant l'abattement
+/// - Comparaison avec le barème progressif (IR + PS)
+///
+/// [investedAmount] et [currentValue] servent à calculer la proportion du
+/// gain latent réalisée par le retrait.
+PFUResult computePFU({
+  required double withdrawalAmount,
+  required double investedAmount,
+  required double currentValue,
+  required DateTime openingDate,
+  required AccountEnvelope envelope,
+  double pfuIrRate = 12.8,
+  double pfuPsRate = 18.6,
+  List<double> irLimits = irLimits,
+  List<double> irRates = irRates,
+  double nbrParts = 1,
+  DateTime? referenceDate,
+}) {
+  final now = referenceDate ?? DateTime.now();
+  final gain = max(0.0, currentValue - investedAmount);
+
+  // Proportion du gain latent réalisée par le retrait.
+  final gainRetrait = currentValue > 0
+      ? gain * (withdrawalAmount / currentValue)
+      : 0.0;
+
+  // Ancienneté du compte en années.
+  final anciennete = now.difference(openingDate).inDays / 365.25;
+
+  final String envelopeLabel;
+  final bool isExempt;
+  double gainImposable;
+  double pfuIr;
+  double pfuPs;
+  double? baremeIr;
+  double? baremePs;
+  double? baremeTotal;
+  double? netAfterBareme;
+
+  if (envelope == AccountEnvelope.pea) {
+    envelopeLabel = 'PEA';
+    // PEA : exonéré après 5 ans.
+    if (anciennete >= 5) {
+      isExempt = true;
+      gainImposable = 0;
+      pfuIr = 0;
+      pfuPs = 0;
+    } else {
+      isExempt = false;
+      gainImposable = gainRetrait;
+      pfuIr = gainImposable * pfuIrRate / 100;
+      pfuPs = gainImposable * pfuPsRate / 100;
+    }
+    // Pas de comparaison barème pour le PEA.
+    baremeIr = null;
+    baremePs = null;
+    baremeTotal = null;
+    netAfterBareme = null;
+  } else {
+    // Assurance-Vie.
+    envelopeLabel = 'Assurance Vie';
+    isExempt = false;
+
+    // Abattement annuel : 4 600 € (< 8 ans) ou 9 200 € (≥ 8 ans).
+    final abattement = anciennete >= 8 ? 9200.0 : 4600.0;
+    gainImposable = max(0.0, gainRetrait - abattement);
+
+    // PFU.
+    pfuIr = gainImposable * pfuIrRate / 100;
+    pfuPs = gainImposable * pfuPsRate / 100;
+
+    // Barème progressif (IR + PS) pour comparaison. Les PS au barème sont
+    // identiques au PFU (même taux de PS) ; seule la composante IR diffère
+    // (barème progressif vs 12.8 % fixe).
+    final irResult = computeIR(
+      netImposable: gainImposable,
+      nbrParts: nbrParts,
+      limits: irLimits,
+      rates: irRates,
+    );
+    final bIr = irResult.total;
+    final bPs = gainImposable * pfuPsRate / 100;
+    baremeIr = bIr;
+    baremePs = bPs;
+    baremeTotal = bIr + bPs;
+    netAfterBareme = withdrawalAmount - (bIr + bPs);
+  }
+
+  final pfuTotal = pfuIr + pfuPs;
+  final netAfterPfu = withdrawalAmount - pfuTotal;
+
+  return PFUResult(
+    gain: gain,
+    gainImposable: gainImposable,
+    pfuIr: pfuIr,
+    pfuPs: pfuPs,
+    pfuTotal: pfuTotal,
+    netAfterPfu: netAfterPfu,
+    baremeIr: baremeIr,
+    baremePs: baremePs,
+    baremeTotal: baremeTotal,
+    netAfterBareme: netAfterBareme,
+    envelopeLabel: envelopeLabel,
+    isExempt: isExempt,
+  );
+}
+
 class _IFITab extends StatefulWidget {
   final String vaultPath;
   final AmountVisibilityController amountVisibility;
@@ -561,6 +745,7 @@ class _IFITabState extends State<_IFITab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final result = _compute();
     final accent = Theme.of(context).colorScheme.primary;
     final violet = const Color(0xFF9B7BE8);
@@ -572,7 +757,7 @@ class _IFITabState extends State<_IFITab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _NumberField(
-            label: 'Patrimoine immobilier net',
+            label: l10n.simulations_taxation_field_ifi_net_worth,
             suffix: '€',
             value: _immobilierNet,
             step: 50000,
@@ -585,7 +770,7 @@ class _IFITabState extends State<_IFITab> {
           OutlineButton(
             onPressed: _resetState,
             leading: const Icon(LucideIcons.refreshCw),
-            child: const shadcn.Text('Réinitialiser les paramètres'),
+            child: shadcn.Text(l10n.simulations_taxation_reset_parameters),
           ),
         ],
       ),
@@ -595,25 +780,24 @@ class _IFITabState extends State<_IFITab> {
             TextSpan(
               style: const TextStyle(fontSize: 18),
               children: [
-                const TextSpan(
-                  text:
-                      'Cette année, vous avez un patrimoine immobilier net de ',
+                TextSpan(
+                  text: l10n.simulations_taxation_ifi_summary_prefix,
                 ),
                 TextSpan(
                   text: displayEuros(_immobilierNet, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(
-                  text:
-                      ', induisant un impôt sur la fortune immobilière total de ',
+                TextSpan(
+                  text: l10n.simulations_taxation_ifi_summary_middle,
                 ),
                 TextSpan(
                   text: displayEuros(result.total, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ", soit l'équivalent de "),
+                TextSpan(text: l10n.simulations_taxation_summary_equivalent_suffix),
                 TextSpan(
-                  text: '${displayEuros(result.total / 12, hidden)}/mois',
+                  text:
+                      '${displayEuros(result.total / 12, hidden)}/${l10n.simulations_loan_per_month_suffix}',
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -639,9 +823,12 @@ class _IFITabState extends State<_IFITab> {
             alignment: WrapAlignment.center,
             spacing: 20,
             children: [
-              _LegendPill(color: accent, label: 'Montant'),
-              _LegendPill(color: violet, label: 'Montant max de la tranche'),
-              _LegendPill(color: red, label: 'Impôt'),
+              _LegendPill(color: accent, label: l10n.simulations_taxation_legend_amount),
+              _LegendPill(
+                color: violet,
+                label: l10n.simulations_taxation_legend_bracket_max,
+              ),
+              _LegendPill(color: red, label: l10n.simulations_taxation_legend_tax),
             ],
           ),
           const SizedBox(height: 24),
@@ -649,18 +836,731 @@ class _IFITabState extends State<_IFITab> {
           const SizedBox(height: 16),
           _StatRow(
             items: [
-              ("Taux maximal d'imposition", ['${result.tauxMax}%']),
               (
-                'IFI (total & mensualisé)',
+                l10n.simulations_taxation_ifi_stat_max_rate,
+                ['${result.tauxMax}%'],
+              ),
+              (
+                l10n.simulations_taxation_ifi_stat_total_monthly,
                 [
                   displayEuros(result.total, hidden),
-                  '${displayEuros(result.total / 12, hidden)}/mois',
+                  '${displayEuros(result.total / 12, hidden)}/${l10n.simulations_loan_per_month_suffix}',
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
           const _IFIDisclaimer(),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------
+// Onglet PFU (retrait PEA / Assurance-Vie)
+// ---------------------------------------------------------------------
+
+class _PFUTab extends StatefulWidget {
+  final String vaultPath;
+  final AmountVisibilityController amountVisibility;
+
+  const _PFUTab({required this.vaultPath, required this.amountVisibility});
+
+  @override
+  State<_PFUTab> createState() => _PFUTabState();
+}
+
+class _PFUTabState extends State<_PFUTab> {
+  // --- Champs du formulaire ---
+  AccountEnvelope _envelope = AccountEnvelope.pea;
+  bool _isManualMode = true;
+  String? _selectedAccountId;
+  double _withdrawalAmount = 10000;
+  double _investedAmount = 8000;
+  double _currentValue = 12000;
+  DateTime _openingDate = DateTime.now().subtract(const Duration(days: 365 * 3));
+
+  // --- Données ---
+  List<InvestmentAccount> _accounts = [];
+  late final SimulationStateRepository _stateRepo;
+  TaxParameters _taxParams = TaxParameters.defaults;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateRepo = SimulationStateRepository(widget.vaultPath);
+    _loadState();
+    _loadTaxParams();
+    _loadAccounts();
+    widget.amountVisibility.addListener(_onAmountVisibilityChanged);
+  }
+
+  Future<void> _loadTaxParams() async {
+    final params = await loadTaxParameters(widget.vaultPath);
+    if (!mounted) return;
+    setState(() => _taxParams = params);
+  }
+
+  Future<void> _loadAccounts() async {
+    final repo = InvestmentsRepository(widget.vaultPath);
+    final all = await repo.listAll();
+    if (!mounted) return;
+    setState(() => _accounts = all);
+  }
+
+  void _onAmountVisibilityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.amountVisibility.removeListener(_onAmountVisibilityChanged);
+    super.dispose();
+  }
+
+  /// Comptes éligibles au filtre courant (PEA ou AV).
+  List<InvestmentAccount> get _eligibleAccounts => _accounts.where((a) {
+    if (_envelope == AccountEnvelope.pea) {
+      return a.envelope == AccountEnvelope.pea ||
+          a.envelope == AccountEnvelope.peaPme;
+    }
+    return a.envelope == AccountEnvelope.assuranceVie;
+  }).toList();
+
+  Future<void> _loadState() async {
+    final data = await _stateRepo.read('taxation_pfu');
+    if (!mounted || data.isEmpty) return;
+    setState(() {
+      final envName = data['envelope'] as String?;
+      if (envName != null) {
+        _envelope = AccountEnvelope.fromName(envName);
+      }
+      final isManual = data['isManualMode'];
+      if (isManual is bool) _isManualMode = isManual;
+      final selectedId = data['selectedAccountId'] as String?;
+      if (selectedId != null) _selectedAccountId = selectedId;
+      final withdrawal = data['withdrawalAmount'];
+      if (withdrawal is num) _withdrawalAmount = withdrawal.toDouble();
+      final invested = data['investedAmount'];
+      if (invested is num) _investedAmount = invested.toDouble();
+      final current = data['currentValue'];
+      if (current is num) _currentValue = current.toDouble();
+      final opening = data['openingDate'] as String?;
+      if (opening != null) {
+        _openingDate = DateTime.tryParse(opening) ?? _openingDate;
+      }
+    });
+  }
+
+  Future<void> _saveState() {
+    return _stateRepo.write('taxation_pfu', {
+      'envelope': _envelope.name,
+      'isManualMode': _isManualMode,
+      'selectedAccountId': _selectedAccountId,
+      'withdrawalAmount': _withdrawalAmount,
+      'investedAmount': _investedAmount,
+      'currentValue': _currentValue,
+      'openingDate': _openingDate.toIso8601String(),
+    });
+  }
+
+  Future<void> _resetState() async {
+    await _stateRepo.delete('taxation_pfu');
+    if (!mounted) return;
+    setState(() {
+      _envelope = AccountEnvelope.pea;
+      _isManualMode = true;
+      _selectedAccountId = null;
+      _withdrawalAmount = 10000;
+      _investedAmount = 8000;
+      _currentValue = 12000;
+      _openingDate = DateTime.now().subtract(const Duration(days: 365 * 3));
+    });
+  }
+
+  /// Pré-remplit les champs depuis un compte sélectionné.
+  void _applyAccount(InvestmentAccount account) {
+    setState(() {
+      _selectedAccountId = account.id;
+      _investedAmount = account.totalInvested;
+      _currentValue = account.totalMarketValue;
+      if (account.openingDate != null) _openingDate = account.openingDate!;
+    });
+    _saveState();
+  }
+
+  PFUResult _compute() => computePFU(
+    withdrawalAmount: _withdrawalAmount,
+    investedAmount: _investedAmount,
+    currentValue: _currentValue,
+    openingDate: _openingDate,
+    envelope: _envelope,
+    pfuIrRate: _taxParams.pfuIrRate,
+    pfuPsRate: _taxParams.pfuPsRate,
+    irLimits: _taxParams.irLimits,
+    irRates: _taxParams.irRates,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final result = _compute();
+    final accent = Theme.of(context).colorScheme.primary;
+    final hidden = widget.amountVisibility.hidden;
+
+    return _TaxationSplitCard(
+      left: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- Sélection de l'enveloppe ---
+            shadcn.Text(l10n.simulations_taxation_pfu_field_envelope).muted().small(),
+            const SizedBox(height: 6),
+            Select<AccountEnvelope>(
+              value: _envelope,
+              constraints: const BoxConstraints(minWidth: 220),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _envelope = value;
+                  _selectedAccountId = null;
+                });
+                _saveState();
+              },
+              itemBuilder: (context, value) => shadcn.Text(value.label),
+              popup: (context) => SelectPopup(
+                items: SelectItemList(
+                  children: [
+                    SelectItemButton(
+                      value: AccountEnvelope.pea,
+                      child: shadcn.Text(AccountEnvelope.pea.label),
+                    ),
+                    SelectItemButton(
+                      value: AccountEnvelope.assuranceVie,
+                      child: shadcn.Text(AccountEnvelope.assuranceVie.label),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // --- Mode de saisie ---
+            shadcn.Text(l10n.simulations_taxation_pfu_field_data_source).muted().small(),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: _PillButton(
+                    label: l10n.simulations_taxation_pfu_mode_manual,
+                    selected: _isManualMode,
+                    onTap: () {
+                      setState(() => _isManualMode = true);
+                      _saveState();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _PillButton(
+                    label: l10n.simulations_taxation_pfu_mode_existing_account,
+                    selected: !_isManualMode,
+                    onTap: () {
+                      setState(() => _isManualMode = false);
+                      _saveState();
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            if (!_isManualMode && _eligibleAccounts.isNotEmpty) ...[
+              // --- Sélection de compte ---
+              shadcn.Text(l10n.simulations_taxation_pfu_field_choose_account).muted().small(),
+              const SizedBox(height: 6),
+              Select<String>(
+                value: _selectedAccountId,
+                constraints: const BoxConstraints(minWidth: 220),
+                placeholder: shadcn.Text(
+                  l10n.simulations_taxation_pfu_select_account_placeholder,
+                ),
+                onChanged: (id) {
+                  if (id == null) return;
+                  final account = _eligibleAccounts.firstWhere(
+                    (a) => a.id == id,
+                  );
+                  _applyAccount(account);
+                },
+                itemBuilder: (context, id) {
+                  final account = _eligibleAccounts.firstWhere(
+                    (a) => a.id == id,
+                  );
+                  return shadcn.Text(
+                    account.bankName != null
+                        ? '${account.name} (${account.bankName})'
+                        : account.name,
+                  );
+                },
+                popup: (context) => SelectPopup(
+                  items: SelectItemList(
+                    children: [
+                      for (final a in _eligibleAccounts)
+                        SelectItemButton(
+                          value: a.id,
+                          child: shadcn.Text(
+                            a.bankName != null
+                                ? '${a.name} (${a.bankName})'
+                                : a.name,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            if (!_isManualMode && _eligibleAccounts.isEmpty) ...[
+              shadcn.Text(
+                l10n.simulations_taxation_pfu_no_account_found(_envelope.label),
+              ).muted().small(),
+              const SizedBox(height: 16),
+            ],
+
+            // --- Date d'ouverture (mode manuel) ---
+            if (_isManualMode) ...[
+              shadcn.Text(l10n.simulations_taxation_pfu_field_opening_date).muted().small(),
+              const SizedBox(height: 6),
+              _DateField(
+                date: _openingDate,
+                onChanged: (date) {
+                  setState(() => _openingDate = date);
+                  _saveState();
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // --- Montant investi (mode manuel) ---
+            if (_isManualMode) ...[
+              _NumberField(
+                label: l10n.simulations_taxation_field_invested_amount,
+                suffix: '€',
+                value: _investedAmount,
+                step: 1000,
+                onChanged: (v) {
+                  setState(() => _investedAmount = v);
+                  _saveState();
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // --- Valeur actuelle (mode manuel) ---
+            if (_isManualMode) ...[
+              _NumberField(
+                label: l10n.simulations_taxation_field_current_value,
+                suffix: '€',
+                value: _currentValue,
+                step: 1000,
+                onChanged: (v) {
+                  setState(() => _currentValue = v);
+                  _saveState();
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // --- Montant du retrait ---
+            _NumberField(
+              label: l10n.simulations_taxation_field_withdrawal_amount,
+              suffix: '€',
+              value: _withdrawalAmount,
+              step: 1000,
+              onChanged: (v) {
+                setState(() => _withdrawalAmount = max(0.0, v));
+                _saveState();
+              },
+            ),
+            const SizedBox(height: 8),
+            OutlineButton(
+              onPressed: _resetState,
+              leading: const Icon(LucideIcons.refreshCw),
+              child: shadcn.Text(l10n.simulations_taxation_reset_parameters),
+            ),
+          ],
+        ),
+      ),
+      right: Column(
+        children: [
+          // --- Résumé ---
+          shadcn.Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 18),
+              children: [
+                TextSpan(
+                  text: result.isExempt
+                      ? l10n.simulations_taxation_pfu_summary_withdrawal_exempt_prefix(
+                          result.envelopeLabel,
+                        )
+                      : l10n.simulations_taxation_pfu_summary_withdrawal_prefix(
+                          result.envelopeLabel,
+                        ),
+                ),
+                if (result.isExempt)
+                  TextSpan(
+                    text: l10n.simulations_taxation_pfu_summary_tax_exempt,
+                    style: const TextStyle(
+                      color: Color(0xFF66BB6A),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                else ...[
+                  TextSpan(text: l10n.simulations_taxation_pfu_summary_gain_prefix),
+                  TextSpan(
+                    text: displayEuros(result.gain, hidden),
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextSpan(text: l10n.simulations_taxation_pfu_summary_pfu_tax_prefix),
+                  TextSpan(
+                    text: displayEuros(result.pfuTotal, hidden),
+                    style: TextStyle(
+                      color: const Color(0xFFE07A6B),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextSpan(text: l10n.simulations_taxation_pfu_summary_net_received_prefix),
+                  TextSpan(
+                    text: displayEuros(result.netAfterPfu, hidden),
+                    style: TextStyle(
+                      color: const Color(0xFF66BB6A),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+
+          if (result.isExempt) ...[
+            const Icon(
+              LucideIcons.shieldCheck,
+              size: 48,
+              color: Color(0xFF66BB6A),
+            ),
+            const SizedBox(height: 12),
+            shadcn.Text(
+              l10n.simulations_taxation_pfu_exempt_message,
+            ).muted(),
+            const SizedBox(height: 4),
+            shadcn.Text(
+              l10n.simulations_taxation_pfu_exempt_explanation,
+            ).muted().small(),
+          ] else ...[
+            const Divider(),
+            const SizedBox(height: 16),
+
+            // --- Stats PFU ---
+            _StatRow(
+              items: [
+                (
+                  l10n.simulations_taxation_pfu_stat_unrealized_gain,
+                  [displayEuros(result.gain, hidden)],
+                ),
+                (
+                  l10n.simulations_taxation_pfu_stat_taxable_gain,
+                  [displayEuros(result.gainImposable, hidden)],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _StatRow(
+              items: [
+                (
+                  l10n.simulations_taxation_pfu_stat_ir_rate('${_taxParams.pfuIrRate}'),
+                  [displayEuros(result.pfuIr, hidden)],
+                ),
+                (
+                  l10n.simulations_taxation_pfu_stat_ps_rate('${_taxParams.pfuPsRate}'),
+                  [displayEuros(result.pfuPs, hidden)],
+                ),
+                (
+                  l10n.simulations_taxation_pfu_stat_total,
+                  [displayEuros(result.pfuTotal, hidden)],
+                ),
+                (
+                  l10n.simulations_taxation_pfu_stat_net_received,
+                  [displayEuros(result.netAfterPfu, hidden)],
+                ),
+              ],
+            ),
+
+            // --- Comparaison barème (AV uniquement) ---
+            if (result.baremeTotal != null) ...[
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 12),
+              shadcn.Text(l10n.simulations_taxation_pfu_comparison_title)
+                  .semiBold(),
+              const SizedBox(height: 12),
+              _StatRow(
+                items: [
+                  (
+                    l10n.simulations_taxation_pfu_stat_bareme_ir,
+                    [displayEuros(result.baremeIr!, hidden)],
+                  ),
+                  (
+                    l10n.simulations_taxation_pfu_stat_bareme_ps,
+                    [displayEuros(result.baremePs!, hidden)],
+                  ),
+                  (
+                    l10n.simulations_taxation_pfu_stat_bareme_total,
+                    [displayEuros(result.baremeTotal!, hidden)],
+                  ),
+                  (
+                    l10n.simulations_taxation_pfu_stat_net_after_bareme,
+                    [displayEuros(result.netAfterBareme!, hidden)],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _PFUComparisonBanner(
+                pfuTotal: result.pfuTotal,
+                baremeTotal: result.baremeTotal!,
+              ),
+            ],
+          ],
+
+          const SizedBox(height: 16),
+          const _PFUDisclaimer(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Petit bouton pilule pour basculer entre deux modes.
+class _PillButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PillButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary.withValues(alpha: 0.15)
+              : theme.colorScheme.muted,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.border,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: shadcn.Text(
+          label,
+          style: TextStyle(
+            color: selected ? theme.colorScheme.primary : null,
+            fontWeight: selected ? FontWeight.w600 : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Champ de date simplifié (saisie du jour/mois/année via text fields).
+class _DateField extends StatefulWidget {
+  final DateTime date;
+  final ValueChanged<DateTime> onChanged;
+
+  const _DateField({required this.date, required this.onChanged});
+
+  @override
+  State<_DateField> createState() => _DateFieldState();
+}
+
+class _DateFieldState extends State<_DateField> {
+  late final TextEditingController _dayCtrl;
+  late final TextEditingController _monthCtrl;
+  late final TextEditingController _yearCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _dayCtrl = TextEditingController(text: widget.date.day.toString());
+    _monthCtrl = TextEditingController(
+      text: widget.date.month.toString().padLeft(2, '0'),
+    );
+    _yearCtrl = TextEditingController(text: widget.date.year.toString());
+  }
+
+  @override
+  void didUpdateWidget(covariant _DateField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.date != widget.date) {
+      _dayCtrl.text = widget.date.day.toString();
+      _monthCtrl.text = widget.date.month.toString().padLeft(2, '0');
+      _yearCtrl.text = widget.date.year.toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _dayCtrl.dispose();
+    _monthCtrl.dispose();
+    _yearCtrl.dispose();
+    super.dispose();
+  }
+
+  void _sync() {
+    final day = int.tryParse(_dayCtrl.text);
+    final month = int.tryParse(_monthCtrl.text);
+    final year = int.tryParse(_yearCtrl.text);
+    if (day != null && month != null && year != null &&
+        month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      widget.onChanged(DateTime(year, month, day));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _dayCtrl,
+            keyboardType: TextInputType.number,
+            placeholder: shadcn.Text(l10n.simulations_taxation_date_day_placeholder),
+            textAlign: TextAlign.center,
+            onChanged: (_) => _sync(),
+          ),
+        ),
+        const SizedBox(width: 4),
+        shadcn.Text('/'),
+        const SizedBox(width: 4),
+        Expanded(
+          child: TextField(
+            controller: _monthCtrl,
+            keyboardType: TextInputType.number,
+            placeholder: shadcn.Text(l10n.simulations_taxation_date_month_placeholder),
+            textAlign: TextAlign.center,
+            onChanged: (_) => _sync(),
+          ),
+        ),
+        const SizedBox(width: 4),
+        shadcn.Text('/'),
+        const SizedBox(width: 4),
+        Expanded(
+          flex: 2,
+          child: TextField(
+            controller: _yearCtrl,
+            keyboardType: TextInputType.number,
+            placeholder: shadcn.Text(l10n.simulations_taxation_date_year_placeholder),
+            textAlign: TextAlign.center,
+            onChanged: (_) => _sync(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bannière indiquant quel régime est le plus avantageux.
+class _PFUComparisonBanner extends StatelessWidget {
+  final double pfuTotal;
+  final double baremeTotal;
+
+  const _PFUComparisonBanner({
+    required this.pfuTotal,
+    required this.baremeTotal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final pfuWins = pfuTotal <= baremeTotal;
+    final difference = (pfuTotal - baremeTotal).abs();
+    final color = pfuWins ? const Color(0xFF66BB6A) : const Color(0xFFE9A23B);
+    final icon = pfuWins ? LucideIcons.trendingDown : LucideIcons.trendingUp;
+    final label = pfuWins
+        ? l10n.simulations_taxation_pfu_wins_label
+        : l10n.simulations_taxation_bareme_wins_label;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: shadcn.Text(
+              l10n.simulations_taxation_pfu_comparison_savings(
+                label,
+                displayEuros(difference, false),
+              ),
+            ).small(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Avertissement sur les règles fiscales du PFU.
+class _PFUDisclaimer extends StatelessWidget {
+  const _PFUDisclaimer();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final muted = Theme.of(context).colorScheme.mutedForeground;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          shadcn.Text(l10n.simulations_taxation_pfu_about_title).small().semiBold(),
+          const SizedBox(height: 4),
+          shadcn.Text(
+            l10n.simulations_taxation_pfu_about_body,
+            style: TextStyle(fontSize: 12, color: muted),
+          ),
+          const SizedBox(height: 4),
+          shadcn.Text(
+            l10n.simulations_taxation_pfu_about_rates_note,
+            style: TextStyle(fontSize: 12, color: muted),
+          ),
         ],
       ),
     );
@@ -824,6 +1724,7 @@ class _IRTabState extends State<_IRTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final result = _compute();
     final accent = Theme.of(context).colorScheme.primary;
     final violet = const Color(0xFF9B7BE8);
@@ -835,7 +1736,7 @@ class _IRTabState extends State<_IRTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _NumberField(
-            label: 'Revenu net imposable',
+            label: l10n.simulations_taxation_field_taxable_income,
             suffix: '€',
             value: _netImposable,
             step: 5000,
@@ -846,7 +1747,7 @@ class _IRTabState extends State<_IRTab> {
           ),
           const SizedBox(height: 16),
           _NumberField(
-            label: 'Nombre de parts',
+            label: l10n.simulations_taxation_field_parts,
             suffix: '',
             value: _nbrParts,
             step: 0.5,
@@ -860,7 +1761,7 @@ class _IRTabState extends State<_IRTab> {
           OutlineButton(
             onPressed: _resetState,
             leading: const Icon(LucideIcons.refreshCw),
-            child: const shadcn.Text('Réinitialiser les paramètres'),
+            child: shadcn.Text(l10n.simulations_taxation_reset_parameters),
           ),
         ],
       ),
@@ -870,23 +1771,24 @@ class _IRTabState extends State<_IRTab> {
             TextSpan(
               style: const TextStyle(fontSize: 18),
               children: [
-                const TextSpan(
-                  text: 'Cette année, vous avez un net imposable de ',
+                TextSpan(
+                  text: l10n.simulations_taxation_ir_summary_prefix,
                 ),
                 TextSpan(
                   text: displayEuros(_netImposable, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(
-                  text: ", induisant un impôt sur le revenu total de ",
+                TextSpan(
+                  text: l10n.simulations_taxation_ir_summary_middle,
                 ),
                 TextSpan(
                   text: displayEuros(result.total, hidden),
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ", soit l'équivalent de "),
+                TextSpan(text: l10n.simulations_taxation_summary_equivalent_suffix),
                 TextSpan(
-                  text: '${displayEuros(result.total / 12, hidden)}/mois',
+                  text:
+                      '${displayEuros(result.total / 12, hidden)}/${l10n.simulations_loan_per_month_suffix}',
                   style: TextStyle(color: accent, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -912,9 +1814,12 @@ class _IRTabState extends State<_IRTab> {
             alignment: WrapAlignment.center,
             spacing: 20,
             children: [
-              _LegendPill(color: accent, label: 'Montant'),
-              _LegendPill(color: violet, label: 'Montant max de la tranche'),
-              _LegendPill(color: red, label: 'Impôt'),
+              _LegendPill(color: accent, label: l10n.simulations_taxation_legend_amount),
+              _LegendPill(
+                color: violet,
+                label: l10n.simulations_taxation_legend_bracket_max,
+              ),
+              _LegendPill(color: red, label: l10n.simulations_taxation_legend_tax),
             ],
           ),
           const SizedBox(height: 24),
@@ -922,13 +1827,19 @@ class _IRTabState extends State<_IRTab> {
           const SizedBox(height: 16),
           _StatRow(
             items: [
-              ('Quotient familial', [displayEuros(result.quotient, hidden)]),
-              ("Taux marginal d'imposition", ['${result.tmi}%']),
               (
-                'Impôt sur le revenu (total & mensualisé)',
+                l10n.simulations_taxation_ir_stat_quotient,
+                [displayEuros(result.quotient, hidden)],
+              ),
+              (
+                l10n.simulations_taxation_ir_stat_marginal_rate,
+                ['${result.tmi}%'],
+              ),
+              (
+                l10n.simulations_taxation_ir_stat_total_monthly,
                 [
                   displayEuros(result.total, hidden),
-                  '${displayEuros(result.total / 12, hidden)}/mois',
+                  '${displayEuros(result.total / 12, hidden)}/${l10n.simulations_loan_per_month_suffix}',
                 ],
               ),
             ],
@@ -1034,7 +1945,9 @@ class _BracketChartState extends State<_BracketChart> {
                       max(0.0, chartHeight - 180),
                     ),
                     child: _BracketTooltip(
-                      title: 'Tranche ${hovered.label}',
+                      title: AppLocalizations.of(
+                        context,
+                      ).simulations_taxation_bracket_tooltip_title(hovered.label),
                       montant: hovered.montant,
                       montantMax: hovered.montantMax,
                       impot: hovered.impot,
@@ -1079,6 +1992,7 @@ class _BracketTooltip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return IgnorePointer(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -1098,11 +2012,11 @@ class _BracketTooltip extends StatelessWidget {
                 const SizedBox(height: 10),
                 const Divider(),
                 const SizedBox(height: 8),
-                _row('Montant', montant, amber),
+                _row(l10n.simulations_taxation_legend_amount, montant, amber),
                 const SizedBox(height: 6),
-                _row('Montant max', montantMax, violet),
+                _row(l10n.simulations_taxation_bracket_tooltip_max, montantMax, violet),
                 const SizedBox(height: 6),
-                _row('Impôt', impot, red),
+                _row(l10n.simulations_taxation_legend_tax, impot, red),
               ],
             ),
           ),

@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
+import '../../l10n/app_localizations.dart';
 import '../dashboard/category_detail_screen.dart';
 import '../dashboard/patrimoine_models.dart';
 import '../investments/patrimoine_refresh_controller.dart';
@@ -181,7 +182,9 @@ class _RealPassifDetailScreenState extends State<RealPassifDetailScreen> {
       onAccountTap: _openLiability,
       historyByLineIdForPeriod: _historyForPeriod,
       showAvatar: false,
-      accountsCardTitle: 'Passifs',
+      // Réutilise la clé de navigation existante ("Passifs") plutôt que
+      // d'en créer une dédiée : même libellé, même sens.
+      accountsCardTitle: AppLocalizations.of(context).nav_liabilities,
       // La courbe projette toujours jusqu'à 0 € (voir la doc de classe) :
       // un "% d'évolution" y serait toujours -100 %, quel que soit
       // l'onglet — pas une vraie mesure de performance sur la période.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' show Colors;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors, Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Nœud générique d'un diagramme de flux (Sankey) — appartient à une
 /// [column] (position horizontale), avec une couleur et un [minValue]
@@ -75,22 +76,33 @@ class SankeyDiagram extends StatelessWidget {
   final List<SankeyNode> nodes;
   final List<SankeyLink> links;
   final bool hidden;
-  final String emptyMessage;
+
+  /// Message affiché quand [nodes] est vide. `null` (par défaut) retombe
+  /// sur un message générique traduit — voir [build] — plutôt qu'une
+  /// valeur par défaut figée dans une langue, impossible avec un champ
+  /// `const` initialisé depuis [AppLocalizations] (qui a besoin d'un
+  /// [BuildContext]).
+  final String? emptyMessage;
 
   const SankeyDiagram({
     super.key,
     required this.nodes,
     required this.links,
     required this.hidden,
-    this.emptyMessage = 'Pas encore de données pour ce flux.',
+    this.emptyMessage,
   });
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (nodes.isEmpty) {
       return SizedBox(
         height: 280,
-        child: Center(child: shadcn.Text(emptyMessage).muted()),
+        child: Center(
+          child: shadcn.Text(
+            emptyMessage ?? l10n.budget_sankey_no_data_fallback,
+          ).muted(),
+        ),
       );
     }
     return LayoutBuilder(
@@ -106,6 +118,7 @@ class SankeyDiagram extends StatelessWidget {
               links: links,
               canvasWidth: width,
               hidden: hidden,
+              l10n: l10n,
             ),
           ),
         );
@@ -191,6 +204,7 @@ class _SankeyPainter extends CustomPainter {
   final List<SankeyLink> links;
   final double canvasWidth;
   final bool hidden;
+  final AppLocalizations l10n;
 
   static const double _linkGap = 6.0;
   static const double _cornerRadius = 3.0;
@@ -201,6 +215,7 @@ class _SankeyPainter extends CustomPainter {
     required this.links,
     required this.canvasWidth,
     required this.hidden,
+    required this.l10n,
   });
 
   @override
@@ -256,15 +271,21 @@ class _SankeyPainter extends CustomPainter {
       // doit annoncer le vrai montant du nœud, jamais celui, gonflé, des
       // flux qu'il n'a fait que faire transiter.
       final hasDeficit = node.deficit > 0;
+      final amount = displayEuros(node.displayValue ?? node.value, hidden);
       final label = hasDeficit
-          ? '${node.label} : ${displayEuros(node.displayValue ?? node.value, hidden)} '
-                '(déficit de ${displayEuros(node.deficit, hidden)})'
-          : '${node.label} : ${displayEuros(node.displayValue ?? node.value, hidden)}';
+          ? l10n.budget_sankey_deficit_label(
+              node.label,
+              amount,
+              displayEuros(node.deficit, hidden),
+            )
+          : l10n.budget_sankey_node_label(node.label, amount);
       final tp = TextPainter(
         text: TextSpan(
           text: label,
           style: TextStyle(
-            color: hasDeficit ? const Color(0xFF991B1B) : const Color(0xFF1A1A1A),
+            color: hasDeficit
+                ? const Color(0xFF991B1B)
+                : const Color(0xFF1A1A1A),
             fontSize: 12,
             fontWeight: hasDeficit ? FontWeight.w700 : FontWeight.w500,
           ),

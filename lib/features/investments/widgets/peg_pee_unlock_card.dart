@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
 import '../../../core/date_format.dart';
 import '../../../core/money_format.dart';
 import '../../../core/ui/gold_progress_bar.dart';
@@ -19,6 +20,7 @@ class PegPeeUnlockCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (tranches.isEmpty) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
 
     final total = tranches.fold(0.0, (sum, t) => sum + t.amount);
     final unlocked = tranches
@@ -31,15 +33,20 @@ class PegPeeUnlockCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         shadcn.Text(
-          'Déblocable : ${formatEuros(unlocked)} sur ${formatEuros(total)}',
+          l10n.investments_unlockable_amount(
+            formatEuros(unlocked),
+            formatEuros(total),
+          ),
         ).xSmall().semiBold(),
         const SizedBox(height: 6),
         GoldProgressBar(fraction: fraction, height: 6),
         if (next != null) ...[
           const SizedBox(height: 4),
           shadcn.Text(
-            'Prochain déblocage : ${formatEuros(next.amount)} le '
-            '${formatDateDdMmYyyy(next.unlockDate)}',
+            l10n.investments_next_unlock(
+              formatEuros(next.amount),
+              formatDateDdMmYyyy(next.unlockDate),
+            ),
           ).muted().xSmall(),
         ],
       ],

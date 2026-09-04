@@ -9,6 +9,7 @@ import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/toggle_button_style.dart';
+import '../../l10n/app_localizations.dart';
 import 'tax_parameters.dart';
 
 class TransmissionSimulationScreen extends StatefulWidget {
@@ -68,6 +69,8 @@ class _TransmissionSimulationScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -87,10 +90,10 @@ class _TransmissionSimulationScreenState
                   setState(() => _tabIndex = value);
                   _saveState();
                 },
-                children: const [
-                  TabItem(child: shadcn.Text('Démembrement')),
-                  TabItem(child: shadcn.Text('Donation')),
-                  TabItem(child: shadcn.Text('Héritage')),
+                children: [
+                  TabItem(child: shadcn.Text(l10n.simulations_transmission_demembrement)),
+                  TabItem(child: shadcn.Text(l10n.simulations_transmission_donation)),
+                  TabItem(child: shadcn.Text(l10n.simulations_transmission_heritage)),
                 ],
               ),
             ),
@@ -278,6 +281,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final result = _compute();
     final accent = Theme.of(context).colorScheme.primary;
     final hidden = widget.amountVisibility.hidden;
@@ -287,14 +291,14 @@ class _DemembrementTabState extends State<_DemembrementTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _NumberField(
-            label: 'Valeur en pleine propriété',
+            label: l10n.simulations_transmission_value_full_property,
             suffix: '€',
             value: _valeurPleinePropriete,
             step: 10000,
             onChanged: (v) => _update(() => _valeurPleinePropriete = max(0, v)),
           ),
           _NumberField(
-            label: "Âge de l'usufruitier",
+            label: l10n.simulations_transmission_usufruitier_age,
             suffix: 'ans',
             value: _ageUsufruitier.toDouble(),
             step: 1,
@@ -303,7 +307,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
                 _update(() => _ageUsufruitier = v.round().clamp(18, 110)),
           ),
           _NumberField(
-            label: "Nombre d'enfants bénéficiaires",
+            label: l10n.simulations_transmission_number_beneficiary_children,
             suffix: '',
             value: _nombreEnfants.toDouble(),
             step: 1,
@@ -312,7 +316,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
                 _update(() => _nombreEnfants = v.round().clamp(1, 10)),
           ),
           _NumberField(
-            label: 'Abattement par enfant (restant)',
+            label: l10n.simulations_transmission_abatement_per_child_remaining,
             suffix: '€',
             value: _abattementParEnfant,
             step: 5000,
@@ -322,7 +326,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
           OutlineButton(
             onPressed: _resetState,
             leading: const Icon(LucideIcons.refreshCw),
-            child: const shadcn.Text('Réinitialiser les paramètres'),
+            child: shadcn.Text(l10n.simulations_transmission_reset_parameters),
           ),
         ],
       ),
@@ -330,13 +334,13 @@ class _DemembrementTabState extends State<_DemembrementTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _ProjectionHeader(
-            title: 'Projection des droits en démembrement',
+            title: l10n.simulations_transmission_projection_demembrement,
             value: displayEuros(result.droitsTotauxNue, hidden),
             subtitle: shadcn.Text.rich(
               TextSpan(
                 style: DefaultTextStyle.of(context).style,
                 children: [
-                  const TextSpan(text: 'Hypothèse 2026 : nue-propriété '),
+                  TextSpan(text: l10n.simulations_transmission_hypothesis_2026_nue),
                   TextSpan(
                     text: '${result.nueProprietePct.toStringAsFixed(0)}%',
                     style: TextStyle(
@@ -344,7 +348,7 @@ class _DemembrementTabState extends State<_DemembrementTab> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const TextSpan(text: ' / usufruit '),
+                  TextSpan(text: l10n.simulations_transmission_usufruit_separator),
                   TextSpan(
                     text: '${result.usufruitPct.toStringAsFixed(0)}%',
                     style: TextStyle(
@@ -359,20 +363,20 @@ class _DemembrementTabState extends State<_DemembrementTab> {
           const SizedBox(height: 20),
           _MiniBarChart(
             hidden: hidden,
-            title: 'Comparaison des scénarios',
+            title: l10n.simulations_transmission_scenario_comparison,
             items: [
               _BarItem(
-                label: 'Droits pleine propriété',
+                label: l10n.simulations_transmission_full_property_rights,
                 value: result.droitsTotauxPleine,
                 color: const Color(0xFFE07A6B),
               ),
               _BarItem(
-                label: 'Droits démembrement',
+                label: l10n.simulations_transmission_demembrement_rights,
                 value: result.droitsTotauxNue,
                 color: const Color(0xFF7B8FE8),
               ),
               _BarItem(
-                label: 'Économie potentielle',
+                label: l10n.simulations_transmission_potential_savings,
                 value: max(0, result.economiePotentielle),
                 color: accent,
               ),
@@ -381,13 +385,13 @@ class _DemembrementTabState extends State<_DemembrementTab> {
           const SizedBox(height: 18),
           _StatRow(
             items: [
-              ('Valeur NP', displayEuros(result.valeurNuePropriete, hidden)),
+              (l10n.simulations_transmission_np_value, displayEuros(result.valeurNuePropriete, hidden)),
               (
-                'Taxable NP / enfant',
+                l10n.simulations_transmission_np_taxable_per_child,
                 displayEuros(result.taxableParEnfantNue, hidden),
               ),
               (
-                'Droits NP / enfant',
+                l10n.simulations_transmission_np_rights_per_child,
                 displayEuros(result.droitsParEnfantNue, hidden),
               ),
             ],
@@ -396,24 +400,22 @@ class _DemembrementTabState extends State<_DemembrementTab> {
           _StatRow(
             items: [
               (
-                'Droits si pleine propriété',
+                l10n.simulations_transmission_full_property_rights_if,
                 displayEuros(result.droitsTotauxPleine, hidden),
               ),
               (
-                'Droits en démembrement',
+                l10n.simulations_transmission_demembrement_rights_detail,
                 displayEuros(result.droitsTotauxNue, hidden),
               ),
               (
-                'Économie potentielle',
+                l10n.simulations_transmission_potential_savings,
                 displayEuros(result.economiePotentielle, hidden),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const _TransmissionDisclaimer(
-            text:
-                "Barème de valorisation usufruit/nue-propriété selon l'article 669 CGI (référentiel 2026). "
-                'Simulation indicative, hors clauses civiles spécifiques, réserve/usufruit successif et optimisation notariale personnalisée.',
+          _TransmissionDisclaimer(
+            text: l10n.simulations_transmission_disclaimer_demembrement,
           ),
         ],
       ),
@@ -516,6 +518,7 @@ class _DonationTabState extends State<_DonationTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final result = _compute();
     final accent = Theme.of(context).colorScheme.primary;
     final hidden = widget.amountVisibility.hidden;
@@ -525,14 +528,14 @@ class _DonationTabState extends State<_DonationTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _NumberField(
-            label: 'Montant de la donation',
+            label: l10n.simulations_transmission_donation_amount,
             suffix: '€',
             value: _montantDonation,
             step: 5000,
             onChanged: (v) => _update(() => _montantDonation = max(0, v)),
           ),
           _NumberField(
-            label: 'Nombre de bénéficiaires',
+            label: l10n.simulations_transmission_number_beneficiaries,
             suffix: '',
             value: _nombreDonataires.toDouble(),
             step: 1,
@@ -540,7 +543,7 @@ class _DonationTabState extends State<_DonationTab> {
             onChanged: (v) =>
                 _update(() => _nombreDonataires = v.round().clamp(1, 20)),
           ),
-          shadcn.Text('Lien donateur / donataire').muted().small(),
+          shadcn.Text(l10n.simulations_transmission_donor_donee_link).muted().small(),
           const SizedBox(height: 8),
           ButtonGroup(
             children: [
@@ -550,7 +553,7 @@ class _DonationTabState extends State<_DonationTab> {
                     _update(() => _relation = DonationRelation.enfant),
                 selectedStyle: const ButtonStyle.primary(),
                 style: toggleUnselectedStyle(context),
-                child: const shadcn.Text('Enfant'),
+                child: shadcn.Text(l10n.simulations_transmission_child),
               ),
               SelectedButton(
                 value: _relation == DonationRelation.petitEnfant,
@@ -558,7 +561,7 @@ class _DonationTabState extends State<_DonationTab> {
                     _update(() => _relation = DonationRelation.petitEnfant),
                 selectedStyle: const ButtonStyle.primary(),
                 style: toggleUnselectedStyle(context),
-                child: const shadcn.Text('Petit-enfant'),
+                child: shadcn.Text(l10n.simulations_transmission_grandchild),
               ),
               SelectedButton(
                 value: _relation == DonationRelation.conjoint,
@@ -566,19 +569,19 @@ class _DonationTabState extends State<_DonationTab> {
                     _update(() => _relation = DonationRelation.conjoint),
                 selectedStyle: const ButtonStyle.primary(),
                 style: toggleUnselectedStyle(context),
-                child: const shadcn.Text('Conjoint/PACS'),
+                child: shadcn.Text(l10n.simulations_transmission_spouse_pacs),
               ),
             ],
           ),
           const SizedBox(height: 8),
           shadcn.Text(
-            'Abattement pris en compte : ${displayEuros(result.abattementParDonataire, hidden)} / bénéficiaire',
+            l10n.simulations_transmission_abatement_per_beneficiary(displayEuros(result.abattementParDonataire, hidden)),
           ).muted().small(),
           const SizedBox(height: 8),
           OutlineButton(
             onPressed: _resetState,
             leading: const Icon(LucideIcons.refreshCw),
-            child: const shadcn.Text('Réinitialiser les paramètres'),
+            child: shadcn.Text(l10n.simulations_transmission_reset_parameters),
           ),
         ],
       ),
@@ -586,13 +589,13 @@ class _DonationTabState extends State<_DonationTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _ProjectionHeader(
-            title: 'Droits de donation estimés',
+            title: l10n.simulations_transmission_estimated_donation_rights,
             value: displayEuros(result.droitsTotaux, hidden),
             subtitle: shadcn.Text.rich(
               TextSpan(
                 style: DefaultTextStyle.of(context).style,
                 children: [
-                  const TextSpan(text: 'Taux effectif '),
+                  TextSpan(text: l10n.simulations_transmission_effective_rate_prefix),
                   TextSpan(
                     text: '${result.tauxEffectif.toStringAsFixed(1)}%',
                     style: TextStyle(
@@ -600,7 +603,7 @@ class _DonationTabState extends State<_DonationTab> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const TextSpan(text: ' sur le montant transmis.'),
+                  TextSpan(text: l10n.simulations_transmission_effective_rate_suffix),
                 ],
               ),
             ).muted(),
@@ -608,20 +611,20 @@ class _DonationTabState extends State<_DonationTab> {
           const SizedBox(height: 20),
           _MiniBarChart(
             hidden: hidden,
-            title: 'Répartition fiscale',
+            title: l10n.simulations_transmission_tax_breakdown,
             items: [
               _BarItem(
-                label: 'Montant total transmis',
+                label: l10n.simulations_transmission_total_amount_transferred,
                 value: _montantDonation,
                 color: const Color(0xFF6B7280),
               ),
               _BarItem(
-                label: 'Base taxable totale',
+                label: l10n.simulations_transmission_total_taxable_base,
                 value: result.taxableParDonataire * _nombreDonataires,
                 color: const Color(0xFF7B8FE8),
               ),
               _BarItem(
-                label: 'Droits totaux',
+                label: l10n.simulations_transmission_total_rights,
                 value: result.droitsTotaux,
                 color: accent,
               ),
@@ -631,24 +634,22 @@ class _DonationTabState extends State<_DonationTab> {
           _StatRow(
             items: [
               (
-                'Montant / bénéficiaire',
+                l10n.simulations_transmission_amount_per_beneficiary,
                 displayEuros(result.montantParDonataire, hidden),
               ),
               (
-                'Taxable / bénéficiaire',
+                l10n.simulations_transmission_taxable_per_beneficiary,
                 displayEuros(result.taxableParDonataire, hidden),
               ),
               (
-                'Droits / bénéficiaire',
+                l10n.simulations_transmission_rights_per_beneficiary,
                 displayEuros(result.droitsParDonataire, hidden),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const _TransmissionDisclaimer(
-            text:
-                'Barèmes simplifiés de droits de donation 2026. Abattements simulés par lien de parenté, '
-                'hors dons familiaux de sommes d\'argent, rapport fiscal, réductions spécifiques ou passif déductible.',
+          _TransmissionDisclaimer(
+            text: l10n.simulations_transmission_disclaimer_donation,
           ),
         ],
       ),
@@ -774,6 +775,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final result = _compute();
     final hidden = widget.amountVisibility.hidden;
 
@@ -782,7 +784,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _NumberField(
-            label: 'Actif net successoral',
+            label: l10n.simulations_transmission_net_estate_assets,
             suffix: '€',
             value: _actifNetSuccessoral,
             step: 10000,
@@ -791,7 +793,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
           Row(
             children: [
               Expanded(
-                child: shadcn.Text('Conjoint survivant').muted().small(),
+                child: shadcn.Text(l10n.simulations_transmission_surviving_spouse).muted().small(),
               ),
               _SimpleSwitch(
                 value: _conjointSurvivant,
@@ -802,7 +804,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
           if (_conjointSurvivant) ...[
             const SizedBox(height: 12),
             _NumberField(
-              label: 'Part attribuée au conjoint',
+              label: l10n.simulations_transmission_spouse_share,
               suffix: '%',
               value: _partConjointPct,
               step: 1,
@@ -812,7 +814,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
             ),
           ],
           _NumberField(
-            label: "Nombre d'enfants héritiers",
+            label: l10n.simulations_transmission_number_inheriting_children,
             suffix: '',
             value: _nombreEnfants.toDouble(),
             step: 1,
@@ -821,7 +823,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
                 _update(() => _nombreEnfants = v.round().clamp(1, 10)),
           ),
           _NumberField(
-            label: 'Abattement par enfant',
+            label: l10n.simulations_transmission_abatement_per_child,
             suffix: '€',
             value: _abattementParEnfant,
             step: 5000,
@@ -831,7 +833,7 @@ class _InheritanceTabState extends State<_InheritanceTab> {
           OutlineButton(
             onPressed: _resetState,
             leading: const Icon(LucideIcons.refreshCw),
-            child: const shadcn.Text('Réinitialiser les paramètres'),
+            child: shadcn.Text(l10n.simulations_transmission_reset_parameters),
           ),
         ],
       ),
@@ -839,26 +841,26 @@ class _InheritanceTabState extends State<_InheritanceTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _ProjectionHeader(
-            title: 'Droits de succession estimés',
+            title: l10n.simulations_transmission_estimated_inheritance_rights,
             value: displayEuros(result.droitsTotauxEnfants, hidden),
           ),
           const SizedBox(height: 20),
           _MiniBarChart(
             hidden: hidden,
-            title: 'Répartition de la succession',
+            title: l10n.simulations_transmission_estate_breakdown,
             items: [
               _BarItem(
-                label: 'Part conjoint exonérée',
+                label: l10n.simulations_transmission_spouse_exempt_part,
                 value: result.partConjointExoneree,
                 color: const Color(0xFF6B7280),
               ),
               _BarItem(
-                label: 'Masse enfants',
+                label: l10n.simulations_transmission_children_mass,
                 value: result.masseTaxableEnfants,
                 color: const Color(0xFF7B8FE8),
               ),
               _BarItem(
-                label: 'Droits totaux enfants',
+                label: l10n.simulations_transmission_children_total_rights,
                 value: result.droitsTotauxEnfants,
                 color: const Color(0xFFE07A6B),
               ),
@@ -868,15 +870,15 @@ class _InheritanceTabState extends State<_InheritanceTab> {
           _StatRow(
             items: [
               (
-                'Part conjoint exonérée',
+                l10n.simulations_transmission_spouse_exempt_part,
                 displayEuros(result.partConjointExoneree, hidden),
               ),
               (
-                'Masse transmise aux enfants',
+                l10n.simulations_transmission_children_transferred_mass,
                 displayEuros(result.masseTaxableEnfants, hidden),
               ),
               (
-                'Part brute / enfant',
+                l10n.simulations_transmission_gross_part_per_child,
                 displayEuros(result.partParEnfant, hidden),
               ),
             ],
@@ -885,18 +887,16 @@ class _InheritanceTabState extends State<_InheritanceTab> {
           _StatRow(
             items: [
               (
-                'Taxable / enfant',
+                l10n.simulations_transmission_taxable_per_child,
                 displayEuros(result.taxableParEnfant, hidden),
               ),
-              ('Droits / enfant', displayEuros(result.droitsParEnfant, hidden)),
-              ('Net / enfant', displayEuros(result.netParEnfant, hidden)),
+              (l10n.simulations_transmission_rights_per_child, displayEuros(result.droitsParEnfant, hidden)),
+              (l10n.simulations_transmission_net_per_child, displayEuros(result.netParEnfant, hidden)),
             ],
           ),
           const SizedBox(height: 16),
-          const _TransmissionDisclaimer(
-            text:
-                'Référentiel succession 2026 simplifié : conjoint/PACS exonéré, barème ligne directe pour enfants. '
-                'Ne tient pas compte des options civiles détaillées (usufruit légal du conjoint, quotité disponible, testament, assurance-vie).',
+          _TransmissionDisclaimer(
+            text: l10n.simulations_transmission_disclaimer_heritage,
           ),
         ],
       ),

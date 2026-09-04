@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/profiles/profile_controller.dart';
 import '../../core/storage/vault_folder_service.dart';
+import '../../l10n/app_localizations.dart';
 
 Widget _profileAvatar(BuildContext context, String initials, double size) {
   final bg = Theme.of(context).colorScheme.primary.withValues(alpha: 0.18);
@@ -149,16 +150,20 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
         widget.onNoVaultSelected();
       } else {
         await widget.onVaultActivated(activeVault.vaultPath);
+        if (!widget.anchorContext.mounted) return;
+        final l10n = AppLocalizations.of(widget.anchorContext);
         _showAccountToast(
           widget.anchorContext,
-          'Coffre-fort actif : ${activeVault.name}',
-          'Basculé depuis le sélecteur de compte',
+          l10n.navigation_vault_active_toast_title(activeVault.name),
+          l10n.navigation_vault_switched_toast_subtitle,
         );
       }
     } catch (e) {
+      if (!widget.anchorContext.mounted) return;
+      final l10n = AppLocalizations.of(widget.anchorContext);
       _showAccountToast(
         widget.anchorContext,
-        'Impossible d\'activer ce coffre-fort',
+        l10n.navigation_vault_activate_failed_toast_title,
         '$e',
       );
     }
@@ -176,6 +181,7 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
   /// focus — un `setState` déclenché pendant le démontage d'un item
   /// redistribuant le focus plante ("widget tree was locked").
   Widget _buildVaultSwitcherRow(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final index = _vaults.indexWhere((v) => v.id == _activeVaultId);
     final activeName = index != -1 ? _vaults[index].name : null;
     SavedVault? previous;
@@ -194,8 +200,8 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
             tooltip: TooltipContainer(
               child: shadcn.Text(
                 previous != null
-                    ? 'Coffre-fort précédent : ${previous.name}'
-                    : 'Coffre-fort précédent',
+                    ? l10n.navigation_vault_previous_named(previous.name)
+                    : l10n.navigation_vault_previous,
               ),
             ),
             child: IconButton.ghost(
@@ -207,7 +213,9 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
           ),
           Expanded(
             child: Center(
-              child: shadcn.Text(activeName ?? 'Coffre-fort').medium.small,
+              child: shadcn.Text(
+                activeName ?? l10n.navigation_vault_fallback_label,
+              ).medium.small,
             ),
           ),
           Tooltip(
@@ -215,8 +223,8 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
             tooltip: TooltipContainer(
               child: shadcn.Text(
                 next != null
-                    ? 'Coffre-fort suivant : ${next.name}'
-                    : 'Coffre-fort suivant',
+                    ? l10n.navigation_vault_next_named(next.name)
+                    : l10n.navigation_vault_next,
               ),
             ),
             child: IconButton.ghost(
@@ -234,6 +242,7 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
     return AnimatedBuilder(
       animation: widget.profileController,
       builder: (context, _) {
+        final l10n = AppLocalizations.of(context);
         final profiles = widget.profileController.profiles;
         final activeProfileId = widget.profileController.active?.id;
         return ConstrainedBox(
@@ -261,21 +270,22 @@ class _AccountSwitcherContentState extends State<_AccountSwitcherContent> {
                     widget.profileController.switchTo(profile.id);
                     _showAccountToast(
                       widget.anchorContext,
-                      'Profil actif: ${profile.name}',
+                      l10n.navigation_profile_active_toast_title(profile.name),
                       profile.relationship.isNotEmpty
                           ? profile.relationship
-                          : 'Compte activé',
+                          : l10n.navigation_account_activated,
                     );
                   },
                 ),
               const MenuDivider(),
-              // Un seul point d'entrée « Paramètres » : la gestion des
-              // comptes (créer/éditer/basculer un profil) vit désormais
-              // dans cette même page, à côté de celle des vaults (voir
-              // `settings_screen.dart`'s `_ProfilesCard`/`_VaultCard`).
+              // Un seul point d'entrée « Réglages » (même libellé que
+              // `nav_settings`) : la gestion des comptes (créer/éditer/
+              // basculer un profil) vit désormais dans cette même page, à
+              // côté de celle des vaults (voir `settings_screen.dart`'s
+              // `_ProfilesCard`/`_VaultCard`).
               MenuButton(
                 leading: const Icon(LucideIcons.settings),
-                child: const shadcn.Text('Paramètres'),
+                child: shadcn.Text(l10n.nav_settings),
                 onPressed: (ctx) => widget.onSelect('settings'),
               ),
             ],

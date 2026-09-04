@@ -136,4 +136,187 @@ void main() {
       );
     },
   );
+
+  group('filtrage par mots-clés', () {
+    test(
+      'question avec mot-clé investissement → n\'inclut pas budget/suivi',
+      () async {
+        final now = DateTime.now();
+        await BudgetTrackingRepository(tempDir.path).save(
+          BudgetTrackingMonth(
+            month: now.month,
+            year: now.year,
+            revenues: const [],
+            factures: const [],
+            depenses: [
+              TrackingItem(name: 'Amazon', budget: 50, realite: 63),
+            ],
+            investEpargnes: const [],
+            projets: const [],
+            dettes: const [],
+          ),
+        );
+
+        final context = await AssistantContextBuilder(
+          tempDir.path,
+        ).buildPatrimoineContext(question: 'Quel est mon rendement PEA ?');
+
+        expect(context, contains('Synthèse du patrimoine'));
+        // Budget tracking et suivi ne devraient pas être inclus
+        expect(context, isNot(contains('Suivi budgétaire mensuel')));
+        expect(context, isNot(contains('Amazon')));
+      },
+    );
+
+    test(
+      'question avec mot-clé budget → n\'inclut pas suivi budgétaire',
+      () async {
+        final now = DateTime.now();
+        await BudgetTrackingRepository(tempDir.path).save(
+          BudgetTrackingMonth(
+            month: now.month,
+            year: now.year,
+            revenues: const [],
+            factures: const [],
+            depenses: [
+              TrackingItem(name: 'Amazon', budget: 50, realite: 63),
+            ],
+            investEpargnes: const [],
+            projets: const [],
+            dettes: const [],
+          ),
+        );
+
+        final context = await AssistantContextBuilder(
+          tempDir.path,
+        ).buildPatrimoineContext(
+          question: 'Quelles sont mes dépenses ?',
+        );
+
+        expect(context, contains('Synthèse du patrimoine'));
+        // Suivi ne devrait pas être inclus (mot-clé "suivi" absent)
+        expect(context, isNot(contains('Suivi budgétaire mensuel')));
+        expect(context, isNot(contains('Amazon')));
+      },
+    );
+
+    test(
+      'question avec mot-clé suivi → inclut suivi budgétaire',
+      () async {
+        final now = DateTime.now();
+        await BudgetTrackingRepository(tempDir.path).save(
+          BudgetTrackingMonth(
+            month: now.month,
+            year: now.year,
+            revenues: const [],
+            factures: const [],
+            depenses: [
+              TrackingItem(name: 'Amazon', budget: 50, realite: 63),
+            ],
+            investEpargnes: const [],
+            projets: const [],
+            dettes: const [],
+          ),
+        );
+
+        final context = await AssistantContextBuilder(
+          tempDir.path,
+        ).buildPatrimoineContext(
+          question: 'Combien ai-je dépensé chez Amazon ce mois ?',
+        );
+
+        expect(context, contains('Suivi budgétaire mensuel'));
+        expect(context, contains('Amazon'));
+      },
+    );
+
+    test(
+      'question sans mot-clé correspondant → inclut toutes les sections',
+      () async {
+        final now = DateTime.now();
+        await BudgetTrackingRepository(tempDir.path).save(
+          BudgetTrackingMonth(
+            month: now.month,
+            year: now.year,
+            revenues: const [],
+            factures: const [],
+            depenses: [
+              TrackingItem(name: 'Amazon', budget: 50, realite: 63),
+            ],
+            investEpargnes: const [],
+            projets: const [],
+            dettes: const [],
+          ),
+        );
+
+        final context = await AssistantContextBuilder(
+          tempDir.path,
+        ).buildPatrimoineContext(question: 'Bonjour !');
+
+        // Toutes les sections sont incluses
+        expect(context, contains('Suivi budgétaire mensuel'));
+        expect(context, contains('Amazon'));
+        expect(context, contains('Synthèse du patrimoine'));
+      },
+    );
+
+    test(
+      'question vide → inclut toutes les sections',
+      () async {
+        final now = DateTime.now();
+        await BudgetTrackingRepository(tempDir.path).save(
+          BudgetTrackingMonth(
+            month: now.month,
+            year: now.year,
+            revenues: const [],
+            factures: const [],
+            depenses: [
+              TrackingItem(name: 'Amazon', budget: 50, realite: 63),
+            ],
+            investEpargnes: const [],
+            projets: const [],
+            dettes: const [],
+          ),
+        );
+
+        final context = await AssistantContextBuilder(
+          tempDir.path,
+        ).buildPatrimoineContext(question: '');
+
+        expect(context, contains('Suivi budgétaire mensuel'));
+        expect(context, contains('Amazon'));
+        expect(context, contains('Synthèse du patrimoine'));
+      },
+    );
+
+    test(
+      'filtrage casse-insensible : "BUDGET" et "budget" sont équivalents',
+      () async {
+        final now = DateTime.now();
+        await BudgetTrackingRepository(tempDir.path).save(
+          BudgetTrackingMonth(
+            month: now.month,
+            year: now.year,
+            revenues: const [],
+            factures: const [],
+            depenses: [
+              TrackingItem(name: 'Amazon', budget: 50, realite: 63),
+            ],
+            investEpargnes: const [],
+            projets: const [],
+            dettes: const [],
+          ),
+        );
+
+        final context = await AssistantContextBuilder(
+          tempDir.path,
+        ).buildPatrimoineContext(
+          question: 'Analyse mon BUDGET',
+        );
+
+        expect(context, contains('Synthèse du patrimoine'));
+        expect(context, isNot(contains('Suivi budgétaire mensuel')));
+      },
+    );
+  });
 }

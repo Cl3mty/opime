@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import '../core/assistant/assistant_chat_controller.dart';
 import '../core/assistant/assistant_config_controller.dart';
 import '../core/notifications/notifications_settings_controller.dart';
@@ -30,7 +31,11 @@ import 'theme_controller.dart';
 /// il renvoie directement au tableau de bord.
 class _MobileTab {
   final String key;
-  final String label;
+
+  /// Résolu au moment de l'affichage plutôt qu'une simple `String` : les 4
+  /// onglets sont déclarés une fois pour toute l'app (variable top-level),
+  /// avant qu'un `BuildContext` (donc une locale) ne soit disponible.
+  final String Function(AppLocalizations l10n) label;
   final IconData icon;
   final List<NavItem> Function() items;
 
@@ -38,17 +43,22 @@ class _MobileTab {
 }
 
 final _mobileTabs = [
-  _MobileTab('home', 'Home', LucideIcons.house, () => const []),
+  _MobileTab('home', (l10n) => l10n.nav_home, LucideIcons.house, () => const []),
   _MobileTab(
     'portfolio',
-    'Portfolio',
+    (l10n) => l10n.nav_patrimoine,
     LucideIcons.walletMinimal,
     () => portfolioTabItems,
   ),
-  _MobileTab('tools', 'Tools', LucideIcons.wrench, () => toolsTabItems),
+  _MobileTab(
+    'tools',
+    (l10n) => l10n.nav_tools,
+    LucideIcons.wrench,
+    () => toolsTabItems,
+  ),
   _MobileTab(
     'learn',
-    'Learn',
+    (l10n) => l10n.nav_academy,
     LucideIcons.graduationCap,
     () => academieGroup.items,
   ),
@@ -195,24 +205,25 @@ class _AppShellState extends State<AppShell> {
     if (!mounted) return;
     final unread = widget.assistantChatController.unreadResponses.value;
     if (unread == 0 || _selectedKey == 'assistant') return;
+    final l10n = AppLocalizations.of(context);
     showToast(
       context: context,
       location: ToastLocation.bottomRight,
       builder: (context, overlay) => SurfaceCard(
         child: Basic(
           leading: const Icon(LucideIcons.bot, size: 18),
-          title: const Text('Réponse de l\'assistant prête'),
+          title: Text(l10n.shell_assistant_response_ready),
           subtitle: Text(
             unread > 1
-                ? '$unread réponses en attente'
-                : 'Une réponse est prête',
+                ? l10n.shell_responses_pending(unread)
+                : l10n.shell_one_response_ready,
           ),
           trailing: PrimaryButton(
             onPressed: () {
               overlay.close();
               _select('assistant');
             },
-            child: const Text('Voir'),
+            child: Text(l10n.common_see),
           ),
         ),
       ),
@@ -296,26 +307,37 @@ class _AppShellState extends State<AppShell> {
     return _mobileDrillParent != null;
   }
 
-  String get _mobileTitle {
+  /// Titre affiché dans l'AppBar mobile — dépend de la locale (voir
+  /// [_MobileTab.label]), donc reçoit un `BuildContext` plutôt que d'être un
+  /// simple getter comme avant l'internationalisation de l'app.
+  String _mobileTitleFor(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (_mobileShowingHub) {
-      return _mobileDrillParent?.label ?? _currentMobileTab.label;
+      return _mobileDrillParent != null
+          ? navLocalizedLabel(l10n, _mobileDrillParent!.key,
+              fallback: _mobileDrillParent!.label)
+          : _currentMobileTab.label(l10n);
     }
-    if (_selectedKey == 'dashboard') return 'Opime';
-    if (_selectedKey == 'settings') return 'Réglages';
+    if (_selectedKey == 'dashboard') return l10n.appName;
+    if (_selectedKey == 'settings') return l10n.nav_settings;
     for (final item in _currentMobileTab.items()) {
-      if (item.key == _selectedKey) return item.label;
+      if (item.key == _selectedKey) {
+        return navLocalizedLabel(l10n, item.key, fallback: item.label);
+      }
       for (final child in item.children) {
-        if (child.key == _selectedKey) return child.label;
+        if (child.key == _selectedKey) {
+          return navLocalizedLabel(l10n, child.key, fallback: child.label);
+        }
       }
     }
-    return _currentMobileTab.label;
+    return _currentMobileTab.label(l10n);
   }
 
   Widget _mobileContent(BuildContext context) {
     if (_mobileActiveTab == 'home' || !_mobileShowingHub) {
       final page =
           widget.pages[_selectedKey]?.call(context) ??
-          const Center(child: Text('Page introuvable'));
+          Center(child: Text(AppLocalizations.of(context).common_page_not_found));
       return NavigationScope(
         onSelect: _select,
         dashboardEpoch: _dashboardEpoch,
@@ -336,6 +358,7 @@ class _AppShellState extends State<AppShell> {
     // desktop (donc vers l'Assistant, absent de la version mobile) — voir
     // le commentaire de isWideLayout() sur le choix de shortestSide.
     final isWide = isWideLayout(context);
+    final l10n = AppLocalizations.of(context);
 
     if (isWide) {
       final page = NavigationScope(
@@ -343,7 +366,7 @@ class _AppShellState extends State<AppShell> {
         dashboardEpoch: _dashboardEpoch,
         child:
             widget.pages[_selectedKey]?.call(context) ??
-            const Center(child: Text('Page introuvable')),
+            Center(child: Text(l10n.common_page_not_found)),
       );
       // AppBackground (halo/dégradé) habille uniquement la sidebar et la
       // TopBar — le contenu de page reste un aplat uni (theme.background),
@@ -417,7 +440,7 @@ class _AppShellState extends State<AppShell> {
           title: FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(_mobileTitle, maxLines: 1, softWrap: false),
+            child: Text(_mobileTitleFor(context), maxLines: 1, softWrap: false),
           ),
           leading: [
             if (_mobileCanGoBack)
@@ -469,7 +492,7 @@ class _AppShellState extends State<AppShell> {
           children: [
             for (final tab in _mobileTabs)
               NavigationItem(
-                label: Text(tab.label),
+                label: Text(tab.label(l10n)),
                 selectedStyle: const ButtonStyle.primaryIcon(),
                 selected: _mobileActiveTab == tab.key,
                 onChanged: (isSelected) {

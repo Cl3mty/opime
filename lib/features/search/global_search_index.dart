@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart' show IconData;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 import '../../core/academy/academy_models.dart';
+import '../../l10n/app_localizations.dart';
 import '../academy/envelopes_data.dart';
 import '../academy/formation_data.dart';
 import '../academy/investissement_data.dart';
@@ -8,19 +9,27 @@ import '../investments/investments_models.dart';
 import '../investments/investments_repository.dart';
 import '../navigation/nav_models.dart';
 
-/// Grandes familles de résultats de la recherche globale, affichées comme
-/// en-têtes de groupe dans le panneau de résultats (dans cet ordre).
-enum SearchCategory {
-  page('Pages'),
-  fondamentaux('Fondamentaux'),
-  enveloppe('Enveloppes'),
-  formation('Formation'),
-  vocabulaire('Vocabulaire'),
-  patrimoine('Patrimoine');
-
-  final String label;
-  const SearchCategory(this.label);
+/// Libellé traduit d'une [SearchCategory], affiché comme en-tête de groupe
+/// dans le panneau de résultats (voir `global_search_bar.dart`).
+String searchCategoryLabel(AppLocalizations l10n, SearchCategory category) {
+  return switch (category) {
+    SearchCategory.page => l10n.search_category_page,
+    SearchCategory.fondamentaux => l10n.search_category_fondamentaux,
+    SearchCategory.enveloppe => l10n.search_category_enveloppe,
+    SearchCategory.formation => l10n.search_category_formation,
+    SearchCategory.vocabulaire => l10n.search_category_vocabulaire,
+    SearchCategory.patrimoine => l10n.search_category_patrimoine,
+  };
 }
+
+/// Grandes familles de résultats de la recherche globale, affichées comme
+/// en-têtes de groupe dans le panneau de résultats (dans cet ordre). Pas de
+/// libellé hardcodé sur l'enum lui-même (contrairement à `NavItem`/
+/// `NavGroup` dans `nav_models.dart`) : cet enum n'est consommé que par
+/// [global_search_bar.dart], qui a un `BuildContext` à sa disposition — son
+/// libellé traduit se résout donc via `searchCategoryLabel` au point
+/// d'affichage plutôt que d'être porté en dur ici.
+enum SearchCategory { page, fondamentaux, enveloppe, formation, vocabulaire, patrimoine }
 
 /// Une entrée de l'index de recherche globale : un titre, un sous-titre
 /// facultatif, une icône, et [extra] — du texte additionnel cherchable mais

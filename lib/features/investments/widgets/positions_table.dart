@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../../l10n/app_localizations.dart';
 import '../../../core/money_format.dart';
 import '../../../core/ui/asset_table_header_cell.dart';
 import '../../../core/ui/performance_amount.dart';
@@ -96,6 +97,7 @@ class PositionsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final investments = visibleInvestments ?? account.investments;
     final active = [
       for (final i in investments)
@@ -109,7 +111,7 @@ class PositionsTable extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (investments.isEmpty)
-          shadcn.Text('Aucune position pour l\'instant.').muted().small()
+          shadcn.Text(l10n.investments_no_positions_yet).muted().small()
         else if (active.isNotEmpty)
           _PositionsSubTable(
             investments: active,
@@ -120,9 +122,7 @@ class PositionsTable extends StatelessWidget {
             priceHistories: priceHistories,
           )
         else
-          shadcn.Text(
-            'Aucune position ouverte pour l\'instant.',
-          ).muted().small(),
+          shadcn.Text(l10n.investments_no_open_positions_yet).muted().small(),
         // Ordre volontaire : positions ouvertes, puis positions à effet de
         // levier, puis anciennes positions en dernier — l'historique soldé
         // est ce qu'on consulte le moins souvent, il reste donc tout en bas.
@@ -141,7 +141,7 @@ class PositionsTable extends StatelessWidget {
         // les confondre dans les totaux affichés au-dessus de ce tableau.
         if (closed.isNotEmpty) ...[
           const SizedBox(height: 28),
-          shadcn.Text('Anciennes positions').muted().xSmall(),
+          shadcn.Text(l10n.investments_old_positions_label).muted().xSmall(),
           const SizedBox(height: 8),
           _PositionsSubTable(
             investments: closed,
@@ -181,12 +181,13 @@ class _LeveragedPositionsSection extends StatelessWidget {
     BuildContext context,
     LeveragedPosition position,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${position.market}" ?',
-      message:
-          'Cette position sera définitivement supprimée. Cette action '
-          'est irréversible.',
+      title: l10n.investments_delete_leveraged_position_confirm_title(
+        position.market,
+      ),
+      message: l10n.investments_delete_leveraged_position_confirm_message,
     );
     if (!confirmed) return;
     final updatedAccount = account.copyWith(
@@ -201,6 +202,7 @@ class _LeveragedPositionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final open = [
       for (final p in account.leveragedPositions)
         if (p.isOpen) p,
@@ -214,7 +216,7 @@ class _LeveragedPositionsSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            shadcn.Text('Positions à effet de levier').muted().xSmall(),
+            shadcn.Text(l10n.investments_leveraged_section_title).muted().xSmall(),
             const Spacer(),
             GestureDetector(
               onTap: () => showLeveragedPositionDialog(
@@ -233,7 +235,7 @@ class _LeveragedPositionsSection extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   shadcn.Text(
-                    'Ajouter une position',
+                    l10n.investments_add_position_link,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                     ),
@@ -246,7 +248,7 @@ class _LeveragedPositionsSection extends StatelessWidget {
         const SizedBox(height: 8),
         if (open.isEmpty && closed.isEmpty)
           shadcn.Text(
-            'Aucune position à effet de levier pour l\'instant.',
+            l10n.investments_no_leveraged_positions_yet,
           ).muted().small()
         else if (open.isNotEmpty)
           _LeveragedPositionsSubTable(
@@ -259,7 +261,7 @@ class _LeveragedPositionsSection extends StatelessWidget {
           ),
         if (closed.isNotEmpty) ...[
           const SizedBox(height: 20),
-          shadcn.Text('Positions fermées').muted().xSmall(),
+          shadcn.Text(l10n.investments_closed_positions_label).muted().xSmall(),
           const SizedBox(height: 8),
           _LeveragedPositionsSubTable(
             positions: closed,
@@ -300,17 +302,30 @@ class _LeveragedPositionsSubTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             const Expanded(child: SizedBox()),
-            const AssetTableHeaderCell('Taille', width: _colWidth),
-            const AssetTableHeaderCell('Entrée', width: _colWidth),
-            const AssetTableHeaderCell('Cours', width: _colWidth),
-            const AssetTableHeaderCell('Montant', width: _colWidth),
-            const AssetTableHeaderCell('PnL (ROE)', width: _colWidth),
+            AssetTableHeaderCell(l10n.investments_size_label, width: _colWidth),
+            AssetTableHeaderCell(
+              l10n.investments_column_entry_label,
+              width: _colWidth,
+            ),
+            AssetTableHeaderCell(
+              l10n.investments_column_price_label,
+              width: _colWidth,
+            ),
+            AssetTableHeaderCell(
+              l10n.investments_column_amount_label,
+              width: _colWidth,
+            ),
+            AssetTableHeaderCell(
+              l10n.investments_pnl_roe_column_label,
+              width: _colWidth,
+            ),
             const SizedBox(width: 32),
           ],
         ),
@@ -348,6 +363,7 @@ class _LeveragedPositionLine extends StatelessWidget {
   });
 
   void _openMenu(BuildContext anchorContext) {
+    final l10n = AppLocalizations.of(anchorContext);
     showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.topEnd,
@@ -360,7 +376,7 @@ class _LeveragedPositionLine extends StatelessWidget {
             if (position.isOpen) ...[
               MenuButton(
                 leading: const Icon(LucideIcons.refreshCw, size: 14),
-                child: const shadcn.Text('Actualiser'),
+                child: shadcn.Text(l10n.investments_refresh_menu_item),
                 onPressed: (_) => showRefreshLeveragedPositionDialog(
                   context,
                   vaultPath: vaultPath,
@@ -371,7 +387,7 @@ class _LeveragedPositionLine extends StatelessWidget {
               ),
               MenuButton(
                 leading: const Icon(LucideIcons.pencil, size: 14),
-                child: const shadcn.Text('Modifier'),
+                child: shadcn.Text(l10n.common_edit),
                 onPressed: (_) => showLeveragedPositionDialog(
                   context,
                   vaultPath: vaultPath,
@@ -382,7 +398,7 @@ class _LeveragedPositionLine extends StatelessWidget {
               ),
               MenuButton(
                 leading: const Icon(LucideIcons.flagOff, size: 14),
-                child: const shadcn.Text('Clôturer'),
+                child: shadcn.Text(l10n.investments_close_position_menu_item),
                 onPressed: (_) => showCloseLeveragedPositionDialog(
                   context,
                   vaultPath: vaultPath,
@@ -394,7 +410,7 @@ class _LeveragedPositionLine extends StatelessWidget {
             ],
             MenuButton(
               leading: const Icon(LucideIcons.trash2, size: 14),
-              child: const shadcn.Text('Supprimer'),
+              child: shadcn.Text(l10n.common_delete),
               onPressed: (_) => onDelete(),
             ),
           ],
@@ -411,6 +427,7 @@ class _LeveragedPositionLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final pnl = position.pnl;
     final roe = position.roePercent;
     final leverageLabel = position.leverage == position.leverage.roundToDouble()
@@ -465,15 +482,18 @@ class _LeveragedPositionLine extends StatelessWidget {
                     ),
                     if (!position.isOpen) ...[
                       const SizedBox(width: 6),
-                      shadcn.Text('Fermée').muted().xSmall(),
+                      shadcn.Text(
+                        l10n.investments_position_closed_badge,
+                      ).muted().xSmall(),
                     ],
                   ],
                 ),
                 if (position.isOpen &&
                     position.effectiveLiquidationPrice != null)
                   shadcn.Text(
-                    'Liquidation : '
-                    '${displayEuros(position.effectiveLiquidationPrice!, hidden)}',
+                    l10n.investments_liquidation_price_label(
+                      displayEuros(position.effectiveLiquidationPrice!, hidden),
+                    ),
                     style: liqColor == null ? null : TextStyle(color: liqColor),
                   ).xSmall(),
               ],
@@ -572,18 +592,25 @@ class _PositionsSubTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             const Expanded(child: SizedBox()),
-            const AssetTableHeaderCell('Quantité', width: _colWidth),
-            const AssetTableHeaderCell('PRU', width: _colWidth),
-            const AssetTableHeaderCell('Cours', width: _colWidth),
-            const AssetTableHeaderCell('Valeur', width: _colWidth),
-            const AssetTableHeaderCell('Évolution', width: _colWidth),
-            const AssetTableHeaderCell('+/- value', width: _colWidth),
+            AssetTableHeaderCell(
+              l10n.investments_field_quantity,
+              width: _colWidth,
+            ),
+            AssetTableHeaderCell(l10n.dashboard_column_pru, width: _colWidth),
+            AssetTableHeaderCell(
+              l10n.investments_column_price_label,
+              width: _colWidth,
+            ),
+            AssetTableHeaderCell(l10n.dashboard_column_value, width: _colWidth),
+            AssetTableHeaderCell(l10n.dashboard_column_change, width: _colWidth),
+            AssetTableHeaderCell(l10n.dashboard_column_pnl, width: _colWidth),
           ],
         ),
         for (final investment in investments) ...[

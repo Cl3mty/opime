@@ -6,6 +6,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/ui/frosted_card.dart';
+import '../../../l10n/app_localizations.dart';
 import '../confirm_delete_dialog.dart';
 import '../document_storage.dart';
 import '../investments_models.dart';
@@ -20,6 +21,20 @@ const kRealEstateDocumentCategories = [
   'Quittance',
   'Autre',
 ];
+
+/// Libellé affiché pour une catégorie de document — les clés ci-dessus
+/// restent en français côté stockage (elles sont persistées telles quelles
+/// dans le JSON existant, voir [VaultDocument.category]) ; seul l'affichage
+/// est traduit. Une catégorie inconnue (le champ reste du texte libre côté
+/// modèle) retombe sur la valeur brute plutôt que de planter.
+String _categoryLabel(AppLocalizations l10n, String category) => switch (category) {
+  'Facture' => l10n.real_estate_document_category_invoice,
+  'Plan' => l10n.real_estate_document_category_plan,
+  'Photo' => l10n.real_estate_document_category_photo,
+  'Quittance' => l10n.real_estate_document_category_receipt,
+  'Autre' => l10n.real_estate_document_category_other,
+  _ => category,
+};
 
 /// Section "Documents" d'un bien immobilier — variante catégorisée de
 /// `DocumentsSection` (Facture/Plan/Photo/Quittance/Autre) avec une grille
@@ -80,6 +95,7 @@ class _RealEstateDocumentsSectionState
   Future<({String category, String? name})?> _promptDocumentDetails(
     BuildContext context,
   ) {
+    final l10n = AppLocalizations.of(context);
     final nameController = TextEditingController();
     var category = kRealEstateDocumentCategories.first;
     return showDialog<({String category, String? name})>(
@@ -95,15 +111,16 @@ class _RealEstateDocumentsSectionState
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const shadcn.Text(
-                      'Ajouter un document',
+                    shadcn.Text(
+                      l10n.real_estate_add_document_title,
                     ).large().semiBold(),
                     const SizedBox(height: 12),
-                    shadcn.Text('Catégorie').muted().xSmall(),
+                    shadcn.Text(l10n.common_category).muted().xSmall(),
                     const SizedBox(height: 4),
                     Select<String>(
                       value: category,
-                      itemBuilder: (context, value) => shadcn.Text(value),
+                      itemBuilder: (context, value) =>
+                          shadcn.Text(_categoryLabel(l10n, value)),
                       onChanged: (v) {
                         if (v != null) setDialogState(() => category = v);
                       },
@@ -113,7 +130,7 @@ class _RealEstateDocumentsSectionState
                             for (final c in kRealEstateDocumentCategories)
                               SelectItemButton(
                                 value: c,
-                                child: shadcn.Text(c),
+                                child: shadcn.Text(_categoryLabel(l10n, c)),
                               ),
                           ],
                         ),
@@ -122,8 +139,8 @@ class _RealEstateDocumentsSectionState
                     const SizedBox(height: 12),
                     TextField(
                       controller: nameController,
-                      placeholder: const shadcn.Text(
-                        'Nom du document (optionnel)',
+                      placeholder: shadcn.Text(
+                        l10n.real_estate_document_name_hint,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -136,12 +153,12 @@ class _RealEstateDocumentsSectionState
                                 ? null
                                 : nameController.text.trim(),
                           )),
-                          child: const shadcn.Text('Continuer'),
+                          child: shadcn.Text(l10n.real_estate_continue_button),
                         ),
                         const SizedBox(width: 8),
                         OutlineButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const shadcn.Text('Annuler'),
+                          child: shadcn.Text(l10n.common_cancel),
                         ),
                       ],
                     ),
@@ -163,10 +180,11 @@ class _RealEstateDocumentsSectionState
   }
 
   Future<void> _confirmAndDelete(VaultDocument document) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${document.fileName}" ?',
-      message: 'Le fichier sera définitivement supprimé du coffre-fort.',
+      title: l10n.real_estate_delete_document_title(document.fileName),
+      message: l10n.real_estate_delete_document_message,
     );
     if (!confirmed) return;
     widget.onDelete(document);
@@ -174,6 +192,7 @@ class _RealEstateDocumentsSectionState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final counts = <String, int>{
       for (final c in kRealEstateDocumentCategories) c: 0,
     };
@@ -189,7 +208,7 @@ class _RealEstateDocumentsSectionState
       children: [
         Row(
           children: [
-            const shadcn.Text('Documents').large().medium(),
+            shadcn.Text(l10n.real_estate_documents_title).large().medium(),
             const Spacer(),
             GestureDetector(
               onTap: _pickAndAdd,
@@ -203,7 +222,7 @@ class _RealEstateDocumentsSectionState
                   ),
                   const SizedBox(width: 6),
                   shadcn.Text(
-                    'Ajouter',
+                    l10n.common_add,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                     ),
@@ -219,13 +238,16 @@ class _RealEstateDocumentsSectionState
           runSpacing: 8,
           children: [
             _CategoryChip(
-              label: 'Tous (${widget.documents.length})',
+              label: l10n.real_estate_documents_filter_all(
+                widget.documents.length,
+              ),
               selected: _filter == null,
               onTap: () => setState(() => _filter = null),
             ),
             for (final category in kRealEstateDocumentCategories)
               _CategoryChip(
-                label: '$category (${counts[category]})',
+                label: '${_categoryLabel(l10n, category)} '
+                    '(${counts[category]})',
                 selected: _filter == category,
                 onTap: () => setState(() => _filter = category),
               ),
@@ -233,7 +255,7 @@ class _RealEstateDocumentsSectionState
         ),
         const SizedBox(height: 12),
         if (filtered.isEmpty)
-          shadcn.Text('Aucun document pour l\'instant.').muted().small()
+          shadcn.Text(l10n.real_estate_no_documents_yet).muted().small()
         else if (isPhotoFilter)
           Wrap(
             spacing: 8,
@@ -315,6 +337,7 @@ class _RealEstateDocumentRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -343,7 +366,7 @@ class _RealEstateDocumentRow extends StatelessWidget {
                 ),
                 OutlineBadge(
                   child: shadcn.Text(
-                    document.category ?? 'Autre',
+                    _categoryLabel(l10n, document.category ?? 'Autre'),
                   ).xSmall(),
                 ),
                 const SizedBox(width: 8),

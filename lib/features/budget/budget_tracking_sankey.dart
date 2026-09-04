@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import '../../l10n/app_localizations.dart';
 import 'budget_tracking_models.dart';
 import 'sankey_diagram.dart';
 
@@ -41,6 +42,7 @@ class BudgetTrackingSankeyChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final totalRevenues = _realiteSum(data.revenues);
     final buckets = [
       data.factures,
@@ -57,9 +59,7 @@ class BudgetTrackingSankeyChart extends StatelessWidget {
         nodes: const [],
         links: const [],
         hidden: hidden,
-        emptyMessage:
-            'Renseigne des montants dans les colonnes Réalité pour voir le '
-            'flux de ce mois.',
+        emptyMessage: l10n.budget_tracking_sankey_empty_message,
       );
     }
 
@@ -85,7 +85,7 @@ class BudgetTrackingSankeyChart extends StatelessWidget {
     // `displayValue`/`deficit`, voir leur doc dans `sankey_diagram.dart`.
     final totalOut = buckets.fold(0.0, (sum, b) => sum + _realiteSum(b));
     final revenusNode = SankeyNode(
-      label: 'Revenus',
+      label: l10n.budget_tab_revenues,
       column: revenueColumnOffset,
       color: _green,
       minValue: totalRevenues,
@@ -98,7 +98,9 @@ class BudgetTrackingSankeyChart extends StatelessWidget {
       for (var i = 0; i < positiveRevenues.length; i++) {
         final revenue = positiveRevenues[i];
         final revenueNode = SankeyNode(
-          label: revenue.name.isEmpty ? 'Revenu' : revenue.name,
+          label: revenue.name.isEmpty
+              ? l10n.budget_sankey_revenue_fallback
+              : revenue.name,
           column: 0,
           color: _revenuePalette[i % _revenuePalette.length],
         );
@@ -113,10 +115,18 @@ class BudgetTrackingSankeyChart extends StatelessWidget {
       }
     }
 
-    void addCategorizedBucket(String label, List<TrackingItem> items, Color color) {
+    void addCategorizedBucket(
+      String label,
+      List<TrackingItem> items,
+      Color color,
+    ) {
       final total = _realiteSum(items);
       if (total <= 0) return;
-      final bucketNode = SankeyNode(label: label, column: bucketColumn, color: color);
+      final bucketNode = SankeyNode(
+        label: label,
+        column: bucketColumn,
+        color: color,
+      );
       nodes.add(bucketNode);
       links.add(
         SankeyLink(source: revenusNode, target: bucketNode, value: total),
@@ -125,7 +135,9 @@ class BudgetTrackingSankeyChart extends StatelessWidget {
       final byCategory = <String, List<TrackingItem>>{};
       for (final item in items) {
         if (item.realite <= 0) continue;
-        final key = item.category.isEmpty ? 'Sans catégorie' : item.category;
+        final key = item.category.isEmpty
+            ? l10n.budget_sankey_uncategorized
+            : item.category;
         byCategory.putIfAbsent(key, () => []).add(item);
       }
       for (final entry in byCategory.entries) {
@@ -136,9 +148,7 @@ class BudgetTrackingSankeyChart extends StatelessWidget {
           color: color,
         );
         nodes.add(catNode);
-        links.add(
-          SankeyLink(source: bucketNode, target: catNode, value: sum),
-        );
+        links.add(SankeyLink(source: bucketNode, target: catNode, value: sum));
         for (final item in entry.value) {
           final itemNode = SankeyNode(
             label: item.name.isEmpty ? label : item.name,
@@ -156,7 +166,11 @@ class BudgetTrackingSankeyChart extends StatelessWidget {
     void addFlatBucket(String label, List<TrackingItem> items, Color color) {
       final total = _realiteSum(items);
       if (total <= 0) return;
-      final bucketNode = SankeyNode(label: label, column: bucketColumn, color: color);
+      final bucketNode = SankeyNode(
+        label: label,
+        column: bucketColumn,
+        color: color,
+      );
       nodes.add(bucketNode);
       links.add(
         SankeyLink(source: revenusNode, target: bucketNode, value: total),
@@ -178,11 +192,15 @@ class BudgetTrackingSankeyChart extends StatelessWidget {
     // Seules Factures et Dépenses proposent une catégorisation par poste
     // dans Suivi (voir `_CategoryCard`) : les autres branches restent à
     // plat, un poste directement relié à sa catégorie de la page.
-    addCategorizedBucket('Factures', data.factures, _red);
-    addCategorizedBucket('Dépenses', data.depenses, _red);
-    addFlatBucket('Invest/Épargne', data.investEpargnes, accent);
-    addFlatBucket('Projets', data.projets, _red);
-    addFlatBucket('Dettes', data.dettes, _red);
+    addCategorizedBucket(l10n.budget_bucket_factures, data.factures, _red);
+    addCategorizedBucket(l10n.budget_tab_expenses, data.depenses, _red);
+    addFlatBucket(
+      l10n.budget_bucket_invest_epargne,
+      data.investEpargnes,
+      accent,
+    );
+    addFlatBucket(l10n.nav_projects, data.projets, _red);
+    addFlatBucket(l10n.budget_bucket_dettes, data.dettes, _red);
 
     return SankeyDiagram(nodes: nodes, links: links, hidden: hidden);
   }

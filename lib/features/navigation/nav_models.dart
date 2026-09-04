@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import '../../l10n/app_localizations.dart';
 
 class NavItem {
   final String key;
@@ -15,9 +16,14 @@ class NavItem {
 }
 
 class NavGroup {
+  final String key;
   final String label;
   final List<NavItem> items;
-  const NavGroup({required this.label, required this.items});
+  const NavGroup({
+    required this.key,
+    required this.label,
+    required this.items,
+  });
 }
 
 /// Sur desktop, le Dashboard permet déjà de naviguer vers chaque catégorie
@@ -27,6 +33,7 @@ class NavGroup {
 /// cliquables, l'onglet Portfolio continue de les exposer via
 /// [patrimoineCategoryItems].
 const patrimoineGroup = NavGroup(
+  key: 'patrimoine',
   label: 'Patrimoine',
   items: [
     NavItem(
@@ -107,6 +114,7 @@ const patrimoineCategoryItems = [
 /// N'apparaît dans la sidebar (`app_sidebar.dart`) que pour un coffre-fort
 /// de ce type.
 const entitesGroup = NavGroup(
+  key: 'professionnel',
   label: 'Professionnel',
   items: [
     NavItem(key: 'entites', label: 'Entités', icon: LucideIcons.building2),
@@ -114,6 +122,7 @@ const entitesGroup = NavGroup(
 );
 
 const academieGroup = NavGroup(
+  key: 'academie',
   label: 'Académie',
   items: [
     NavItem(
@@ -252,6 +261,7 @@ const academieGroup = NavGroup(
 const portfolioTabItems = patrimoineCategoryItems;
 
 const outilsGroup = NavGroup(
+  key: 'outils',
   label: 'Outils',
   items: [
     NavItem(
@@ -359,4 +369,141 @@ String navLabelForKey(String key) {
     'settings' => 'Réglages',
     _ => '',
   };
+}
+
+/// Libellé localisé d'un item ou d'un groupe de navigation à partir de sa
+/// clé (`NavItem.key` / `NavGroup.key`). Les libellés français restent codés
+/// en dur dans les modèles (`label`) — comme `AcademyLevel.label` — car ce
+/// fichier vit sans `BuildContext` ; la traduction se résout ici, aux seuls
+/// points d'affichage (sidebar, topbar, navigation mobile). Retombe sur
+/// [fallback] (typiquement le libellé français du modèle) pour une clé
+/// inconnue.
+String navLocalizedLabel(
+  AppLocalizations l10n,
+  String key, {
+  String fallback = '',
+}) {
+  return switch (key) {
+    // Groupes.
+    'patrimoine' => l10n.nav_patrimoine,
+    'professionnel' => l10n.nav_professional,
+    'academie' => l10n.nav_academy,
+    'outils' => l10n.nav_tools,
+    // Items de premier niveau.
+    'dashboard' => l10n.nav_dashboard,
+    'analyses' => l10n.nav_analyses,
+    'projets' => l10n.nav_projects,
+    'entites' => l10n.nav_entities,
+    'strategie' => l10n.nav_strategy,
+    'budget' => l10n.nav_budget,
+    'budget_ventilation' => l10n.nav_budget_allocation,
+    'budget_suivi' => l10n.nav_budget_tracking,
+    'simulation' => l10n.nav_simulation,
+    'simulation_patrimoine' => l10n.nav_simulation_wealth,
+    'simulation_immobilier' => l10n.nav_simulation_real_estate,
+    'simulation_taxation' => l10n.nav_simulation_taxation,
+    'simulation_transmission' => l10n.nav_simulation_transmission,
+    'assistant' => l10n.nav_assistant,
+    // Catégories d'actif.
+    'actifs' => l10n.nav_assets,
+    'actifs_actions_fonds' => l10n.nav_assets_actions_funds,
+    'actifs_private_equity' => l10n.nav_assets_private_equity,
+    'actifs_immobilier' => l10n.nav_assets_real_estate,
+    'actifs_crypto' => l10n.nav_assets_crypto,
+    'actifs_metaux_precieux' => l10n.nav_assets_precious_metals,
+    'actifs_epargne' => l10n.nav_assets_savings,
+    'actifs_autres' => l10n.nav_assets_other,
+    // Catégories de passif.
+    'passifs' => l10n.nav_liabilities,
+    'passifs_emprunts' => l10n.nav_liabilities_loans,
+    'passifs_prets_immobiliers' => l10n.nav_liabilities_mortgages,
+    // Académie — Fondamentaux.
+    'investissement' => l10n.nav_investment,
+    'invest_pourquoi' => l10n.nav_invest_why,
+    'invest_inflation' => l10n.nav_invest_inflation,
+    'invest_risque' => l10n.nav_invest_risk,
+    'invest_diversification' => l10n.nav_invest_diversification,
+    'invest_etf' => l10n.nav_invest_etf,
+    'invest_frais' => l10n.nav_invest_fees,
+    'invest_fiscalite' => l10n.nav_invest_taxation,
+    'invest_pyramide' => l10n.nav_invest_pyramid,
+    'invest_allocation' => l10n.nav_invest_allocation,
+    'invest_temps_long' => l10n.nav_invest_long_term,
+    // Académie — Enveloppes.
+    'enveloppes' => l10n.nav_envelopes,
+    'envelope_compte_courant' => l10n.nav_envelope_current_account,
+    'envelope_livret_a' => l10n.nav_envelope_livret_a,
+    'envelope_ldds' => l10n.nav_envelope_ldds,
+    'envelope_lep' => l10n.nav_envelope_lep,
+    'envelope_pel' => l10n.nav_envelope_pel,
+    'envelope_cto' => l10n.nav_envelope_cto,
+    'envelope_pea' => l10n.nav_envelope_pea,
+    'envelope_assurance_vie' => l10n.nav_envelope_life_insurance,
+    'envelope_contrat_capitalisation' =>
+        l10n.nav_envelope_capitalization_contract,
+    'envelope_pee_peg' => l10n.nav_envelope_pee_peg,
+    'envelope_per' => l10n.nav_envelope_per,
+    // Académie — Formation.
+    'formation' => l10n.nav_training,
+    'formation_bourse' => l10n.nav_training_stock_market,
+    'formation_metaux' => l10n.nav_training_precious_metals,
+    'formation_crypto' => l10n.nav_training_crypto,
+    'formation_immobilier' => l10n.nav_training_real_estate,
+    'formation_structuration' => l10n.nav_training_wealth_structuring,
+    // Pages hors sidebar.
+    'settings' => l10n.nav_settings,
+    _ => fallback,
+  };
+}
+
+/// Fil d'Ariane localisé de la page courante : chaque segment du parcours
+/// (parent → sous-page) est traduit via [navLocalizedLabel]. Retourne `['']`
+/// pour une clé inconnue, comme [navBreadcrumbForKey].
+List<String> navLocalizedBreadcrumb(AppLocalizations l10n, String key) {
+  return [
+    for (final k in navBreadcrumbKeysForKey(key)) navLocalizedLabel(l10n, k),
+  ];
+}
+
+/// Clés du fil d'Ariane de la page courante, du parent vers la feuille — la
+/// version "labels" de [navBreadcrumbForKey], pour résoudre la traduction au
+/// point d'affichage.
+List<String> navBreadcrumbKeysForKey(String key) {
+  final navItems = [
+    ...patrimoineGroup.items,
+    ...entitesGroup.items,
+    ...academieGroup.items,
+    ...outilsGroup.items,
+    ...patrimoineCategoryItems,
+  ];
+  for (final item in navItems) {
+    if (item.key == key) return [item.key];
+    for (final child in item.children) {
+      if (child.key == key) return [item.key, child.key];
+    }
+  }
+  return switch (key) {
+    'settings' => ['settings'],
+    _ => [''],
+  };
+}
+
+/// Titre localisé de la page sélectionnée (TopBar desktop). Pour un
+/// sous-item, c'est le libellé du parent qui sert de titre — retombe sur
+/// [navLabelForKey] par clé.
+String navLocalizedTitle(AppLocalizations l10n, String key) {
+  for (final group in [
+    patrimoineGroup,
+    entitesGroup,
+    academieGroup,
+    outilsGroup,
+  ]) {
+    for (final item in group.items) {
+      if (item.key == key) return navLocalizedLabel(l10n, item.key);
+      for (final child in item.children) {
+        if (child.key == key) return navLocalizedLabel(l10n, item.key);
+      }
+    }
+  }
+  return navLocalizedLabel(l10n, key);
 }

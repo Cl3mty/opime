@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/academy/academy_level.dart';
+import '../../../l10n/app_localizations.dart';
 import '../academy_theme.dart';
 
 /// Encadré "à retenir" mis en valeur — l'essentiel d'une carte de
@@ -38,7 +39,9 @@ class AcademyTakeawayBox extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                shadcn.Text('À retenir').semiBold(),
+                shadcn.Text(
+                  AppLocalizations.of(context).academy_takeaway_title,
+                ).semiBold(),
                 shadcn.Text(text),
               ],
             ),

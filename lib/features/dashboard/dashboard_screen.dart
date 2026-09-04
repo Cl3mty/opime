@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import '../../l10n/app_localizations.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../investments/investments_models.dart'
     show AssetClass, InvestmentAccount;
@@ -339,6 +340,7 @@ class _RealDashboardState extends State<_RealDashboard> {
     if (_isEverythingEmpty) {
       return const DashboardOnboardingView();
     }
+    final l10n = AppLocalizations.of(context);
     return AnimatedBuilder(
       animation: widget.amountVisibility,
       builder: (context, _) {
@@ -396,7 +398,7 @@ class _RealDashboardState extends State<_RealDashboard> {
                 const SizedBox(height: 24),
               ],
               CategoryBreakdownCard(
-                title: 'Actifs',
+                title: l10n.dashboard_assets_label,
                 categories: _categoriesByAccount,
                 categoriesByInvestment: _categories,
                 hidden: hidden,
@@ -408,7 +410,7 @@ class _RealDashboardState extends State<_RealDashboard> {
               ),
               const SizedBox(height: 16),
               CategoryBreakdownCard(
-                title: 'Passifs',
+                title: l10n.dashboard_liabilities_label,
                 categories: _passifCategories,
                 hidden: hidden,
                 showPru: false,

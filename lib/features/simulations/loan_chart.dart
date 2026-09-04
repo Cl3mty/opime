@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
+import '../../l10n/app_localizations.dart';
 import 'loan_calculator.dart';
 
 /// Pastille de légende (pastille de couleur + libellé + valeur), utilisée
@@ -90,6 +91,7 @@ class _LoanChartState extends State<LoanChart> {
   @override
   Widget build(BuildContext context) {
     if (widget.years.isEmpty) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -132,6 +134,10 @@ class _LoanChartState extends State<LoanChart> {
                     gridColor: widget.gridColor,
                     hoveredYear: _hoveredYear,
                     hidden: widget.hidden,
+                    todayLabel: l10n.simulations_loan_chart_today,
+                    yearsLabel: l10n.investments_delay_years(
+                      widget.years.length,
+                    ),
                   ),
                 ),
                 if (hovered != null)
@@ -146,7 +152,9 @@ class _LoanChartState extends State<LoanChart> {
                       max(0.0, chartHeight - 180),
                     ),
                     child: ChartTooltip(
-                      title: 'Année ${hovered.year + 1}',
+                      title: l10n.simulations_loan_chart_year_label(
+                        hovered.year + 1,
+                      ),
                       capital: hovered.capital,
                       interest: hovered.interest,
                       insurance: hovered.insurance,
@@ -192,6 +200,7 @@ class ChartTooltip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return IgnorePointer(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -216,15 +225,17 @@ class ChartTooltip extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                shadcn.Text('mensualité moyenne').muted().small(),
+                shadcn.Text(
+                  l10n.simulations_loan_chart_average_monthly_payment,
+                ).muted().small(),
                 const SizedBox(height: 10),
                 const Divider(),
                 const SizedBox(height: 8),
-                _row('Capital', capital, red),
+                _row(l10n.simulations_loan_chart_capital, capital, red),
                 const SizedBox(height: 6),
-                _row('Intérêts', interest, blue),
+                _row(l10n.simulations_loan_chart_interest, interest, blue),
                 const SizedBox(height: 6),
-                _row('Assurance', insurance, gold),
+                _row(l10n.simulations_loan_chart_insurance, insurance, gold),
               ],
             ),
           ),
@@ -261,6 +272,8 @@ class LoanChartPainter extends CustomPainter {
   final Color gridColor;
   final int? hoveredYear;
   final bool hidden;
+  final String todayLabel;
+  final String yearsLabel;
 
   LoanChartPainter({
     required this.years,
@@ -271,6 +284,8 @@ class LoanChartPainter extends CustomPainter {
     required this.gridColor,
     required this.hoveredYear,
     required this.hidden,
+    required this.todayLabel,
+    required this.yearsLabel,
   });
 
   @override
@@ -363,7 +378,7 @@ class LoanChartPainter extends CustomPainter {
 
     _drawXLabel(
       canvas,
-      "Aujourd'hui",
+      todayLabel,
       leftAxisWidth,
       chartHeight,
       textColor,
@@ -371,7 +386,7 @@ class LoanChartPainter extends CustomPainter {
     );
     _drawXLabel(
       canvas,
-      '${years.length} ans',
+      yearsLabel,
       size.width,
       chartHeight,
       textColor,

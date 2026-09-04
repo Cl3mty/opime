@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/core/ui/opime_date_picker.dart';
 import 'package:opime/features/investments/autres_photo_avatar.dart';
 import 'package:opime/features/investments/investments_models.dart';
@@ -47,6 +49,13 @@ void main() {
 
   Widget buildScreen() {
     return ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
       home: Scaffold(
         child: StockAccountScreen(
           vaultPath: tempDir.path,
@@ -1297,6 +1306,13 @@ void main() {
       }
 
       Widget buildRestrictedScreen() => ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
         home: Scaffold(
           child: StockAccountScreen(
             vaultPath: tempDir.path,
@@ -1374,6 +1390,13 @@ void main() {
           await setUpMixedAssuranceVie(tester);
           await tester.pumpWidget(
             ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
               home: Scaffold(
                 child: StockAccountScreen(
                   vaultPath: tempDir.path,
@@ -1402,6 +1425,13 @@ void main() {
           await setUpMixedAssuranceVie(tester);
           await tester.pumpWidget(
             ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
               home: Scaffold(
                 child: StockAccountScreen(
                   vaultPath: tempDir.path,
@@ -1431,6 +1461,13 @@ void main() {
           await setUpMixedAssuranceVie(tester);
           await tester.pumpWidget(
             ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
               home: Scaffold(
                 child: StockAccountScreen(
                   vaultPath: tempDir.path,

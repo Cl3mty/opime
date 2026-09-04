@@ -4,6 +4,7 @@ import '../../core/academy/academy_models.dart';
 import '../../core/academy/academy_progress_controller.dart';
 import '../../core/academy/academy_progress_repository.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 import 'academy_theme.dart';
 import 'widgets/academy_disclaimer.dart';
 import 'widgets/academy_level_badge.dart';
@@ -47,6 +48,7 @@ class _EnvelopeSheetScreenState extends State<EnvelopeSheetScreen> {
   Widget build(BuildContext context) {
     final envelope = widget.envelope;
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final color = envelope.level.color;
 
     return Padding(
@@ -78,18 +80,30 @@ class _EnvelopeSheetScreenState extends State<EnvelopeSheetScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _FactRow(label: 'Plafond', value: envelope.ceiling),
+                      _FactRow(
+                        label: l10n.academy_envelope_ceiling_label,
+                        value: envelope.ceiling,
+                      ),
                       const Divider(),
-                      _FactRow(label: 'Fiscalité', value: envelope.taxation),
+                      _FactRow(
+                        label: l10n.academy_envelope_taxation_label,
+                        value: envelope.taxation,
+                      ),
                       const Divider(),
-                      _FactRow(label: 'Liquidité', value: envelope.liquidity),
+                      _FactRow(
+                        label: l10n.academy_envelope_liquidity_label,
+                        value: envelope.liquidity,
+                      ),
                       const Divider(),
-                      _FactRow(label: 'Idéal pour', value: envelope.idealFor),
+                      _FactRow(
+                        label: l10n.academy_envelope_ideal_for_label,
+                        value: envelope.idealFor,
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
-                shadcn.Text('Bon à savoir').semiBold(),
+                shadcn.Text(l10n.academy_envelope_good_to_know_title).semiBold(),
                 const SizedBox(height: 10),
                 for (final point in envelope.goodToKnow)
                   Padding(
@@ -134,9 +148,11 @@ class _EnvelopeSheetScreenState extends State<EnvelopeSheetScreen> {
                           TextSpan(
                             style: DefaultTextStyle.of(context).style,
                             children: [
-                              const TextSpan(
-                                text: 'Piège à éviter — ',
-                                style: TextStyle(fontWeight: FontWeight.w700),
+                              TextSpan(
+                                text: l10n.academy_envelope_pitfall_label,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               TextSpan(text: envelope.pitfall),
                             ],

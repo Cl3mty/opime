@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'update_checker.dart';
 
 class UpdateBanner extends StatefulWidget {
@@ -66,6 +67,7 @@ class _UpdateBannerState extends State<UpdateBanner> {
   Widget build(BuildContext context) {
     if (_update == null || _dismissed) return widget.child;
     final accent = Theme.of(context).colorScheme.primary;
+    final l10n = AppLocalizations.of(context);
 
     return Column(
       children: [
@@ -78,27 +80,15 @@ class _UpdateBannerState extends State<UpdateBanner> {
               Icon(LucideIcons.sparkles, size: 16, color: accent),
               const SizedBox(width: 8),
               Expanded(
-                child: shadcn.Text.rich(
-                  TextSpan(
-                    style: DefaultTextStyle.of(context).style,
-                    children: [
-                      const TextSpan(
-                        text: 'Une nouvelle version d\'Opime est disponible (',
-                      ),
-                      TextSpan(
-                        text: _update!.latestVersion,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const TextSpan(text: ').'),
-                    ],
-                  ),
+                child: shadcn.Text(
+                  l10n.updates_banner_new_version(_update!.latestVersion),
                 ),
               ),
               PrimaryButton(
                 size: ButtonSize.small,
                 onPressed: _download,
                 leading: const Icon(LucideIcons.download, size: 14),
-                child: const shadcn.Text('Télécharger et installer'),
+                child: shadcn.Text(l10n.settings_download_install),
               ),
               const SizedBox(width: 8),
               IconButton.ghost(

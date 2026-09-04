@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../l10n/app_localizations.dart';
 import 'investments_models.dart';
 
 /// Champ "identifiant" d'un nouvel investissement, à la création : une
@@ -42,6 +43,7 @@ class InvestmentIdentifierField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final options =
         this.options ??
         identifierOptionsFor(
@@ -62,13 +64,13 @@ class InvestmentIdentifierField extends StatelessWidget {
         // `_commitCreateInvestment`, qui en génère un si laissé vide.
         placeholder: shadcn.Text(
           assetClass == AssetClass.autres
-              ? 'Référence (optionnelle : numéro de série, référence...)'
+              ? l10n.investments_identifier_reference_hint
               : assetClass == AssetClass.privateEquity
-              ? 'Identifiant (optionnel : laisse vide si le fonds n\'en a pas)'
+              ? l10n.investments_identifier_optional_hint
               : assetClass == AssetClass.actionsEtFonds &&
                     isinOptionalFor(assetClass, accountEnvelope: accountEnvelope)
-              ? 'ISIN (optionnel : laisse vide si le fonds n\'en a pas)'
-              : 'Identifiant (ISIN, ou libre : adresse, référence...)',
+              ? l10n.investments_identifier_isin_optional_hint
+              : l10n.investments_identifier_generic_hint,
         ),
         autofocus: autofocus,
       );
@@ -97,7 +99,7 @@ class InvestmentIdentifierField extends StatelessWidget {
           isinController.text = selected;
           if (labelController.text.isEmpty) labelController.text = selected;
         },
-        placeholder: const shadcn.Text('Choisir...'),
+        placeholder: shadcn.Text(l10n.investments_identifier_choose_placeholder),
       ),
     );
   }

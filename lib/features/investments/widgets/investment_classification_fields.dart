@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
 import '../../../core/money_format.dart' show parseDecimal;
 import '../investments_models.dart';
 
@@ -35,6 +36,7 @@ class InvestmentClassificationFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -48,7 +50,7 @@ class InvestmentClassificationFields extends StatelessWidget {
                 children: [
                   Select<Sector>(
                     value: sector,
-                    placeholder: const shadcn.Text('Secteur'),
+                    placeholder: shadcn.Text(l10n.investments_sector_placeholder),
                     onChanged: (value) {
                       if (value != null) onSectorChanged(value);
                     },
@@ -88,7 +90,7 @@ class InvestmentClassificationFields extends StatelessWidget {
                 children: [
                   Select<String>(
                     value: countryCode,
-                    placeholder: const shadcn.Text('Pays'),
+                    placeholder: shadcn.Text(l10n.investments_country_placeholder),
                     onChanged: (value) {
                       if (value != null) onCountryCodeChanged(value);
                     },
@@ -163,6 +165,7 @@ class _WeightEditorHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -172,7 +175,7 @@ class _WeightEditorHeader extends StatelessWidget {
           children: [
             Button.text(
               onPressed: onRevertToSingle,
-              child: const shadcn.Text('Revenir à une seule valeur').xSmall(),
+              child: shadcn.Text(l10n.investments_revert_to_single_value_label).xSmall(),
             ),
             IconButton.ghost(
               key: ValueKey('add_weight_$title'),
@@ -199,11 +202,12 @@ class _SectorWeightEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _WeightEditorHeader(
-          title: 'Répartition par secteur',
+          title: l10n.investments_sector_breakdown_title,
           onAdd: () => onChanged([
             ...weights,
             SectorWeight(sector: Sector.values.first, percent: 0),
@@ -288,11 +292,12 @@ class _CountryWeightEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _WeightEditorHeader(
-          title: 'Répartition par pays',
+          title: l10n.investments_country_breakdown_title,
           onAdd: () => onChanged([
             ...weights,
             CountryWeight(countryCode: 'US', percent: 0),

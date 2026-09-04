@@ -5,6 +5,7 @@ import '../../core/money_format.dart' show displayEuros;
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/load_error_view.dart';
+import '../../l10n/app_localizations.dart';
 import '../investments/account_detail_screen.dart';
 import '../investments/investment_detail_screen.dart';
 import '../investments/investments_models.dart';
@@ -159,12 +160,11 @@ class _EntityDetailScreenState extends State<EntityDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_loadError) {
       return LoadErrorView(
-        message:
-            'Impossible de charger les comptes de cette entité. Vérifiez '
-            'que le dossier Coffre-fort est accessible.',
+        message: l10n.entities_detail_load_error,
         onRetry: _load,
       );
     }
@@ -231,9 +231,15 @@ class _EntityDetailScreenState extends State<EntityDetailScreen> {
           shadcn.Text(widget.entity.name).x2Large().bold(),
           const SizedBox(height: 4),
           shadcn.Text(
-            '${widget.entity.type.label} · '
-            '${_formatPercent(widget.entity.ownershipPercent)} % détenu'
-            '${widget.entity.parentEntityId != null ? ' par sa société mère' : ' par vous'}',
+            widget.entity.parentEntityId != null
+                ? l10n.entities_ownership_by_parent(
+                    widget.entity.type.label,
+                    _formatPercent(widget.entity.ownershipPercent),
+                  )
+                : l10n.entities_ownership_by_user(
+                    widget.entity.type.label,
+                    _formatPercent(widget.entity.ownershipPercent),
+                  ),
           ).muted().small(),
           const SizedBox(height: 16),
           FrostedCard(
@@ -242,7 +248,7 @@ class _EntityDetailScreenState extends State<EntityDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  shadcn.Text('Valeur nette').muted().small(),
+                  shadcn.Text(l10n.entities_net_value_label).muted().small(),
                   const SizedBox(height: 4),
                   shadcn.Text(displayEuros(netValue, hidden)).x2Large().bold(),
                 ],
@@ -250,12 +256,11 @@ class _EntityDetailScreenState extends State<EntityDetailScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          shadcn.Text('Comptes').large().medium(),
+          shadcn.Text(l10n.entities_accounts_section_title).large().medium(),
           const SizedBox(height: 8),
           if (_accounts.isEmpty)
             shadcn.Text(
-              'Aucun compte pour l\'instant — utilise "Compléter mon '
-              'patrimoine" en choisissant cette entité.',
+              l10n.entities_no_accounts_yet,
             ).muted().small()
           else
             for (final a in _accounts) ...[
@@ -267,10 +272,12 @@ class _EntityDetailScreenState extends State<EntityDetailScreen> {
               const SizedBox(height: 8),
             ],
           const SizedBox(height: 24),
-          shadcn.Text('Passifs').large().medium(),
+          shadcn.Text(
+            l10n.entities_liabilities_section_title,
+          ).large().medium(),
           const SizedBox(height: 8),
           if (_liabilities.isEmpty)
-            shadcn.Text('Aucun passif pour l\'instant.').muted().small()
+            shadcn.Text(l10n.entities_no_liabilities_yet).muted().small()
           else
             for (final l in _liabilities) ...[
               _EntityLiabilityRow(

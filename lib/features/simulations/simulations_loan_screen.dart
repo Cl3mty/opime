@@ -6,6 +6,7 @@ import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/toggle_button_style.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 import 'loan_calculator.dart';
 import 'loan_chart.dart';
 
@@ -241,10 +242,11 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
   // ---------------------------------------------------------------------
 
   Widget _buildInputsContent() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        shadcn.Text('Type de crédit').muted().small(),
+        shadcn.Text(l10n.simulations_loan_type_label).muted().small(),
         const SizedBox(height: 8),
         ButtonGroup(
           children: [
@@ -253,20 +255,20 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
               onChanged: (_) => _update(() => _type = LoanType.amortissable),
               selectedStyle: const ButtonStyle.primary(),
               style: toggleUnselectedStyle(context),
-              child: const shadcn.Text('Amortissable'),
+              child: shadcn.Text(l10n.simulations_loan_type_amortizing),
             ),
             SelectedButton(
               value: _type == LoanType.inFine,
               onChanged: (_) => _update(() => _type = LoanType.inFine),
               selectedStyle: const ButtonStyle.primary(),
               style: toggleUnselectedStyle(context),
-              child: const shadcn.Text('In fine'),
+              child: shadcn.Text(l10n.simulations_loan_type_infine),
             ),
           ],
         ),
         const SizedBox(height: 20),
         _NumberField(
-          label: 'Montant du projet',
+          label: l10n.simulations_loan_project_amount_label,
           suffix: '€',
           value: _montantProjet,
           step: 1000,
@@ -274,7 +276,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
         ),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Apport',
+          label: l10n.simulations_loan_down_payment_label,
           suffix: '€',
           value: _apport,
           step: 1000,
@@ -282,12 +284,14 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
         ),
         const SizedBox(height: 4),
         shadcn.Text(
-          'Montant emprunté (dérivé) : ${displayEuros(_montantEmprunteDerive, widget.amountVisibility.hidden)}',
+          l10n.simulations_loan_derived_borrowed_amount(
+            displayEuros(_montantEmprunteDerive, widget.amountVisibility.hidden),
+          ),
         ).muted().small(),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Durée de remboursement',
-          suffix: 'ans',
+          label: l10n.simulations_loan_repayment_duration_label,
+          suffix: l10n.simulations_loan_suffix_years,
           value: _dureeAnnees.toDouble(),
           step: 1,
           decimals: 0,
@@ -300,7 +304,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
           children: [
             Expanded(
               child: _NumberField(
-                label: "Taux d'intérêt",
+                label: l10n.simulations_loan_interest_rate_label,
                 suffix: '%',
                 value: _tauxInteret,
                 step: 0.1,
@@ -311,8 +315,8 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: "Assurance mensuelle",
-                suffix: '€/mois',
+                label: l10n.simulations_loan_monthly_insurance_label,
+                suffix: l10n.simulations_loan_suffix_eur_per_month,
                 value: _assuranceMensuelle,
                 step: 5,
                 decimals: 2,
@@ -327,7 +331,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
           children: [
             Expanded(
               child: _NumberField(
-                label: 'Frais de dossier',
+                label: l10n.simulations_loan_application_fees_label,
                 suffix: '€',
                 value: _fraisDossier,
                 step: 50,
@@ -338,7 +342,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: 'Frais de garantie',
+                label: l10n.simulations_loan_guarantee_fees_label,
                 suffix: '€',
                 value: _fraisGarantie,
                 step: 50,
@@ -356,7 +360,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
             children: [
               Expanded(
                 child: shadcn.Text(
-                  'Différé de remboursement',
+                  l10n.simulations_loan_deferral_label,
                 ).semiBold().small(),
               ),
               _SimpleSwitch(
@@ -375,7 +379,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
                       _update(() => _typeDiffere = DeferType.partielle),
                   selectedStyle: const ButtonStyle.primary(),
                   style: toggleUnselectedStyle(context),
-                  child: const shadcn.Text('Franchise partielle'),
+                  child: shadcn.Text(l10n.simulations_loan_deferral_partial),
                 ),
                 SelectedButton(
                   value: _typeDiffere == DeferType.totale,
@@ -383,20 +387,20 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
                       _update(() => _typeDiffere = DeferType.totale),
                   selectedStyle: const ButtonStyle.primary(),
                   style: toggleUnselectedStyle(context),
-                  child: const shadcn.Text('Franchise totale'),
+                  child: shadcn.Text(l10n.simulations_loan_deferral_total),
                 ),
               ],
             ),
             const SizedBox(height: 4),
             shadcn.Text(
               _typeDiffere == DeferType.partielle
-                  ? "Seuls les intérêts sont payés pendant le différé, le capital ne bouge pas."
-                  : "Aucun paiement pendant le différé, les intérêts s'ajoutent au capital restant dû.",
+                  ? l10n.simulations_loan_deferral_partial_explanation
+                  : l10n.simulations_loan_deferral_total_explanation,
             ).muted().small(),
             const SizedBox(height: 12),
             _NumberField(
-              label: 'Durée du différé',
-              suffix: 'mois',
+              label: l10n.simulations_loan_deferral_duration_label,
+              suffix: l10n.simulations_loan_suffix_months,
               value: _dureeDiffereMois.toDouble(),
               step: 1,
               decimals: 0,
@@ -413,7 +417,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
         OutlineButton(
           onPressed: _resetState,
           leading: const Icon(LucideIcons.refreshCw),
-          child: const shadcn.Text('Réinitialiser les paramètres'),
+          child: shadcn.Text(l10n.simulations_loan_reset_parameters),
         ),
       ],
     );
@@ -424,13 +428,14 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
   // ---------------------------------------------------------------------
 
   Widget _buildResultsContent(LoanResult result, bool hidden) {
+    final l10n = AppLocalizations.of(context);
     final accent = Theme.of(context).colorScheme.primary;
     final red = const Color(0xFFE07A6B);
     final blue = const Color(0xFF7B8FE8);
 
     return Column(
       children: [
-        shadcn.Text('Mensualités').muted(),
+        shadcn.Text(l10n.simulations_loan_monthly_payments_label).muted(),
         const SizedBox(height: 8),
         shadcn.Text(
           displayEuros(result.mensualite, hidden),
@@ -441,9 +446,10 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
           TextSpan(
             style: DefaultTextStyle.of(context).style,
             children: [
-              const TextSpan(text: 'Dont assurance '),
+              TextSpan(text: '${l10n.simulations_loan_including_insurance} '),
               TextSpan(
-                text: '${displayEuros(result.assuranceMensuelle, hidden)}/mois',
+                text:
+                    '${displayEuros(result.assuranceMensuelle, hidden)}/${l10n.simulations_loan_per_month_suffix}',
                 style: TextStyle(color: accent, fontWeight: FontWeight.bold),
               ),
             ],
@@ -452,25 +458,32 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
         if (result.mensualiteDifferee != null) ...[
           const SizedBox(height: 2),
           shadcn.Text(
-            'Pendant le différé : ${displayEuros(result.mensualiteDifferee!, hidden)}/mois',
+            l10n.simulations_loan_during_deferral_monthly_payment(
+              displayEuros(result.mensualiteDifferee!, hidden),
+            ),
           ).muted().small(),
         ],
         if (result.capitalRembourseInFine != null) ...[
           const SizedBox(height: 2),
           shadcn.Text(
-            'Capital remboursé en une fois à l\'échéance : ${displayEuros(result.capitalRembourseInFine!, hidden)}',
+            l10n.simulations_loan_capital_repaid_at_maturity(
+              displayEuros(result.capitalRembourseInFine!, hidden),
+            ),
           ).muted().small(),
         ],
         const SizedBox(height: 20),
         _LoanCostStats(
           items: [
             (
-              'Coût total du crédit',
+              l10n.simulations_loan_total_credit_cost_label,
               displayEuros(result.coutTotalCredit, hidden),
             ),
-            ('Dont assurance', displayEuros(result.totalAssurance, hidden)),
             (
-              'Coût total (frais inclus)',
+              l10n.simulations_loan_including_insurance,
+              displayEuros(result.totalAssurance, hidden),
+            ),
+            (
+              l10n.simulations_loan_total_cost_incl_fees_label,
               displayEuros(result.coutTotalAvecFrais, hidden),
             ),
           ],
@@ -483,12 +496,12 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
           children: [
             LegendPill(
               color: red,
-              label: 'Capital',
+              label: l10n.simulations_loan_chart_capital,
               value: displayEuros(result.montantEmprunte, hidden),
             ),
             LegendPill(
               color: blue,
-              label: 'Intérêts',
+              label: l10n.simulations_loan_chart_interest,
               value: displayEuros(
                 result.coutTotalCredit - result.totalAssurance,
                 hidden,
@@ -496,7 +509,7 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
             ),
             LegendPill(
               color: accent,
-              label: 'Assurance',
+              label: l10n.simulations_loan_chart_insurance,
               value: displayEuros(result.totalAssurance, hidden),
             ),
           ],
@@ -522,17 +535,17 @@ class _LoanSimulationScreenState extends State<LoanSimulationScreen> {
           TextSpan(
             style: DefaultTextStyle.of(context).style,
             children: [
-              const TextSpan(text: 'Pour un emprunt de '),
+              TextSpan(text: l10n.simulations_loan_summary_prefix),
               TextSpan(
                 text: displayEuros(result.montantEmprunte, hidden),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              const TextSpan(text: ' sur '),
+              TextSpan(text: l10n.simulations_loan_summary_over),
               TextSpan(
-                text: '$_dureeAnnees ans',
+                text: l10n.investments_delay_years(_dureeAnnees),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              const TextSpan(text: ', votre mensualité s\'élève à '),
+              TextSpan(text: l10n.simulations_loan_summary_monthly_payment_is),
               TextSpan(
                 text: displayEuros(result.mensualite, hidden),
                 style: TextStyle(fontWeight: FontWeight.bold, color: accent),
@@ -605,6 +618,7 @@ class _LoanDisclaimer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final muted = Theme.of(context).colorScheme.mutedForeground;
     return Container(
       padding: const EdgeInsets.all(14),
@@ -619,9 +633,7 @@ class _LoanDisclaimer extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: shadcn.Text(
-              "Simulation de prêt indicative: les résultats reposent sur des hypothèses simplifiées "
-              "(taux constants, assurance linéaire, frais fixes). Les conditions bancaires réelles, "
-              "garanties et clauses contractuelles peuvent modifier le coût total du crédit.",
+              l10n.simulations_loan_disclaimer,
             ).muted().small(),
           ),
         ],

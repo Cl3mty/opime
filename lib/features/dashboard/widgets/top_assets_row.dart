@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
+import '../../../l10n/app_localizations.dart';
 import '../patrimoine_models.dart';
 import 'patrimoine_chart_widgets.dart' show ExtremePercentLabel;
 
@@ -45,6 +46,7 @@ class TopAssetsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // Performances nulles (rien d'investi ni détenu en début de période)
     // reléguées en fin de liste plutôt que de perturber le tri.
     final sorted = [...assets]
@@ -60,7 +62,7 @@ class TopAssetsRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const shadcn.Text('Mes meilleures performances').large().medium(),
+        shadcn.Text(l10n.dashboard_top_assets_title).large().medium(),
         const SizedBox(height: 12),
         SizedBox(
           height: 116,

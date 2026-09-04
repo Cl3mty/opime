@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../l10n/app_localizations.dart';
 import 'price_sync_status_controller.dart';
 
 /// Bandeau global affiché quand [controller] signale une coupure réseau
@@ -51,6 +52,7 @@ class _PriceSyncBannerState extends State<PriceSyncBanner> {
   @override
   Widget build(BuildContext context) {
     if (!widget.controller.offline) return widget.child;
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     // Même correctif que `FrostedCard` : un aplat de couleur à alpha fixe
     // se voit beaucoup moins sur un fond clair que sur un fond sombre — le
@@ -82,8 +84,7 @@ class _PriceSyncBannerState extends State<PriceSyncBanner> {
               const SizedBox(width: 8),
               Expanded(
                 child: shadcn.Text(
-                  'Impossible de mettre à jour les cours et les '
-                  'performances : vérifie ta connexion internet.',
+                  l10n.investments_price_sync_offline_message,
                   style: TextStyle(color: textColor),
                 ).small(),
               ),

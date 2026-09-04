@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart' show formatEuros, parseDecimal;
+import '../../l10n/app_localizations.dart';
 import 'currency_data.dart';
 import 'currency_format.dart';
 import 'investments_models.dart';
@@ -235,6 +236,7 @@ class TransactionFxRateArea extends StatelessWidget {
       ),
       builder: (context, _) {
         if (!controller.isForeign) return const SizedBox.shrink();
+        final l10n = AppLocalizations.of(context);
         return Padding(
           padding: const EdgeInsets.only(top: 8),
           child: Column(
@@ -250,7 +252,7 @@ class TransactionFxRateArea extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     const SizedBox(width: 6),
-                    shadcn.Text('Recherche du taux de change…')
+                    shadcn.Text(l10n.investments_fx_rate_searching)
                         .muted()
                         .xSmall(),
                   ],
@@ -262,7 +264,9 @@ class TransactionFxRateArea extends StatelessWidget {
                       child: TextField(
                         controller: controller.manualController,
                         placeholder: shadcn.Text(
-                          'Taux de change (1 ${controller.currency} en €)',
+                          l10n.investments_fx_rate_manual_hint(
+                            controller.currency,
+                          ),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
@@ -275,7 +279,9 @@ class TransactionFxRateArea extends StatelessWidget {
                       const SizedBox(width: 8),
                       GhostButton(
                         onPressed: controller.enableAuto,
-                        child: const shadcn.Text('Automatique'),
+                        child: shadcn.Text(
+                          l10n.investments_fx_rate_automatic_button,
+                        ),
                       ),
                     ],
                   ],
@@ -284,13 +290,15 @@ class TransactionFxRateArea extends StatelessWidget {
                 Row(
                   children: [
                     shadcn.Text(
-                      '1 ${controller.currency} ≈ '
-                      '${formatFxRate(controller.fxRateToEur!)} €',
+                      l10n.investments_fx_rate_display(
+                        controller.currency,
+                        formatFxRate(controller.fxRateToEur!),
+                      ),
                     ).muted().xSmall(),
                     const SizedBox(width: 8),
                     GhostButton(
                       onPressed: controller.enableManual,
-                      child: const shadcn.Text('Taux manuel'),
+                      child: shadcn.Text(l10n.investments_fx_rate_manual_button),
                     ),
                   ],
                 ),
@@ -299,7 +307,7 @@ class TransactionFxRateArea extends StatelessWidget {
               // sont renseignés — pour confirmer d'un coup d'œil la
               // conversion au moment de la saisie.
               if (!controller.fxLoading && controller.resolvedRate != null)
-                ..._amountHintWidgets(),
+                ..._amountHintWidgets(l10n),
             ],
           ),
         );
@@ -307,7 +315,7 @@ class TransactionFxRateArea extends StatelessWidget {
     );
   }
 
-  List<Widget> _amountHintWidgets() {
+  List<Widget> _amountHintWidgets(AppLocalizations l10n) {
     final quantity = parseDecimal(quantityController.text);
     final price = parseDecimal(priceController.text);
     final rate = controller.resolvedRate;
@@ -318,7 +326,9 @@ class TransactionFxRateArea extends StatelessWidget {
     final amount = quantity * price * rate;
     return [
       const SizedBox(height: 6),
-      shadcn.Text('Montant ≈ ${formatEuros(amount)}').muted().xSmall(),
+      shadcn.Text(
+        l10n.investments_fx_converted_amount(formatEuros(amount)),
+      ).muted().xSmall(),
     ];
   }
 }

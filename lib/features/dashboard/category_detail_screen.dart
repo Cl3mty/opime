@@ -9,6 +9,7 @@ import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/asset_table_header_cell.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/performance_amount.dart';
+import '../../l10n/app_localizations.dart';
 import '../investments/autres_photo_repository.dart';
 import '../investments/bank_logo_avatar.dart';
 import '../investments/bank_logo_repository.dart';
@@ -131,8 +132,10 @@ class CategoryDetailScreen extends StatefulWidget {
 
   /// Titre du tableau des comptes de la catégorie — "Actifs" par défaut,
   /// "Passifs" pour les catégories de crédits/emprunts (voir
-  /// `RealPassifDetailScreen`).
-  final String accountsCardTitle;
+  /// `RealPassifDetailScreen`). `null` retombe sur le libellé localisé
+  /// "Actifs"/"Assets" — un défaut littéral figé en français n'aurait pas
+  /// suivi le changement de langue de l'app.
+  final String? accountsCardTitle;
 
   /// `true` (défaut) affiche le "(±X %)" à côté du montant absolu sous le
   /// graphique (voir [PeriodChangeRow]). `false` pour `RealPassifDetailScreen`,
@@ -186,7 +189,7 @@ class CategoryDetailScreen extends StatefulWidget {
     this.historyByLineIdForPeriod,
     this.historyForPeriod,
     this.showAvatar = true,
-    this.accountsCardTitle = 'Actifs',
+    this.accountsCardTitle,
     this.showChangePercent = true,
     this.onAccountEdit,
     this.onAccountDelete,
@@ -337,6 +340,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     return AnimatedBuilder(
       animation: widget.amountVisibility,
       builder: (context, _) {
+        final l10n = AppLocalizations.of(context);
         final hidden = widget.amountVisibility.hidden;
         final category = widget.category;
         final period = DashboardPeriod.values[_periodIndex];
@@ -480,7 +484,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 hidden: hidden,
                 onAccountTap: widget.onAccountTap,
                 showAvatar: widget.showAvatar,
-                title: widget.accountsCardTitle,
+                title: widget.accountsCardTitle ?? l10n.dashboard_assets_title,
                 onAccountEdit: widget.onAccountEdit,
                 onAccountDelete: widget.onAccountDelete,
                 onAccountOpen: widget.onAccountOpen,
@@ -715,7 +719,9 @@ class _CategoryAllocationCardState extends State<_CategoryAllocationCard> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final narrow = constraints.maxWidth < 420;
-                final title = shadcn.Text('Allocation').semiBold().large();
+                final title = shadcn.Text(
+                  AppLocalizations.of(context).dashboard_allocation_title,
+                ).semiBold().large();
                 final controls = Wrap(
                   spacing: 8,
                   runSpacing: 8,

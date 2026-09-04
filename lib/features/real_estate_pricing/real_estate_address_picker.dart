@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
+import '../../l10n/app_localizations.dart';
 import 'ban_client.dart';
 
 /// Adresse retenue par [RealEstateAddressPickerController] — sous-ensemble
@@ -156,6 +157,7 @@ class RealEstateAddressSearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -164,7 +166,9 @@ class RealEstateAddressSearchField extends StatelessWidget {
           children: [
             TextField(
               controller: controller.textController,
-              placeholder: const shadcn.Text('Rechercher une adresse...'),
+              placeholder: shadcn.Text(
+                l10n.real_estate_pricing_address_search_placeholder,
+              ),
               onChanged: controller.onQueryChanged,
               features: [
                 InputFeature.leading(

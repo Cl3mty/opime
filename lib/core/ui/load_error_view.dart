@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
 
 /// État d'erreur générique pour un écran dont le chargement initial a
 /// échoué ou dépassé son délai (ex : dossier Vault lent ou inaccessible
@@ -18,6 +19,7 @@ class LoadErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -35,7 +37,7 @@ class LoadErrorView extends StatelessWidget {
             OutlineButton(
               onPressed: onRetry,
               leading: const Icon(LucideIcons.refreshCw),
-              child: const shadcn.Text('Réessayer'),
+              child: shadcn.Text(l10n.common_retry),
             ),
           ],
         ),

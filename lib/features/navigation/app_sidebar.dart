@@ -5,6 +5,7 @@ import '../../core/platform_info.dart';
 import '../../core/profiles/profile_controller.dart';
 import '../../core/profiles/sidebar_prefs_controller.dart';
 import '../../core/storage/vault_folder_service.dart';
+import '../../l10n/app_localizations.dart';
 import 'account_switcher_menu.dart';
 import 'nav_models.dart';
 
@@ -87,7 +88,9 @@ class AppSidebar extends StatelessWidget {
 
   Widget _buildItem(BuildContext context, NavItem item) {
     final theme = Theme.of(context);
-    final label = shadcn.Text(item.label);
+    final l10n = AppLocalizations.of(context);
+    final itemLabel = navLocalizedLabel(l10n, item.key, fallback: item.label);
+    final label = shadcn.Text(itemLabel);
     // Badge « réponses non lues » sur l'item Assistant : une pastille
     // numérique dans la version étendue, une simple pastille pleine dans la
     // version réduite (le libellé n'y est pas affiché, l'icône non plus si
@@ -116,7 +119,7 @@ class AppSidebar extends StatelessWidget {
         : Icon(item.icon);
 
     return _withTooltip(
-      item.label,
+      itemLabel,
       NavigationItem(
         label: Row(
           mainAxisSize: MainAxisSize.min,
@@ -146,9 +149,14 @@ class AppSidebar extends StatelessWidget {
   }
 
   Widget _buildGroup(BuildContext context, NavGroup group, Set<String> hiddenKeys) {
+    final l10n = AppLocalizations.of(context);
     return NavigationGroup(
       labelAlignment: Alignment.centerLeft,
-      label: shadcn.Text(group.label).semiBold.muted.xSmall,
+      label: shadcn
+          .Text(navLocalizedLabel(l10n, group.key, fallback: group.label))
+          .semiBold
+          .muted
+          .xSmall,
       children: [
         for (final item in group.items)
           if (item.children.isEmpty)
@@ -166,6 +174,8 @@ class AppSidebar extends StatelessWidget {
     NavItem item,
     Set<String> hiddenKeys,
   ) {
+    final l10n = AppLocalizations.of(context);
+    final itemLabel = navLocalizedLabel(l10n, item.key, fallback: item.label);
     final visibleChildren = item.children
         .where((c) => !hiddenKeys.contains(c.key))
         .toList();
@@ -181,10 +191,10 @@ class AppSidebar extends StatelessWidget {
     }
 
     return _withTooltip(
-      item.label,
+      itemLabel,
       NavigationCollapsible(
         leading: Icon(item.icon),
-        label: shadcn.Text(item.label),
+        label: shadcn.Text(itemLabel),
         children: [for (final child in visibleChildren) _buildItem(context, child)],
       ),
     );
@@ -194,6 +204,7 @@ class AppSidebar extends StatelessWidget {
     BuildContext anchorContext,
     List<NavItem> children,
   ) {
+    final l10n = AppLocalizations.of(anchorContext);
     showOverlay(
       anchorContext,
       PopoverConfiguration(
@@ -209,7 +220,11 @@ class AppSidebar extends StatelessWidget {
               for (final child in children)
                 Tooltip(
                   // ignore: implicit_call_tearoffs
-                  tooltip: TooltipContainer(child: shadcn.Text(child.label)),
+                  tooltip: TooltipContainer(
+                    child: shadcn.Text(
+                      navLocalizedLabel(l10n, child.key, fallback: child.label),
+                    ),
+                  ),
                   child: IconButton(
                     key: ValueKey('nav_flyout_item_${child.key}'),
                     icon: Icon(child.icon),
@@ -245,8 +260,9 @@ class AppSidebar extends StatelessWidget {
     List<NavItem> visibleChildren,
   ) {
     final isChildSelected = visibleChildren.any((c) => c.key == selectedKey);
+    final l10n = AppLocalizations.of(context);
     return _withTooltip(
-      item.label,
+      navLocalizedLabel(l10n, item.key, fallback: item.label),
       Builder(
         key: ValueKey('nav_parent_flyout_trigger_${item.key}'),
         builder: (anchorContext) => NavigationItem(
@@ -265,6 +281,7 @@ class AppSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return AnimatedBuilder(
       animation: Listenable.merge([
         profileController,
@@ -291,7 +308,7 @@ class AppSidebar extends StatelessWidget {
           expanded: !collapsed,
           header: [
             _withTooltip(
-              collapsed ? 'Étendre' : 'Réduire',
+              collapsed ? l10n.sidebar_expand : l10n.sidebar_collapse,
               NavigationSlot(
                 leading: SizedBox(
                   width: 35,
@@ -316,7 +333,9 @@ class AppSidebar extends StatelessWidget {
           ],
           footer: [
             _withTooltip(
-              active != null ? '${active.name} — changer de compte' : 'Comptes',
+              active != null
+                  ? '${active.name} — ${l10n.sidebar_switch_account}'
+                  : l10n.sidebar_accounts,
               Builder(
                 builder: (slotContext) {
                   final slot = NavigationSlot(
@@ -325,11 +344,13 @@ class AppSidebar extends StatelessWidget {
                       active?.initials ?? '?',
                       32,
                     ),
-                    title: shadcn.Text(active?.name ?? 'Compte').medium.small,
+                    title: shadcn.Text(
+                      active?.name ?? l10n.sidebar_account,
+                    ).medium.small,
                     subtitle: shadcn.Text(
                       active?.relationship.isNotEmpty == true
                           ? active!.relationship
-                          : 'Compte',
+                          : l10n.sidebar_account,
                     ).xSmall.normal,
                     trailing: const Icon(LucideIcons.chevronsUpDown).iconSmall,
                     onPressed: () => _openAccountSwitcher(slotContext),
@@ -371,13 +392,18 @@ class AppSidebar extends StatelessWidget {
               context,
               isDesktopPlatform
                   ? NavGroup(
+                      key: outilsGroup.key,
                       label: outilsGroup.label,
                       items: [
                         for (final item in outilsGroup.items)
                           if (assistantEnabled || item.key != 'assistant') item,
                       ],
                     )
-                  : NavGroup(label: outilsGroup.label, items: toolsTabItems),
+                  : NavGroup(
+                      key: outilsGroup.key,
+                      label: outilsGroup.label,
+                      items: toolsTabItems,
+                    ),
               hiddenKeys,
             ),
           ],

@@ -55,6 +55,20 @@ The UI is in French and domain code mirrors French financial terminology directl
 
 `lib/features/simulations/` covers four areas, each with real calculation logic (not placeholders), each persisted via `SimulationStateRepository`, each wired into `nav_models.dart`/`main.dart`'s `pages` map, and each covered by unit tests on its pure calculator functions: wealth/patrimoine (`simulations_wealth_screen.dart` — deterministic + Monte Carlo projections), real estate (`simulations_real_estate_screen.dart`, itself three tabs: estimation, credit-scoring, and loan/`simulations_loan_screen.dart` — the loan tab has no nav entry of its own by design, it lives under "Immobilier"), taxation (`simulations_taxation_screen.dart` — IFI + IR/quotient familial), and transmission (`simulations_transmission_screen.dart` — démembrement/donation/inheritance per CGI barèmes). Only the calculator logic has test coverage; the screens themselves (state persistence across tab switches, form validation) don't have widget tests.
 
+## i18n translation progress (in-progress, this session)
+
+English translation via flutter_localizations/ARB is underway (`l10n.yaml`,
+`lib/l10n/app_fr.arb`/`app_en.arb`, `LocaleController`). Done and verified:
+academy widgets (4 files), analyses charts, dashboard onboarding/allocation,
+most of `investments/` (account details, transactions, arbitrage,
+identifiers, re-estimation, price sync, FX rates), `liability_detail_view
+.dart`, `app_sidebar.dart`. Known test-harness gotcha (fixed centrally):
+`ShadcnApp` test wrappers need both `shadcnLocalizationsFrDelegate` (from
+`core/ui/shadcn_localizations_fr.dart`) AND `AppLocalizations
+.localizationsDelegates` — omitting either throws at pump time. Formation
+track lesson content (`academy/formation_data.dart`) stays French per
+explicit decision — never translate it.
+
 ## Known repo quirks
 
 - A Codex CLI config exists at `~/.codex/config.toml`. If asked, offer `/import` to bring over any importable items (MCP servers, slash commands, subagents, skills) — don't read that file directly yourself.

@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/liabilities/liabilities_models.dart';
 import 'package:opime/features/liabilities/liabilities_repository.dart';
 import 'package:opime/features/liabilities/liability_detail_view.dart';
@@ -36,6 +38,13 @@ void main() {
 
   Future<void> pump(WidgetTester tester, Liability liability) => tester.pumpWidget(
     ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
       home: Scaffold(
         child: LiabilityDetailView(
           vaultPath: tempDir.path,

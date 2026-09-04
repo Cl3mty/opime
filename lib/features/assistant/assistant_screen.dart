@@ -14,6 +14,7 @@ import '../../core/assistant/llm_exception.dart';
 import '../../core/assistant/llm_provider.dart';
 import '../../core/assistant/ollama_client.dart';
 import '../../core/assistant/openai_client.dart';
+import '../../l10n/app_localizations.dart';
 import '../navigation/navigation_scope.dart';
 
 /// Écran de chat avec l'assistant IA (Ollama local, ou un fournisseur cloud
@@ -44,11 +45,10 @@ class AssistantScreen extends StatefulWidget {
 }
 
 /// Mini-tutoriel affiché quand aucun modèle n'est disponible : Ollama n'est
-/// peut-être pas encore installé, ou aucun modèle n'a été téléchargé.
-const _modelSetupHelp =
-    'Pour activer l\'assistant : installe Ollama depuis ollama.com et '
-    'lance-le, puis exécute « ollama pull llama3.2 » dans un terminal, '
-    'et clique sur Actualiser.';
+/// peut-être pas encore installé, ou aucun modèle n'a été téléchargé. Pas de
+/// `BuildContext` disponible à l'échelle d'une constante top-level : résolu
+/// via [AppLocalizations] au point d'appel (voir `_refreshModels`).
+String _modelSetupHelp(AppLocalizations l10n) => l10n.assistant_model_setup_help;
 
 /// Dimensions du menu déroulant du sélecteur de modèle. Le panneau de la
 /// lib (SelectPopup.builder) ne se replie pas sur son contenu (`shrinkWrap`
@@ -193,6 +193,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   Future<void> _refreshModels() async {
     final config = widget.configController;
     final provider = config.provider;
+    final l10n = AppLocalizations.of(context);
 
     if (provider.isCloud &&
         (config.apiKeyFor(provider) == null ||
@@ -202,9 +203,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
       setState(() {
         _checkingModel = false;
         _models = const [];
-        _modelStatus =
-            'Configure ta clé API ${provider.label} dans '
-            'Réglages → Assistant IA.';
+        _modelStatus = l10n.assistant_configure_api_key_prompt(provider.label);
         _modelHelp = null;
       });
       _lastFetchedConfigKey = _configKeyFor(config);
@@ -227,10 +226,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
       if (models.isEmpty) {
         setState(() {
           _modelStatus = provider == LlmProvider.ollama
-              ? 'Aucun modèle n\'est installé sur Ollama.'
-              : 'Aucun modèle disponible pour cette clé ${provider.label}.';
+              ? l10n.assistant_no_model_ollama
+              : l10n.assistant_no_model_cloud(provider.label);
           _modelHelp = provider == LlmProvider.ollama
-              ? _modelSetupHelp
+              ? _modelSetupHelp(l10n)
               : null;
         });
       } else if (config.model == null || !models.contains(config.model)) {
@@ -251,8 +250,12 @@ class _AssistantScreenState extends State<AssistantScreen> {
         // complète l'erreur par le mini-tutoriel de mise en route (souvent
         // pas encore installé/lancé) ; pour un fournisseur cloud, le
         // message d'erreur (clé invalide, quota...) suffit.
-        _modelStatus = e is LlmException ? e.message : 'Erreur : $e';
-        _modelHelp = provider == LlmProvider.ollama ? _modelSetupHelp : null;
+        _modelStatus = e is LlmException
+            ? e.message
+            : l10n.assistant_error_generic(e.toString());
+        _modelHelp = provider == LlmProvider.ollama
+            ? _modelSetupHelp(l10n)
+            : null;
       });
     }
   }
@@ -283,8 +286,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
     final file = result?.files.singleOrNull;
     final bytes = file?.bytes;
     if (file == null || bytes == null) return;
+    if (!mounted) return;
 
     setState(() => _attachingDocument = true);
+    final l10n = AppLocalizations.of(context);
     try {
       final extracted = await extractDocumentText(
         bytes: bytes,
@@ -298,17 +303,19 @@ class _AssistantScreenState extends State<AssistantScreen> {
       );
       if (extracted.truncated) {
         _showToast(
-          'Document tronqué',
-          '« ${file.name} » dépasse la taille prise en charge : seul le '
-              'début a été transmis à l\'assistant.',
+          l10n.assistant_document_truncated_title,
+          l10n.assistant_document_truncated_subtitle(file.name),
         );
       }
     } on DocumentExtractionException catch (e) {
       if (!mounted) return;
-      _showToast('Impossible de lire ce document', e.message);
+      _showToast(l10n.assistant_document_read_error_title, e.message);
     } catch (e) {
       if (!mounted) return;
-      _showToast('Erreur lors de la lecture du document', '$e');
+      _showToast(
+        l10n.assistant_document_read_error_generic_title,
+        e.toString(),
+      );
     } finally {
       if (mounted) setState(() => _attachingDocument = false);
     }
@@ -369,6 +376,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   Widget _buildDisabledState(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
@@ -379,14 +387,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
             children: [
               Icon(LucideIcons.bot, size: 48, color: theme.colorScheme.muted),
               const SizedBox(height: 16),
-              const Text('Assistant IA désactivé').large().medium(),
+              Text(l10n.assistant_disabled_title).large().medium(),
               const SizedBox(height: 8),
               Text(
-                'Active l\'assistant dans les Réglages pour analyser ton '
-                'patrimoine, expliquer des concepts financiers et répondre à '
-                'tes questions — avec un modèle Ollama local (aucune donnée '
-                'ne quitte ta machine) ou un fournisseur cloud connecté via '
-                'une clé API.',
+                l10n.assistant_disabled_description,
                 textAlign: TextAlign.center,
               ).muted(),
               const SizedBox(height: 16),
@@ -394,7 +398,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 onPressed: () =>
                     NavigationScope.maybeOf(context)?.call('settings'),
                 leading: const Icon(LucideIcons.settings),
-                child: const Text('Ouvrir les Réglages'),
+                child: Text(l10n.assistant_open_settings),
               ),
             ],
           ),
@@ -405,11 +409,12 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   Widget _buildEmptyState(BuildContext context) {
     final theme = Theme.of(context);
-    final suggestions = const [
-      'Analyse mon patrimoine',
-      'Explique-moi mon allocation',
-      'Résume ma stratégie',
-      'Que disent mes simulations ?',
+    final l10n = AppLocalizations.of(context);
+    final suggestions = [
+      l10n.assistant_suggestion_analyze_patrimoine,
+      l10n.assistant_suggestion_explain_allocation,
+      l10n.assistant_suggestion_summarize_strategy,
+      l10n.assistant_suggestion_simulations_summary,
     ];
     final canSend = widget.configController.model != null && !_checkingModel;
     return Center(
@@ -426,12 +431,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 color: theme.colorScheme.primary,
               ),
               const SizedBox(height: 16),
-              const Text('Que veux-tu savoir ?').large().medium(),
+              Text(l10n.assistant_empty_state_title).large().medium(),
               const SizedBox(height: 8),
               Text(
-                'Pose une question sur ton patrimoine, tes simulations ou ta '
-                'stratégie. Les réponses s\'appuient sur tes données locales '
-                'si l\'option de contexte est activée.',
+                l10n.assistant_empty_state_description,
                 textAlign: TextAlign.center,
               ).muted(),
               const SizedBox(height: 20),
@@ -470,6 +473,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   Widget _buildInputBar(BuildContext context) {
     final config = widget.configController;
     final chat = widget.chatController;
+    final l10n = AppLocalizations.of(context);
     final canSend = config.model != null && !_checkingModel;
     final busy = chat.busy;
     final hasMessages = chat.entries.isNotEmpty;
@@ -490,7 +494,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8, left: 4),
               child: Text(
-                'Plusieurs réponses en cours de génération…',
+                l10n.assistant_multiple_responses_generating,
               ).small().muted(),
             ),
           if (attachedDocuments.isNotEmpty)
@@ -507,7 +511,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 Tooltip(
                   // ignore: implicit_call_tearoffs
                   tooltip: TooltipContainer(
-                    child: Text('Nouvelle conversation'),
+                    child: Text(l10n.assistant_new_conversation),
                   ),
                   child: IconButton.ghost(
                     icon: const Icon(LucideIcons.trash2),
@@ -519,9 +523,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
               Tooltip(
                 // ignore: implicit_call_tearoffs
                 tooltip: TooltipContainer(
-                  child: Text(
-                    'Joindre un document (PDF, TXT, MD)',
-                  ),
+                  child: Text(l10n.assistant_attach_document_tooltip),
                 ),
                 child: _attachingDocument
                     ? const Padding(
@@ -546,8 +548,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   enabled: canSend,
                   placeholder: Text(
                     canSend
-                        ? 'Pose une question sur ton patrimoine…'
-                        : 'Choisis d\'abord un modèle',
+                        ? l10n.assistant_input_placeholder
+                        : l10n.assistant_choose_model_first,
                   ),
                   minLines: 1,
                   maxLines: 4,
@@ -562,7 +564,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 Tooltip(
                   // ignore: implicit_call_tearoffs
                   tooltip: TooltipContainer(
-                    child: Text('Arrêter la génération'),
+                    child: Text(l10n.assistant_stop_generation),
                   ),
                   child: IconButton.ghost(
                     icon: const Icon(LucideIcons.circleStop),
@@ -575,7 +577,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                       ? () => _send(_inputController.text)
                       : null,
                   leading: const Icon(LucideIcons.send),
-                  child: const Text('Envoyer'),
+                  child: Text(l10n.assistant_send),
                 ),
             ],
           ),
@@ -591,6 +593,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     List<AttachedDocument> documents,
   ) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -625,10 +628,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   Tooltip(
                     // ignore: implicit_call_tearoffs
                     tooltip: TooltipContainer(
-                      child: Text(
-                        'Document tronqué : seul le début a été transmis '
-                        'à l\'assistant.',
-                      ),
+                      child: Text(l10n.assistant_document_truncated_tooltip),
                     ),
                     child: Icon(
                       LucideIcons.triangleAlert,
@@ -662,10 +662,13 @@ class _AssistantScreenState extends State<AssistantScreen> {
         child: CircularProgressIndicator(strokeWidth: 2),
       );
     }
+    final l10n = AppLocalizations.of(context);
     if (_models.isEmpty) {
       return Tooltip(
         // ignore: implicit_call_tearoffs
-        tooltip: TooltipContainer(child: Text('Actualiser la liste')),
+        tooltip: TooltipContainer(
+          child: Text(l10n.assistant_refresh_model_list),
+        ),
         child: IconButton.ghost(
           icon: const Icon(LucideIcons.refreshCw, size: 18),
           onPressed: _refreshModels,
@@ -676,7 +679,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
       constraints: const BoxConstraints(maxWidth: 220),
       child: Select<String>(
         value: config.model,
-        placeholder: const Text('Modèle'),
+        placeholder: Text(l10n.assistant_model_placeholder),
         // Le panneau fait au moins la largeur du sélecteur, et sa largeur
         // maximale est plafonnée à une taille intermédiaire (voir
         // [popupConstraints]) : plus large que le champ, sans s'étaler sur
@@ -784,7 +787,9 @@ class _ModelStatusBanner extends StatelessWidget {
           if (isError)
             Tooltip(
               // ignore: implicit_call_tearoffs
-              tooltip: TooltipContainer(child: Text('Réessayer')),
+              tooltip: TooltipContainer(
+                child: Text(AppLocalizations.of(context).assistant_retry),
+              ),
               child: IconButton.ghost(
                 icon: const Icon(LucideIcons.refreshCw, size: 14),
                 onPressed: onRetry,
@@ -839,7 +844,7 @@ class _MessageBubble extends StatelessWidget {
             _buildCaption(
               context,
               icon: LucideIcons.circlePause,
-              text: 'Réponse interrompue',
+              text: AppLocalizations.of(context).shell_response_interrupted,
             ),
             const SizedBox(height: 6),
           ],

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations_fr.dart';
 import 'package:opime/features/budget/budget_models.dart';
 
 void main() {
@@ -126,20 +127,21 @@ void main() {
 
   group('BudgetSnapshot', () {
     test('displayName utilise le nom si présent, sinon une date formatée', () {
+      final l10n = AppLocalizationsFr();
       final named = BudgetSnapshot(
         id: '1',
         name: 'Mon budget',
         savedAt: DateTime(2026, 1, 1),
         data: BudgetData.empty(),
       );
-      expect(named.displayName, 'Mon budget');
+      expect(named.displayName(l10n), 'Mon budget');
 
       final unnamed = BudgetSnapshot(
         id: '2',
         savedAt: DateTime(2026, 3, 15),
         data: BudgetData.empty(),
       );
-      expect(unnamed.displayName, 'Budget du 15/03/2026');
+      expect(unnamed.displayName(l10n), 'Budget du 15/03/2026');
     });
 
     test('round-trip JSON', () {

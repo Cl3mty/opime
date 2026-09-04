@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../l10n/app_localizations.dart';
 import '../dashboard/patrimoine_models.dart' show DashboardPeriod;
 import '../dashboard/widgets/net_worth_chart.dart' show PeriodTabs;
 import 'account_detail_screen.dart' show AccountEditForm, BackHeader;
@@ -261,12 +262,13 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
 
   Future<void> _deleteAccount() async {
     if (_hasTransactions) return;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${widget.account.name}" ?',
-      message:
-          'Ce compte et ses investissements (sans transaction) seront '
-          'définitivement supprimés.',
+      title: l10n.investments_delete_account_confirm_title(
+        widget.account.name,
+      ),
+      message: l10n.investments_delete_account_confirm_message,
     );
     if (!confirmed) return;
     await _repo.deleteAccount(widget.account.id);
@@ -324,6 +326,7 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
   }
 
   void _openAccountMenu(BuildContext anchorContext) {
+    final l10n = AppLocalizations.of(anchorContext);
     showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.topEnd,
@@ -335,16 +338,18 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
           children: [
             MenuButton(
               leading: const Icon(LucideIcons.pencil, size: 14),
-              child: const shadcn.Text('Modifier le compte'),
+              child: shadcn.Text(l10n.investments_edit_account_menu_item),
               onPressed: (_) => _startEditAccount(),
             ),
             MenuButton(
               enabled: !_hasTransactions,
               leading: const Icon(LucideIcons.trash2, size: 14),
               trailing: _hasTransactions
-                  ? const shadcn.Text('Vide-le d\'abord').muted().xSmall()
+                  ? shadcn.Text(
+                      l10n.investments_delete_account_requires_empty_tooltip,
+                    ).muted().xSmall()
                   : null,
-              child: const shadcn.Text('Supprimer le compte'),
+              child: shadcn.Text(l10n.investments_delete_account_menu_item),
               onPressed: (_) => _deleteAccount(),
             ),
             MenuButton(
@@ -356,8 +361,8 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               ),
               child: shadcn.Text(
                 widget.account.excludedFromPatrimoine
-                    ? 'Réintégrer au patrimoine'
-                    : 'Exclure du patrimoine',
+                    ? l10n.investments_reinclude_in_net_worth_menu_item
+                    : l10n.investments_exclude_from_net_worth_menu_item,
               ),
               onPressed: (_) => _toggleExcludedFromPatrimoine(),
             ),
@@ -367,7 +372,9 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
             if (widget.account.envelope == AccountEnvelope.cto)
               MenuButton(
                 leading: const Icon(LucideIcons.upload, size: 14),
-                child: const shadcn.Text('Importer un relevé (IBKR)'),
+                child: shadcn.Text(
+                  l10n.investments_import_ibkr_statement_menu_item,
+                ),
                 onPressed: (_) => _importIbkrStatement(),
               ),
           ],
@@ -390,6 +397,7 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
   @override
   Widget build(BuildContext context) {
     final account = widget.account;
+    final l10n = AppLocalizations.of(context);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -455,8 +463,8 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
             index: _tabIndex,
             onChanged: (value) => setState(() => _tabIndex = value),
             children: [
-              const TabItem(child: shadcn.Text('Positions')),
-              const TabItem(child: shadcn.Text('Transactions')),
+              TabItem(child: shadcn.Text(l10n.investments_tab_positions)),
+              TabItem(child: shadcn.Text(l10n.investments_tab_transactions)),
               // Pour les métaux précieux, chaque document doit être
               // rattaché à une transaction précise d'une position (voir
               // `PositionDetailDialog`/`AccountTransactionsTab`) — pas
@@ -465,7 +473,7 @@ class _StockAccountScreenState extends State<StockAccountScreen> {
               // ont les deux : cet onglet pour les documents généraux
               // (facture globale, certificat...) en plus.
               if (_showDocumentsTab)
-                const TabItem(child: shadcn.Text('Documents')),
+                TabItem(child: shadcn.Text(l10n.real_estate_documents_title)),
             ],
           ),
           const SizedBox(height: 16),
@@ -531,6 +539,7 @@ class _ShowAllClassesToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return GhostButton(
       size: ButtonSize.small,
       density: ButtonDensity.compact,
@@ -541,8 +550,10 @@ class _ShowAllClassesToggle extends StatelessWidget {
       ),
       child: shadcn.Text(
         expanded
-            ? 'Masquer le reste du compte'
-            : 'Afficher tout le compte (+$hiddenCount)',
+            ? l10n.investments_show_all_account_toggle_expanded
+            : l10n.investments_show_all_account_toggle_collapsed(
+                hiddenCount,
+              ),
       ).muted().xSmall(),
     );
   }

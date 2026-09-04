@@ -108,12 +108,17 @@ enum RealEstateType {
   }
 }
 
-/// Style de gestion d'un investissement `actionsEtFonds`, renseigné
-/// manuellement par l'utilisateur (aucune heuristique automatique sur le
-/// libellé/ISIN, trop peu fiable) — sert à calculer la répartition gestion
-/// active/passive dans l'écran Analyses (voir `analyses_calculations.dart`'s
-/// `fundStyleAllocation`). `null` sur [Investment.fundStyle] tant que
-/// l'utilisateur ne l'a pas classé : traité comme "non classé", jamais deviné.
+/// Style de gestion d'un investissement `actionsEtFonds` — sert à calculer
+/// la répartition gestion active/passive dans l'écran Analyses (voir
+/// `analyses_calculations.dart`'s `fundStyleAllocation`). `null` sur
+/// [Investment.fundStyle] tant qu'il n'est pas classé, traité comme "non
+/// classé". Classé manuellement par l'utilisateur, ou automatiquement par
+/// [fromYahooQuoteType] via `price_refresh_service.dart` — jamais par une
+/// heuristique sur l'ISIN ou le libellé eux-mêmes (bien trop peu fiable,
+/// contrairement au type d'instrument que Yahoo Finance retourne pour un
+/// symbole déjà résolu, la même source déjà utilisée pour [Sector]/pays de
+/// cotation) : une valeur déjà présente (manuelle ou auto-détectée) n'est
+/// jamais réécrite au rafraîchissement suivant, comme pour [Sector].
 enum FundStyle {
   activeGere,
   indiciel,
@@ -134,6 +139,20 @@ enum FundStyle {
     }
     return null;
   }
+
+  /// Déduit un [FundStyle] depuis le `quoteType` brut renvoyé par Yahoo
+  /// Finance (voir `YahooFinanceClient.fetchClassification`) — seulement
+  /// pour les deux cas sans ambiguïté : une action individuelle ("EQUITY")
+  /// ou un ETF ("ETF", quasi toujours indiciel en pratique). `null` pour
+  /// tout le reste, notamment "MUTUALFUND" : un fonds commun de placement
+  /// peut être aussi bien géré activement qu'indiciel, information que ce
+  /// seul champ ne permet pas de trancher de façon fiable — mieux vaut
+  /// laisser "non classé" que deviner faux.
+  static FundStyle? fromYahooQuoteType(String? quoteType) => switch (quoteType) {
+    'EQUITY' => FundStyle.actionIndividuelle,
+    'ETF' => FundStyle.indiciel,
+    _ => null,
+  };
 }
 
 /// Secteur d'activité d'un investissement `actionsEtFonds` (classification

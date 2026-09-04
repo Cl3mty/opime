@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:opime/core/assistant/assistant_config_controller.dart';
 import 'package:opime/core/assistant/llm_provider.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/settings/settings_screen.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -25,6 +27,12 @@ void main() {
   Future<void> pump(WidgetTester tester, AssistantConfigController config) {
     return tester.pumpWidget(
       ShadcnApp(
+        locale: const Locale('fr'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: [
+          shadcnLocalizationsFrDelegate,
+          ...AppLocalizations.localizationsDelegates,
+        ],
         home: Scaffold(
           child: AssistantSettingsCard(configController: config),
         ),

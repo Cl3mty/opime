@@ -1,11 +1,14 @@
 import 'dart:io';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/real_estate/real_estate_profitability_section.dart';
 import 'package:opime/features/investments/real_estate/rent_models.dart';
 import 'package:opime/features/liabilities/liabilities_models.dart';
 import 'package:opime/features/liabilities/liabilities_repository.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -52,6 +55,15 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(
         ShadcnApp(
+          locale: const Locale('fr'),
+          supportedLocales: const [Locale('fr'), Locale('en')],
+          localizationsDelegates: [
+            shadcnLocalizationsFrDelegate,
+            ...AppLocalizations.localizationsDelegates,
+            GlobalMaterialLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
           home: Scaffold(
             child: RealEstateProfitabilitySection(
               vaultPath: tempDir.path,

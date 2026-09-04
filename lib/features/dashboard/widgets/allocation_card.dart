@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/toggle_button_style.dart';
+import '../../../l10n/app_localizations.dart';
 import '../patrimoine_models.dart';
 import 'allocation_blocks_view.dart';
 import 'allocation_donut_view.dart';
@@ -48,6 +49,7 @@ class _AllocationCardState extends State<AllocationCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final categories = _kind == _Kind.actifs ? widget.actifs : widget.passifs;
     // `montantPatrimoine` (pas `montant`) : cette carte représente le
     // patrimoine global, le seul agrégat où un investissement/compte exclu
@@ -68,7 +70,9 @@ class _AllocationCardState extends State<AllocationCard> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final narrow = constraints.maxWidth < 340;
-                final title = shadcn.Text('Allocation').semiBold().large();
+                final title = shadcn.Text(
+                  l10n.dashboard_allocation_title,
+                ).semiBold().large();
                 final kindToggle = ButtonGroup(
                   children: [
                     SelectedButton(
@@ -87,7 +91,7 @@ class _AllocationCardState extends State<AllocationCard> {
                         }
                       }),
                       child: shadcn.Text(
-                        'Actifs',
+                        l10n.dashboard_assets_label,
                         style: const TextStyle(fontSize: _toggleFontSize),
                       ),
                     ),
@@ -107,7 +111,7 @@ class _AllocationCardState extends State<AllocationCard> {
                         }
                       }),
                       child: shadcn.Text(
-                        'Passifs',
+                        l10n.dashboard_liabilities_label,
                         style: const TextStyle(fontSize: _toggleFontSize),
                       ),
                     ),

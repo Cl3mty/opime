@@ -12,6 +12,7 @@ import '../investments/patrimoine_refresh_controller.dart';
 import '../investments/price_refresh_service.dart';
 import '../investments/price_sync_status_controller.dart';
 import '../liabilities/liabilities_models.dart' show liabilityTypeForCategoryId;
+import '../../l10n/app_localizations.dart';
 
 /// Bouton icône avec tooltip, utilisé par les actions rapides de la barre
 /// du haut (recherche/eye/plus), qu'elle soit rendue par [TopBar] (desktop)
@@ -53,9 +54,12 @@ class AmountVisibilityToggleButton extends StatelessWidget {
       animation: amountVisibility,
       builder: (context, _) {
         final hidden = amountVisibility.hidden;
+        final l10n = AppLocalizations.of(context);
         return TopBarIconButton(
           icon: hidden ? LucideIcons.eyeOff : LucideIcons.eye,
-          tooltip: hidden ? 'Afficher les montants' : 'Masquer les montants',
+          tooltip: hidden
+              ? l10n.navigation_amounts_show
+              : l10n.navigation_amounts_hide,
           onPressed: amountVisibility.toggle,
         );
       },
@@ -161,6 +165,7 @@ class AddMenuButton extends StatelessWidget {
       animation: onboardingHighlight,
       builder: (context, child) {
         final highlighted = onboardingHighlight.isEmpty;
+        final label = AppLocalizations.of(context).navigation_complete_patrimoine;
         final button = compact
             ? IconButton.primary(
                 icon: const Icon(LucideIcons.plus),
@@ -169,13 +174,11 @@ class AddMenuButton extends StatelessWidget {
             : PrimaryButton(
                 leading: const Icon(LucideIcons.plus, size: 16),
                 onPressed: () => _open(context),
-                child: const shadcn.Text('Compléter mon patrimoine'),
+                child: shadcn.Text(label),
               );
         return Tooltip(
           // ignore: implicit_call_tearoffs
-          tooltip: TooltipContainer(
-            child: const shadcn.Text('Compléter mon patrimoine'),
-          ),
+          tooltip: TooltipContainer(child: shadcn.Text(label)),
           child: highlighted
               ? Transform.scale(
                   scale: 1.05,

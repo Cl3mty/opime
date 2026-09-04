@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import '../../core/notifications/notifications_settings_controller.dart';
+import '../../l10n/app_localizations.dart';
 import '../navigation/top_bar_actions.dart' show TopBarIconButton;
 import 'news_panel.dart';
 import 'notifications_controller.dart';
@@ -38,7 +39,7 @@ class NewsButton extends StatelessWidget {
                 children: [
                   TopBarIconButton(
                     icon: LucideIcons.bell,
-                    tooltip: 'Actualités',
+                    tooltip: AppLocalizations.of(context).notifications_title,
                     onPressed: () => openNewsPanel(
                       barContext,
                       controller: controller,

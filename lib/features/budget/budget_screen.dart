@@ -13,6 +13,7 @@ import '../../core/ui/frosted_card.dart';
 import '../../core/ui/load_error_view.dart';
 import '../../core/ui/mobile_orientation.dart';
 import '../../core/ui/slide_page_route.dart';
+import '../../l10n/app_localizations.dart';
 import 'budget_models.dart';
 import 'budget_repository.dart';
 import 'budget_sankey.dart';
@@ -133,10 +134,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
   /// ni risquer d'écraser l'original. Le retour laisse chaque mise en page
   /// décider comment enchaîner (édition inline en desktop, page poussée en
   /// mobile) — comme pour la sélection d'un budget existant.
-  Future<BudgetSnapshot?> _duplicateSnapshot(BudgetSnapshot snapshot) async {
+  Future<BudgetSnapshot?> _duplicateSnapshot(
+    BuildContext context,
+    BudgetSnapshot snapshot,
+  ) async {
+    final l10n = AppLocalizations.of(context);
     final newId = await _repo.saveNew(
       snapshot.data,
-      name: '${snapshot.displayName} (copie)',
+      name: l10n.budget_duplicate_name_suffix(snapshot.displayName(l10n)),
     );
     await _refreshHistory();
     setState(() => _selectedId = newId);
@@ -162,7 +167,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
         (context) => Scaffold(
           headers: [
             AppBar(
-              title: shadcn.Text(snapshot?.displayName ?? 'Nouveau budget'),
+              title: shadcn.Text(
+                snapshot?.displayName(AppLocalizations.of(context)) ??
+                    AppLocalizations.of(context).budget_new_budget,
+              ),
               leading: [
                 IconButton.ghost(
                   icon: const Icon(LucideIcons.chevronLeft),
@@ -187,9 +195,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_loadError) {
       return LoadErrorView(
-        message:
-            'Impossible de charger les budgets. Vérifiez que le dossier '
-            'Coffre-fort est accessible.',
+        message: AppLocalizations.of(context).budget_load_error,
         onRetry: _retryInit,
       );
     }
@@ -217,7 +223,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
               onDelete: _deleteSnapshot,
               onRename: _renameSnapshot,
               onDuplicate: (snapshot) async {
-                final copy = await _duplicateSnapshot(snapshot);
+                final copy = await _duplicateSnapshot(context, snapshot);
                 if (copy != null && context.mounted) {
                   _openBudgetDetail(context, copy);
                 }
@@ -244,7 +250,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
               onNew: () => setState(() => _selectedId = null),
               onDelete: _deleteSnapshot,
               onRename: _renameSnapshot,
-              onDuplicate: (snapshot) => _duplicateSnapshot(snapshot),
+              onDuplicate: (snapshot) => _duplicateSnapshot(context, snapshot),
             ),
           ),
         ),
@@ -334,12 +340,13 @@ class _BudgetEditorState extends State<_BudgetEditor> {
     }
     widget.onSaved(id);
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
     showToast(
       context: context,
       location: ToastLocation.bottomRight,
       builder: (context, overlay) => SurfaceCard(
         child: Basic(
-          title: const shadcn.Text('Budget sauvegardé'),
+          title: shadcn.Text(l10n.budget_saved_toast),
           subtitle: shadcn.Text(
             '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
           ),
@@ -360,8 +367,11 @@ class _BudgetEditorState extends State<_BudgetEditor> {
       if (byteData == null) return;
       final Uint8List bytes = byteData.buffer.asUint8List();
 
+      if (!mounted) return;
       final savePath = await FilePicker.saveFile(
-        dialogTitle: 'Enregistrer le graphique',
+        dialogTitle: AppLocalizations.of(
+          context,
+        ).budget_save_chart_dialog_title,
         fileName: 'flux-budgetaire.png',
         bytes: bytes,
       );
@@ -398,6 +408,7 @@ class _BudgetEditorState extends State<_BudgetEditor> {
   }
 
   Widget _buildContent(BuildContext context, bool hidden) {
+    final l10n = AppLocalizations.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -407,10 +418,10 @@ class _BudgetEditorState extends State<_BudgetEditor> {
             child: Tabs(
               index: _tabIndex,
               onChanged: (value) => setState(() => _tabIndex = value),
-              children: const [
-                TabItem(child: shadcn.Text('Revenus')),
-                TabItem(child: shadcn.Text('Investissements')),
-                TabItem(child: shadcn.Text('Dépenses')),
+              children: [
+                TabItem(child: shadcn.Text(l10n.budget_tab_revenues)),
+                TabItem(child: shadcn.Text(l10n.budget_tab_investments)),
+                TabItem(child: shadcn.Text(l10n.budget_tab_expenses)),
               ],
             ),
           ),
@@ -451,32 +462,32 @@ class _BudgetEditorState extends State<_BudgetEditor> {
                 TextSpan(
                   style: DefaultTextStyle.of(context).style,
                   children: [
-                    const TextSpan(text: "Votre taux d'épargne est de "),
+                    TextSpan(text: l10n.budget_summary_intro),
                     TextSpan(
                       text: '${_data.savingsRate.round()} %',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    const TextSpan(text: ' (taux d\'épargne possible : '),
+                    TextSpan(text: l10n.budget_summary_possible_rate),
                     TextSpan(
                       text: '${_data.possibleSavingsRate.round()} %',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    const TextSpan(text: '). Vous avez un revenu total de '),
+                    TextSpan(text: l10n.budget_summary_total_income),
                     TextSpan(
                       text: displayEuros(_data.totalRevenues, hidden),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    const TextSpan(text: ', des dépenses de '),
+                    TextSpan(text: l10n.budget_summary_expenses),
                     TextSpan(
                       text: displayEuros(_data.totalExpenses, hidden),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    const TextSpan(text: ' et investissez '),
+                    TextSpan(text: l10n.budget_summary_invest),
                     TextSpan(
                       text: displayEuros(_data.totalInvestments, hidden),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    const TextSpan(text: ' tous les mois, il vous reste '),
+                    TextSpan(text: l10n.budget_summary_remaining),
                     TextSpan(
                       text: displayEuros(_data.balance, hidden),
                       style: TextStyle(
@@ -484,7 +495,7 @@ class _BudgetEditorState extends State<_BudgetEditor> {
                         color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
-                    const TextSpan(text: ' disponible.'),
+                    TextSpan(text: l10n.budget_summary_available),
                   ],
                 ),
                 textAlign: TextAlign.center,
@@ -505,7 +516,7 @@ class _BudgetEditorState extends State<_BudgetEditor> {
               PrimaryButton(
                 onPressed: _save,
                 leading: const Icon(LucideIcons.save),
-                child: const shadcn.Text('Sauvegarder'),
+                child: shadcn.Text(l10n.common_save),
               ),
             ],
           ),
@@ -538,7 +549,7 @@ class _LandscapeSuggestion extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             shadcn.Text(
-              "Utilisez l'application en mode paysage pour une meilleure lisibilité",
+              AppLocalizations.of(context).budget_landscape_suggestion,
               textAlign: TextAlign.center,
             ).muted(),
           ],
@@ -587,8 +598,8 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
     super.dispose();
   }
 
-  void _startRename(BudgetSnapshot snapshot) {
-    _editController.text = snapshot.displayName;
+  void _startRename(AppLocalizations l10n, BudgetSnapshot snapshot) {
+    _editController.text = snapshot.displayName(l10n);
     setState(() => _editingId = snapshot.id);
   }
 
@@ -600,12 +611,13 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
-            Expanded(child: shadcn.Text('Budgets ventilés').semiBold()),
+            Expanded(child: shadcn.Text(l10n.budget_history_title).semiBold()),
             IconButton.ghost(
               icon: const Icon(LucideIcons.filePlus),
               onPressed: widget.onNew,
@@ -615,7 +627,7 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
         if (widget.showSearch) ...[
           const SizedBox(height: 8),
           TextField(
-            placeholder: const shadcn.Text('Rechercher un budget...'),
+            placeholder: shadcn.Text(l10n.budget_search_placeholder),
             features: const [
               InputFeature.leading(Icon(LucideIcons.search, size: 16)),
             ],
@@ -634,7 +646,8 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
                   ? snapshots
                   : snapshots
                         .where(
-                          (s) => s.displayName.toLowerCase().contains(query),
+                          (s) =>
+                              s.displayName(l10n).toLowerCase().contains(query),
                         )
                         .toList();
 
@@ -643,8 +656,8 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: shadcn.Text(
                     snapshots.isEmpty
-                        ? 'Aucun budget sauvegardé.'
-                        : 'Aucun résultat.',
+                        ? l10n.budget_history_empty
+                        : l10n.budget_no_results,
                   ).muted().small(),
                 );
               }
@@ -669,7 +682,7 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
                         controller: _editController,
                         autofocus: true,
                         onSubmitted: (_) => _commitRename(snapshot.id),
-                        placeholder: const shadcn.Text('Nom du budget'),
+                        placeholder: shadcn.Text(l10n.budget_name_placeholder),
                       ),
                     );
                   }
@@ -692,7 +705,7 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 shadcn.Text(
-                                  snapshot.displayName,
+                                  snapshot.displayName(l10n),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -705,7 +718,7 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
                           Tooltip(
                             // ignore: implicit_call_tearoffs
                             tooltip: TooltipContainer(
-                              child: shadcn.Text('Dupliquer ce budget'),
+                              child: shadcn.Text(l10n.budget_duplicate_tooltip),
                             ),
                             child: IconButton.ghost(
                               icon: const Icon(LucideIcons.copyPlus, size: 14),
@@ -714,7 +727,7 @@ class _BudgetHistoryColumnState extends State<_BudgetHistoryColumn> {
                           ),
                           IconButton.ghost(
                             icon: const Icon(LucideIcons.pencil, size: 14),
-                            onPressed: () => _startRename(snapshot),
+                            onPressed: () => _startRename(l10n, snapshot),
                           ),
                           IconButton.ghost(
                             icon: const Icon(LucideIcons.trash2, size: 14),
@@ -770,6 +783,7 @@ class _RevenuesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -784,7 +798,9 @@ class _RevenuesCard extends StatelessWidget {
                   Expanded(
                     child: TextField(
                       initialValue: revenues[i].name,
-                      placeholder: const shadcn.Text('Nom du revenu'),
+                      placeholder: shadcn.Text(
+                        l10n.budget_revenue_name_placeholder,
+                      ),
                       border: Border.all(color: Colors.transparent),
                       onChanged: (value) => onChanged([
                         for (var j = 0; j < revenues.length; j++)
@@ -802,7 +818,7 @@ class _RevenuesCard extends StatelessWidget {
                       initialValue: revenues[i].amount == 0
                           ? ''
                           : revenues[i].amount.toStringAsFixed(0),
-                      placeholder: const shadcn.Text('Montant'),
+                      placeholder: shadcn.Text(l10n.budget_amount_placeholder),
                       border: Border.all(color: Colors.transparent),
                       textAlign: TextAlign.end,
                       keyboardType: TextInputType.number,
@@ -831,7 +847,7 @@ class _RevenuesCard extends StatelessWidget {
           ),
         const SizedBox(height: 4),
         _AddLink(
-          label: 'Ajouter une source de revenu',
+          label: l10n.budget_add_revenue_source,
           onTap: () => onChanged([
             ...revenues,
             BudgetItem(id: generateItemId('revenue'), name: '', amount: 0),
@@ -855,6 +871,7 @@ class _CategoriesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -869,7 +886,7 @@ class _CategoriesCard extends StatelessWidget {
                 children: [
                   TextField(
                     initialValue: categories[catIdx].name,
-                    placeholder: const shadcn.Text('Catégorie'),
+                    placeholder: shadcn.Text(l10n.common_category),
                     border: Border.all(color: Colors.transparent),
                     onChanged: (value) {
                       final updated = [...categories];
@@ -886,7 +903,7 @@ class _CategoriesCard extends StatelessWidget {
                           Expanded(
                             child: TextField(
                               initialValue: item.name,
-                              placeholder: const shadcn.Text('Nom'),
+                              placeholder: shadcn.Text(l10n.common_name),
                               border: Border.all(color: Colors.transparent),
                               onChanged: (value) {
                                 final updated = [...categories];
@@ -910,7 +927,9 @@ class _CategoriesCard extends StatelessWidget {
                               initialValue: item.amount == 0
                                   ? ''
                                   : item.amount.toStringAsFixed(0),
-                              placeholder: const shadcn.Text('Montant'),
+                              placeholder: shadcn.Text(
+                                l10n.budget_amount_placeholder,
+                              ),
                               border: Border.all(color: Colors.transparent),
                               textAlign: TextAlign.end,
                               keyboardType: TextInputType.number,
@@ -948,7 +967,7 @@ class _CategoriesCard extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 8, left: 24),
                     child: _AddLink(
-                      label: 'Ajouter',
+                      label: l10n.common_add,
                       onTap: () {
                         final updated = [...categories];
                         updated[catIdx] = updated[catIdx].copyWith(
@@ -971,7 +990,7 @@ class _CategoriesCard extends StatelessWidget {
           ),
         const SizedBox(height: 4),
         _AddLink(
-          label: 'Ajouter une catégorie',
+          label: l10n.budget_add_category,
           onTap: () =>
               onChanged([...categories, BudgetCategory(name: '', items: [])]),
         ),

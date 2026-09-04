@@ -1,0 +1,2406 @@
+{
+  "@@locale": "en",
+  "@investments_amount_value": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_amount_with_bought_quantity": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "quantity": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_delay_days": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@investments_delay_months": {
+    "placeholders": {
+      "months": {
+        "type": "int"
+      }
+    }
+  },
+  "@investments_delay_years": {
+    "placeholders": {
+      "years": {
+        "type": "int"
+      }
+    }
+  },
+  "@investments_delete_transaction_message": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_edit_transaction_title": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_error_quantity_exceeds_sellable": {
+    "placeholders": {
+      "quantity": {
+        "type": "String"
+      },
+      "maxSellable": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_field_amount_currency": {
+    "placeholders": {
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_fiscal_advantage_active_since": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_fiscal_advantage_upcoming": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "delay": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_fx_converted_amount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_fx_rate_display": {
+    "placeholders": {
+      "currency": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_fx_rate_manual_hint": {
+    "placeholders": {
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_mwr_annualized": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_mwr_since_start": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_opened_on": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_save_error": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@liabilities_delete_confirm_title": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@liabilities_remaining_balance_subtitle": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@settings_api_key": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "@settings_cloud_description": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "@settings_cloud_warning": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      },
+      "includePatrimoine": {
+        "type": "String"
+      }
+    }
+  },
+  "@settings_new_version": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@settings_up_to_date": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@settings_vault_activate_failed": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "@settings_vault_add_failed": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "@settings_vault_forget_failed": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "@settings_version_installed": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@shell_responses_pending": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "academy_button_completed": "Completed",
+  "academy_button_mark_completed": "Mark as completed",
+  "academy_disclaimer": "Educational and informational content only, not investment advice: we are not wealth management advisors (CGP). Everyone makes their own financial decisions — the goal is simply to give as many people as possible the keys to decide with full knowledge.",
+  "academy_takeaway_title": "Key takeaway",
+  "academy_vocabulary_title": "Vocabulary",
+  "analyses_benchmark_chart_not_enough_data": "Not enough data for this period",
+  "analyses_stocks_funds_label": "Stocks & Funds",
+  "appName": "Opime",
+  "budget_default_snapshot_name": "Budget of {date}",
+  "common_active": "Active",
+  "common_add": "Add",
+  "common_back": "Back",
+  "common_cancel": "Cancel",
+  "common_category": "Category",
+  "common_close": "Close",
+  "common_confirm": "Confirm",
+  "common_create": "Create",
+  "common_date": "Date",
+  "common_delete": "Delete",
+  "common_description": "Description",
+  "common_edit": "Edit",
+  "common_error": "Error",
+  "common_loading": "Loading...",
+  "common_name": "Name",
+  "common_next": "Next",
+  "common_no": "No",
+  "common_none": "None",
+  "common_ok": "OK",
+  "common_open": "Open",
+  "common_page_not_found": "Page not found",
+  "common_principal": "Primary",
+  "common_remove": "Remove",
+  "common_rename": "Rename",
+  "common_reset": "Reset",
+  "common_save": "Save",
+  "common_search": "Search",
+  "common_see": "View",
+  "common_switch": "Switch",
+  "common_title": "Title",
+  "common_total": "TOTAL",
+  "common_yes": "Yes",
+  "dashboard_allocation_title": "Allocation",
+  "dashboard_assets_label": "Assets",
+  "dashboard_assets_title": "Assets",
+  "dashboard_liabilities_label": "Liabilities",
+  "dashboard_not_enough_data_period": "Not enough data for this period",
+  "dashboard_onboarding_cta_hint": "Click here to get started",
+  "dashboard_onboarding_empty_description": "Add your accounts, investments and loans to see your net worth, allocation and how they evolve. Use the \"Complete my portfolio\" button at the top of the screen.",
+  "dashboard_onboarding_empty_title": "Your dashboard is empty",
+  "investments_add_transaction_submit": "Add transaction",
+  "investments_add_transaction_title": "Add a transaction",
+  "investments_amount_placeholder": "Amount: —",
+  "investments_amount_value": "Amount: {amount}",
+  "investments_amount_with_bought_quantity": "Amount: {amount} → quantity bought: {quantity}",
+  "investments_delay_days": "{days, plural, =1{1 day} other{{days} days}}",
+  "investments_delay_months": "{months} months",
+  "investments_delay_years": "{years} years",
+  "investments_delete_linked_transaction_message": "This transaction is part of a transfer/arbitrage: its counterpart will also be deleted. This action is irreversible and will change the quantity held and the average cost of both positions.",
+  "investments_delete_transaction_message": "This action is irreversible and will change the quantity held and the average cost of \"{label}\".",
+  "investments_delete_transaction_title": "Delete this transaction?",
+  "investments_edit_arbitrage_title": "Edit arbitrage",
+  "investments_edit_impossible_title": "Unable to edit",
+  "investments_edit_transaction_title": "Edit transaction — {label}",
+  "investments_error_buy_price_must_be_positive": "Buy price must be a number greater than 0.",
+  "investments_error_date_required": "Date is required.",
+  "investments_error_quantity_exceeds_sellable": "The quantity ({quantity}) exceeds the quantity that would be held ({maxSellable}).",
+  "investments_error_quantity_must_be_positive": "Quantity must be a number greater than 0.",
+  "investments_error_sell_price_must_be_positive": "Sell price must be a number greater than 0.",
+  "investments_estimate_button": "Estimate",
+  "investments_field_amount_currency": "Amount ({currency})",
+  "investments_field_amount_eur": "Amount (€)",
+  "investments_field_amount_paid_eur": "Amount paid (€)",
+  "investments_field_buy_price": "Buy price",
+  "investments_field_currency_pair_rate": "Currency pair rate",
+  "investments_field_position": "Position",
+  "investments_field_quantity": "Quantity",
+  "investments_field_sell_price": "Sell price",
+  "investments_field_shares_options_count": "Number of shares/options",
+  "investments_field_total_amount_eur": "Total amount (€)",
+  "investments_field_unit_price": "Unit price",
+  "investments_fiscal_advantage_active_since": "Tax advantage active since {date}",
+  "investments_fiscal_advantage_upcoming": "Tax advantage on {date} (in {delay})",
+  "investments_fx_converted_amount": "Amount ≈ {amount}",
+  "investments_fx_rate_automatic_button": "Automatic",
+  "investments_fx_rate_display": "1 {currency} ≈ {rate} €",
+  "investments_fx_rate_manual_button": "Manual rate",
+  "investments_fx_rate_manual_hint": "Exchange rate (1 {currency} in €)",
+  "investments_fx_rate_searching": "Looking up the exchange rate…",
+  "investments_identifier_choose_placeholder": "Choose...",
+  "investments_identifier_generic_hint": "Identifier (ISIN, or free-form: address, reference...)",
+  "investments_identifier_isin_optional_hint": "ISIN (optional: leave blank if the fund doesn't have one)",
+  "investments_identifier_optional_hint": "Identifier (optional: leave blank if the fund doesn't have one)",
+  "investments_identifier_reference_hint": "Reference (optional: serial number, reference...)",
+  "investments_mwr_annualized": "{percent} per year (MWR, money-weighted return)",
+  "investments_mwr_since_start": "{percent} since inception (MWR, less than a year of history)",
+  "investments_net_invested_amount_pending_price": "Net amount invested (price not yet available for all investments)",
+  "investments_new_position_option": "+ New position",
+  "investments_no_data_yet": "No data yet.",
+  "investments_no_transactions_yet": "No transactions yet.",
+  "investments_opened_on": "Opened on {date}",
+  "investments_price_sync_offline_message": "Unable to update prices and performance: check your internet connection.",
+  "investments_property_type_apartment": "Apartment",
+  "investments_property_type_house": "House",
+  "investments_reestimate_dialog_title": "Re-estimate the value (€/m²)",
+  "investments_reestimate_missing_fields_error": "Enter an address and a surface area.",
+  "investments_reestimate_no_comparable_sale_error": "No comparable sale found for this address.",
+  "investments_save_error": "Error while saving: {error}",
+  "investments_surface_m2_label": "Surface area (m²)",
+  "investments_valuation_last_known_price": "Valuation at last known price",
+  "liabilities_delete_confirm_message": "This liability will be permanently deleted.",
+  "liabilities_delete_confirm_title": "Delete \"{name}\"?",
+  "liabilities_paid_off": "Paid off",
+  "liabilities_remaining_balance_subtitle": "Remaining balance, out of {amount} borrowed",
+  "nav_academy": "Academy",
+  "nav_analyses": "Analyses",
+  "nav_assets": "Assets",
+  "nav_assistant": "Assistant",
+  "nav_budget": "Budget",
+  "nav_budget_allocation": "Allocation",
+  "nav_budget_tracking": "Tracking",
+  "nav_dashboard": "Dashboard",
+  "nav_entities": "Entities",
+  "nav_home": "Home",
+  "nav_liabilities": "Liabilities",
+  "nav_patrimoine": "Net worth",
+  "nav_professional": "Professional",
+  "nav_projects": "Projects",
+  "nav_settings": "Settings",
+  "nav_simulation": "Simulation",
+  "nav_simulation_real_estate": "Real estate",
+  "nav_simulation_taxation": "Taxation",
+  "nav_simulation_transmission": "Transmission",
+  "nav_simulation_wealth": "Net worth",
+  "nav_strategy": "Strategy",
+  "nav_tools": "Tools",
+  "settings_account_name_hint": "Name (e.g. Camille)",
+  "settings_add_account": "Add an account",
+  "settings_add_vault": "Add a vault",
+  "settings_api_key": "{provider} API key",
+  "settings_api_key_placeholder": "Paste your API key here",
+  "settings_appearance": "Appearance",
+  "settings_assistant": "AI Assistant",
+  "settings_checking_releases": "Checking GitHub releases...",
+  "settings_cloud_description": "Dialogue with {provider} using your own API key: net worth analyses, educational explanations, questions about your simulations and strategy.",
+  "settings_cloud_include_patrimoine": " and the summary of your net worth",
+  "settings_cloud_warning": "With {provider}, your messages{includePatrimoine} are sent to this provider's servers, off your machine.",
+  "settings_comptes": "Accounts",
+  "settings_comptes_description": "Keep the net worth, budget and strategy notes of each person in the active vault separate.",
+  "settings_create_account": "Create account",
+  "settings_dark": "Dark",
+  "settings_download_install": "Download & install",
+  "settings_encryption": "Vault encryption",
+  "settings_encryption_disable": "Disable encryption",
+  "settings_encryption_disabled": "Encrypt the private data of this vault with a password you define. Public caches (market prices, real estate data, rents...) always stay in clear.",
+  "settings_encryption_enable": "Enable encryption",
+  "settings_encryption_enabled": "The private data of this vault (accounts, budget, liabilities, projects, strategy notes, simulations) is encrypted. The password is asked again at each app launch.",
+  "settings_encryption_regenerate_key": "Generate a new recovery key",
+  "settings_include_patrimoine_context": "Include a summary of my net worth in the model context",
+  "settings_language": "Language",
+  "settings_language_description": "Choose the display language of the application. \"System\" uses your device language.",
+  "settings_language_english": "English",
+  "settings_language_french": "Français",
+  "settings_language_system": "System",
+  "settings_light": "Light",
+  "settings_new_version": "New version detected: {version}",
+  "settings_news": "News",
+  "settings_news_description": "Yahoo Finance news for your held stocks/ETFs, and price variation alerts (CoinGecko) for your held cryptocurrencies. No network request is made if disabled.",
+  "settings_ollama_address": "Ollama server address",
+  "settings_ollama_description": "Dialogue with a local Ollama model (gemma, llama...): net worth analyses, educational explanations, questions about your simulations and strategy. Everything stays on your machine — no data is sent online. Ollama must run in the background (« ollama serve ») and the models are installed with « ollama pull <model> ».",
+  "settings_ollama_reset_default": "Restore default address",
+  "settings_profile_name": "Name",
+  "settings_profile_name_hint": "Name (e.g. Camille)",
+  "settings_profile_relationship": "Relationship",
+  "settings_profile_relationship_hint": "Relationship (e.g. Spouse)",
+  "settings_provider": "Provider",
+  "settings_relation_name": "Relationship",
+  "settings_relationship_hint": "Relationship (e.g. Spouse)",
+  "settings_remote_version_unknown": "Remote version unknown.",
+  "settings_shortcuts": "Keyboard shortcuts",
+  "settings_system": "System",
+  "settings_tax_parameters": "Tax parameters",
+  "settings_tax_parameters_description": "Rates, thresholds and allowances used by the simulators (income tax, IFI, split ownership, donation, inheritance) — update them yourself if the State revises them.",
+  "settings_up_to_date": "You are up to date (latest: {version}).",
+  "settings_update_check_failed": "Unable to check for updates right now.",
+  "settings_vault_activate_failed": "Unable to activate this vault: {error}",
+  "settings_vault_add_failed": "Unable to add a vault: {error}",
+  "settings_vault_forget_failed": "Unable to forget this vault: {error}",
+  "settings_vault_name_hint": "Vault name",
+  "settings_vault_pick_dialog_title": "Choose or create an Opime vault",
+  "settings_vaults": "Vaults",
+  "settings_vaults_description": "Add several vaults, give them a name, switch between them and forget them without touching the data on disk.",
+  "settings_version_installed": "Installed version: {version}",
+  "settings_version_updates": "Version & updates",
+  "settings_view_release": "View release",
+  "shell_assistant_response_ready": "Assistant response ready",
+  "shell_finish_migration_before_export": "Finish the vault migration before exporting.",
+  "shell_migration_pending": "Migration pending",
+  "shell_no_profile_loaded": "No profile loaded",
+  "shell_one_response_ready": "A response is ready",
+  "shell_profiles_load_failed": "Unable to load the profiles. The Vault folder may still be syncing.",
+  "shell_response_interrupted": "Response interrupted",
+  "shell_response_interrupted_subtitle": "The profile or vault changed during generation.",
+  "shell_responses_pending": "{count} responses pending",
+  "shell_retry_after_vault_loaded": "Try again once the vault is loaded.",
+  "shell_unlock_before_export": "Unlock your vault before exporting.",
+  "shell_vault_locked": "Vault locked",
+  "sidebar_account": "Account",
+  "sidebar_accounts": "Accounts",
+  "sidebar_collapse": "Collapse",
+  "sidebar_expand": "Expand",
+  "sidebar_switch_account": "switch account",
+  "@academy_progress_summary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@assistant_configure_api_key_prompt": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistant_document_truncated_subtitle": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistant_error_generic": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistant_no_model_cloud": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "@budget_duplicate_name_suffix": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@budget_redo_tooltip": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "@budget_sankey_deficit_label": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "deficit": {
+        "type": "String"
+      }
+    }
+  },
+  "@budget_sankey_node_label": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@budget_templates_nudge_message": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@budget_undo_tooltip": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "@dashboard_chart_categories_count": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@entities_card_diluted_suffix": {
+    "percent": {
+      "type": "String",
+      "example": "75.0"
+    }
+  },
+  "@entities_card_net_total": {
+    "amount": {
+      "type": "String",
+      "example": "€120,000"
+    }
+  },
+  "@entities_card_ownership_direct": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "@entities_card_ownership_via_parent": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "String"
+      },
+      "parent": {
+        "type": "String"
+      }
+    }
+  },
+  "@entities_dilution_note": {
+    "name": {
+      "type": "String",
+      "example": "Dupont Holding"
+    }
+  },
+  "@entities_ownership_by_parent": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "@entities_ownership_by_user": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "@entities_percent_via_parent_hint": {
+    "name": {
+      "type": "String",
+      "example": "Dupont Holding"
+    }
+  },
+  "@investments_delete_account_confirm_title": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_delete_account_dialog_subtitle": {
+    "placeholders": {
+      "establishment": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_leveraged_estimated_liquidation": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_leveraged_margin": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_leveraged_notional_amount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_merge_dialog_description": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_merge_dialog_title": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_next_unlock": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_unlockable_amount": {
+    "placeholders": {
+      "unlocked": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_wizard_step_number": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "@investments_wizard_step_of_total": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "@navigation_profile_active_toast_title": {
+    "name": {
+      "type": "String",
+      "example": "Me"
+    }
+  },
+  "@navigation_vault_active_toast_title": {
+    "name": {
+      "type": "String",
+      "example": "Primary"
+    }
+  },
+  "@navigation_vault_next_named": {
+    "name": {
+      "type": "String",
+      "example": "Secondary"
+    }
+  },
+  "@navigation_vault_previous_named": {
+    "name": {
+      "type": "String",
+      "example": "Primary"
+    }
+  },
+  "@notifications_crypto_alert_24h": {
+    "placeholders": {
+      "symbol": {
+        "type": "String"
+      },
+      "change": {
+        "type": "String"
+      }
+    }
+  },
+  "@notifications_crypto_price_line": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "@notifications_news_publisher_line": {
+    "placeholders": {
+      "publisher": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@notifications_relative_days": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@notifications_relative_hours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "@notifications_relative_minutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "@onboarding_change_folder_failed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@onboarding_create_folder_failed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@patrimoine_export_failed_subtitle": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@patrimoine_export_success_subtitle": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@real_estate_cashflow_with_loan_note": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@real_estate_delete_document_title": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "@real_estate_delete_rent_period_message": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "@real_estate_delete_work_item_title": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "@real_estate_documents_filter_all": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@real_estate_linked_loan_summary": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      },
+      "balance": {
+        "type": "String"
+      }
+    }
+  },
+  "@real_estate_mark_period_paid_title": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "@real_estate_monthly_cashflow_label": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@real_estate_pricing_heatmap_loading_department_prices": {
+    "placeholders": {
+      "loaded": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@real_estate_pricing_heatmap_neighborhood_tooltip_title": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "@real_estate_pricing_heatmap_sale_count": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@real_estate_work_items_included_note": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@real_estate_work_items_total_label": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@settings_encryption_files_progress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@simulations_loan_capital_repaid_at_maturity": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@simulations_loan_chart_year_label": {
+    "placeholders": {
+      "year": {
+        "type": "int"
+      }
+    }
+  },
+  "@simulations_loan_derived_borrowed_amount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@simulations_loan_during_deferral_monthly_payment": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@simulations_scoring_disposable_income_value": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "@simulations_scoring_duration_years_fractional": {
+    "placeholders": {
+      "years": {
+        "type": "String"
+      }
+    }
+  },
+  "@simulations_scoring_overall_profile_label": {
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "@simulations_scoring_total_points": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "@transactions_export_failed_subtitle": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@transactions_export_success_subtitle": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@transactions_export_transaction_count": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@updates_banner_new_version": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "academy_envelope_ceiling_label": "Ceiling",
+  "academy_envelope_good_to_know_title": "Good to know",
+  "academy_envelope_ideal_for_label": "Ideal for",
+  "academy_envelope_liquidity_label": "Liquidity",
+  "academy_envelope_pitfall_label": "Pitfall — ",
+  "academy_envelope_taxation_label": "Taxation",
+  "academy_level_avance": "Advanced",
+  "academy_level_debutant": "Beginner",
+  "academy_level_intermediaire": "Intermediate",
+  "academy_progress_summary": "{count} / {total} completed",
+  "assistant_attach_document_tooltip": "Attach a document (PDF, TXT, MD)",
+  "assistant_choose_model_first": "Pick a model first",
+  "assistant_configure_api_key_prompt": "Set up your {provider} API key in Settings → AI Assistant.",
+  "assistant_disabled_description": "Enable the assistant in Settings to analyze your net worth, explain financial concepts and answer your questions — with a local Ollama model (no data leaves your machine) or a cloud provider connected via an API key.",
+  "assistant_disabled_title": "AI Assistant disabled",
+  "assistant_document_read_error_generic_title": "Error reading document",
+  "assistant_document_read_error_title": "Unable to read this document",
+  "assistant_document_truncated_subtitle": "\"{fileName}\" exceeds the supported size: only the beginning was sent to the assistant.",
+  "assistant_document_truncated_title": "Document truncated",
+  "assistant_document_truncated_tooltip": "Document truncated: only the beginning was sent to the assistant.",
+  "assistant_empty_state_description": "Ask a question about your net worth, simulations or strategy. Answers use your local data if the context option is enabled.",
+  "assistant_empty_state_title": "What would you like to know?",
+  "assistant_error_generic": "Error: {error}",
+  "assistant_input_placeholder": "Ask a question about your net worth…",
+  "assistant_model_placeholder": "Model",
+  "assistant_model_setup_help": "To enable the assistant: install Ollama from ollama.com and launch it, then run \"ollama pull llama3.2\" in a terminal and click Refresh.",
+  "assistant_multiple_responses_generating": "Multiple responses generating…",
+  "assistant_new_conversation": "New conversation",
+  "assistant_no_model_cloud": "No model available for this {provider} key.",
+  "assistant_no_model_ollama": "No model is installed on Ollama.",
+  "assistant_open_settings": "Open Settings",
+  "assistant_refresh_model_list": "Refresh the list",
+  "assistant_retry": "Retry",
+  "assistant_send": "Send",
+  "assistant_stop_generation": "Stop generation",
+  "assistant_suggestion_analyze_patrimoine": "Analyze my net worth",
+  "assistant_suggestion_explain_allocation": "Explain my allocation",
+  "assistant_suggestion_simulations_summary": "What do my simulations say?",
+  "assistant_suggestion_summarize_strategy": "Summarize my strategy",
+  "budget_add_category": "Add a category",
+  "budget_add_revenue_source": "Add a revenue source",
+  "budget_amount_placeholder": "Amount",
+  "budget_bucket_dettes": "Debts",
+  "budget_bucket_factures": "Bills",
+  "budget_bucket_invest_epargne": "Invest/Savings",
+  "budget_distribution_title": "Distribution",
+  "budget_duplicate_name_suffix": "{name} (copy)",
+  "budget_duplicate_tooltip": "Duplicate this budget",
+  "budget_history_empty": "No budgets saved.",
+  "budget_history_title": "Allocated budgets",
+  "budget_inout_header": "INCOME / EXPENSES",
+  "budget_landscape_suggestion": "Use landscape mode for better readability",
+  "budget_legend_realite": "Actual",
+  "budget_load_error": "Unable to load budgets. Make sure the Vault folder is accessible.",
+  "budget_month_april": "April",
+  "budget_month_august": "August",
+  "budget_month_december": "December",
+  "budget_month_february": "February",
+  "budget_month_flow_title": "Monthly flow",
+  "budget_month_january": "January",
+  "budget_month_july": "July",
+  "budget_month_june": "June",
+  "budget_month_march": "March",
+  "budget_month_may": "May",
+  "budget_month_november": "November",
+  "budget_month_october": "October",
+  "budget_month_september": "September",
+  "budget_name_placeholder": "Budget name",
+  "budget_new_budget": "New budget",
+  "budget_no_data": "No data",
+  "budget_no_results": "No results.",
+  "budget_redo_shortcut_windows": "Ctrl+Shift+Z",
+  "budget_redo_tooltip": "Redo ({shortcut})",
+  "budget_remaining_amount_label": "Remaining amount",
+  "budget_revenue_name_placeholder": "Revenue name",
+  "budget_sankey_deficit_label": "{label}: {amount} (deficit of {deficit})",
+  "budget_sankey_empty_message": "Add revenues, expenses or investments to see the flow.",
+  "budget_sankey_expense_fallback": "Expense",
+  "budget_sankey_investment_fallback": "Investment",
+  "budget_sankey_no_data_fallback": "No data yet for this flow.",
+  "budget_sankey_node_label": "{label}: {amount}",
+  "budget_sankey_revenue_fallback": "Revenue",
+  "budget_sankey_uncategorized": "Uncategorized",
+  "budget_save_chart_dialog_title": "Save chart",
+  "budget_saved_toast": "Budget saved",
+  "budget_search_placeholder": "Search budgets...",
+  "budget_section_depenses": "EXPENSES",
+  "budget_section_dettes": "DEBTS",
+  "budget_section_factures": "BILLS",
+  "budget_section_invest_epargne": "INVEST / SAVINGS",
+  "budget_section_projets": "PROJECTS",
+  "budget_section_revenues": "REVENUES",
+  "budget_summary_available": " available.",
+  "budget_summary_expenses": ", expenses of ",
+  "budget_summary_inout_title": "Income/expense summary",
+  "budget_summary_intro": "Your savings rate is ",
+  "budget_summary_invest": " and invest ",
+  "budget_summary_possible_rate": " (possible savings rate: ",
+  "budget_summary_remaining": " every month, you have ",
+  "budget_summary_row_depenses": "- Expenses",
+  "budget_summary_row_dettes": "- Debts",
+  "budget_summary_row_factures": "- Bills",
+  "budget_summary_row_invest": "- Invest/Savings",
+  "budget_summary_row_projets": "- Projects",
+  "budget_summary_row_remaining": "REMAINING",
+  "budget_summary_row_revenues": "+ Revenues",
+  "budget_summary_total_income": "). Your total income is ",
+  "budget_tab_expenses": "Expenses",
+  "budget_tab_investments": "Investments",
+  "budget_tab_revenues": "Revenues",
+  "budget_templates_nudge_apply": "Add to month",
+  "budget_templates_nudge_message": "{count, plural, =1{1 recurring line available — add it to this month?} other{{count} recurring lines available — add them to this month?}}",
+  "budget_tracking_sankey_empty_message": "Enter amounts in the Actual columns to see this month's flow.",
+  "budget_tracking_subtitle": "Tracking board",
+  "budget_undo_tooltip": "Undo ({shortcut})",
+  "common_continue": "Continue",
+  "common_retry": "Retry",
+  "core_ui_new_vault_kind_prompt": "This vault is...",
+  "core_ui_new_vault_title": "New vault",
+  "core_ui_pick_date": "Pick a date",
+  "core_ui_vault_kind_personal": "Personal",
+  "dashboard_chart_all_categories": "All",
+  "dashboard_chart_categories_count": "{count} classes",
+  "dashboard_chart_category_empty": "(empty)",
+  "dashboard_column_change": "Change",
+  "dashboard_column_pnl": "+/- value",
+  "dashboard_column_pru": "Avg. cost",
+  "dashboard_column_value": "Value",
+  "dashboard_extreme_percent_tooltip": "Huge percentage because the period starts with a very small amount (e.g. first tiny transaction) — most of the increase comes from contributions added since, not actual gains.",
+  "dashboard_mwr_tooltip": "Return calculated taking into account the amount and date of each contribution (MWR method): it reflects the return actually earned.",
+  "dashboard_patrimoine_brut_label": "Gross net worth",
+  "dashboard_patrimoine_net_label": "Net worth",
+  "dashboard_top_assets_title": "Top performers",
+  "dashboard_view_by_account": "By account",
+  "dashboard_view_by_investment": "By investment",
+  "entities_accounts_section_title": "Accounts",
+  "entities_add_button": "Add an entity",
+  "entities_card_diluted_suffix": "{percent} % is your final share",
+  "entities_card_net_total": "of {amount} net",
+  "entities_card_ownership_direct": "{type} · {percent} % owned",
+  "entities_card_ownership_via_parent": "{type} · {percent} % owned via {parent}",
+  "entities_delete_confirm_message": "This entity will be permanently deleted. Its existing accounts/liabilities are not deleted but will no longer be linked to any entity.",
+  "entities_detail_load_error": "Unable to load this entity's accounts. Check that the Vault folder is accessible.",
+  "entities_dilution_note": "Do not count this entity's value in the balance sheet of {name} — the ownership link handles this.",
+  "entities_editor_edit_title": "Edit entity",
+  "entities_editor_new_title": "New entity",
+  "entities_empty_list_hint": "No entities yet — add a holding, a commercial company, an SCI, or a pro account.",
+  "entities_included_in_net_worth_hint": "Included in your net worth (Dashboard, Analyses).",
+  "entities_liabilities_section_title": "Liabilities",
+  "entities_load_error": "Unable to load entities. Check that the Vault folder is accessible.",
+  "entities_name_hint": "Name (e.g. Dupont Holding)",
+  "entities_name_required_error": "Name is required.",
+  "entities_net_value_label": "Net value",
+  "entities_no_accounts_yet": "No accounts yet — use \"Complete my net worth\" while selecting this entity.",
+  "entities_no_liabilities_yet": "No liabilities yet.",
+  "entities_owned_by_label": "Owned by",
+  "entities_owned_by_self": "Me (directly)",
+  "entities_ownership_by_parent": "{type} · {percent} % owned by its parent company",
+  "entities_ownership_by_user": "{type} · {percent} % owned by you",
+  "entities_parent_company_fallback": "its parent company",
+  "entities_percent_direct_hint": "% owned directly by you",
+  "entities_percent_via_parent_hint": "% owned by {name}",
+  "entities_total_net_value_label": "Net value held via professional entities",
+  "entities_type_label": "Type",
+  "investments_account_description_hint": "Description (optional, e.g. Holiday savings)",
+  "investments_account_has_transactions": "contains transactions",
+  "investments_account_name_hint_crypto": "Account name (e.g. Coinbase)",
+  "investments_account_name_hint_generic": "Account name",
+  "investments_account_name_hint_precious_metals": "Account name (e.g. Personal safe)",
+  "investments_account_name_hint_private_equity": "Account name (e.g. Moonfare)",
+  "investments_account_name_hint_real_estate": "Account name (e.g. Primary residence)",
+  "investments_account_name_hint_savings": "Account name (e.g. Savings account)",
+  "investments_account_name_hint_stocks": "Account name (e.g. PEA Boursorama)",
+  "investments_add_custom_type_label": "+ New type",
+  "investments_bank_name_hint": "Bank (e.g. Boursorama)",
+  "investments_comment_hint": "Comment (optional)",
+  "investments_country_breakdown_title": "Country breakdown",
+  "investments_country_placeholder": "Country",
+  "investments_create_account_label": "Create account",
+  "investments_create_investment_label": "Create investment",
+  "investments_create_liability_label": "Create liability",
+  "investments_cumulative_funding_number_error": "Cumulative funding must be a number.",
+  "investments_delete_account_confirm_message": "This account and its investments (without transactions) will be permanently deleted.",
+  "investments_delete_account_confirm_title": "Delete \"{name}\"?",
+  "investments_delete_account_dialog_subtitle": "Accounts at {establishment} — only those without transactions can be deleted.",
+  "investments_delete_account_dialog_title": "Delete an account",
+  "investments_entry_price_label": "Entry price",
+  "investments_establishment_name_hint": "Establishment name (e.g. Boursorama)",
+  "investments_exercise_deadline_hint": "Exercise deadline (optional)",
+  "investments_existing_accounts_label": "Existing accounts",
+  "investments_finish_without_transaction_label": "Finish without transaction",
+  "investments_fund_style_hint": "Management style (optional)",
+  "investments_fund_style_placeholder": "Management style",
+  "investments_item_name_hint": "Name (e.g. Rolex Submariner)",
+  "investments_label_hint_precious_metals": "Label (e.g. Amundi Physical Gold ETC)",
+  "investments_label_hint_private_equity": "Label (e.g. Ardian Expansion Fund)",
+  "investments_label_hint_stocks": "Label (e.g. TotalEnergies)",
+  "investments_leverage_hint": "Leverage (e.g. 2)",
+  "investments_leveraged_edit_title": "Edit position",
+  "investments_leveraged_entry_fx_rate_required_error": "The entry price exchange rate is required.",
+  "investments_leveraged_entry_price_positive_error": "The entry price must be greater than 0.",
+  "investments_leveraged_estimated_liquidation": "Liquidation (estimated): {amount}",
+  "investments_leveraged_leverage_positive_error": "Leverage must be greater than 0.",
+  "investments_leveraged_margin": "Margin: {amount}",
+  "investments_leveraged_market_required_error": "The market (e.g. BTC) is required.",
+  "investments_leveraged_new_title": "New leveraged position",
+  "investments_leveraged_notional_amount": "Position amount: {amount}",
+  "investments_leveraged_opening_date_required_error": "The opening date is required.",
+  "investments_leveraged_position_label": "Leveraged position",
+  "investments_leveraged_save_impossible_title": "Unable to save position",
+  "investments_leveraged_size_positive_error": "Size must be greater than 0.",
+  "investments_linked_asset_label": "Linked asset (optional)",
+  "investments_mark_price_positive_error": "The mark price must be greater than 0.",
+  "investments_market_hint": "Market (e.g. BTC)",
+  "investments_market_placeholder": "Market",
+  "investments_merge_choose_destination_message": "Choose the position to merge into.",
+  "investments_merge_dialog_description": "To fix the same position entered twice under different names — not for a real financial move (use \"Arbitrate\" for that). All transactions of \"{label}\" are moved as-is (same dates, quantities, prices) to the position chosen below, then \"{label}\" is deleted. This action is irreversible.",
+  "investments_merge_dialog_title": "Merge \"{label}\"",
+  "investments_merge_impossible_title": "Unable to merge",
+  "investments_merge_no_other_position_message": "No other position in this account to merge into.",
+  "investments_merge_submit_button": "Merge",
+  "investments_merge_target_label": "Merge into",
+  "investments_new_account_section_label": "New account",
+  "investments_new_custom_type_hint": "e.g. Collectible wines",
+  "investments_new_custom_type_title": "New type",
+  "investments_next_unlock": "Next unlock: {amount} on {date}",
+  "investments_note_hint": "Note (optional)",
+  "investments_opening_date_hint": "Opening date (optional)",
+  "investments_opening_date_label": "Opening date",
+  "investments_real_estate_name_hint": "Property name (e.g. Lyon 6th apartment)",
+  "investments_refresh_impossible_title": "Unable to refresh",
+  "investments_revert_to_single_value_label": "Revert to single value",
+  "investments_sector_breakdown_title": "Sector breakdown",
+  "investments_sector_placeholder": "Sector",
+  "investments_side_label": "Side",
+  "investments_size_label": "Size",
+  "investments_stop_loss_hint": "Stop loss (optional)",
+  "investments_take_profit_hint": "Take profit (optional)",
+  "investments_transaction_buy_label": "Buy",
+  "investments_transaction_sell_label": "Sell",
+  "investments_unlock_date_hint": "Unlock date",
+  "investments_unlockable_amount": "Unlockable: {unlocked} of {total}",
+  "investments_unlocked_on_label": "Unlocked on",
+  "investments_vesting_cliff_hint": "Cliff (months, optional)",
+  "investments_vesting_duration_hint": "Vesting duration (months, optional)",
+  "investments_wizard_account_title": "Which account?",
+  "investments_wizard_add_item_label": "Add item",
+  "investments_wizard_asset_class_title": "Which asset class?",
+  "investments_wizard_asset_item_title": "Which item?",
+  "investments_wizard_asset_label": "An asset",
+  "investments_wizard_asset_sublabel": "Real estate, stocks, savings, crypto...",
+  "investments_wizard_continue_label": "Continue",
+  "investments_wizard_create_currency_label": "Create currency",
+  "investments_wizard_currency_title": "Which currency?",
+  "investments_wizard_establishment_title": "Which establishment?",
+  "investments_wizard_investment_or_currency_title": "Which investment or currency?",
+  "investments_wizard_investment_title": "Which investment?",
+  "investments_wizard_item_title": "Which item?",
+  "investments_wizard_kind_title": "What do you want to add?",
+  "investments_wizard_liability_label": "A liability",
+  "investments_wizard_liability_sublabel": "Mortgage, consumer loan...",
+  "investments_wizard_liability_type_title": "Which liability type?",
+  "investments_wizard_new_account_label": "New account",
+  "investments_wizard_new_asset_item_label": "New item",
+  "investments_wizard_new_currency_label": "New currency",
+  "investments_wizard_new_entity_label": "New entity",
+  "investments_wizard_new_entity_sublabel": "Holding company, business, SCI, pro account...",
+  "investments_wizard_new_establishment_label": "New establishment",
+  "investments_wizard_new_investment_label": "New investment",
+  "investments_wizard_new_investment_or_currency_label": "New investment or currency",
+  "investments_wizard_new_item_label": "New item",
+  "investments_wizard_new_liability_title": "New liability",
+  "investments_wizard_no_precise_type": "No specific type",
+  "investments_wizard_owner_title": "Who does this belong to?",
+  "investments_wizard_step_number": "Step {n}",
+  "investments_wizard_step_of_total": "Step {current} of {total}",
+  "investments_wizard_step_preliminary": "Preliminary step",
+  "investments_wizard_toggle_currency": "Currency",
+  "investments_wizard_toggle_investment": "Investment",
+  "liabilities_deferral_duration_label": "Deferral duration (months)",
+  "liabilities_deferral_partial": "Partial",
+  "liabilities_deferral_total": "Full",
+  "liabilities_deferral_type_label": "Deferment type",
+  "liabilities_deferred_loan_label": "Deferred loan",
+  "liabilities_down_payment_hint": "Down payment (€, 0 if none)",
+  "liabilities_installments_count_label": "Number of installments (months)",
+  "liabilities_interest_rate_label": "Interest rate (%)",
+  "liabilities_loan_type_amortizing": "Amortizing",
+  "liabilities_loan_type_in_fine": "Bullet",
+  "liabilities_monthly_insurance_label": "Monthly insurance (€)",
+  "liabilities_name_hint": "Name (e.g. Primary residence loan)",
+  "liabilities_price_total_label": "Total price (€)",
+  "liabilities_start_date_label": "Start date",
+  "navigation_account_activated": "Account activated",
+  "navigation_amounts_hide": "Hide amounts",
+  "navigation_amounts_show": "Show amounts",
+  "navigation_complete_patrimoine": "Complete my net worth",
+  "navigation_export_download_patrimoine_pdf": "Download my net worth (PDF)",
+  "navigation_export_tooltip": "Export",
+  "navigation_export_transactions_csv_json": "Export transactions (JSON/CSV)",
+  "navigation_profile_active_toast_title": "Active profile: {name}",
+  "navigation_vault_activate_failed_toast_title": "Unable to activate this vault",
+  "navigation_vault_active_toast_title": "Active vault: {name}",
+  "navigation_vault_fallback_label": "Vault",
+  "navigation_vault_next": "Next vault",
+  "navigation_vault_next_named": "Next vault: {name}",
+  "navigation_vault_previous": "Previous vault",
+  "navigation_vault_previous_named": "Previous vault: {name}",
+  "navigation_vault_switched_toast_subtitle": "Switched from account switcher",
+  "notifications_crypto_alert_24h": "{symbol} {change}% in 24h",
+  "notifications_crypto_price_line": "{name} · {price} €",
+  "notifications_empty": "No news for now.",
+  "notifications_news_publisher_line": "{publisher} · {time}",
+  "notifications_relative_days": "{days}d ago",
+  "notifications_relative_hours": "{hours}h ago",
+  "notifications_relative_minutes": "{minutes}min ago",
+  "notifications_relative_now": "just now",
+  "notifications_title": "News",
+  "onboarding_change_folder_failed": "Unable to change folder: {error}",
+  "onboarding_change_vault_folder": "Change vault folder",
+  "onboarding_choose_password": "Choose a password.",
+  "onboarding_confirm_new_password": "Confirm new password",
+  "onboarding_create_folder_failed": "Unable to create the data folder: {error}",
+  "onboarding_creating": "Creating...",
+  "onboarding_description": "Choose where your data will be stored. You can start locally and move this folder to a cloud service (iCloud, Google Drive, Dropbox...) later.",
+  "onboarding_forgot_password": "Forgot password?",
+  "onboarding_migration_interrupted_continue": "I understand, continue anyway",
+  "onboarding_migration_interrupted_description": "An encryption or decryption operation on this vault was interrupted before it finished (the app may have been closed during the operation). Some private files may have remained in a previous state while others are already up to date.",
+  "onboarding_migration_interrupted_recommendation": "Recommended: restart the operation from Settings (Enable/Disable encryption) once you are informed — it will bring all files to the same state. If a specific file then refuses to load, it will be a sign that it needs to be restored from a backup.",
+  "onboarding_migration_interrupted_title": "Encryption interrupted",
+  "onboarding_new_password": "New password",
+  "onboarding_password": "Password",
+  "onboarding_password_incorrect": "Incorrect password.",
+  "onboarding_passwords_mismatch": "The two passwords do not match.",
+  "onboarding_pick_location": "Choose a location",
+  "onboarding_recovery_description": "Enter the recovery key you received when encryption was enabled.",
+  "onboarding_recovery_key_hint": "Recovery key (e.g. XXXX-XXXX-XXXX-XXXX)",
+  "onboarding_recovery_key_incorrect": "Incorrect recovery key.",
+  "onboarding_recovery_new_password_description": "Your recovery key is valid. Choose a new password for this vault.",
+  "onboarding_recovery_new_password_title": "New password",
+  "onboarding_recovery_saving": "Saving...",
+  "onboarding_recovery_set_and_unlock": "Set and unlock",
+  "onboarding_recovery_title": "Vault recovery",
+  "onboarding_recovery_validate_key": "Validate key",
+  "onboarding_recovery_verifying": "Verifying...",
+  "onboarding_selecting": "Selecting...",
+  "onboarding_unlock": "Unlock",
+  "onboarding_unlock_description": "This vault is encrypted. Enter your password to access your data.",
+  "onboarding_unlocking": "Unlocking...",
+  "onboarding_vault_kind_prompt": "This vault is...",
+  "onboarding_welcome_title": "Welcome to Opime",
+  "patrimoine_export_failed_subtitle": "The PDF could not be generated or saved: {error}",
+  "patrimoine_export_generate_pdf": "Generate PDF",
+  "patrimoine_export_save_dialog_title": "Save net worth (PDF)",
+  "patrimoine_export_subtitle": "Select assets and liabilities to include in the PDF.",
+  "patrimoine_export_success_subtitle": "The PDF has been saved: {path}",
+  "patrimoine_export_title": "Download my net worth",
+  "real_estate_add_document_title": "Add a document",
+  "real_estate_add_rent_period_button": "Add a period",
+  "real_estate_add_work_item_button": "Add an item",
+  "real_estate_add_work_item_title": "Add a work item",
+  "real_estate_amount_due_label": "Amount due (rent + charges)",
+  "real_estate_amount_received_label": "Amount received",
+  "real_estate_annual_charges_not_tracked_note": "Annual charges (property tax, insurance, management...) not yet tracked: net yield equals gross yield.",
+  "real_estate_annual_rental_income_label": "Annual rental income",
+  "real_estate_cashflow_no_loan_note": "No linked loan (see above): cash flow calculated for cash purchase, without loan repayment.",
+  "real_estate_cashflow_with_loan_note": "Loan repayment deducted: {amount}.",
+  "real_estate_continue_button": "Continue",
+  "real_estate_create_mortgage_loan": "Create a mortgage",
+  "real_estate_create_work_loan": "Create a work loan",
+  "real_estate_delete_document_message": "The file will be permanently deleted from the vault.",
+  "real_estate_delete_document_title": "Delete \"{fileName}\"?",
+  "real_estate_delete_rent_period_message": "The period {period} will be permanently removed from the rent history.",
+  "real_estate_delete_rent_period_title": "Delete this period?",
+  "real_estate_delete_work_item_message": "This work item will be permanently removed.",
+  "real_estate_delete_work_item_title": "Delete \"{label}\"?",
+  "real_estate_document_category_invoice": "Invoice",
+  "real_estate_document_category_other": "Other",
+  "real_estate_document_category_photo": "Photo",
+  "real_estate_document_category_plan": "Plan",
+  "real_estate_document_category_receipt": "Receipt",
+  "real_estate_document_name_hint": "Document name (optional)",
+  "real_estate_documents_filter_all": "All ({count})",
+  "real_estate_documents_title": "Documents",
+  "real_estate_gross_yield_label": "Gross yield",
+  "real_estate_link_existing_loan": "Link an existing loan",
+  "real_estate_linked_loan_summary": "{name} · {type} · {balance}",
+  "real_estate_mark_period_paid_title": "Mark {period} as paid",
+  "real_estate_month_label": "Month",
+  "real_estate_monthly_cashflow_label": "Monthly cash flow: {amount}",
+  "real_estate_net_yield_label": "Net yield",
+  "real_estate_no_documents_yet": "No documents yet.",
+  "real_estate_no_rent_periods_yet": "No rent periods tracked yet.",
+  "real_estate_no_work_items_yet": "No work items yet.",
+  "real_estate_not_self_financed": "Not self-financed",
+  "real_estate_note_optional_label": "Note (optional)",
+  "real_estate_payment_date_label": "Payment date",
+  "real_estate_pricing_address_search_placeholder": "Search for an address...",
+  "real_estate_pricing_heatmap_loading_communes": "Loading visible communes...",
+  "real_estate_pricing_heatmap_loading_department_prices": "Loading department prices: {loaded} / {total} (cached, next opening will be instant)",
+  "real_estate_pricing_heatmap_loading_grid": "Loading fine grid...",
+  "real_estate_pricing_heatmap_neighborhood_tooltip_title": "Neighborhood (~{size} m)",
+  "real_estate_pricing_heatmap_no_data": "No data",
+  "real_estate_pricing_heatmap_rent_commune_only": "Rent is only available at the commune level (native granularity of the source).",
+  "real_estate_pricing_heatmap_sale_count": "{count} sale(s)",
+  "real_estate_profitability_no_rent_hint": "Add rent periods (Rent tab) to calculate the profitability of this property.",
+  "real_estate_rent_paid": "Paid",
+  "real_estate_rent_periods_title": "Rent",
+  "real_estate_rent_unpaid": "Unpaid",
+  "real_estate_self_financed": "Self-financed",
+  "real_estate_tenant_optional_label": "Tenant (optional)",
+  "real_estate_total_project_cost_label": "Total project cost",
+  "real_estate_work_category_electrical": "Electrical",
+  "real_estate_work_category_furniture": "Furniture",
+  "real_estate_work_category_other": "Other",
+  "real_estate_work_category_paint": "Paint",
+  "real_estate_work_category_plumbing": "Plumbing",
+  "real_estate_work_category_structural": "Structural",
+  "real_estate_work_item_amount_label": "Amount",
+  "real_estate_work_item_category_optional_label": "Category (optional)",
+  "real_estate_work_item_label_field": "Label",
+  "real_estate_work_item_label_hint": "E.g.: Roof repair",
+  "real_estate_work_items_included_note": "Including {amount} in work (Work tab).",
+  "real_estate_work_items_title": "Work",
+  "real_estate_work_items_total_label": "Total: {amount}",
+  "search_category_enveloppe": "Envelopes",
+  "search_category_fondamentaux": "Fundamentals",
+  "search_category_formation": "Training",
+  "search_category_page": "Pages",
+  "search_category_patrimoine": "Net Worth",
+  "search_category_vocabulaire": "Vocabulary",
+  "search_no_results": "No results",
+  "search_placeholder": "Search in Opime...",
+  "settings_encryption_confirm_password": "Confirm password",
+  "settings_encryption_continue": "Continue",
+  "settings_encryption_dont_close_app": "Do not close the application during this operation (window closing is blocked until it completes).",
+  "settings_encryption_enable_description": "Choose a password to encrypt the private data of this vault (accounts, budget, liabilities, projects, strategy notes, simulations). It will be asked again at each app launch.",
+  "settings_encryption_encrypting_progress_label": "Encrypting data...",
+  "settings_encryption_files_progress": "{done} / {total} file(s)",
+  "settings_encryption_preparing": "Preparing...",
+  "settings_encryption_recovery_key_confirmed_checkbox": "I have saved this key in a safe place",
+  "settings_encryption_recovery_key_description": "Save it in a safe place (password manager, paper...). It allows you to reset your password if you forget it — without it, your data is permanently lost. It will never be displayed again.",
+  "settings_encryption_recovery_key_title": "Your recovery key",
+  "settings_tax_abattement_conjoint_label": "Spouse/PACS partner (€)",
+  "settings_tax_abattement_enfant_label": "Child (€)",
+  "settings_tax_abattement_petit_enfant_label": "Grandchild (€)",
+  "settings_tax_abattements_title": "Allowances",
+  "settings_tax_bareme_epoux_title": "Scale between spouses or PACS partners",
+  "settings_tax_bareme_ligne_directe_title": "Direct line scale (parent/child)",
+  "settings_tax_bracket_beyond": "Beyond",
+  "settings_tax_bracket_nue_propriete_percent": "Bare ownership (%)",
+  "settings_tax_bracket_rate_percent": "Rate (%)",
+  "settings_tax_bracket_upto_eur": "Up to (€)",
+  "settings_tax_bracket_upto_years": "Up to (years)",
+  "settings_tax_demembrement_description": "Tax scale for usufruct based on the age of the usufructuary (article 669 CGI) — see the Simulation → Transmission page, Split ownership tab.",
+  "settings_tax_demembrement_title": "Split ownership (usufruct / bare ownership)",
+  "settings_tax_donation_description": "Gift and inheritance tax scales (article 777 CGI) and allowances by family relationship — see the Simulation → Transmission page, Split ownership/Donation/Inheritance tabs.",
+  "settings_tax_donation_title": "Donation and inheritance",
+  "settings_tax_ifi_description": "Rate scale by brackets of net real estate wealth (article 977 CGI) and threshold below which IFI is not due at all.",
+  "settings_tax_ifi_threshold_label": "Tax threshold (€) — total exemption below",
+  "settings_tax_ifi_title": "IFI (real estate wealth tax)",
+  "settings_tax_ir_description": "Progressive rate scale per family quotient share (article 197 CGI) — see the Simulation → Taxation page, Income tax tab.",
+  "settings_tax_ir_title": "Income tax",
+  "settings_tax_page_description": "Rates, thresholds and allowances used by the simulators (income tax, IFI, split ownership, donation and inheritance). Edit a value here if the State revises it, without waiting for a software update — each can be individually reset to its known legal reference via the ↺ icon that appears next to a modified value.",
+  "settings_tax_pfu_description": "\"Flat tax\" on capital income and capital gains, broken down into its income tax part and its social contributions part — the State can revise one without the other (e.g. social contributions went from 15.5% to 17.2% in 2018, then to 18.6% in early 2026, without touching the income tax rate). Reference values only for now: no app simulator uses them in a calculation yet.",
+  "settings_tax_pfu_ir_label": "Income tax part (%)",
+  "settings_tax_pfu_ps_label": "Social contributions part (%)",
+  "settings_tax_pfu_title": "PFU (flat tax)",
+  "settings_tax_reset_to_legal_value": "Reset to legal value",
+  "simulations_loan_application_fees_label": "Application fees",
+  "simulations_loan_capital_repaid_at_maturity": "Capital repaid in a lump sum at maturity: {amount}",
+  "simulations_loan_chart_average_monthly_payment": "average monthly payment",
+  "simulations_loan_chart_capital": "Capital",
+  "simulations_loan_chart_insurance": "Insurance",
+  "simulations_loan_chart_interest": "Interest",
+  "simulations_loan_chart_today": "Today",
+  "simulations_loan_chart_year_label": "Year {year}",
+  "simulations_loan_deferral_duration_label": "Deferral duration",
+  "simulations_loan_deferral_label": "Repayment deferral",
+  "simulations_loan_deferral_partial": "Partial moratorium",
+  "simulations_loan_deferral_partial_explanation": "Only interest is paid during the deferral; the principal remains unchanged.",
+  "simulations_loan_deferral_total": "Full moratorium",
+  "simulations_loan_deferral_total_explanation": "No payment during the deferral; interest is added to the outstanding principal.",
+  "simulations_loan_derived_borrowed_amount": "Borrowed amount (derived): {amount}",
+  "simulations_loan_disclaimer": "Indicative loan simulation: results are based on simplified assumptions (constant rate, linear insurance, fixed fees). Actual bank conditions, guarantees, and contractual terms may change the total cost of credit.",
+  "simulations_loan_down_payment_label": "Down payment",
+  "simulations_loan_during_deferral_monthly_payment": "During deferral: {amount}/mo",
+  "simulations_loan_guarantee_fees_label": "Guarantee fees",
+  "simulations_loan_including_insurance": "Including insurance",
+  "simulations_loan_interest_rate_label": "Interest rate",
+  "simulations_loan_monthly_insurance_label": "Monthly insurance",
+  "simulations_loan_monthly_payments_label": "Monthly payments",
+  "simulations_loan_per_month_suffix": "mo",
+  "simulations_loan_project_amount_label": "Project amount",
+  "simulations_loan_repayment_duration_label": "Repayment duration",
+  "simulations_loan_reset_parameters": "Reset parameters",
+  "simulations_loan_suffix_eur_per_month": "€/mo",
+  "simulations_loan_suffix_months": "months",
+  "simulations_loan_suffix_years": "years",
+  "simulations_loan_summary_monthly_payment_is": ", your monthly payment is ",
+  "simulations_loan_summary_over": " over ",
+  "simulations_loan_summary_prefix": "For a loan of ",
+  "simulations_loan_total_cost_incl_fees_label": "Total cost (incl. fees)",
+  "simulations_loan_total_credit_cost_label": "Total credit cost",
+  "simulations_loan_type_amortizing": "Amortizing",
+  "simulations_loan_type_infine": "Bullet",
+  "simulations_loan_type_label": "Loan type",
+  "simulations_real_estate_tab_estimation": "Estimation",
+  "simulations_real_estate_tab_loan": "Loan",
+  "simulations_real_estate_tab_scoring": "Scoring",
+  "simulations_scoring_age_label": "Age",
+  "simulations_scoring_bank_history_label": "Bank history",
+  "simulations_scoring_bank_history_none_1y": "No incidents (< 1 yr)",
+  "simulations_scoring_bank_history_none_3y": "No incidents (≥ 3 yrs)",
+  "simulations_scoring_bank_history_none_6m": "No incidents (< 6 mo)",
+  "simulations_scoring_bank_history_one_6m": "1 incident (< 6 mo)",
+  "simulations_scoring_bank_history_several_6m": "Several incidents (< 6 mo)",
+  "simulations_scoring_debt_ratio_label": "Debt ratio",
+  "simulations_scoring_disclaimer": "Educational and indicative estimate: the scoring grid used here is a common simplification of standard bank criteria, not the benchmark of any specific institution. A bank's actual scoring takes many more factors into account (collateral, assets, current internal policy…).",
+  "simulations_scoring_disposable_income_label": "Disposable income",
+  "simulations_scoring_disposable_income_value": "{value} €/yr",
+  "simulations_scoring_duration_years_fractional": "{years} yrs",
+  "simulations_scoring_household_monthly_income_label": "Household monthly income",
+  "simulations_scoring_income_charges_section_label": "Income & expenses",
+  "simulations_scoring_income_seniority_label": "Income seniority",
+  "simulations_scoring_income_stability_label": "Income stability",
+  "simulations_scoring_monthly_expenses_label": "Monthly expenses (excl. mortgage)",
+  "simulations_scoring_monthly_savings_label": "Monthly savings",
+  "simulations_scoring_mortgage_payment_label": "Mortgage payment",
+  "simulations_scoring_overall_profile_label": "{tier} profile",
+  "simulations_scoring_prefilled_from_loan_tab": "Pre-filled from the Loan tab until modified here.",
+  "simulations_scoring_profession_employee": "Employee",
+  "simulations_scoring_profession_executive": "Executive",
+  "simulations_scoring_profession_executive_senior": "Senior executive",
+  "simulations_scoring_profession_label": "Profession",
+  "simulations_scoring_profession_unemployed": "Unemployed",
+  "simulations_scoring_profession_worker": "Worker",
+  "simulations_scoring_profile_section_label": "Profile",
+  "simulations_scoring_savings_effort_label": "Savings effort",
+  "simulations_scoring_suffix_shares": "shares",
+  "simulations_scoring_tax_shares_label": "Tax shares",
+  "simulations_scoring_tier_average": "Average",
+  "simulations_scoring_tier_critical": "Critical",
+  "simulations_scoring_tier_excellent": "Excellent",
+  "simulations_scoring_tier_good": "Good",
+  "simulations_scoring_tier_poor": "Poor",
+  "simulations_scoring_total_points": "{points} / 35 points",
+  "transactions_export_deselect_all": "Deselect all",
+  "transactions_export_empty": "No transactions to export yet.",
+  "transactions_export_failed_subtitle": "The file could not be generated or saved: {error}",
+  "transactions_export_failed_title": "Export failed",
+  "transactions_export_save_dialog_title": "Save transactions",
+  "transactions_export_select_all": "Select all",
+  "transactions_export_subtitle": "Select accounts to include.",
+  "transactions_export_success_subtitle": "The file has been saved: {path}",
+  "transactions_export_success_title": "Export successful",
+  "transactions_export_title": "Export my transactions",
+  "transactions_export_transaction_count": "{count, plural, =1{1 transaction} other{{count} transactions}}",
+  "updates_banner_new_version": "A new version of Opime is available ({version}).",
+  "nav_assets_actions_funds": "Stocks & Funds",
+  "nav_assets_private_equity": "Private Equity",
+  "nav_assets_real_estate": "Real estate",
+  "nav_assets_crypto": "Crypto",
+  "nav_assets_precious_metals": "Precious metals",
+  "nav_assets_savings": "Savings",
+  "nav_assets_other": "Other",
+  "nav_liabilities_loans": "Loans",
+  "nav_liabilities_mortgages": "Real estate loans",
+  "nav_investment": "Fundamentals",
+  "nav_invest_why": "Why invest?",
+  "nav_invest_inflation": "Inflation",
+  "nav_invest_risk": "Risk",
+  "nav_invest_diversification": "Diversification",
+  "nav_invest_etf": "ETFs",
+  "nav_invest_fees": "Fees",
+  "nav_invest_taxation": "Taxation",
+  "nav_invest_pyramid": "Investment pyramid",
+  "nav_invest_allocation": "Strategic/dynamic allocation",
+  "nav_invest_long_term": "The long term",
+  "nav_envelopes": "Tax wrappers",
+  "nav_envelope_current_account": "Current account",
+  "nav_envelope_livret_a": "Livret A",
+  "nav_envelope_ldds": "LDDS",
+  "nav_envelope_lep": "LEP",
+  "nav_envelope_pel": "PEL",
+  "nav_envelope_cto": "CTO",
+  "nav_envelope_pea": "PEA",
+  "nav_envelope_life_insurance": "Life insurance",
+  "nav_envelope_capitalization_contract": "Capitalization contract",
+  "nav_envelope_pee_peg": "PEE / PEG",
+  "nav_envelope_per": "PER",
+  "nav_training": "Training",
+  "nav_training_stock_market": "Stock market",
+  "nav_training_precious_metals": "Precious metals",
+  "nav_training_crypto": "Crypto",
+  "nav_training_real_estate": "Real estate",
+  "nav_training_wealth_structuring": "Wealth structuring",
+  "simulations_wealth_tab_compound_interest": "Compound interest",
+  "simulations_wealth_tab_deterministic_compound_interest": "Deterministic (Compound interest)",
+  "simulations_wealth_tab_monte_carlo": "Monte-Carlo",
+  "simulations_wealth_tab_stochastic_monte_carlo": "Stochastic (Monte-Carlo)",
+  "simulations_wealth_simple_disclaimer": "Indicative deterministic projection based on constant returns and simplified tax rules. \"Current purchasing power\" values discount the nominal result using the entered inflation rate (real value = nominal value / (1 + inflation)^years). Markets, fees, actual taxes, and life events may significantly alter the results.",
+  "simulations_wealth_monte_carlo_disclaimer": "Indicative Monte-Carlo simulation: the chosen distributions and volatility assumptions are simplified. Percentiles are neither a performance guarantee nor an investment recommendation.",
+  "simulations_wealth_current_assets": "Current assets",
+  "simulations_wealth_initial_asset_allocation": "Initial asset allocation",
+  "simulations_wealth_stock": "Stocks",
+  "simulations_wealth_other": "Other",
+  "simulations_wealth_monthly_investments": "Monthly investments",
+  "simulations_wealth_investment_allocation": "Investment allocation",
+  "simulations_wealth_savings_years": "Number of savings years",
+  "simulations_wealth_stock_return": "Stock return",
+  "simulations_wealth_other_return": "Other return",
+  "simulations_wealth_stock_tax": "Stock tax",
+  "simulations_wealth_other_tax": "Other tax",
+  "simulations_wealth_withdrawal_rate": "Withdrawal rate",
+  "simulations_wealth_inflation_rate": "Inflation rate",
+  "simulations_wealth_reset_parameters": "Reset parameters",
+  "simulations_wealth_net_value_in_n_years": "Net value in {count} years",
+  "@simulations_wealth_net_value_in_n_years": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "simulations_wealth_passive_income_prefix": "i.e. a passive income of around ",
+  "simulations_wealth_initial_assets": "Initial assets",
+  "simulations_wealth_contributions": "Contributions",
+  "simulations_wealth_net_interest": "Net interest",
+  "simulations_wealth_stat_future_value": "Future value",
+  "simulations_wealth_stat_included_capital_gains": "Including capital gains",
+  "simulations_wealth_stat_net_value": "Net value",
+  "simulations_wealth_stat_monthly_income": "Monthly income",
+  "simulations_wealth_stat_net_value_purchasing_power": "Net value (current purchasing power)",
+  "simulations_wealth_stat_monthly_income_purchasing_power": "Monthly income (current purchasing power)",
+  "simulations_wealth_chart_today": "Today",
+  "simulations_wealth_chart_in_n_years": "In {count} years",
+  "@simulations_wealth_chart_in_n_years": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "simulations_wealth_chart_n_years": "{count} years",
+  "@simulations_wealth_chart_n_years": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "simulations_wealth_avg_stock_return": "Avg. stock return",
+  "simulations_wealth_stock_std_dev": "Stock std. deviation",
+  "simulations_wealth_avg_other_return": "Avg. other return",
+  "simulations_wealth_other_std_dev": "Other std. deviation",
+  "simulations_wealth_number_of_simulations": "Number of simulations",
+  "simulations_wealth_median_net_value_in_n_years": "Median net value in {count} years",
+  "@simulations_wealth_median_net_value_in_n_years": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "simulations_wealth_median_passive_income_prefix": "i.e. a median passive income of around ",
+  "simulations_wealth_between_p10_and_p90": "Between {p10} and {p90} across scenarios (10th-90th percentile)",
+  "@simulations_wealth_between_p10_and_p90": {
+    "placeholders": {
+      "p10": {
+        "type": "String"
+      },
+      "p90": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_wealth_median_net_interest": "Median (net interest)",
+  "simulations_wealth_stat_median_future_value": "Median future value",
+  "simulations_wealth_stat_median_included_capital_gains": "Including median capital gains",
+  "simulations_wealth_stat_median_net_value": "Median net value",
+  "simulations_wealth_stat_median_monthly_income": "Median monthly income",
+  "simulations_wealth_median_label": "Median",
+  "simulations_wealth_90th_percentile": "90th percentile",
+  "simulations_wealth_10th_percentile": "10th percentile",
+  "simulations_transmission_demembrement": "Usufruct",
+  "simulations_transmission_donation": "Gift",
+  "simulations_transmission_heritage": "Inheritance",
+  "simulations_transmission_value_full_property": "Full ownership value",
+  "simulations_transmission_usufruitier_age": "Usufructuary age",
+  "simulations_transmission_number_beneficiary_children": "Number of beneficiary children",
+  "simulations_transmission_abatement_per_child_remaining": "Allowance per child (remaining)",
+  "simulations_transmission_reset_parameters": "Reset parameters",
+  "simulations_transmission_projection_demembrement": "Usufruct rights projection",
+  "simulations_transmission_hypothesis_2026_nue": "2026 assumption: bare ownership ",
+  "simulations_transmission_usufruit_separator": " / usufruct ",
+  "simulations_transmission_scenario_comparison": "Scenario comparison",
+  "simulations_transmission_full_property_rights": "Full ownership rights",
+  "simulations_transmission_demembrement_rights": "Usufruct rights",
+  "simulations_transmission_potential_savings": "Potential savings",
+  "simulations_transmission_np_value": "BO value",
+  "simulations_transmission_np_taxable_per_child": "Taxable BO / child",
+  "simulations_transmission_np_rights_per_child": "Rights BO / child",
+  "simulations_transmission_full_property_rights_if": "Rights if full ownership",
+  "simulations_transmission_demembrement_rights_detail": "Rights under usufruct",
+  "simulations_transmission_donation_amount": "Gift amount",
+  "simulations_transmission_number_beneficiaries": "Number of beneficiaries",
+  "simulations_transmission_donor_donee_link": "Donor / donee relationship",
+  "simulations_transmission_child": "Child",
+  "simulations_transmission_grandchild": "Grandchild",
+  "simulations_transmission_spouse_pacs": "Spouse / PACS partner",
+  "simulations_transmission_abatement_per_beneficiary": "Allowance applied: {amount} / beneficiary",
+  "@simulations_transmission_abatement_per_beneficiary": {
+    "placeholders": {
+      "amount": {
+        "type": "String",
+        "example": "100,000 €"
+      }
+    }
+  },
+  "simulations_transmission_estimated_donation_rights": "Estimated gift tax",
+  "simulations_transmission_effective_rate_prefix": "Effective rate ",
+  "simulations_transmission_effective_rate_suffix": " on the transferred amount.",
+  "simulations_transmission_tax_breakdown": "Tax breakdown",
+  "simulations_transmission_total_amount_transferred": "Total amount transferred",
+  "simulations_transmission_total_taxable_base": "Total taxable base",
+  "simulations_transmission_total_rights": "Total rights",
+  "simulations_transmission_amount_per_beneficiary": "Amount / beneficiary",
+  "simulations_transmission_taxable_per_beneficiary": "Taxable / beneficiary",
+  "simulations_transmission_rights_per_beneficiary": "Rights / beneficiary",
+  "simulations_transmission_estimated_inheritance_rights": "Estimated inheritance tax",
+  "simulations_transmission_estate_breakdown": "Estate breakdown",
+  "simulations_transmission_spouse_exempt_part": "Spouse exempt share",
+  "simulations_transmission_children_mass": "Children's mass",
+  "simulations_transmission_children_total_rights": "Children's total rights",
+  "simulations_transmission_children_transferred_mass": "Mass transferred to children",
+  "simulations_transmission_gross_part_per_child": "Gross share / child",
+  "simulations_transmission_taxable_per_child": "Taxable / child",
+  "simulations_transmission_rights_per_child": "Rights / child",
+  "simulations_transmission_net_per_child": "Net / child",
+  "simulations_transmission_surviving_spouse": "Surviving spouse",
+  "simulations_transmission_spouse_share": "Share allocated to spouse",
+  "simulations_transmission_number_inheriting_children": "Number of inheriting children",
+  "simulations_transmission_net_estate_assets": "Net estate assets",
+  "simulations_transmission_abatement_per_child": "Allowance per child",
+  "simulations_transmission_disclaimer_demembrement": "Usufruct/bare ownership valuation schedule per article 669 CGI (2026 reference). Indicative simulation, excluding specific civil clauses, successive usufruct/ownership, and personalised notarial optimisation.",
+  "simulations_transmission_disclaimer_donation": "Simplified 2026 gift tax schedules. Allowances simulated by kinship, excluding family cash gifts, tax carry-over, specific deductions, or deductible liabilities.",
+  "simulations_transmission_disclaimer_heritage": "Simplified 2026 inheritance reference: spouse/PACS exempt, direct-line schedule for children. Does not account for detailed civil options (legal usufruct of spouse, available portion, will, life insurance).",
+  "simulations_estimation_property_address": "Property address",
+  "simulations_estimation_price_per_sqm": "Price per m²",
+  "simulations_estimation_rent_per_sqm": "Rent per m²",
+  "simulations_estimation_property_usage": "Property usage",
+  "simulations_estimation_usage_locatif": "Rental investment",
+  "simulations_estimation_usage_residence": "Primary/secondary residence",
+  "simulations_estimation_property_type": "Property type",
+  "simulations_estimation_type_maison": "House",
+  "simulations_estimation_type_appartement": "Flat",
+  "simulations_estimation_field_surface": "Surface area",
+  "simulations_estimation_field_price_per_sqm": "Price per m² (adjustable)",
+  "simulations_estimation_rental_units": "Rental units",
+  "simulations_estimation_unit_number": "Unit {n}",
+  "@simulations_estimation_unit_number": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "simulations_estimation_financing": "Financing",
+  "simulations_estimation_field_travaux": "Renovation works",
+  "simulations_estimation_field_frais_notaire": "Notary fees",
+  "simulations_estimation_field_charges_annuelles": "Annual charges (shared costs, property tax, insurance...)",
+  "simulations_estimation_cash_purchase": "Cash purchase (no loan)",
+  "simulations_estimation_derived_loan_amount": "Borrowed amount (derived): {amount}",
+  "@simulations_estimation_derived_loan_amount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_estimation_loan_info": "Down payment {apport}, rate {taux} % over {duree} years, insurance {assurance}/month — set in the Loan tab.",
+  "@simulations_estimation_loan_info": {
+    "placeholders": {
+      "apport": {
+        "type": "String"
+      },
+      "taux": {
+        "type": "String"
+      },
+      "duree": {
+        "type": "int"
+      },
+      "assurance": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_estimation_use_configured_loan": "Use configured loan",
+  "simulations_estimation_estimated_price": "Estimated property price",
+  "simulations_estimation_estimation_in_progress": "Estimating...",
+  "simulations_estimation_comparable_sales_info": "Based on {sampleSize} comparable sale(s) {scope}, {years}.",
+  "@simulations_estimation_comparable_sales_info": {
+    "placeholders": {
+      "sampleSize": {
+        "type": "int"
+      },
+      "scope": {
+        "type": "String"
+      },
+      "years": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_estimation_no_comparable_sales": "No comparable sales found — adjust the price manually.",
+  "simulations_estimation_rent_estimation_in_progress": "Estimating rent...",
+  "simulations_estimation_estimated_rent_label": "Estimated rent: ",
+  "simulations_estimation_rent_zone_commune": " (commune)",
+  "simulations_estimation_rent_zone_expanded": " (expanded zone)",
+  "simulations_estimation_gross_rental_income": "Gross rental income",
+  "simulations_estimation_net_rental_income": "Net rental income",
+  "simulations_estimation_loan_payment": "Loan payment",
+  "simulations_estimation_project_self_financed": "Self-financed project",
+  "simulations_estimation_project_not_self_financed": "Project not self-financed",
+  "simulations_estimation_monthly_cash_flow": "Monthly cash flow: {amount}",
+  "@simulations_estimation_monthly_cash_flow": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_estimation_gross_yield": "Gross yield",
+  "simulations_estimation_net_yield": "Net yield",
+  "simulations_estimation_total_project_cost": "Total project cost",
+  "simulations_estimation_strategy": "Strategy",
+  "simulations_estimation_strategy_long_term": "Long-term",
+  "simulations_estimation_strategy_short_term": "Short-term",
+  "simulations_estimation_strategy_seasonal_mix": "Seasonal mix",
+  "simulations_estimation_strategy_colocation": "Co-living",
+  "simulations_estimation_field_monthly_rent": "Monthly rent (€)",
+  "simulations_estimation_field_nightly_rate": "Nightly rate (€)",
+  "simulations_estimation_field_occupancy": "Occupancy (%)",
+  "simulations_estimation_field_long_term_months": "Long-term months",
+  "simulations_estimation_field_long_term_rent": "Long-term rent (€)",
+  "simulations_estimation_field_short_term_months": "Short-term months",
+  "simulations_estimation_field_summer_nightly_rate": "Summer nightly rate (€)",
+  "simulations_estimation_room_number": "Room {n}",
+  "@simulations_estimation_room_number": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "simulations_estimation_add_room": "+ Add a room",
+  "simulations_estimation_unit_default_label": "Whole property",
+  "simulations_estimation_whole_township": "(entire township)",
+  "simulations_estimation_within_radius": "within a {kilometers} km radius",
+  "@simulations_estimation_within_radius": {
+    "placeholders": {
+      "kilometers": {
+        "type": "String",
+        "example": "1.5"
+      }
+    }
+  },
+  "simulations_estimation_room_default_label": "Room 1",
+  "budget_manage_recurring_tooltip": "Recurring lines",
+  "budget_new_category_placeholder": "New category",
+  "investments_documents_no_transaction_title": "No transaction",
+  "investments_documents_no_transaction_message": "Add a transaction first so you can attach a document to it.",
+  "investments_documents_link_transaction_label": "Attach to which transaction?",
+  "investments_documents_empty": "No documents yet.",
+  "investments_documents_view_dialog_title": "Transaction documents",
+  "investments_documents_view_dialog_subtitle": "{count, plural, =1{1 document — click to open.} other{{count} documents — click to open.}}",
+  "@investments_documents_view_dialog_subtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "budget_recurring_templates_dialog_title": "Recurring lines — {sectionTitle}",
+  "@budget_recurring_templates_dialog_title": {
+    "placeholders": {
+      "sectionTitle": {
+        "type": "String"
+      }
+    }
+  },
+  "budget_recurring_templates_dialog_subtitle": "A reusable starting point, not a living rule: editing a template does not change lines already added in previous months.",
+  "budget_recurring_templates_empty": "No recurring line yet.",
+  "budget_recurring_templates_apply_now": "Apply now",
+  "investments_edit_account_menu_item": "Edit account",
+  "investments_delete_account_menu_item": "Delete account",
+  "investments_delete_account_requires_empty_tooltip": "Empty it first",
+  "investments_reinclude_in_net_worth_menu_item": "Include in net worth again",
+  "investments_exclude_from_net_worth_menu_item": "Exclude from net worth",
+  "investments_import_ibkr_statement_menu_item": "Import a statement (IBKR)",
+  "investments_tab_positions": "Positions",
+  "investments_tab_transactions": "Transactions",
+  "investments_show_all_account_toggle_expanded": "Hide the rest of the account",
+  "investments_show_all_account_toggle_collapsed": "Show entire account (+{count})",
+  "@investments_show_all_account_toggle_collapsed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projects_new_project": "New project",
+  "projects_edit_project": "Edit project",
+  "projects_name_placeholder": "Project name (e.g. Buy primary residence)",
+  "projects_description_placeholder": "Description (optional)",
+  "projects_echeance_placeholder": "Deadline",
+  "projects_rendement_placeholder": "Expected return (% / year)",
+  "projects_apport_mensuel_placeholder": "Monthly contribution in € (optional)",
+  "projects_montant_cible_placeholder": "Target amount in € (optional)",
+  "projects_linked_accounts_label": "Linked accounts",
+  "projects_linked_liabilities_label": "Linked liabilities",
+  "projects_dangling_links_warning": "One or more links no longer resolve (item deleted since).",
+  "projects_no_accounts_available": "No accounts available.",
+  "projects_no_liabilities_available": "No liabilities available.",
+  "projects_trajectory_title": "Projected trajectory",
+  "projects_stat_rendement_attendu": "Expected return",
+  "projects_stat_apport_mensuel": "Monthly contribution",
+  "projects_stat_temps_restant": "Time remaining",
+  "projects_stat_montant_actuel": "Current amount",
+  "projects_stat_reste_a_atteindre": "Remaining to reach",
+  "projects_linked_accounts_liabilities_title": "Linked accounts and liabilities",
+  "projects_echeance_deadline_passed": "Deadline passed",
+  "projects_echeance_today": "Deadline today",
+  "projects_echeance_in_days": "In {days} days",
+  "@projects_echeance_in_days": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "projects_echeance_in_months": "In {months} months",
+  "@projects_echeance_in_months": {
+    "placeholders": {
+      "months": {
+        "type": "int"
+      }
+    }
+  },
+  "projects_echeance_in_years": "In {years} years",
+  "@projects_echeance_in_years": {
+    "placeholders": {
+      "years": {
+        "type": "int"
+      }
+    }
+  },
+  "projects_days_count": "{days} days",
+  "@projects_days_count": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "projects_on_track_label": "On track",
+  "projects_off_track_label": "Behind schedule",
+  "projects_load_error": "Unable to load projects. Check that the Vault folder is accessible.",
+  "projects_select_or_create": "Select or create a project",
+  "projects_empty": "No projects",
+  "simulations_taxation_tab_ir": "IR",
+  "simulations_taxation_tab_ifi": "IFI",
+  "simulations_taxation_tab_pfu": "PFU",
+  "simulations_taxation_ifi_disclaimer": "Indicative IFI (real-estate wealth tax) simulation based on a simplified 2026 schedule, excluding specific mechanisms (rebates, particular exemptions, usufruct/bare-ownership cases, income-based capping, etc.). Tax rules change regularly: always check with a professional before making a decision.",
+  "simulations_taxation_ir_disclaimer": "Indicative income tax simulation with a simplified family quotient. It does not account for every real-life situation (deductible expenses, tax credits/reductions, specific income types, caps, and particular rules). Check the final result with an expert.",
+  "simulations_taxation_field_ifi_net_worth": "Net real estate worth",
+  "simulations_taxation_reset_parameters": "Reset parameters",
+  "simulations_taxation_ifi_summary_prefix": "This year, you have a net real estate worth of ",
+  "simulations_taxation_ifi_summary_middle": ", resulting in a total real estate wealth tax (IFI) of ",
+  "simulations_taxation_summary_equivalent_suffix": ", or the equivalent of ",
+  "simulations_taxation_legend_amount": "Amount",
+  "simulations_taxation_legend_bracket_max": "Bracket max amount",
+  "simulations_taxation_legend_tax": "Tax",
+  "simulations_taxation_ifi_stat_max_rate": "Maximum tax rate",
+  "simulations_taxation_ifi_stat_total_monthly": "IFI (total & monthly)",
+  "simulations_taxation_pfu_field_envelope": "Envelope",
+  "simulations_taxation_pfu_field_data_source": "Data source",
+  "simulations_taxation_pfu_mode_manual": "Manual entry",
+  "simulations_taxation_pfu_mode_existing_account": "Existing account",
+  "simulations_taxation_pfu_field_choose_account": "Choose an account",
+  "simulations_taxation_pfu_select_account_placeholder": "Select…",
+  "simulations_taxation_pfu_no_account_found": "No {envelope} account found in your net worth.",
+  "@simulations_taxation_pfu_no_account_found": {
+    "placeholders": {
+      "envelope": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_taxation_pfu_field_opening_date": "Account opening date",
+  "simulations_taxation_field_invested_amount": "Invested amount",
+  "simulations_taxation_field_current_value": "Current value",
+  "simulations_taxation_field_withdrawal_amount": "Withdrawal amount",
+  "simulations_taxation_pfu_summary_withdrawal_exempt_prefix": "{envelope} withdrawal after 5 years: ",
+  "@simulations_taxation_pfu_summary_withdrawal_exempt_prefix": {
+    "placeholders": {
+      "envelope": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_taxation_pfu_summary_withdrawal_prefix": "{envelope} withdrawal: ",
+  "@simulations_taxation_pfu_summary_withdrawal_prefix": {
+    "placeholders": {
+      "envelope": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_taxation_pfu_summary_tax_exempt": "tax-exempt",
+  "simulations_taxation_pfu_summary_gain_prefix": "gain of ",
+  "simulations_taxation_pfu_summary_pfu_tax_prefix": ", PFU tax of ",
+  "simulations_taxation_pfu_summary_net_received_prefix": ", net received ",
+  "simulations_taxation_pfu_exempt_message": "Your withdrawal is fully tax-exempt.",
+  "simulations_taxation_pfu_exempt_explanation": "PEA gains are exempt from income tax and social contributions after 5 years of holding.",
+  "simulations_taxation_pfu_stat_unrealized_gain": "Unrealized gain",
+  "simulations_taxation_pfu_stat_taxable_gain": "Taxable gain",
+  "simulations_taxation_pfu_stat_ir_rate": "IR (PFU {rate}%)",
+  "@simulations_taxation_pfu_stat_ir_rate": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_taxation_pfu_stat_ps_rate": "PS (PFU {rate}%)",
+  "@simulations_taxation_pfu_stat_ps_rate": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_taxation_pfu_stat_total": "Total PFU",
+  "simulations_taxation_pfu_stat_net_received": "Net amount received",
+  "simulations_taxation_pfu_comparison_title": "Comparison: PFU vs progressive tax schedule",
+  "simulations_taxation_pfu_stat_bareme_ir": "Progressive income tax",
+  "simulations_taxation_pfu_stat_bareme_ps": "Progressive social contributions",
+  "simulations_taxation_pfu_stat_bareme_total": "Total progressive tax",
+  "simulations_taxation_pfu_stat_net_after_bareme": "Net after progressive tax",
+  "simulations_taxation_pfu_wins_label": "The PFU is more advantageous",
+  "simulations_taxation_bareme_wins_label": "The progressive tax schedule is more advantageous",
+  "simulations_taxation_pfu_comparison_savings": "{label} ({amount} in savings)",
+  "@simulations_taxation_pfu_comparison_savings": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_taxation_pfu_about_title": "About the PFU (flat tax)",
+  "simulations_taxation_pfu_about_body": "The PFU is a flat tax of 31.4% (12.8% income tax + 18.6% social contributions) on capital gains from disposals. For a PEA, gains are exempt after 5 years. For a life insurance policy (Assurance-Vie), an annual allowance of €4,600 (€9,200 after 8 years) applies before taxation.",
+  "simulations_taxation_pfu_about_rates_note": "The rates used come from Settings → Tax parameters and can be customized.",
+  "simulations_taxation_field_taxable_income": "Net taxable income",
+  "simulations_taxation_field_parts": "Number of tax shares",
+  "simulations_taxation_ir_summary_prefix": "This year, you have a net taxable income of ",
+  "simulations_taxation_ir_summary_middle": ", resulting in a total income tax of ",
+  "simulations_taxation_ir_stat_quotient": "Family quotient",
+  "simulations_taxation_ir_stat_marginal_rate": "Marginal tax rate",
+  "simulations_taxation_ir_stat_total_monthly": "Income tax (total & monthly)",
+  "simulations_taxation_bracket_tooltip_title": "Bracket {label}",
+  "@simulations_taxation_bracket_tooltip_title": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "simulations_taxation_bracket_tooltip_max": "Max amount",
+  "simulations_taxation_date_day_placeholder": "DD",
+  "simulations_taxation_date_month_placeholder": "MM",
+  "simulations_taxation_date_year_placeholder": "YYYY",
+  "investments_section_title": "Investments",
+  "investments_identifier_copied_toast_title": "Identifier copied",
+  "investments_ticker_copied_toast_title": "Ticker copied",
+  "investments_quantity_units_suffix": "units",
+  "investments_add_investment_button": "Add an investment",
+  "investments_establishment_select_placeholder": "Institution (bank)",
+  "investments_clear_opening_date_button": "Clear the date",
+  "strategy_documents_button_label": "{count, plural, =0{Documents} other{Documents ({count})}}",
+  "@strategy_documents_button_label": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "strategy_editor_placeholder": "Write your strategy...",
+  "strategy_load_error": "Unable to load notes. Check that the Vault folder is accessible.",
+  "strategy_select_or_create": "Select or create a note",
+  "strategy_new_folder_title": "New folder",
+  "strategy_rename_folder_title": "Rename folder",
+  "strategy_folder_name_placeholder": "Folder name",
+  "strategy_folder_color_title": "Folder color",
+  "strategy_delete_folder_confirm_title": "Delete \"{name}\"?",
+  "@strategy_delete_folder_confirm_title": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "strategy_delete_folder_confirm_message": "The notes it contains will not be deleted, only moved back out of the folder.",
+  "strategy_move_to_folder_title": "Move to a folder",
+  "strategy_no_folder_label": "No folder",
+  "strategy_duplicate_note_menu_item": "Duplicate",
+  "strategy_notes_panel_title": "Notes",
+  "strategy_search_placeholder": "Search a note...",
+  "strategy_no_notes": "No notes",
+  "strategy_change_color_menu_item": "Change color",
+  "investments_price_fresh_badge": "up to date",
+  "investments_price_manual_badge": "manual",
+  "investments_manual_price_estimated_on": "Estimated on {date}",
+  "@investments_manual_price_estimated_on": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_excluded_from_patrimoine_badge": "Excluded from total net worth",
+  "investments_documents_attached_tooltip": "{count, plural, =1{1 attached document} other{{count} attached documents}} — view",
+  "@investments_documents_attached_tooltip": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "investments_transaction_type_arbitrage_label": "Arbitrage",
+  "investments_arbitrage_sold_bought_summary": "Sold {sellQuantity} × {sellPrice} → Bought {buyQuantity} × {buyPrice}",
+  "@investments_arbitrage_sold_bought_summary": {
+    "placeholders": {
+      "sellQuantity": {
+        "type": "String"
+      },
+      "sellPrice": {
+        "type": "String"
+      },
+      "buyQuantity": {
+        "type": "String"
+      },
+      "buyPrice": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_manual_price_dialog_title": "Current estimated price",
+  "investments_manual_price_hint_multi_unit": "Estimated price per unit — update it yourself whenever you see fit, no automatic price source exists for this holding. The displayed value will be this price × {quantity} units held.",
+  "@investments_manual_price_hint_multi_unit": {
+    "placeholders": {
+      "quantity": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_manual_price_hint_single_unit": "Update it yourself whenever you see fit — no automatic price source exists for this holding.",
+  "investments_field_price_eur": "Price (€)",
+  "investments_pe_valuation_dialog_title": "Current valuation",
+  "investments_pe_valuation_hint": "Latest NAV/valuation reported by the fund manager — update it yourself when you receive it, no automatic price source exists for this holding.",
+  "investments_field_valuation_eur": "Valuation (€)",
+  "investments_delete_position_confirm_title": "Delete \"{label}\"?",
+  "@investments_delete_position_confirm_title": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_delete_position_confirm_message": "This position will be permanently deleted.",
+  "investments_reestimate_pe_valuation_menu_item": "Re-estimate the valuation",
+  "investments_reestimate_price_menu_item": "Re-estimate the price",
+  "investments_transfer_to_other_account_menu_item": "Transfer to another account",
+  "investments_arbitrage_to_other_security_menu_item": "Switch to another security",
+  "investments_merge_with_other_position_menu_item": "Merge with another position",
+  "investments_delete_position_requires_no_transactions_hint": "Delete its transactions first",
+  "investments_delete_position_menu_item": "Delete the position",
+  "investments_isin_copied_toast": "ISIN copied",
+  "investments_identifier_copied_toast": "Identifier copied",
+  "investments_ticker_copied_toast": "Ticker copied",
+  "investments_stat_net_invested_capital": "Net capital invested",
+  "investments_stat_quantity_held": "Quantity held",
+  "investments_stat_vested": "Vested",
+  "investments_stat_last_price": "Last price",
+  "investments_stat_estimated_price": "Estimated price",
+  "investments_stat_valuation": "Valuation",
+  "investments_performance_annualized": "{percent} / year",
+  "@investments_performance_annualized": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_performance_since_start": "{percent} since inception",
+  "@investments_performance_since_start": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_insufficient_price_history": "Not enough price history for this calculation.",
+  "investments_insufficient_transaction_history": "Not enough transaction history for this calculation.",
+  "investments_pe_valuation_estimated_on": "Valuation estimated on {date} (use the \"⋮\" menu to update it).",
+  "@investments_pe_valuation_estimated_on": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_pe_no_valuation_hint": "No valuation provided: the amount above is the net capital invested — use the \"⋮\" menu to enter the latest NAV reported by the manager.",
+  "investments_manual_price_estimated_on_menu_hint": "Price estimated on {date} (use the \"⋮\" menu to update it).",
+  "@investments_manual_price_estimated_on_menu_hint": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_no_manual_price_hint": "No price provided: the valuation above is the net amount invested — use the \"⋮\" menu to add one.",
+  "investments_price_not_found_yahoo": "Price not found on Yahoo Finance for \"{isin}\".",
+  "@investments_price_not_found_yahoo": {
+    "placeholders": {
+      "isin": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_price_not_available_yet": "Real-time price not yet available: the valuation above is the net amount invested.",
+  "investments_no_positions_yet": "No positions yet.",
+  "investments_no_open_positions_yet": "No open positions yet.",
+  "investments_old_positions_label": "Past positions",
+  "investments_delete_leveraged_position_confirm_title": "Delete \"{market}\"?",
+  "@investments_delete_leveraged_position_confirm_title": {
+    "placeholders": {
+      "market": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_delete_leveraged_position_confirm_message": "This position will be permanently deleted. This action is irreversible.",
+  "investments_leveraged_section_title": "Leveraged positions",
+  "investments_add_position_link": "Add a position",
+  "investments_no_leveraged_positions_yet": "No leveraged positions yet.",
+  "investments_closed_positions_label": "Closed positions",
+  "investments_column_entry_label": "Entry",
+  "investments_column_price_label": "Price",
+  "investments_column_amount_label": "Amount",
+  "investments_pnl_roe_column_label": "PnL (ROE)",
+  "investments_refresh_menu_item": "Refresh",
+  "investments_close_position_menu_item": "Close",
+  "investments_position_closed_badge": "Closed",
+  "investments_liquidation_price_label": "Liquidation: {price}",
+  "@investments_liquidation_price_label": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_delete_investment_confirm_title": "Delete \"{label}\"?",
+  "@investments_delete_investment_confirm_title": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_delete_investment_confirm_message": "This investment will be permanently deleted.",
+  "investments_transfer_to_account_menu_item": "Transfer to another account",
+  "investments_arbitrage_to_security_menu_item": "Switch to another security",
+  "investments_merge_with_position_menu_item": "Merge with another position",
+  "investments_delete_investment_requires_empty_tooltip": "Delete its transactions first",
+  "investments_delete_investment_menu_item": "Delete the investment",
+  "investments_receipt_save_dialog_title": "Save the receipt",
+  "investments_receipt_document_name": "Receipt {month}",
+  "@investments_receipt_document_name": {
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_receipt_saved_toast_title": "Receipt saved",
+  "investments_receipt_save_failed_toast_title": "Save failed",
+  "investments_receipt_save_failed_subtitle": "The receipt could not be generated or saved: {error}",
+  "@investments_receipt_save_failed_subtitle": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_isin_copied_toast_title": "ISIN copied",
+  "investments_quantity_held_label": "Quantity held",
+  "investments_last_price_label": "Last price",
+  "investments_performance_annualized_label": "{rate} / year",
+  "@investments_performance_annualized_label": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_performance_since_start_label": "{rate} since inception",
+  "@investments_performance_since_start_label": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_not_enough_price_history": "Not enough price history for this calculation.",
+  "investments_twr_explanation": "TWR (Time-Weighted Return): the asset's performance, independent of when your contributions were made.",
+  "investments_mwr_explanation": "MWR (Money-Weighted Return): the return actually earned, taking into account the amount and date of each contribution.",
+  "investments_price_not_found_hint": "No price found on Yahoo Finance for \"{isin}\": unknown identifier or unlisted asset. Check the identifier — the value above is the net amount invested (purchase price), not the current market price.",
+  "@investments_price_not_found_hint": {
+    "placeholders": {
+      "isin": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_price_not_yet_available_hint": "Real-time price not yet available: the value above is the net amount invested (purchase price), not the current market price.",
+  "investments_tab_profitability": "Profitability",
+  "investments_ibkr_import_dialog_title": "Import IBKR statement",
+  "investments_ibkr_period_label": "Period: {start} → {end}",
+  "@investments_ibkr_period_label": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_ibkr_row_security_trades": "Security purchases / sales",
+  "investments_ibkr_row_currency_conversions": "Currency conversions",
+  "investments_ibkr_row_dividends": "Dividends",
+  "investments_ibkr_row_withholding_tax": "Withholding tax",
+  "investments_ibkr_row_fees": "Fees",
+  "investments_ibkr_row_deposits": "Deposits",
+  "investments_ibkr_row_withdrawals": "Withdrawals",
+  "investments_ibkr_row_other_flows": "Other movements",
+  "investments_ibkr_empty_state": "No new transactions to import — this file has already been imported, or contains no recognized lines.",
+  "investments_ibkr_duplicates_skipped": "{count, plural, =1{1 line already imported — skipped.} other{{count} lines already imported — skipped.}}",
+  "@investments_ibkr_duplicates_skipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "investments_ibkr_warnings_title": "Warnings",
+  "investments_ibkr_import_button": "Import",
+  "investments_transfer_title": "Transfer \"{label}\"",
+  "@investments_transfer_title": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_arbitrage_title": "Arbitrage \"{label}\"",
+  "@investments_arbitrage_title": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_transfer_description": "The average cost is kept: the sale here and the purchase on the destination account both use the current average cost — no capital gain is realized by the transfer itself.",
+  "investments_arbitrage_description": "The sale happens at market price (realizing the unrealized gain/loss); the proceeds exactly fund the purchase of the new holding.",
+  "investments_field_pru_kept": "Avg. cost kept",
+  "investments_no_other_account_for_transfer": "No other account available for a transfer.",
+  "investments_field_dest_account": "To account",
+  "investments_field_dest_buy_price": "Destination buy price",
+  "investments_amount_obtained_placeholder": "Amount obtained: —",
+  "investments_amount_obtained_value": "Amount obtained: {amount}",
+  "@investments_amount_obtained_value": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_amount_obtained_with_bought_quantity": "Amount obtained: {amount} → quantity bought: {quantity}",
+  "@investments_amount_obtained_with_bought_quantity": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "quantity": {
+        "type": "String"
+      }
+    }
+  },
+  "investments_transfer_button": "Transfer",
+  "investments_arbitrage_button": "Arbitrage",
+  "investments_transfer_impossible_title": "Transfer not possible",
+  "investments_arbitrage_impossible_title": "Arbitrage not possible",
+  "investments_error_dest_account_required": "Choose a destination account.",
+  "investments_error_new_position_fields_required": "Fill in the label (and the identifier if required) of the new position.",
+  "investments_error_pru_must_be_positive": "Avg. cost must be a number greater than 0."
+}

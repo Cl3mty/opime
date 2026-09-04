@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 import '../navigation/navigation_scope.dart';
 import '../simulations/tax_parameters.dart';
 
@@ -57,6 +58,7 @@ class _TaxParametersScreenState extends State<TaxParametersScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    final l10n = AppLocalizations.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -71,49 +73,40 @@ class _TaxParametersScreenState extends State<TaxParametersScreen> {
                 children: [
                   const Icon(LucideIcons.chevronLeft, size: 18),
                   const SizedBox(width: 4),
-                  const shadcn.Text('Réglages').small(),
+                  shadcn.Text(l10n.nav_settings).small(),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 12),
-          const shadcn.Text('Paramètres fiscaux').x2Large().semiBold(),
+          shadcn.Text(l10n.settings_tax_parameters).x2Large().semiBold(),
           const SizedBox(height: 8),
-          const shadcn.Text(
-            'Barèmes, seuils et abattements utilisés par les simulateurs '
-            '(impôt sur le revenu, IFI, démembrement, donation et '
-            'succession). Modifie une valeur ici si l\'État la révise, '
-            'sans attendre une mise à jour du logiciel — chacune peut être '
-            'réinitialisée individuellement à sa référence légale connue '
-            'via l\'icône ↺ qui apparaît à côté d\'une valeur modifiée.',
-          ).muted().small(),
+          shadcn.Text(l10n.settings_tax_page_description).muted().small(),
           const SizedBox(height: 24),
-          _buildIRSection(),
+          _buildIRSection(l10n),
           const SizedBox(height: 16),
-          _buildIFISection(),
+          _buildIFISection(l10n),
           const SizedBox(height: 16),
-          _buildDemembrementSection(),
+          _buildDemembrementSection(l10n),
           const SizedBox(height: 16),
-          _buildDonationSection(),
+          _buildDonationSection(l10n),
           const SizedBox(height: 16),
-          _buildPfuSection(),
+          _buildPfuSection(l10n),
           const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  Widget _buildIRSection() {
+  Widget _buildIRSection(AppLocalizations l10n) {
     return _TaxCard(
-      title: 'Impôt sur le revenu',
-      description:
-          'Barème progressif par part de quotient familial (article 197 '
-          'CGI) — voir la page Simulation → Fiscalité, onglet IR.',
+      title: l10n.settings_tax_ir_title,
+      description: l10n.settings_tax_ir_description,
       children: _bracketRows(
         count: _params.irRates.length,
-        firstLabel: 'Jusqu\'à (€)',
-        secondLabel: 'Taux (%)',
-        unboundedLabel: 'Au-delà',
+        firstLabel: l10n.settings_tax_bracket_upto_eur,
+        secondLabel: l10n.settings_tax_bracket_rate_percent,
+        unboundedLabel: l10n.settings_tax_bracket_beyond,
         firstValue: (i) => i < _params.irLimits.length ? _params.irLimits[i] : null,
         firstDefault: (i) => defaultIrLimits[i],
         onFirstChanged: (i, v) => _update(
@@ -128,17 +121,15 @@ class _TaxParametersScreenState extends State<TaxParametersScreen> {
     );
   }
 
-  Widget _buildIFISection() {
+  Widget _buildIFISection(AppLocalizations l10n) {
     return _TaxCard(
-      title: 'IFI (impôt sur la fortune immobilière)',
-      description:
-          'Barème par tranches de patrimoine immobilier net (article 977 '
-          'CGI) et seuil en-dessous duquel l\'IFI n\'est pas dû du tout.',
+      title: l10n.settings_tax_ifi_title,
+      description: l10n.settings_tax_ifi_description,
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: _EditableNumber(
-            label: 'Seuil d\'imposition (€) — exonération totale en-dessous',
+            label: l10n.settings_tax_ifi_threshold_label,
             value: _params.ifiSeuilImposition,
             defaultValue: defaultIfiSeuilImposition,
             onChanged: (v) =>
@@ -147,9 +138,9 @@ class _TaxParametersScreenState extends State<TaxParametersScreen> {
         ),
         ..._bracketRows(
           count: _params.ifiRates.length,
-          firstLabel: 'Jusqu\'à (€)',
-          secondLabel: 'Taux (%)',
-          unboundedLabel: 'Au-delà',
+          firstLabel: l10n.settings_tax_bracket_upto_eur,
+          secondLabel: l10n.settings_tax_bracket_rate_percent,
+          unboundedLabel: l10n.settings_tax_bracket_beyond,
           firstValue: (i) =>
               i < _params.ifiLimits.length ? _params.ifiLimits[i] : null,
           firstDefault: (i) => defaultIfiLimits[i],
@@ -166,19 +157,16 @@ class _TaxParametersScreenState extends State<TaxParametersScreen> {
     );
   }
 
-  Widget _buildDemembrementSection() {
+  Widget _buildDemembrementSection(AppLocalizations l10n) {
     final brackets = _params.demembrementBrackets;
     return _TaxCard(
-      title: 'Démembrement (usufruit / nue-propriété)',
-      description:
-          'Barème fiscal de l\'usufruit selon l\'âge de l\'usufruitier '
-          '(article 669 CGI) — voir la page Simulation → Transmission, '
-          'onglet Démembrement.',
+      title: l10n.settings_tax_demembrement_title,
+      description: l10n.settings_tax_demembrement_description,
       children: _bracketRows(
         count: brackets.length,
-        firstLabel: 'Jusqu\'à (ans)',
-        secondLabel: 'Nue-propriété (%)',
-        unboundedLabel: 'Au-delà',
+        firstLabel: l10n.settings_tax_bracket_upto_years,
+        secondLabel: l10n.settings_tax_bracket_nue_propriete_percent,
+        unboundedLabel: l10n.settings_tax_bracket_beyond,
         firstValue: (i) => brackets[i].maxAge?.toDouble(),
         firstDefault: (i) => defaultDemembrementBrackets[i].maxAge!.toDouble(),
         onFirstChanged: (i, v) => _update(
@@ -205,37 +193,33 @@ class _TaxParametersScreenState extends State<TaxParametersScreen> {
     );
   }
 
-  Widget _buildDonationSection() {
+  Widget _buildDonationSection(AppLocalizations l10n) {
     return _TaxCard(
-      title: 'Donation et succession',
-      description:
-          'Barèmes des droits de mutation à titre gratuit (article 777 '
-          'CGI) et abattements par lien de parenté — voir la page '
-          'Simulation → Transmission, onglets Démembrement/Donation/'
-          'Succession.',
+      title: l10n.settings_tax_donation_title,
+      description: l10n.settings_tax_donation_description,
       children: [
-        const shadcn.Text('Abattements').medium(),
+        shadcn.Text(l10n.settings_tax_abattements_title).medium(),
         const SizedBox(height: 8),
         Wrap(
           spacing: 16,
           runSpacing: 12,
           children: [
             _EditableNumber(
-              label: 'Enfant (€)',
+              label: l10n.settings_tax_abattement_enfant_label,
               value: _params.abattementEnfant,
               defaultValue: defaultAbattementEnfant,
               onChanged: (v) =>
                   _update((p) => p.copyWith(abattementEnfant: v)),
             ),
             _EditableNumber(
-              label: 'Petit-enfant (€)',
+              label: l10n.settings_tax_abattement_petit_enfant_label,
               value: _params.abattementPetitEnfant,
               defaultValue: defaultAbattementPetitEnfant,
               onChanged: (v) =>
                   _update((p) => p.copyWith(abattementPetitEnfant: v)),
             ),
             _EditableNumber(
-              label: 'Conjoint/PACS (€)',
+              label: l10n.settings_tax_abattement_conjoint_label,
               value: _params.abattementConjoint,
               defaultValue: defaultAbattementConjoint,
               onChanged: (v) =>
@@ -244,18 +228,20 @@ class _TaxParametersScreenState extends State<TaxParametersScreen> {
           ],
         ),
         const SizedBox(height: 20),
-        const shadcn.Text('Barème en ligne directe (parent/enfant)').medium(),
+        shadcn.Text(l10n.settings_tax_bareme_ligne_directe_title).medium(),
         const SizedBox(height: 8),
         ..._taxBracketRows(
+          l10n,
           brackets: _params.directLineBrackets,
           defaults: defaultDirectLineBrackets,
           onChanged: (updated) =>
               _update((p) => p.copyWith(directLineBrackets: updated)),
         ),
         const SizedBox(height: 12),
-        const shadcn.Text('Barème entre époux ou partenaires de PACS').medium(),
+        shadcn.Text(l10n.settings_tax_bareme_epoux_title).medium(),
         const SizedBox(height: 8),
         ..._taxBracketRows(
+          l10n,
           brackets: _params.spouseBrackets,
           defaults: defaultSpouseBrackets,
           onChanged: (updated) =>
@@ -265,30 +251,23 @@ class _TaxParametersScreenState extends State<TaxParametersScreen> {
     );
   }
 
-  Widget _buildPfuSection() {
+  Widget _buildPfuSection(AppLocalizations l10n) {
     return _TaxCard(
-      title: 'PFU (prélèvement forfaitaire unique)',
-      description:
-          '"Flat tax" sur les revenus de capitaux mobiliers et plus-values '
-          'mobilières, décomposée en sa part IR et sa part prélèvements '
-          'sociaux — l\'État peut réviser l\'une sans l\'autre (ex : PS '
-          'passés de 15,5 % à 17,2 % en 2018, puis à 18,6 % début 2026, '
-          'sans toucher au taux d\'IR). Valeurs de référence uniquement '
-          'pour l\'instant : aucun simulateur de l\'app ne les utilise '
-          'encore dans un calcul.',
+      title: l10n.settings_tax_pfu_title,
+      description: l10n.settings_tax_pfu_description,
       children: [
         Wrap(
           spacing: 16,
           runSpacing: 12,
           children: [
             _EditableNumber(
-              label: 'Part IR (%)',
+              label: l10n.settings_tax_pfu_ir_label,
               value: _params.pfuIrRate,
               defaultValue: defaultPfuIrRate,
               onChanged: (v) => _update((p) => p.copyWith(pfuIrRate: v)),
             ),
             _EditableNumber(
-              label: 'Part prélèvements sociaux (%)',
+              label: l10n.settings_tax_pfu_ps_label,
               value: _params.pfuPsRate,
               defaultValue: defaultPfuPsRate,
               onChanged: (v) => _update((p) => p.copyWith(pfuPsRate: v)),
@@ -304,15 +283,16 @@ class _TaxParametersScreenState extends State<TaxParametersScreen> {
   /// doc) alors que l'UI affiche/saisit toujours un pourcentage, d'où la
   /// conversion ×100/÷100 ici plutôt que dans [_bracketRows], générique et
   /// agnostique de cette convention de stockage.
-  List<Widget> _taxBracketRows({
+  List<Widget> _taxBracketRows(
+    AppLocalizations l10n, {
     required List<TaxBracket> brackets,
     required List<TaxBracket> defaults,
     required ValueChanged<List<TaxBracket>> onChanged,
   }) => _bracketRows(
     count: brackets.length,
-    firstLabel: 'Jusqu\'à (€)',
-    secondLabel: 'Taux (%)',
-    unboundedLabel: 'Au-delà',
+    firstLabel: l10n.settings_tax_bracket_upto_eur,
+    secondLabel: l10n.settings_tax_bracket_rate_percent,
+    unboundedLabel: l10n.settings_tax_bracket_beyond,
     firstValue: (i) =>
         brackets[i].upper.isFinite ? brackets[i].upper : null,
     firstDefault: (i) => defaults[i].upper,
@@ -470,8 +450,10 @@ class _EditableNumber extends StatelessWidget {
               if (!isDefault) ...[
                 const SizedBox(width: 4),
                 Tooltip(
-                  tooltip: (context) => const TooltipContainer(
-                    child: shadcn.Text('Réinitialiser à la valeur légale'),
+                  tooltip: (context) => TooltipContainer(
+                    child: shadcn.Text(
+                      AppLocalizations.of(context).settings_tax_reset_to_legal_value,
+                    ),
                   ),
                   child: IconButton.ghost(
                     icon: const Icon(LucideIcons.rotateCcw, size: 14),

@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
+import '../../l10n/app_localizations.dart';
 import 'real_estate_estimation_screen.dart';
 import 'real_estate_scoring_screen.dart';
 import 'simulations_loan_screen.dart';
@@ -57,6 +58,7 @@ class _RealEstateSimulationScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -71,10 +73,18 @@ class _RealEstateSimulationScreenState
                   setState(() => _tabIndex = value);
                   _saveState();
                 },
-                children: const [
-                  TabItem(child: shadcn.Text('Estimation')),
-                  TabItem(child: shadcn.Text('Scoring')),
-                  TabItem(child: shadcn.Text('Prêt')),
+                children: [
+                  TabItem(
+                    child: shadcn.Text(
+                      l10n.simulations_real_estate_tab_estimation,
+                    ),
+                  ),
+                  TabItem(
+                    child: shadcn.Text(l10n.simulations_real_estate_tab_scoring),
+                  ),
+                  TabItem(
+                    child: shadcn.Text(l10n.simulations_real_estate_tab_loan),
+                  ),
                 ],
               ),
             ),

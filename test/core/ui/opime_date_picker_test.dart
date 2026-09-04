@@ -2,6 +2,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/ui/opime_date_picker.dart';
 import 'package:opime/core/ui/shadcn_localizations_fr.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -13,6 +14,7 @@ void main() {
     supportedLocales: const [Locale('fr')],
     localizationsDelegates: [
       shadcnLocalizationsFrDelegate,
+      ...AppLocalizations.localizationsDelegates,
       GlobalMaterialLocalizations.delegate,
       GlobalCupertinoLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,

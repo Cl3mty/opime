@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/storage/vault_crypto.dart';
 import '../../core/storage/vault_encryption_metadata.dart';
 import '../../core/storage/vault_folder_service.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Écran affiché au lancement quand le vault actif est chiffré (voir
 /// `main.dart`'s `_buildHome`, entre "vault trouvé" et le chargement des
@@ -60,7 +61,7 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Mot de passe incorrect.';
+        _error = AppLocalizations.of(context).onboarding_password_incorrect;
         _loading = false;
       });
     }
@@ -71,14 +72,17 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
       _pickingFolder = true;
       _error = null;
     });
+    final l10n = AppLocalizations.of(context);
     try {
       final vault = await widget.vaultFolderService.pickAndRememberVault(
-        dialogTitle: 'Choisis ou crée un coffre-fort Opime',
+        dialogTitle: l10n.settings_vault_pick_dialog_title,
       );
       if (vault != null) await widget.onVaultActivated(vault.vaultPath);
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Impossible de changer de dossier : $e');
+        setState(
+          () => _error = l10n.onboarding_change_folder_failed(e.toString()),
+        );
       }
     } finally {
       if (mounted) setState(() => _pickingFolder = false);
@@ -87,6 +91,7 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       child: Center(
         child: ConstrainedBox(
@@ -102,14 +107,13 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(height: 24),
-                const shadcn.Text(
-                  'Coffre-fort verrouillé',
+                shadcn.Text(
+                  l10n.shell_vault_locked,
                   textAlign: TextAlign.center,
                 ).large().large().medium(),
                 const SizedBox(height: 12),
-                const shadcn.Text(
-                  'Ce coffre-fort est chiffré. Saisis ton mot de passe pour '
-                  'accéder à tes données.',
+                shadcn.Text(
+                  l10n.onboarding_unlock_description,
                   textAlign: TextAlign.center,
                 ).muted(),
                 const SizedBox(height: 24),
@@ -117,7 +121,7 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
                   controller: _controller,
                   obscureText: true,
                   autofocus: true,
-                  placeholder: const shadcn.Text('Mot de passe'),
+                  placeholder: shadcn.Text(l10n.onboarding_password),
                   onSubmitted: (_) => _loading ? null : _unlock(),
                 ),
                 const SizedBox(height: 16),
@@ -131,7 +135,9 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
                         )
                       : const Icon(LucideIcons.lockOpen),
                   child: shadcn.Text(
-                    _loading ? 'Déverrouillage...' : 'Déverrouiller',
+                    _loading
+                        ? l10n.onboarding_unlocking
+                        : l10n.onboarding_unlock,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -139,7 +145,7 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
                   onPressed: (_loading || _pickingFolder)
                       ? null
                       : widget.onForgotPassword,
-                  child: const shadcn.Text('Mot de passe oublié ?'),
+                  child: shadcn.Text(l10n.onboarding_forgot_password),
                 ),
                 TextButton(
                   onPressed: (_loading || _pickingFolder)
@@ -154,8 +160,8 @@ class _VaultUnlockScreenState extends State<VaultUnlockScreen> {
                       : const Icon(LucideIcons.folderOpen, size: 14),
                   child: shadcn.Text(
                     _pickingFolder
-                        ? 'Sélection en cours...'
-                        : 'Changer de dossier du coffre-fort',
+                        ? l10n.onboarding_selecting
+                        : l10n.onboarding_change_vault_folder,
                   ),
                 ),
                 if (_error != null) ...[

@@ -28,6 +28,8 @@ import 'features/settings/settings_screen.dart';
 import 'features/settings/tax_parameters_screen.dart';
 import 'features/assistant/assistant_screen.dart';
 import 'app/theme_controller.dart';
+import 'app/locale_controller.dart';
+import 'l10n/app_localizations.dart';
 import 'app/app_shell.dart';
 import 'core/platform_info.dart';
 import 'core/ui/load_error_view.dart';
@@ -106,6 +108,7 @@ class _OpimeAppState extends State<OpimeApp> {
   static const _githubRepo = 'opime';
 
   final _themeController = ThemeController();
+  final _localeController = LocaleController();
   final _amountVisibilityController = AmountVisibilityController();
   final _keyboardShortcutsController = KeyboardShortcutsController();
   final _assistantConfigController = AssistantConfigController();
@@ -267,9 +270,9 @@ class _OpimeAppState extends State<OpimeApp> {
         builder: (context, overlay) => SurfaceCard(
           child: Basic(
             leading: const Icon(LucideIcons.circlePause, size: 18),
-            title: const Text('Réponse interrompue'),
-            subtitle: const Text(
-              'Le profil ou le coffre-fort a changé pendant la génération.',
+            title: Text(AppLocalizations.of(context).shell_response_interrupted),
+            subtitle: Text(
+              AppLocalizations.of(context).shell_response_interrupted_subtitle,
             ),
           ),
         ),
@@ -282,6 +285,8 @@ class _OpimeAppState extends State<OpimeApp> {
     super.initState();
     _themeController.load();
     _themeController.addListener(() => setState(() {}));
+    _localeController.load();
+    _localeController.addListener(() => setState(() {}));
     _amountVisibilityController.load();
     _keyboardShortcutsController.load();
     // Réévalue le `builder` de ShadcnApp (voir [build]) quand les Réglages
@@ -518,6 +523,14 @@ class _OpimeAppState extends State<OpimeApp> {
       ThemeMode.dark => Brightness.dark,
       ThemeMode.system => material.MediaQuery.platformBrightnessOf(context),
     };
+    // Langue effective : la langue choisie dans les Réglages, ou à défaut
+    // (AppLocale.system) celle de l'appareil. Français par défaut si la
+    // langue système n'est ni le français ni l'anglais.
+    final effectiveLocale =
+        _localeController.locale.locale ??
+        (WidgetsBinding.instance.platformDispatcher.locale.languageCode == 'en'
+            ? const Locale('en')
+            : const Locale('fr'));
     final activeTheme = effectiveBrightness == Brightness.dark
         ? darkTheme
         : lightTheme;
@@ -540,17 +553,19 @@ class _OpimeAppState extends State<OpimeApp> {
       themeMode: _themeController.mode,
       materialTheme: materialTheme,
       home: _buildHome(),
-      // Sans ça, shadcn_flutter (boutons Annuler/Enregistrer de la boîte de
-      // dialogue d'[OpimeDatePicker]...) reste bloqué sur sa locale par
-      // défaut (`Locale('en', 'US')`, voir `ShadcnApp`'s propre valeur par
-      // défaut de `supportedLocales`) quel que soit le système — l'app est
-      // toujours en français (voir CLAUDE.md), pas seulement selon la
-      // locale de l'appareil.
-      locale: const Locale('fr'),
-      supportedLocales: const [Locale('fr')],
+      // La langue de l'app est pilotée par le réglage Langue (voir
+      // LocaleController) et non plus câblée en dur au français : sans ça,
+      // shadcn_flutter (boutons Annuler/Enregistrer de la boîte de dialogue
+      // d'[OpimeDatePicker]...) resterait bloqué sur sa locale par défaut et
+      // l'app sur le français, quel que soit le choix de l'utilisateur.
+      locale: effectiveLocale,
+      supportedLocales: const [Locale('fr'), Locale('en')],
       localizationsDelegates: [
         ...FlutterQuillLocalizations.localizationsDelegates,
         shadcnLocalizationsFrDelegate,
+        // Nos traductions d'app (voir lib/l10n) — c'est le délégué qui
+        // fournit `AppLocalizations.of(context)` partout dans l'UI.
+        ...AppLocalizations.localizationsDelegates,
         // Sans ces trois-là, `ShadcnApp` retombe sur ses propres délégués
         // Material/Cupertino/Widgets internes (`m.DefaultMaterialLocalizations`...),
         // qui ne prennent en charge que l'anglais — Flutter avertirait alors
@@ -630,17 +645,18 @@ class _OpimeAppState extends State<OpimeApp> {
   /// profil n'est chargé (vault verrouillé, migration en attente, ou
   /// chargement/erreur en cours).
   void _showExportUnavailableToast(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final String title;
     final String subtitle;
     if (_vaultLocked) {
-      title = 'Coffre-fort verrouillé';
-      subtitle = "Déverrouille ton coffre-fort avant d'exporter.";
+      title = l10n.shell_vault_locked;
+      subtitle = l10n.shell_unlock_before_export;
     } else if (_vaultMigrationInterrupted) {
-      title = 'Migration en attente';
-      subtitle = "Termine la migration du coffre-fort avant d'exporter.";
+      title = l10n.shell_migration_pending;
+      subtitle = l10n.shell_finish_migration_before_export;
     } else {
-      title = 'Aucun profil chargé';
-      subtitle = 'Réessaie une fois le coffre-fort chargé.';
+      title = l10n.shell_no_profile_loaded;
+      subtitle = l10n.shell_retry_after_vault_loaded;
     }
     showToast(
       context: context,
@@ -695,9 +711,7 @@ class _OpimeAppState extends State<OpimeApp> {
     if (_profilesLoadError != null) {
       return Scaffold(
         child: LoadErrorView(
-          message:
-              'Impossible de charger les profils. Le dossier Coffre-fort '
-              'est peut-être encore en cours de synchronisation.',
+          message: AppLocalizations.of(context).shell_profiles_load_failed,
           onRetry: _retryInitProfiles,
         ),
       );
@@ -851,6 +865,7 @@ class _OpimeAppState extends State<OpimeApp> {
                 onVaultActivated: _onVaultReady,
                 onNoVaultSelected: _resetVault,
                 themeController: _themeController,
+                localeController: _localeController,
                 assistantConfigController: _assistantConfigController,
                 notificationsSettingsController:
                     _notificationsSettingsController,

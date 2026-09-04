@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/profiles/profile_controller.dart';
+import '../../l10n/app_localizations.dart';
 import '../patrimoine_export/patrimoine_export_dialog.dart';
 import '../transactions_export/transactions_export_dialog.dart';
 
@@ -19,6 +20,7 @@ class PatrimoineExportMenuButton extends StatelessWidget {
   });
 
   void _openMenu(BuildContext anchorContext) {
+    final l10n = AppLocalizations.of(anchorContext);
     showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.topEnd,
@@ -30,7 +32,7 @@ class PatrimoineExportMenuButton extends StatelessWidget {
           children: [
             MenuButton(
               leading: const Icon(LucideIcons.arrowDownToLine, size: 14),
-              child: const shadcn.Text('Télécharger mon patrimoine (PDF)'),
+              child: shadcn.Text(l10n.navigation_export_download_patrimoine_pdf),
               onPressed: (_) => showPatrimoineExportDialog(
                 anchorContext,
                 vaultPath: profileController.activeDataPath,
@@ -39,7 +41,7 @@ class PatrimoineExportMenuButton extends StatelessWidget {
             ),
             MenuButton(
               leading: const Icon(LucideIcons.fileSpreadsheet, size: 14),
-              child: const shadcn.Text('Exporter les transactions (JSON/CSV)'),
+              child: shadcn.Text(l10n.navigation_export_transactions_csv_json),
               onPressed: (_) => showTransactionsExportDialog(
                 anchorContext,
                 vaultPath: profileController.activeDataPath,
@@ -55,7 +57,9 @@ class PatrimoineExportMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       // ignore: implicit_call_tearoffs
-      tooltip: TooltipContainer(child: const shadcn.Text('Exporter')),
+      tooltip: TooltipContainer(
+        child: shadcn.Text(AppLocalizations.of(context).navigation_export_tooltip),
+      ),
       child: Builder(
         builder: (context) => IconButton.ghost(
           icon: const Icon(LucideIcons.arrowDownToLine),

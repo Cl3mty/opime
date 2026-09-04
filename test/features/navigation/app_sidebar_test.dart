@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/core/profiles/profile_controller.dart';
 import 'package:opime/core/profiles/profile_repository.dart';
 import 'package:opime/core/profiles/sidebar_prefs_controller.dart';
@@ -42,6 +44,13 @@ void main() {
   }) async {
     await tester.pumpWidget(
       ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
         home: Scaffold(
           child: AppSidebar(
             selectedKey: selectedKey,

@@ -6,6 +6,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/money_format.dart';
 import '../../core/ui/copyable_identifier.dart';
 import '../../core/ui/toggle_button_style.dart';
+import '../../l10n/app_localizations.dart';
 import 'account_detail_screen.dart' show BackHeader;
 import 'confirm_delete_dialog.dart';
 import 'currency_data.dart' show kKnownStablecoins;
@@ -240,17 +241,22 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
       isCurrencyInvestment(widget.account, widget.investment);
 
   String get _quantityFieldLabel {
-    if (_isImmobilier) return 'Montant total (€)';
+    final l10n = AppLocalizations.of(context);
+    if (_isImmobilier) return l10n.investments_field_total_amount_eur;
     if (_isCurrency) {
       return _isEurCurrency
-          ? 'Montant (€)'
-          : 'Montant (${widget.investment.isin})';
+          ? l10n.investments_field_amount_eur
+          : l10n.investments_field_amount_currency(widget.investment.isin);
     }
-    return 'Quantité';
+    return l10n.investments_field_quantity;
   }
 
-  String get _priceFieldLabel =>
-      _isCurrency ? 'Cours de la paire de devise' : 'Prix unitaire';
+  String get _priceFieldLabel {
+    final l10n = AppLocalizations.of(context);
+    return _isCurrency
+        ? l10n.investments_field_currency_pair_rate
+        : l10n.investments_field_unit_price;
+  }
 
   /// Le sélecteur de devise s'affiche sur le champ prix dès qu'il est
   /// pertinent : hors immobilier (pas de prix unitaire), et hors position
@@ -438,10 +444,13 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
 
   Future<void> _deleteInvestment() async {
     if (!_canDelete) return;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${widget.investment.label}" ?',
-      message: 'Cet investissement sera définitivement supprimé.',
+      title: l10n.investments_delete_investment_confirm_title(
+        widget.investment.label,
+      ),
+      message: l10n.investments_delete_investment_confirm_message,
     );
     if (!confirmed) return;
     final updatedAccount = widget.account.copyWith(
@@ -571,6 +580,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   }
 
   void _openInvestmentMenu(BuildContext anchorContext) {
+    final l10n = AppLocalizations.of(anchorContext);
     showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.topEnd,
@@ -582,19 +592,19 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
           children: [
             MenuButton(
               leading: const Icon(LucideIcons.pencil, size: 14),
-              child: const shadcn.Text('Modifier'),
+              child: shadcn.Text(l10n.common_edit),
               onPressed: (_) => _startEditInvestment(),
             ),
             if (_isImmobilier)
               MenuButton(
                 leading: const Icon(LucideIcons.mapPin, size: 14),
-                child: const shadcn.Text('Réestimer la valeur (€/m²)'),
+                child: shadcn.Text(l10n.investments_reestimate_dialog_title),
                 onPressed: (_) => _openReestimateDialog(),
               ),
             MenuButton(
               enabled: widget.investment.quantityHeld > 0,
               leading: const Icon(LucideIcons.arrowRightLeft, size: 14),
-              child: const shadcn.Text('Transférer vers un autre compte'),
+              child: shadcn.Text(l10n.investments_transfer_to_account_menu_item),
               onPressed: (_) => showTransferDialog(
                 context,
                 vaultPath: widget.vaultPath,
@@ -606,7 +616,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             MenuButton(
               enabled: widget.investment.quantityHeld > 0,
               leading: const Icon(LucideIcons.shuffle, size: 14),
-              child: const shadcn.Text('Arbitrer vers un autre titre'),
+              child: shadcn.Text(l10n.investments_arbitrage_to_security_menu_item),
               onPressed: (_) => showArbitrageDialog(
                 context,
                 vaultPath: widget.vaultPath,
@@ -618,7 +628,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             MenuButton(
               enabled: widget.account.investments.length > 1,
               leading: const Icon(LucideIcons.combine, size: 14),
-              child: const shadcn.Text('Fusionner avec une autre position'),
+              child: shadcn.Text(l10n.investments_merge_with_position_menu_item),
               onPressed: (_) => _openMergeDialog(),
             ),
             MenuButton(
@@ -626,10 +636,10 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               leading: const Icon(LucideIcons.trash2, size: 14),
               trailing: _canDelete
                   ? null
-                  : const shadcn.Text(
-                      'Supprime d\'abord ses transactions',
+                  : shadcn.Text(
+                      l10n.investments_delete_investment_requires_empty_tooltip,
                     ).muted().xSmall(),
-              child: const shadcn.Text('Supprimer l\'investissement'),
+              child: shadcn.Text(l10n.investments_delete_investment_menu_item),
               onPressed: (_) => _deleteInvestment(),
             ),
           ],
@@ -656,16 +666,15 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
     // une position déséquilibrée (ex : un titre "arrivé" nulle part) sur
     // l'autre compte/position, une erreur silencieuse difficile à repérer.
     final linkedId = transaction.linkedTransactionId;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer cette transaction ?',
+      title: l10n.investments_delete_transaction_title,
       message: linkedId == null
-          ? 'Cette action est irréversible et modifiera la quantité '
-                'détenue et le PRU de cet investissement.'
-          : 'Cette transaction fait partie d\'un transfert/arbitrage : sa '
-                'contrepartie sera aussi supprimée. Cette action est '
-                'irréversible et modifiera la quantité détenue et le PRU '
-                'des deux positions concernées.',
+          ? l10n.investments_delete_transaction_message(
+              widget.investment.label,
+            )
+          : l10n.investments_delete_linked_transaction_message,
     );
     if (!confirmed) return;
     // Un document rattaché à cette transaction (voir `DocumentsSection`'s
@@ -783,12 +792,13 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   /// dans les documents du bien (catégorie "Quittance") pour un historique
   /// consultable sans avoir à la régénérer.
   Future<void> _downloadQuittance(RentPeriod period, Uint8List pdfBytes) async {
+    final l10n = AppLocalizations.of(context);
     final monthLabel =
         '${period.periodStart.year}-'
         '${period.periodStart.month.toString().padLeft(2, '0')}';
     try {
       final savePath = await FilePicker.saveFile(
-        dialogTitle: 'Enregistrer la quittance',
+        dialogTitle: l10n.investments_receipt_save_dialog_title,
         fileName: 'quittance-$monthLabel.pdf',
         bytes: pdfBytes,
       );
@@ -801,19 +811,19 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
         'quittance-$monthLabel.pdf',
         pdfBytes,
         null,
-        'Quittance $monthLabel',
-        'Quittance',
+        l10n.investments_receipt_document_name(monthLabel),
+        l10n.real_estate_document_category_receipt,
       );
       if (!mounted) return;
       _showToast(
-        title: 'Quittance enregistrée',
-        subtitle: 'Le PDF a été enregistré : $path',
+        title: l10n.investments_receipt_saved_toast_title,
+        subtitle: l10n.patrimoine_export_success_subtitle(path),
       );
     } catch (e) {
       if (!mounted) return;
       _showToast(
-        title: 'Échec de l\'enregistrement',
-        subtitle: 'La quittance n\'a pas pu être générée ou enregistrée : $e',
+        title: l10n.investments_receipt_save_failed_toast_title,
+        subtitle: l10n.investments_receipt_save_failed_subtitle('$e'),
       );
     }
   }
@@ -862,6 +872,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
   Widget build(BuildContext context) {
     final investment = widget.investment;
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     // Voir `TransactionRow.centerDate` : la date ne reste centrée que tant
     // qu'aucune transaction affichée ne porte de commentaire.
     final centerDate = !investment.transactions.any((t) => t.hasNote);
@@ -954,14 +965,14 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                     CopyableIdentifier(
                       value: investment.isin,
                       toastTitle: _isRealIsin
-                          ? 'ISIN copié'
-                          : 'Identifiant copié',
+                          ? l10n.investments_isin_copied_toast_title
+                          : l10n.investments_identifier_copied_toast_title,
                     ),
                   if (investment.symbol != null &&
                       investment.symbol!.isNotEmpty)
                     CopyableIdentifier(
                       value: investment.symbol!,
-                      toastTitle: 'Ticker copié',
+                      toastTitle: l10n.investments_ticker_copied_toast_title,
                     ),
                 ],
               ),
@@ -999,14 +1010,14 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             children: [
               if (!_isImmobilier) ...[
                 InvestmentStatChip(
-                  label: 'Quantité détenue',
+                  label: l10n.investments_quantity_held_label,
                   value: formatQuantity(
                     investment.quantityHeld,
                     _effectiveClass,
                   ),
                 ),
                 InvestmentStatChip(
-                  label: 'PRU',
+                  label: l10n.dashboard_column_pru,
                   // Une position en devise (épargne ou devise d'un compte-
                   // titres) est tenue à un taux de change (le PRU est le
                   // cours de la paire à l'achat), pas à un montant :
@@ -1019,7 +1030,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               ],
               if (hasPrice)
                 InvestmentStatChip(
-                  label: 'Dernier cours',
+                  label: l10n.investments_last_price_label,
                   value: _lastPriceDisplay,
                   trailing: investment.isPriceFresh
                       ? const FreshPriceBadge()
@@ -1057,9 +1068,12 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 if (performance != null)
                   shadcn.Text(
                     performance.annualized
-                        ? '${displayPercent(performance.rate * 100)} / an'
-                        : '${displayPercent(performance.rate * 100)} depuis '
-                              'le début',
+                        ? l10n.investments_performance_annualized_label(
+                            displayPercent(performance.rate * 100),
+                          )
+                        : l10n.investments_performance_since_start_label(
+                            displayPercent(performance.rate * 100),
+                          ),
                     style: TextStyle(
                       color: performance.rate >= 0 ? _green : _red,
                       fontWeight: FontWeight.w600,
@@ -1067,18 +1081,15 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                   ).medium()
                 else
                   shadcn.Text(
-                    'Pas assez d\'historique de cours pour ce calcul.',
+                    l10n.investments_not_enough_price_history,
                   ).muted().xSmall(),
               ],
             ),
             const SizedBox(height: 4),
             shadcn.Text(
               _perfMode == _PerfMode.twr
-                  ? 'TWR (Time-Weighted Return) : performance de l\'actif, '
-                        'indépendamment du moment de vos apports.'
-                  : 'MWR (Money-Weighted Return) : rendement réellement '
-                        'perçu, compte tenu du montant et de la date de '
-                        'chaque apport.',
+                  ? l10n.investments_twr_explanation
+                  : l10n.investments_mwr_explanation,
             ).muted().xSmall(),
           ] else
             Row(
@@ -1097,16 +1108,10 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 Expanded(
                   child: shadcn.Text(
                     investment.priceUnavailable == true
-                        ? 'Cours introuvable sur Yahoo Finance pour '
-                              '« ${investment.isin} » : identifiant inconnu '
-                              'ou actif non coté. Vérifiez l\'identifiant — '
-                              'la valorisation ci-dessus correspond au '
-                              'montant net investi (prix d\'achat), pas au '
-                              'cours actuel du marché.'
-                        : 'Cours en temps réel pas encore disponible : la '
-                              'valorisation ci-dessus correspond au montant '
-                              'net investi (prix d\'achat), pas au cours '
-                              'actuel du marché.',
+                        ? l10n.investments_price_not_found_hint(
+                            investment.isin,
+                          )
+                        : l10n.investments_price_not_yet_available_hint,
                   ).muted().xSmall(),
                 ),
               ],
@@ -1123,11 +1128,11 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               index: _realEstateTabIndex,
               onChanged: (value) =>
                   setState(() => _realEstateTabIndex = value),
-              children: const [
-                TabItem(child: shadcn.Text('Loyers')),
-                TabItem(child: shadcn.Text('Travaux')),
-                TabItem(child: shadcn.Text('Documents')),
-                TabItem(child: shadcn.Text('Rentabilité')),
+              children: [
+                TabItem(child: shadcn.Text(l10n.real_estate_rent_periods_title)),
+                TabItem(child: shadcn.Text(l10n.real_estate_work_items_title)),
+                TabItem(child: shadcn.Text(l10n.real_estate_documents_title)),
+                TabItem(child: shadcn.Text(l10n.investments_tab_profitability)),
               ],
             ),
             const SizedBox(height: 16),
@@ -1163,7 +1168,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
               ),
           ],
           const SizedBox(height: 24),
-          const shadcn.Text('Transactions').large().medium(),
+          shadcn.Text(l10n.investments_tab_transactions).large().medium(),
           const SizedBox(height: 12),
           for (final txn in investment.transactions.reversed) ...[
             if (txn.id == _editingTransactionId)
@@ -1185,7 +1190,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
                 onDateChanged: (d) => setState(() => _newDate = d),
                 onCreate: _commitEditTransaction,
                 onCancel: _cancelEdit,
-                submitLabel: 'Enregistrer',
+                submitLabel: l10n.common_save,
                 // Les pièces justificatives (facture, photo des pièces...)
                 // se consultent et s'ajoutent directement en éditant la
                 // transaction qu'elles justifient — métaux précieux et
@@ -1229,7 +1234,7 @@ class _InvestmentDetailViewState extends State<InvestmentDetailView> {
             const SizedBox(height: 8),
           ],
           if (investment.transactions.isEmpty)
-            shadcn.Text('Aucune transaction pour l\'instant.').muted().small(),
+            shadcn.Text(l10n.investments_no_transactions_yet).muted().small(),
           const SizedBox(height: 8),
           if (_creating)
             TransactionForm(

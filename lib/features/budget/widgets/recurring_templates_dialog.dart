@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/ui/frosted_card.dart';
+import '../../../l10n/app_localizations.dart';
 import '../budget_recurring_templates_models.dart';
 import '../budget_recurring_templates_repository.dart';
 import '../budget_tracking_models.dart';
@@ -61,8 +62,7 @@ class _RecurringTemplatesDialog extends StatefulWidget {
       _RecurringTemplatesDialogState();
 }
 
-class _RecurringTemplatesDialogState
-    extends State<_RecurringTemplatesDialog> {
+class _RecurringTemplatesDialogState extends State<_RecurringTemplatesDialog> {
   late final BudgetRecurringTemplatesRepository _repo =
       BudgetRecurringTemplatesRepository(widget.vaultPath);
   final _nameController = TextEditingController();
@@ -142,6 +142,7 @@ class _RecurringTemplatesDialogState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -153,20 +154,19 @@ class _RecurringTemplatesDialogState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 shadcn.Text(
-                  'Lignes récurrentes — ${widget.sectionTitle}',
+                  l10n.budget_recurring_templates_dialog_title(
+                    widget.sectionTitle,
+                  ),
                 ).semiBold(),
                 const SizedBox(height: 4),
                 shadcn.Text(
-                  'Un point de départ réutilisable, pas une règle vivante : '
-                  'modifier un template ne change pas les lignes déjà '
-                  'ajoutées les mois précédents.',
+                  l10n.budget_recurring_templates_dialog_subtitle,
                 ).muted().small(),
                 const SizedBox(height: 12),
                 if (_loading)
                   const Center(child: CircularProgressIndicator())
                 else if (_templates.isEmpty)
-                  shadcn.Text('Aucune ligne récurrente pour l\'instant.')
-                      .muted()
+                  shadcn.Text(l10n.budget_recurring_templates_empty).muted()
                 else
                   for (final template in _templates)
                     Padding(
@@ -190,7 +190,7 @@ class _RecurringTemplatesDialogState
                     Expanded(
                       child: TextField(
                         controller: _nameController,
-                        placeholder: const shadcn.Text('Nom'),
+                        placeholder: shadcn.Text(l10n.common_name),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -198,7 +198,9 @@ class _RecurringTemplatesDialogState
                       width: 100,
                       child: TextField(
                         controller: _amountController,
-                        placeholder: const shadcn.Text('Montant'),
+                        placeholder: shadcn.Text(
+                          l10n.budget_amount_placeholder,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -213,12 +215,14 @@ class _RecurringTemplatesDialogState
                   children: [
                     PrimaryButton(
                       onPressed: _templates.isEmpty ? null : _applyNow,
-                      child: const shadcn.Text('Appliquer maintenant'),
+                      child: shadcn.Text(
+                        l10n.budget_recurring_templates_apply_now,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     OutlineButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const shadcn.Text('Fermer'),
+                      child: shadcn.Text(l10n.common_close),
                     ),
                   ],
                 ),

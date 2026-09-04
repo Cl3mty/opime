@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/core/money_format.dart';
 import 'package:opime/features/dashboard/patrimoine_models.dart';
 import 'package:opime/features/dashboard/widgets/patrimoine_chart_widgets.dart'
@@ -45,6 +47,13 @@ void main() {
     ValueChanged<int>? onPeriodChanged,
   }) {
     return ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
       home: Scaffold(
         child: RealPatrimoineCard(
           actifs: actifs,

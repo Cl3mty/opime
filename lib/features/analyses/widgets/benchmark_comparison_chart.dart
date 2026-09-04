@@ -11,6 +11,7 @@ import '../../dashboard/widgets/net_worth_chart.dart'
         drawDashedLine,
         drawDateAxisLabels,
         formatChartTooltipDate;
+import '../../../l10n/app_localizations.dart';
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
@@ -72,12 +73,13 @@ class _BenchmarkComparisonChartState extends State<BenchmarkComparisonChart> {
   Widget build(BuildContext context) {
     final portfolio = widget.portfolioPoints;
     final benchmark = widget.benchmarkPoints;
+    final l10n = AppLocalizations.of(context);
     if (portfolio.length < 2 ||
         benchmark.length < 2 ||
         portfolio.length != benchmark.length) {
       return Center(
         child: shadcn.Text(
-          'Pas assez de données sur cette période',
+          l10n.analyses_benchmark_chart_not_enough_data,
         ).muted().small(),
       );
     }
@@ -86,7 +88,10 @@ class _BenchmarkComparisonChartState extends State<BenchmarkComparisonChart> {
       children: [
         Row(
           children: [
-            _LegendDot(color: widget.portfolioColor, label: 'Actions & Fonds'),
+            _LegendDot(
+              color: widget.portfolioColor,
+              label: l10n.analyses_stocks_funds_label,
+            ),
             const SizedBox(width: 16),
             _LegendDot(color: widget.benchmarkColor, label: widget.benchmarkTicker),
           ],

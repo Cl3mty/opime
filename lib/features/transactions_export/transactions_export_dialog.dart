@@ -9,6 +9,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/toggle_button_style.dart';
+import '../../l10n/app_localizations.dart';
 import '../investments/investments_models.dart';
 import '../investments/investments_repository.dart';
 import 'transactions_export_csv.dart';
@@ -109,6 +110,7 @@ class _TransactionsExportDialogState
 
   Future<void> _generate() async {
     setState(() => _generating = true);
+    final l10n = AppLocalizations.of(context);
     try {
       final rows = buildTransactionExportRows(
         _accounts,
@@ -125,7 +127,7 @@ class _TransactionsExportDialogState
           'transactions-${now.year}${_pad2(now.month)}${_pad2(now.day)}'
           '.$ext';
       final savePath = await FilePicker.saveFile(
-        dialogTitle: 'Enregistrer les transactions',
+        dialogTitle: l10n.transactions_export_save_dialog_title,
         fileName: fileName,
         bytes: bytes,
       );
@@ -139,16 +141,16 @@ class _TransactionsExportDialogState
       await File(path).writeAsBytes(bytes);
       if (!mounted) return;
       _showToast(
-        title: 'Export réussi',
-        subtitle: 'Le fichier a été enregistré : $path',
+        title: l10n.transactions_export_success_title,
+        subtitle: l10n.transactions_export_success_subtitle(path),
       );
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       setState(() => _generating = false);
       _showToast(
-        title: 'Échec de l\'export',
-        subtitle: 'Le fichier n\'a pas pu être généré ou enregistré : $e',
+        title: l10n.transactions_export_failed_title,
+        subtitle: l10n.transactions_export_failed_subtitle(e.toString()),
       );
     }
   }
@@ -199,7 +201,7 @@ class _TransactionsExportDialogState
         _buildFormatToggle(),
         const SizedBox(height: 12),
         if (_accounts.isEmpty)
-          shadcn.Text('Aucune transaction à exporter pour l\'instant.')
+          shadcn.Text(AppLocalizations.of(context).transactions_export_empty)
               .muted()
               .small()
         else
@@ -218,6 +220,7 @@ class _TransactionsExportDialogState
   }
 
   Widget _buildHeader() {
+    final l10n = AppLocalizations.of(context);
     return Row(
       children: [
         Expanded(
@@ -225,10 +228,8 @@ class _TransactionsExportDialogState
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              shadcn.Text('Exporter mes transactions').large().semiBold(),
-              shadcn.Text(
-                'Sélectionnez les comptes à inclure.',
-              ).muted().small(),
+              shadcn.Text(l10n.transactions_export_title).large().semiBold(),
+              shadcn.Text(l10n.transactions_export_subtitle).muted().small(),
             ],
           ),
         ),
@@ -279,7 +280,7 @@ class _TransactionsExportDialogState
             ),
           ),
           shadcn.Text(
-            count == 1 ? '1 transaction' : '$count transactions',
+            AppLocalizations.of(context).transactions_export_transaction_count(count),
           ).muted().xSmall(),
           const SizedBox(width: 8),
           Checkbox(
@@ -295,15 +296,16 @@ class _TransactionsExportDialogState
   }
 
   Widget _buildFooter() {
+    final l10n = AppLocalizations.of(context);
     return Row(
       children: [
         TextButton(
           onPressed: () => _selectAll(true),
-          child: const shadcn.Text('Tout sélectionner'),
+          child: shadcn.Text(l10n.transactions_export_select_all),
         ),
         TextButton(
           onPressed: () => _selectAll(false),
-          child: const shadcn.Text('Tout désélectionner'),
+          child: shadcn.Text(l10n.transactions_export_deselect_all),
         ),
         const Spacer(),
         PrimaryButton(
@@ -315,7 +317,7 @@ class _TransactionsExportDialogState
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(LucideIcons.arrowDownToLine),
-          child: const shadcn.Text('Exporter'),
+          child: shadcn.Text(l10n.navigation_export_tooltip),
         ),
       ],
     );

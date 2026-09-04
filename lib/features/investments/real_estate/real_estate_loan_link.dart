@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../../core/money_format.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../liabilities/liabilities_models.dart';
 import '../../liabilities/liabilities_repository.dart';
 import '../complete_patrimoine_dialog.dart' show showCompletePatrimoineDialog;
@@ -145,6 +146,7 @@ class _RealEstateLoanLinkSectionState
   Widget build(BuildContext context) {
     if (_loading) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final linked = _linkedLoans;
     final candidates = _linkableCandidates;
 
@@ -166,7 +168,7 @@ class _RealEstateLoanLinkSectionState
                   onTap: () => _openLinkMenu(context),
                   child: _LinkAction(
                     icon: LucideIcons.link,
-                    label: 'Lier un crédit existant',
+                    label: l10n.real_estate_link_existing_loan,
                     color: theme.colorScheme.primary,
                   ),
                 ),
@@ -175,7 +177,7 @@ class _RealEstateLoanLinkSectionState
               onTap: () => _createAndLink(LiabilityType.pretImmobilier),
               child: _LinkAction(
                 icon: LucideIcons.plus,
-                label: 'Créer un prêt immobilier',
+                label: l10n.real_estate_create_mortgage_loan,
                 color: theme.colorScheme.primary,
               ),
             ),
@@ -185,7 +187,7 @@ class _RealEstateLoanLinkSectionState
               onTap: () => _createAndLink(LiabilityType.creditAutre),
               child: _LinkAction(
                 icon: LucideIcons.plus,
-                label: 'Créer un crédit travaux',
+                label: l10n.real_estate_create_work_loan,
                 color: theme.colorScheme.primary,
               ),
             ),
@@ -205,6 +207,7 @@ class _LinkedLoanRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Row(
       children: [
         Icon(
@@ -215,8 +218,14 @@ class _LinkedLoanRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: shadcn.Text(
-            '${liability.name} · ${liability.type.label} · '
-            '${displayEuros(liability.remainingBalance, false)} restant dû',
+            l10n.real_estate_linked_loan_summary(
+              liability.name,
+              // `LiabilityType.label` (`liabilities_models.dart`) n'est pas
+              // encore traduit — hors du périmètre de ce fichier, reste en
+              // français jusqu'à ce que ce getter partagé le soit.
+              liability.type.label,
+              displayEuros(liability.remainingBalance, false),
+            ),
           ).small(),
         ),
         IconButton.ghost(

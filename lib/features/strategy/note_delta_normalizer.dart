@@ -12,9 +12,7 @@ final RegExp rawHtmlTagPattern = RegExp(
   r'''<u>|</u>|<span\b[^>]*>|</span>|<a\b[^>]*>|</a>''',
   caseSensitive: false,
 );
-final RegExp rawHtmlHrefPattern = RegExp(
-  r'''href=(?:"([^"]+)"|'([^']+)')''',
-);
+final RegExp rawHtmlHrefPattern = RegExp(r'''href=(?:"([^"]+)"|'([^']+)')''');
 final RegExp rawHtmlStylePattern = RegExp(
   r'''style\s*=\s*(?:"([^"]*)"|'([^']*)')''',
 );
@@ -59,10 +57,10 @@ Delta applyHeadingParagraphIndentation(Delta input) {
       final chunk = parts[index];
       final isLineBreak = index < parts.length - 1;
 
-        if (chunk.isNotEmpty) {
-          result.insert(chunk, inlineTextAttributes(attrs));
-          lineHasContent = true;
-        }
+      if (chunk.isNotEmpty) {
+        result.insert(chunk, inlineTextAttributes(attrs));
+        lineHasContent = true;
+      }
 
       if (!isLineBreak) continue;
 
@@ -193,8 +191,9 @@ Delta rebaseListIndentation(Delta input) {
 
       if (!isLineBreak) continue;
 
-      final lineAttrs =
-          attrs == null ? <String, dynamic>{} : Map<String, dynamic>.from(attrs);
+      final lineAttrs = attrs == null
+          ? <String, dynamic>{}
+          : Map<String, dynamic>.from(attrs);
       final indentLevel = lineAttrs[Attribute.indent.key] as int?;
 
       if (lineAttrs.containsKey(Attribute.list.key)) {

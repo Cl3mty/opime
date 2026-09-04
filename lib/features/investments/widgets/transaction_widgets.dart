@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../../l10n/app_localizations.dart';
 import '../../../core/date_format.dart';
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
@@ -136,7 +137,9 @@ class FreshPriceBadge extends StatelessWidget {
         size: 10,
         color: Colors.green,
       ),
-      child: shadcn.Text('à jour').xSmall(),
+      child: shadcn.Text(
+        AppLocalizations.of(context).investments_price_fresh_badge,
+      ).xSmall(),
     );
   }
 }
@@ -153,9 +156,14 @@ class ManualPriceBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Tooltip(
       tooltip: (context) => TooltipContainer(
-        child: shadcn.Text('Estimé le ${formatDateDdMmYyyy(updatedAt)}'),
+        child: shadcn.Text(
+          l10n.investments_manual_price_estimated_on(
+            formatDateDdMmYyyy(updatedAt),
+          ),
+        ),
       ),
       child: OutlineBadge(
         leading: Icon(
@@ -163,7 +171,7 @@ class ManualPriceBadge extends StatelessWidget {
           size: 10,
           color: Theme.of(context).colorScheme.mutedForeground,
         ),
-        child: shadcn.Text('manuel').xSmall(),
+        child: shadcn.Text(l10n.investments_price_manual_badge).xSmall(),
       ),
     );
   }
@@ -187,7 +195,9 @@ class ExcludedFromPatrimoineBadge extends StatelessWidget {
         size: 10,
         color: theme.colorScheme.mutedForeground,
       ),
-      child: shadcn.Text('Hors patrimoine global').xSmall().muted(),
+      child: shadcn.Text(
+        AppLocalizations.of(context).investments_excluded_from_patrimoine_badge,
+      ).xSmall().muted(),
     );
   }
 }
@@ -265,6 +275,7 @@ class TransactionRow extends StatelessWidget {
   });
 
   void _openMenu(BuildContext anchorContext) {
+    final l10n = AppLocalizations.of(anchorContext);
     showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.topEnd,
@@ -276,12 +287,12 @@ class TransactionRow extends StatelessWidget {
           children: [
             MenuButton(
               leading: const Icon(LucideIcons.pencil, size: 14),
-              child: const shadcn.Text('Modifier'),
+              child: shadcn.Text(l10n.common_edit),
               onPressed: (_) => onEdit(),
             ),
             MenuButton(
               leading: const Icon(LucideIcons.trash2, size: 14),
-              child: const shadcn.Text('Supprimer'),
+              child: shadcn.Text(l10n.common_delete),
               onPressed: (_) => onDelete(),
             ),
           ],
@@ -412,9 +423,11 @@ class TransactionRow extends StatelessWidget {
                   : Tooltip(
                       tooltip: (context) => TooltipContainer(
                         child: shadcn.Text(
-                          '${documents.length} document'
-                          '${documents.length > 1 ? 's' : ''} rattaché'
-                          '${documents.length > 1 ? 's' : ''} — consulter',
+                          AppLocalizations.of(
+                            context,
+                          ).investments_documents_attached_tooltip(
+                            documents.length,
+                          ),
                         ),
                       ),
                       child: IconButton.ghost(
@@ -493,6 +506,7 @@ class ArbitrageTransactionRow extends StatelessWidget {
   });
 
   void _openMenu(BuildContext anchorContext) {
+    final l10n = AppLocalizations.of(anchorContext);
     showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.topEnd,
@@ -504,12 +518,12 @@ class ArbitrageTransactionRow extends StatelessWidget {
           children: [
             MenuButton(
               leading: const Icon(LucideIcons.pencil, size: 14),
-              child: const shadcn.Text('Modifier l\'arbitrage'),
+              child: shadcn.Text(l10n.investments_edit_arbitrage_title),
               onPressed: (_) => onEdit(),
             ),
             MenuButton(
               leading: const Icon(LucideIcons.trash2, size: 14),
-              child: const shadcn.Text('Supprimer'),
+              child: shadcn.Text(l10n.common_delete),
               onPressed: (_) => onDelete(),
             ),
           ],
@@ -527,6 +541,7 @@ class ArbitrageTransactionRow extends StatelessWidget {
     // `_commitArbitrage` : la quantité achetée est dérivée du produit de la
     // vente) — un seul montant à afficher plutôt que deux.
     final amount = sellTransaction.amount;
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -537,7 +552,10 @@ class ArbitrageTransactionRow extends StatelessWidget {
               flex: _leftGroupFlex,
               child: Row(
                 children: [
-                  const _TransactionKindBadge(label: 'Arbitrage', color: _orange),
+                  _TransactionKindBadge(
+                    label: l10n.investments_transaction_type_arbitrage_label,
+                    color: _orange,
+                  ),
                   const SizedBox(width: 8),
                   Flexible(
                     child: shadcn.Text(
@@ -566,10 +584,12 @@ class ArbitrageTransactionRow extends StatelessWidget {
                 children: [
                   Flexible(
                     child: shadcn.Text(
-                      'Vendu ${formatQuantity(sellTransaction.quantity, sellAssetClass)} × '
-                      '${displayEuros(sellTransaction.unitPrice, hidden)} → '
-                      'Acheté ${formatQuantity(buyTransaction.quantity, buyAssetClass)} × '
-                      '${displayEuros(buyTransaction.unitPrice, hidden)}',
+                      l10n.investments_arbitrage_sold_bought_summary(
+                        formatQuantity(sellTransaction.quantity, sellAssetClass),
+                        displayEuros(sellTransaction.unitPrice, hidden),
+                        formatQuantity(buyTransaction.quantity, buyAssetClass),
+                        displayEuros(buyTransaction.unitPrice, hidden),
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ).muted().xSmall(),
                   ),
@@ -585,9 +605,11 @@ class ArbitrageTransactionRow extends StatelessWidget {
                   : Tooltip(
                       tooltip: (context) => TooltipContainer(
                         child: shadcn.Text(
-                          '${documents.length} document'
-                          '${documents.length > 1 ? 's' : ''} rattaché'
-                          '${documents.length > 1 ? 's' : ''} — consulter',
+                          AppLocalizations.of(
+                            context,
+                          ).investments_documents_attached_tooltip(
+                            documents.length,
+                          ),
                         ),
                       ),
                       child: IconButton.ghost(
@@ -618,13 +640,15 @@ class ArbitrageTransactionRow extends StatelessWidget {
 /// Fonds.
 class AddTransactionButton extends StatelessWidget {
   final VoidCallback onTap;
-  final String label;
 
-  const AddTransactionButton({
-    super.key,
-    required this.onTap,
-    this.label = 'Ajouter une transaction',
-  });
+  /// Libellé affiché — `null` retombe sur "Ajouter une transaction" traduit
+  /// (voir [AppLocalizations.investments_add_transaction_title]) : un
+  /// paramètre de constructeur ne peut pas appeler `AppLocalizations.of`
+  /// (pas de `BuildContext` disponible avant `build`), d'où ce fallback
+  /// résolu ici plutôt qu'une valeur par défaut figée en français.
+  final String? label;
+
+  const AddTransactionButton({super.key, required this.onTap, this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -640,7 +664,7 @@ class AddTransactionButton extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           shadcn.Text(
-            label,
+            label ?? AppLocalizations.of(context).investments_add_transaction_title,
             style: TextStyle(color: Theme.of(context).colorScheme.primary),
           ),
         ],
@@ -669,17 +693,22 @@ class TransactionForm extends StatelessWidget {
   final ValueChanged<DateTime?> onDateChanged;
   final VoidCallback onCreate;
   final VoidCallback onCancel;
-  final String submitLabel;
 
-  /// Libellé du champ [quantityController] — "Quantité" par défaut,
-  /// `Montant (€)`/`Montant (<devise>)` pour une position en devise (voir
-  /// `InvestmentDetailView`'s `_quantityFieldLabel`).
-  final String quantityLabel;
+  /// Libellé du bouton de validation — `null` retombe sur "Ajouter la
+  /// transaction" traduit (comme [quantityLabel]/[priceLabel] ci-dessous, un
+  /// paramètre de constructeur ne peut pas résoudre `AppLocalizations.of`,
+  /// faute de `BuildContext` avant `build`).
+  final String? submitLabel;
 
-  /// Libellé du champ [priceController] — "Prix unitaire" par défaut,
-  /// "Cours de la paire de devise" pour une position en devise (voir
-  /// `InvestmentDetailView`'s `_priceFieldLabel`).
-  final String priceLabel;
+  /// Libellé du champ [quantityController] — `null` retombe sur "Quantité"
+  /// traduit ; sinon `Montant (€)`/`Montant (<devise>)` pour une position en
+  /// devise (voir `InvestmentDetailView`'s `_quantityFieldLabel`).
+  final String? quantityLabel;
+
+  /// Libellé du champ [priceController] — `null` retombe sur "Prix
+  /// unitaire" traduit ; sinon "Cours de la paire de devise" pour une
+  /// position en devise (voir `InvestmentDetailView`'s `_priceFieldLabel`).
+  final String? priceLabel;
 
   /// `false` masque entièrement le champ [priceController] — une position
   /// en devise tenue en euros n'a pas de taux de change à saisir (voir
@@ -727,9 +756,9 @@ class TransactionForm extends StatelessWidget {
     required this.quantityController,
     required this.priceController,
     required this.noteController,
-    this.submitLabel = 'Ajouter la transaction',
-    this.quantityLabel = 'Quantité',
-    this.priceLabel = 'Prix unitaire',
+    this.submitLabel,
+    this.quantityLabel,
+    this.priceLabel,
     this.showPriceField = true,
     this.showCurrencySelector = false,
     this.priceCurrencyController,
@@ -745,6 +774,7 @@ class TransactionForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -763,21 +793,21 @@ class TransactionForm extends StatelessWidget {
                       selectedStyle: const ButtonStyle.primary(),
                       style: toggleUnselectedStyle(context),
                       onChanged: (_) => onIsBuyChanged(true),
-                      child: const shadcn.Text('Achat'),
+                      child: shadcn.Text(l10n.investments_transaction_buy_label),
                     ),
                     SelectedButton(
                       value: !isBuy,
                       selectedStyle: const ButtonStyle.primary(),
                       style: toggleUnselectedStyle(context),
                       onChanged: (_) => onIsBuyChanged(false),
-                      child: const shadcn.Text('Vente'),
+                      child: shadcn.Text(l10n.investments_transaction_sell_label),
                     ),
                   ],
                 ),
                 OpimeDatePicker(
                   value: date,
                   onChanged: onDateChanged,
-                  placeholder: const shadcn.Text('Date'),
+                  placeholder: shadcn.Text(l10n.common_date),
                 ),
               ],
             ),
@@ -785,12 +815,12 @@ class TransactionForm extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  shadcn.Text('Débloqué le').muted().xSmall(),
+                  shadcn.Text(l10n.investments_unlocked_on_label).muted().xSmall(),
                   const SizedBox(width: 8),
                   OpimeDatePicker(
                     value: unlockDate,
                     onChanged: onUnlockDateChanged,
-                    placeholder: const shadcn.Text('Date de déblocage'),
+                    placeholder: shadcn.Text(l10n.investments_unlock_date_hint),
                   ),
                 ],
               ),
@@ -801,7 +831,9 @@ class TransactionForm extends StatelessWidget {
                 Expanded(
                   child: TextField(
                     controller: quantityController,
-                    placeholder: shadcn.Text(quantityLabel),
+                    placeholder: shadcn.Text(
+                      quantityLabel ?? l10n.investments_field_quantity,
+                    ),
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
@@ -812,7 +844,9 @@ class TransactionForm extends StatelessWidget {
                   Expanded(
                     child: TextField(
                       controller: priceController,
-                      placeholder: shadcn.Text(priceLabel),
+                      placeholder: shadcn.Text(
+                        priceLabel ?? l10n.investments_field_unit_price,
+                      ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
@@ -838,7 +872,7 @@ class TransactionForm extends StatelessWidget {
             const SizedBox(height: 8),
             TextField(
               controller: noteController,
-              placeholder: const shadcn.Text('Commentaire (facultatif)'),
+              placeholder: shadcn.Text(l10n.investments_comment_hint),
             ),
             if (documentsSection != null) ...[
               const SizedBox(height: 16),
@@ -849,12 +883,14 @@ class TransactionForm extends StatelessWidget {
               children: [
                 PrimaryButton(
                   onPressed: onCreate,
-                  child: shadcn.Text(submitLabel),
+                  child: shadcn.Text(
+                    submitLabel ?? l10n.investments_add_transaction_submit,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 OutlineButton(
                   onPressed: onCancel,
-                  child: const shadcn.Text('Annuler'),
+                  child: shadcn.Text(l10n.common_cancel),
                 ),
               ],
             ),

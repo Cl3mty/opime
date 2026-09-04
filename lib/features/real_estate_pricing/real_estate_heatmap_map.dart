@@ -6,6 +6,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/money_format.dart';
+import '../../l10n/app_localizations.dart';
 import 'commune_boundaries_client.dart';
 import 'commune_boundaries_repository.dart';
 import 'department_boundaries_client.dart';
@@ -444,6 +445,7 @@ class _RealEstateHeatmapMapState extends State<RealEstateHeatmapMap> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final marker = widget.addressController.marker;
     final renderTier = _renderTier;
     return Column(
@@ -456,22 +458,28 @@ class _RealEstateHeatmapMapState extends State<RealEstateHeatmapMap> {
           ),
           const SizedBox(height: 4),
           shadcn.Text(
-            'Chargement des prix par département : $_loadedCount / $_totalCount'
-            ' (mis en cache, la prochaine ouverture sera instantanée)',
+            l10n.real_estate_pricing_heatmap_loading_department_prices(
+              _loadedCount,
+              _totalCount,
+            ),
           ).muted().xSmall(),
         ],
         if (renderTier == _Tier.commune && _loadingCommuneDepts.isNotEmpty) ...[
           const SizedBox(height: 8),
-          shadcn.Text('Chargement des communes visibles...').muted().xSmall(),
+          shadcn.Text(
+            l10n.real_estate_pricing_heatmap_loading_communes,
+          ).muted().xSmall(),
         ],
         if (renderTier == _Tier.grid && _loadingGrid) ...[
           const SizedBox(height: 8),
-          shadcn.Text('Chargement de la grille fine...').muted().xSmall(),
+          shadcn.Text(
+            l10n.real_estate_pricing_heatmap_loading_grid,
+          ).muted().xSmall(),
         ],
         if (_tier == _Tier.grid && widget.metric == HeatmapMetric.rentPerSqm) ...[
           const SizedBox(height: 8),
           shadcn.Text(
-            "Le loyer n'est disponible qu'à l'échelle de la commune (granularité native de la source).",
+            l10n.real_estate_pricing_heatmap_rent_commune_only,
           ).muted().xSmall(),
         ],
         const SizedBox(height: 10),
@@ -570,7 +578,7 @@ class _RealEstateHeatmapMapState extends State<RealEstateHeatmapMap> {
                             ),
                         ],
                       ),
-                _buildTooltip(theme, renderTier),
+                _buildTooltip(theme, l10n, renderTier),
               ],
             ),
           ),
@@ -619,15 +627,17 @@ class _RealEstateHeatmapMapState extends State<RealEstateHeatmapMap> {
   /// actuellement rendu (grille > commune > département), plutôt qu'au
   /// dernier événement de tap toutes couches confondues (la couche
   /// Département reste toujours montée en-dessous, voir [build]).
-  Widget _buildTooltip(ThemeData theme, _Tier renderTier) {
+  Widget _buildTooltip(ThemeData theme, AppLocalizations l10n, _Tier renderTier) {
     if (renderTier == _Tier.grid && _selectedGridCellKey != null) {
       final cell = _gridCells[_selectedGridCellKey];
       if (cell != null) {
         return _tooltipCard(
           theme,
-          title: 'Quartier (~${_gridCellSizeMeters.round()} m)',
+          title: l10n.real_estate_pricing_heatmap_neighborhood_tooltip_title(
+            _gridCellSizeMeters.round(),
+          ),
           value: _formatValue(cell.medianPricePerSqm),
-          subtitle: '${cell.sampleSize} vente(s)',
+          subtitle: l10n.real_estate_pricing_heatmap_sale_count(cell.sampleSize),
         );
       }
     }
@@ -641,7 +651,9 @@ class _RealEstateHeatmapMapState extends State<RealEstateHeatmapMap> {
       return _tooltipCard(
         theme,
         title: commune?.name ?? code,
-        value: value == null ? 'Pas de donnée' : _formatValue(value),
+        value: value == null
+            ? l10n.real_estate_pricing_heatmap_no_data
+            : _formatValue(value),
       );
     }
     if (_selectedDeptCode != null) {
@@ -651,7 +663,9 @@ class _RealEstateHeatmapMapState extends State<RealEstateHeatmapMap> {
       return _tooltipCard(
         theme,
         title: boundary?.name ?? code,
-        value: value == null ? 'Pas de donnée' : _formatValue(value),
+        value: value == null
+            ? l10n.real_estate_pricing_heatmap_no_data
+            : _formatValue(value),
       );
     }
     return const SizedBox.shrink();

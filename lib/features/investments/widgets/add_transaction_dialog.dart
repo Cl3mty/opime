@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart' show parseDecimal;
 import '../../../core/ui/frosted_card.dart';
+import '../../../l10n/app_localizations.dart';
 import '../currency_data.dart' show kKnownStablecoins;
 import '../document_storage.dart';
 import '../documents_section.dart';
@@ -325,21 +326,26 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   bool get _showCurrencySelector =>
       !_isEurCurrency && !_usesTotalAmount && !_isCurrency;
 
-  String get _quantityFieldLabel {
-    if (_effectiveClass == AssetClass.immobilier) return 'Montant total (€)';
+  String _quantityFieldLabel(AppLocalizations l10n) {
+    if (_effectiveClass == AssetClass.immobilier) {
+      return l10n.investments_field_total_amount_eur;
+    }
     if (_effectiveClass == AssetClass.privateEquity) {
       return _selectedInvestment?.privateEquityKind ==
               PrivateEquityKind.actionsSalarie
-          ? 'Nombre de titres/options'
-          : 'Montant versé (€)';
+          ? l10n.investments_field_shares_options_count
+          : l10n.investments_field_amount_paid_eur;
     }
-    if (!_isCurrency) return 'Quantité';
+    if (!_isCurrency) return l10n.investments_field_quantity;
     final isin = _selectedInvestment!.isin;
-    return _isEurCurrency ? 'Montant (€)' : 'Montant ($isin)';
+    return _isEurCurrency
+        ? l10n.investments_field_amount_eur
+        : l10n.investments_field_amount_currency(isin);
   }
 
-  String get _priceFieldLabel =>
-      _isCurrency ? 'Cours de la paire de devise' : 'Prix unitaire';
+  String _priceFieldLabel(AppLocalizations l10n) => _isCurrency
+      ? l10n.investments_field_currency_pair_rate
+      : l10n.investments_field_unit_price;
 
   String get _txnCurrency =>
       _isCurrency ? 'EUR' : _priceCurrencyController.currency;
@@ -454,6 +460,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -472,7 +479,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     children: [
                       Expanded(
                         child: shadcn.Text(
-                          'Ajouter une transaction',
+                          l10n.investments_add_transaction_title,
                         ).large().semiBold(),
                       ),
                       IconButton.ghost(
@@ -482,7 +489,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  shadcn.Text('Position').muted().xSmall(),
+                  shadcn.Text(l10n.investments_field_position).muted().xSmall(),
                   const SizedBox(height: 4),
                   Select<String>(
                     value: _selection,
@@ -492,7 +499,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     },
                     itemBuilder: (context, value) => shadcn.Text(
                       value == _newPositionValue
-                          ? '+ Nouvelle position'
+                          ? l10n.investments_new_position_option
                           : _account.investments
                                 .firstWhere((i) => i.id == value)
                                 .label,
@@ -505,9 +512,11 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                               value: investment.id,
                               child: shadcn.Text(investment.label),
                             ),
-                          const SelectItemButton(
+                          SelectItemButton(
                             value: _newPositionValue,
-                            child: shadcn.Text('+ Nouvelle position'),
+                            child: shadcn.Text(
+                              l10n.investments_new_position_option,
+                            ),
                           ),
                         ],
                       ),
@@ -529,8 +538,8 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     quantityController: _quantityController,
                     priceController: _priceController,
                     noteController: _noteController,
-                    quantityLabel: _quantityFieldLabel,
-                    priceLabel: _priceFieldLabel,
+                    quantityLabel: _quantityFieldLabel(l10n),
+                    priceLabel: _priceFieldLabel(l10n),
                     showPriceField: !_isEurCurrency && !_usesTotalAmount,
                     showCurrencySelector: _showCurrencySelector,
                     priceCurrencyController: _priceCurrencyController,
@@ -541,7 +550,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     onDateChanged: (d) => setState(() => _date = d),
                     onCreate: _commit,
                     onCancel: _cancel,
-                    submitLabel: 'Ajouter la transaction',
+                    submitLabel: l10n.investments_add_transaction_submit,
                     unlockDate: _unlockDate,
                     onUnlockDateChanged: _unlockDateApplicable
                         ? (d) => setState(() => _unlockDateOverride = d)

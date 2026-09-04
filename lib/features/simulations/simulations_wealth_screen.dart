@@ -7,6 +7,7 @@ import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 
 class WealthSimulationScreen extends StatefulWidget {
   final String vaultPath;
@@ -54,6 +55,7 @@ class _WealthSimulationScreenState extends State<WealthSimulationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -81,15 +83,15 @@ class _WealthSimulationScreenState extends State<WealthSimulationScreen> {
                       TabItem(
                         child: shadcn.Text(
                           compactLabels
-                              ? 'Intérêts composés'
-                              : 'Déterministe (Intérêts composés)',
+                              ? l10n.simulations_wealth_tab_compound_interest
+                              : l10n.simulations_wealth_tab_deterministic_compound_interest,
                         ),
                       ),
                       TabItem(
                         child: shadcn.Text(
                           compactLabels
-                              ? 'Monte-Carlo'
-                              : 'Stochastique (Monte-Carlo)',
+                              ? l10n.simulations_wealth_tab_monte_carlo
+                              : l10n.simulations_wealth_tab_stochastic_monte_carlo,
                         ),
                       ),
                     ],
@@ -172,6 +174,7 @@ class _WealthSimpleDisclaimer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final muted = Theme.of(context).colorScheme.mutedForeground;
     return Container(
       padding: const EdgeInsets.all(14),
@@ -186,10 +189,7 @@ class _WealthSimpleDisclaimer extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: shadcn.Text(
-              "Projection déterministe indicative fondée sur des rendements constants et une fiscalité simplifiée. "
-              "Les valeurs « pouvoir d'achat actuel » actualisent le résultat nominal avec le taux d'inflation renseigné "
-              "(valeur réelle = valeur nominale ÷ (1 + inflation)^années). "
-              "Les marchés, frais, impôts réels et aléas de vie peuvent modifier significativement les résultats.",
+              l10n.simulations_wealth_simple_disclaimer,
             ).muted().small(),
           ),
         ],
@@ -203,6 +203,7 @@ class _WealthMonteCarloDisclaimer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final muted = Theme.of(context).colorScheme.mutedForeground;
     return Container(
       padding: const EdgeInsets.all(14),
@@ -217,8 +218,7 @@ class _WealthMonteCarloDisclaimer extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: shadcn.Text(
-              "Simulation Monte-Carlo indicative: les distributions retenues et hypothèses de volatilité restent simplifiées. "
-              "Les percentiles ne constituent ni une garantie de performance ni une recommandation d'investissement.",
+              l10n.simulations_wealth_monte_carlo_disclaimer,
             ).muted().small(),
           ),
         ],
@@ -770,40 +770,41 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
   );
 
   Widget _buildInputsContent() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _NumberField(
-          label: 'Patrimoine actuel',
+          label: l10n.simulations_wealth_current_assets,
           suffix: '€',
           value: _patrimoineActuel,
           step: 1000,
           onChanged: (v) => _update(() => _patrimoineActuel = v),
         ),
         _SplitSlider(
-          label: 'Répartition de votre patrimoine initial',
-          leftLabel: 'Bourse',
-          rightLabel: 'Autre',
+          label: l10n.simulations_wealth_initial_asset_allocation,
+          leftLabel: l10n.simulations_wealth_stock,
+          rightLabel: l10n.simulations_wealth_other,
           value: _repartitionInitialeBourse,
           onChanged: (v) => _update(() => _repartitionInitialeBourse = v),
         ),
         _NumberField(
-          label: 'Investissements mensuels',
+          label: l10n.simulations_wealth_monthly_investments,
           suffix: '€',
           value: _investissementsMensuels,
           step: 50,
           onChanged: (v) => _update(() => _investissementsMensuels = v),
         ),
         _SplitSlider(
-          label: 'Répartition des investissements',
-          leftLabel: 'Bourse',
-          rightLabel: 'Autre',
+          label: l10n.simulations_wealth_investment_allocation,
+          leftLabel: l10n.simulations_wealth_stock,
+          rightLabel: l10n.simulations_wealth_other,
           value: _repartitionInvestBourse,
           onChanged: (v) => _update(() => _repartitionInvestBourse = v),
         ),
         _NumberField(
-          label: "Nombre d'années d'épargne",
+          label: l10n.simulations_wealth_savings_years,
           suffix: 'ans',
           value: _nombreAnnees.toDouble(),
           step: 1,
@@ -816,7 +817,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
           children: [
             Expanded(
               child: _NumberField(
-                label: 'Rendement bourse',
+                label: l10n.simulations_wealth_stock_return,
                 suffix: '%',
                 value: _rendementBourse,
                 step: 0.5,
@@ -827,7 +828,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: 'Rendement autre',
+                label: l10n.simulations_wealth_other_return,
                 suffix: '%',
                 value: _rendementAutre,
                 step: 0.5,
@@ -842,7 +843,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
           children: [
             Expanded(
               child: _NumberField(
-                label: 'Imposition bourse',
+                label: l10n.simulations_wealth_stock_tax,
                 suffix: '%',
                 value: _impositionBourse,
                 step: 0.1,
@@ -853,7 +854,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: 'Imposition autre',
+                label: l10n.simulations_wealth_other_tax,
                 suffix: '%',
                 value: _impositionAutre,
                 step: 0.1,
@@ -868,7 +869,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
           children: [
             Expanded(
               child: _NumberField(
-                label: 'Taux de retrait',
+                label: l10n.simulations_wealth_withdrawal_rate,
                 suffix: '%',
                 value: _tauxRetrait,
                 step: 0.5,
@@ -879,7 +880,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: "Taux d'inflation",
+                label: l10n.simulations_wealth_inflation_rate,
                 suffix: '%',
                 value: _tauxInflation,
                 step: 0.5,
@@ -893,20 +894,21 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
         OutlineButton(
           onPressed: _resetState,
           leading: const Icon(LucideIcons.refreshCw),
-          child: const shadcn.Text('Réinitialiser les paramètres'),
+          child: shadcn.Text(l10n.simulations_wealth_reset_parameters),
         ),
       ],
     );
   }
 
   Widget _buildResultsContent(SimulationResult result, bool hidden) {
+    final l10n = AppLocalizations.of(context);
     final accent = Theme.of(context).colorScheme.primary;
     final blue = const Color(0xFF7B8FE8);
     final grey = const Color(0xFF6B7280);
 
     return Column(
       children: [
-        shadcn.Text('Valeur nette dans $_nombreAnnees ans').muted(),
+        shadcn.Text(l10n.simulations_wealth_net_value_in_n_years(_nombreAnnees)).muted(),
         const SizedBox(height: 8),
         shadcn.Text(
           displayEuros(result.valeurNette, hidden),
@@ -917,7 +919,7 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
           TextSpan(
             style: DefaultTextStyle.of(context).style,
             children: [
-              const TextSpan(text: "soit un revenu passif d'environ "),
+              TextSpan(text: l10n.simulations_wealth_passive_income_prefix),
               TextSpan(
                 text: '${displayEuros(result.revenuMensuel, hidden)} / mois',
                 style: TextStyle(color: accent, fontWeight: FontWeight.bold),
@@ -933,17 +935,17 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
           children: [
             _LegendPill(
               color: grey,
-              label: 'Patrimoine initial',
+              label: l10n.simulations_wealth_initial_assets,
               value: displayEuros(result.patrimoineInitial, hidden),
             ),
             _LegendPill(
               color: blue,
-              label: 'Versements',
+              label: l10n.simulations_wealth_contributions,
               value: displayEuros(result.versements, hidden),
             ),
             _LegendPill(
               color: accent,
-              label: 'Intérêts nets',
+              label: l10n.simulations_wealth_net_interest,
               value: displayEuros(result.plusValue, hidden),
             ),
           ],
@@ -962,6 +964,15 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
             gridColor: Theme.of(context).colorScheme.border,
             cardColor: Theme.of(context).colorScheme.popover,
             hidden: hidden,
+            labels: {
+              'today': l10n.simulations_wealth_chart_today,
+              'in_n_years': l10n.simulations_wealth_chart_in_n_years(
+                _nombreAnnees,
+              ),
+              'n_years': l10n.simulations_wealth_chart_n_years(
+                _nombreAnnees ~/ 2,
+              ),
+            },
           ),
         ),
         const SizedBox(height: 24),
@@ -969,21 +980,21 @@ class _SimpleSimulationTabState extends State<_SimpleSimulationTab> {
         const SizedBox(height: 16),
         _StatRow(
           items: [
-            ('Valeur future', displayEuros(result.valeurFuture, hidden)),
-            ('Dont plus-value', displayEuros(result.plusValue, hidden)),
-            ('Valeur nette', displayEuros(result.valeurNette, hidden)),
-            ('Revenu mensuel', displayEuros(result.revenuMensuel, hidden)),
+            (l10n.simulations_wealth_stat_future_value, displayEuros(result.valeurFuture, hidden)),
+            (l10n.simulations_wealth_stat_included_capital_gains, displayEuros(result.plusValue, hidden)),
+            (l10n.simulations_wealth_stat_net_value, displayEuros(result.valeurNette, hidden)),
+            (l10n.simulations_wealth_stat_monthly_income, displayEuros(result.revenuMensuel, hidden)),
           ],
         ),
         const SizedBox(height: 14),
         _StatRow(
           items: [
             (
-              'Valeur nette (pouvoir d\'achat actuel)',
+              l10n.simulations_wealth_stat_net_value_purchasing_power,
               displayEuros(result.valeurNetteReelle, hidden),
             ),
             (
-              'Revenu mensuel (pouvoir d\'achat actuel)',
+              l10n.simulations_wealth_stat_monthly_income_purchasing_power,
               displayEuros(result.revenuMensuelReel, hidden),
             ),
           ],
@@ -1120,6 +1131,7 @@ class _ProjectionChart extends StatefulWidget {
   final Color gridColor;
   final Color cardColor;
   final bool hidden;
+  final Map<String, String> labels;
 
   const _ProjectionChart({
     required this.points,
@@ -1132,6 +1144,7 @@ class _ProjectionChart extends StatefulWidget {
     required this.gridColor,
     required this.cardColor,
     required this.hidden,
+    required this.labels,
   });
 
   @override
@@ -1194,6 +1207,7 @@ class _ProjectionChartState extends State<_ProjectionChart> {
                     gridColor: widget.gridColor,
                     hoveredYear: _hoveredYear,
                     hidden: widget.hidden,
+                    labels: widget.labels,
                   ),
                 ),
                 if (hoveredPoint != null)
@@ -1256,6 +1270,7 @@ class _HoverTooltip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return IgnorePointer(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -1272,7 +1287,7 @@ class _HoverTooltip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 shadcn.Text(
-                  year == 0 ? "Aujourd'hui" : 'Dans $year ans',
+                  year == 0 ? l10n.simulations_wealth_chart_today : l10n.simulations_wealth_chart_in_n_years(year),
                 ).muted(),
                 const SizedBox(height: 4),
                 shadcn.Text(
@@ -1285,11 +1300,11 @@ class _HoverTooltip extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Divider(),
                 const SizedBox(height: 8),
-                _row('Intérêts nets', interet, gold),
+                _row(l10n.simulations_wealth_net_interest, interet, gold),
                 const SizedBox(height: 6),
-                _row('Versements', versements, blue),
+                _row(l10n.simulations_wealth_contributions, versements, blue),
                 const SizedBox(height: 6),
-                _row('Patrimoine initial', patrimoineInitial, grey),
+                _row(l10n.simulations_wealth_initial_assets, patrimoineInitial, grey),
               ],
             ),
           ),
@@ -1328,6 +1343,7 @@ class _ProjectionChartPainter extends CustomPainter {
   final Color gridColor;
   final int? hoveredYear;
   final bool hidden;
+  final Map<String, String> labels;
 
   _ProjectionChartPainter({
     required this.points,
@@ -1340,6 +1356,7 @@ class _ProjectionChartPainter extends CustomPainter {
     required this.gridColor,
     required this.hoveredYear,
     required this.hidden,
+    required this.labels,
   });
 
   @override
@@ -1458,7 +1475,7 @@ class _ProjectionChartPainter extends CustomPainter {
 
     _drawXLabel(
       canvas,
-      "Aujourd'hui",
+      labels['today']!,
       xFor(0),
       chartHeight,
       textColor,
@@ -1466,14 +1483,14 @@ class _ProjectionChartPainter extends CustomPainter {
     );
     _drawXLabel(
       canvas,
-      '${nombreAnnees ~/ 2} ans',
+      labels['n_years']!,
       xFor(nombreAnnees ~/ 2),
       chartHeight,
       textColor,
     );
     _drawXLabel(
       canvas,
-      'dans $nombreAnnees ans',
+      labels['in_n_years']!,
       xFor(nombreAnnees),
       chartHeight,
       textColor,
@@ -1750,40 +1767,41 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
   );
 
   Widget _buildInputsContent() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _NumberField(
-          label: 'Patrimoine actuel',
+          label: l10n.simulations_wealth_current_assets,
           suffix: '€',
           value: _patrimoineActuel,
           step: 1000,
           onChanged: (v) => _update(() => _patrimoineActuel = v),
         ),
         _SplitSlider(
-          label: 'Répartition de votre patrimoine initial',
-          leftLabel: 'Bourse',
-          rightLabel: 'Autre',
+          label: l10n.simulations_wealth_initial_asset_allocation,
+          leftLabel: l10n.simulations_wealth_stock,
+          rightLabel: l10n.simulations_wealth_other,
           value: _repartitionInitialeBourse,
           onChanged: (v) => _update(() => _repartitionInitialeBourse = v),
         ),
         _NumberField(
-          label: 'Investissements mensuels',
+          label: l10n.simulations_wealth_monthly_investments,
           suffix: '€',
           value: _investissementsMensuels,
           step: 50,
           onChanged: (v) => _update(() => _investissementsMensuels = v),
         ),
         _SplitSlider(
-          label: 'Répartition des investissements',
-          leftLabel: 'Bourse',
-          rightLabel: 'Autre',
+          label: l10n.simulations_wealth_investment_allocation,
+          leftLabel: l10n.simulations_wealth_stock,
+          rightLabel: l10n.simulations_wealth_other,
           value: _repartitionInvestBourse,
           onChanged: (v) => _update(() => _repartitionInvestBourse = v),
         ),
         _NumberField(
-          label: "Nombre d'années d'épargne",
+          label: l10n.simulations_wealth_savings_years,
           suffix: 'ans',
           value: _nombreAnnees.toDouble(),
           step: 1,
@@ -1796,7 +1814,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
           children: [
             Expanded(
               child: _NumberField(
-                label: 'Rendement moyen bourse',
+                label: l10n.simulations_wealth_avg_stock_return,
                 suffix: '%',
                 value: _rendementBourse,
                 step: 0.5,
@@ -1807,7 +1825,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: 'Écart-type bourse',
+                label: l10n.simulations_wealth_stock_std_dev,
                 suffix: '%',
                 value: _ecartTypeBourse,
                 step: 0.5,
@@ -1822,7 +1840,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
           children: [
             Expanded(
               child: _NumberField(
-                label: 'Rendement moyen autre',
+                label: l10n.simulations_wealth_avg_other_return,
                 suffix: '%',
                 value: _rendementAutre,
                 step: 0.5,
@@ -1833,7 +1851,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: 'Écart-type autre',
+                label: l10n.simulations_wealth_other_std_dev,
                 suffix: '%',
                 value: _ecartTypeAutre,
                 step: 0.5,
@@ -1848,7 +1866,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
           children: [
             Expanded(
               child: _NumberField(
-                label: 'Imposition bourse',
+                label: l10n.simulations_wealth_stock_tax,
                 suffix: '%',
                 value: _impositionBourse,
                 step: 0.1,
@@ -1859,7 +1877,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: 'Imposition autre',
+                label: l10n.simulations_wealth_other_tax,
                 suffix: '%',
                 value: _impositionAutre,
                 step: 0.1,
@@ -1874,7 +1892,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
           children: [
             Expanded(
               child: _NumberField(
-                label: 'Taux de retrait',
+                label: l10n.simulations_wealth_withdrawal_rate,
                 suffix: '%',
                 value: _tauxRetrait,
                 step: 0.5,
@@ -1885,7 +1903,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberField(
-                label: 'Nombre de simulations',
+                label: l10n.simulations_wealth_number_of_simulations,
                 suffix: '',
                 value: _nombreSimulations.toDouble(),
                 step: 50,
@@ -1901,20 +1919,21 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
         OutlineButton(
           onPressed: _resetState,
           leading: const Icon(LucideIcons.refreshCw),
-          child: const shadcn.Text('Réinitialiser les paramètres'),
+          child: shadcn.Text(l10n.simulations_wealth_reset_parameters),
         ),
       ],
     );
   }
 
   Widget _buildResultsContent(MCResult result, bool hidden) {
+    final l10n = AppLocalizations.of(context);
     final accent = Theme.of(context).colorScheme.primary;
     final blue = const Color(0xFF7B8FE8);
     final grey = const Color(0xFF6B7280);
 
     return Column(
       children: [
-        shadcn.Text('Valeur nette médiane dans $_nombreAnnees ans').muted(),
+        shadcn.Text(l10n.simulations_wealth_median_net_value_in_n_years(_nombreAnnees)).muted(),
         const SizedBox(height: 8),
         shadcn.Text(
           displayEuros(result.valeurNetteMediane, hidden),
@@ -1925,7 +1944,7 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
           TextSpan(
             style: DefaultTextStyle.of(context).style,
             children: [
-              const TextSpan(text: "soit un revenu passif médian d'environ "),
+              TextSpan(text: l10n.simulations_wealth_median_passive_income_prefix),
               TextSpan(
                 text:
                     '${displayEuros(result.revenuMensuelMedian, hidden)} / mois',
@@ -1936,7 +1955,10 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
         ).muted(),
         const SizedBox(height: 4),
         shadcn.Text(
-          'Entre ${displayEuros(result.valeurNetteP10, hidden)} et ${displayEuros(result.valeurNetteP90, hidden)} selon les scénarios (10e-90e percentile)',
+          l10n.simulations_wealth_between_p10_and_p90(
+            displayEuros(result.valeurNetteP10, hidden),
+            displayEuros(result.valeurNetteP90, hidden),
+          ),
         ).muted().small(),
         const SizedBox(height: 16),
         Wrap(
@@ -1946,17 +1968,17 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
           children: [
             _LegendPill(
               color: grey,
-              label: 'Patrimoine initial',
+              label: l10n.simulations_wealth_initial_assets,
               value: displayEuros(result.patrimoineInitial, hidden),
             ),
             _LegendPill(
               color: blue,
-              label: 'Versements',
+              label: l10n.simulations_wealth_contributions,
               value: displayEuros(result.versements, hidden),
             ),
             _LegendPill(
               color: accent,
-              label: 'Médiane (intérêts nets)',
+              label: l10n.simulations_wealth_median_net_interest,
               value: displayEuros(result.plusValueMediane, hidden),
             ),
           ],
@@ -1975,6 +1997,15 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
             gridColor: Theme.of(context).colorScheme.border,
             cardColor: Theme.of(context).colorScheme.popover,
             hidden: hidden,
+            labels: {
+              'today': l10n.simulations_wealth_chart_today,
+              'in_n_years': l10n.simulations_wealth_chart_in_n_years(
+                _nombreAnnees,
+              ),
+              'n_years': l10n.simulations_wealth_chart_n_years(
+                _nombreAnnees ~/ 2,
+              ),
+            },
           ),
         ),
         const SizedBox(height: 24),
@@ -1983,19 +2014,19 @@ class _MonteCarloSimulationTabState extends State<_MonteCarloSimulationTab> {
         _StatRow(
           items: [
             (
-              'Valeur future médiane',
+              l10n.simulations_wealth_stat_median_future_value,
               displayEuros(result.valeurFutureMediane, hidden),
             ),
             (
-              'Dont plus-value médiane',
+              l10n.simulations_wealth_stat_median_included_capital_gains,
               displayEuros(result.plusValueMediane, hidden),
             ),
             (
-              'Valeur nette médiane',
+              l10n.simulations_wealth_stat_median_net_value,
               displayEuros(result.valeurNetteMediane, hidden),
             ),
             (
-              'Revenu mensuel médian',
+              l10n.simulations_wealth_stat_median_monthly_income,
               displayEuros(result.revenuMensuelMedian, hidden),
             ),
           ],
@@ -2167,6 +2198,7 @@ class _MonteCarloChart extends StatefulWidget {
   final Color gridColor;
   final Color cardColor;
   final bool hidden;
+  final Map<String, String> labels;
 
   const _MonteCarloChart({
     required this.points,
@@ -2179,6 +2211,7 @@ class _MonteCarloChart extends StatefulWidget {
     required this.gridColor,
     required this.cardColor,
     required this.hidden,
+    required this.labels,
   });
 
   @override
@@ -2241,6 +2274,7 @@ class _MonteCarloChartState extends State<_MonteCarloChart> {
                     gridColor: widget.gridColor,
                     hoveredYear: _hoveredYear,
                     hidden: widget.hidden,
+                    labels: widget.labels,
                   ),
                 ),
                 if (hoveredPoint != null)
@@ -2306,6 +2340,7 @@ class _MCHoverTooltip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return IgnorePointer(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -2322,7 +2357,7 @@ class _MCHoverTooltip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 shadcn.Text(
-                  year == 0 ? "Aujourd'hui" : 'Dans $year ans',
+                  year == 0 ? l10n.simulations_wealth_chart_today : l10n.simulations_wealth_chart_in_n_years(year),
                 ).muted(),
                 const SizedBox(height: 4),
                 shadcn.Text(
@@ -2332,17 +2367,17 @@ class _MCHoverTooltip extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                shadcn.Text('Médiane').muted().small(),
+                shadcn.Text(l10n.simulations_wealth_median_label).muted().small(),
                 const SizedBox(height: 12),
                 const Divider(),
                 const SizedBox(height: 8),
-                _row('90e percentile', p90, gold),
+                _row(l10n.simulations_wealth_90th_percentile, p90, gold),
                 const SizedBox(height: 6),
-                _row('10e percentile', p10, gold.withValues(alpha: 0.5)),
+                _row(l10n.simulations_wealth_10th_percentile, p10, gold.withValues(alpha: 0.5)),
                 const SizedBox(height: 6),
-                _row('Versements', versements, blue),
+                _row(l10n.simulations_wealth_contributions, versements, blue),
                 const SizedBox(height: 6),
-                _row('Patrimoine initial', patrimoineInitial, grey),
+                _row(l10n.simulations_wealth_initial_assets, patrimoineInitial, grey),
               ],
             ),
           ),
@@ -2381,6 +2416,7 @@ class _MonteCarloChartPainter extends CustomPainter {
   final Color gridColor;
   final int? hoveredYear;
   final bool hidden;
+  final Map<String, String> labels;
 
   _MonteCarloChartPainter({
     required this.points,
@@ -2393,6 +2429,7 @@ class _MonteCarloChartPainter extends CustomPainter {
     required this.gridColor,
     required this.hoveredYear,
     required this.hidden,
+    required this.labels,
   });
 
   @override
@@ -2512,7 +2549,7 @@ class _MonteCarloChartPainter extends CustomPainter {
 
     _drawXLabel(
       canvas,
-      "Aujourd'hui",
+      labels['today']!,
       xFor(0),
       chartHeight,
       textColor,
@@ -2520,14 +2557,14 @@ class _MonteCarloChartPainter extends CustomPainter {
     );
     _drawXLabel(
       canvas,
-      '${nombreAnnees ~/ 2} ans',
+      labels['n_years']!,
       xFor(nombreAnnees ~/ 2),
       chartHeight,
       textColor,
     );
     _drawXLabel(
       canvas,
-      'dans $nombreAnnees ans',
+      labels['in_n_years']!,
       xFor(nombreAnnees),
       chartHeight,
       textColor,

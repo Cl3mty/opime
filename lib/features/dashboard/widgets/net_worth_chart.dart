@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../../l10n/app_localizations.dart';
 import '../patrimoine_models.dart';
 
 /// Largeur réservée à gauche du graphique pour les repères de montant sur
@@ -56,10 +57,11 @@ class _NetWorthChartState extends State<NetWorthChart> {
   @override
   Widget build(BuildContext context) {
     if (widget.points.length < 2) {
+      final l10n = AppLocalizations.of(context);
       return Center(
-        child: shadcn.Text(
-          'Pas assez de données sur cette période',
-        ).muted().small(),
+        child: shadcn.Text(l10n.dashboard_not_enough_data_period)
+            .muted()
+            .small(),
       );
     }
     return LayoutBuilder(

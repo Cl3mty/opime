@@ -5,8 +5,69 @@ import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 import 'loan_calculator.dart';
 import 'real_estate_scoring_calculator.dart';
+
+// ---------------------------------------------------------------------
+// Libellés localisés des enums de `real_estate_scoring_calculator.dart`.
+//
+// Ces enums exposent aussi un getter `.label` en dur en français (utilisé
+// par le calculateur pour construire `ScoreCriterion.label`/`.valueLabel`
+// et couvert tel quel par `real_estate_scoring_calculator_test.dart`, qui
+// n'a pas accès à un `BuildContext`/`AppLocalizations`) : on ne peut donc
+// pas le faire dépendre de la locale sans casser ce test. On duplique donc
+// ici, côté écran (qui a le contexte), un mapping enum → texte localisé
+// utilisé pour tout l'affichage — le `.label` du calculateur reste une
+// donnée interne non affichée.
+// ---------------------------------------------------------------------
+
+String _localizedTierLabel(AppLocalizations l10n, ScoreTier tier) =>
+    switch (tier) {
+      ScoreTier.excellent => l10n.simulations_scoring_tier_excellent,
+      ScoreTier.bon => l10n.simulations_scoring_tier_good,
+      ScoreTier.moyen => l10n.simulations_scoring_tier_average,
+      ScoreTier.mauvais => l10n.simulations_scoring_tier_poor,
+      ScoreTier.critique => l10n.simulations_scoring_tier_critical,
+    };
+
+String _localizedProfessionLabel(
+  AppLocalizations l10n,
+  ProfessionCategory profession,
+) => switch (profession) {
+  ProfessionCategory.dirigeantCadreSuperieur =>
+    l10n.simulations_scoring_profession_executive_senior,
+  ProfessionCategory.cadre => l10n.simulations_scoring_profession_executive,
+  ProfessionCategory.salarie => l10n.simulations_scoring_profession_employee,
+  ProfessionCategory.ouvrier => l10n.simulations_scoring_profession_worker,
+  ProfessionCategory.chomeur => l10n.simulations_scoring_profession_unemployed,
+};
+
+String _localizedBankHistoryLabel(
+  AppLocalizations l10n,
+  BankHistoryStatus status,
+) => switch (status) {
+  BankHistoryStatus.none3Years => l10n.simulations_scoring_bank_history_none_3y,
+  BankHistoryStatus.none1Year => l10n.simulations_scoring_bank_history_none_1y,
+  BankHistoryStatus.none6Months =>
+    l10n.simulations_scoring_bank_history_none_6m,
+  BankHistoryStatus.one6Months => l10n.simulations_scoring_bank_history_one_6m,
+  BankHistoryStatus.several6Months =>
+    l10n.simulations_scoring_bank_history_several_6m,
+};
+
+/// Équivalent localisé de `stabilityDurationLabel` (calculateur, resté en
+/// français pour la raison ci-dessus).
+String _localizedStabilityDurationLabel(AppLocalizations l10n, int months) {
+  if (months < 12) return l10n.investments_delay_months(months);
+  final years = months / 12;
+  final wholeYears = years == years.truncateToDouble();
+  return wholeYears
+      ? l10n.investments_delay_years(years.toInt())
+      : l10n.simulations_scoring_duration_years_fractional(
+          years.toStringAsFixed(1),
+        );
+}
 
 /// Onglet "Scoring" de Simulation > Immobilier : estime approximativement
 /// la qualité du profil d'un utilisateur pour l'obtention d'un crédit
@@ -320,13 +381,16 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
   // ---------------------------------------------------------------------
 
   Widget _buildInputsContent(bool hidden) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        shadcn.Text('Revenus & charges').muted().small(),
+        shadcn.Text(
+          l10n.simulations_scoring_income_charges_section_label,
+        ).muted().small(),
         const SizedBox(height: 12),
         _NumberField(
-          label: 'Revenus mensuels du foyer',
+          label: l10n.simulations_scoring_household_monthly_income_label,
           suffix: '€',
           value: _revenusMensuels,
           step: 100,
@@ -335,7 +399,7 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
         ),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Charges mensuelles (hors prêt immo)',
+          label: l10n.simulations_scoring_monthly_expenses_label,
           suffix: '€',
           value: _chargesMensuelles,
           step: 50,
@@ -344,7 +408,7 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
         ),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Mensualité du prêt immobilier',
+          label: l10n.simulations_scoring_mortgage_payment_label,
           suffix: '€',
           value: _mensualitePret,
           step: 50,
@@ -352,12 +416,12 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
               _update(() => _mensualitePret = v.clamp(0, double.infinity)),
         ),
         shadcn.Text(
-          'Pré-remplie depuis l\'onglet Prêt tant que non modifiée ici.',
+          l10n.simulations_scoring_prefilled_from_loan_tab,
         ).muted().xSmall(),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Parts fiscales',
-          suffix: 'parts',
+          label: l10n.simulations_scoring_tax_shares_label,
+          suffix: l10n.simulations_scoring_suffix_shares,
           value: _partsFiscales,
           step: 0.5,
           decimals: 1,
@@ -366,7 +430,7 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
         ),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Épargne mensuelle',
+          label: l10n.simulations_scoring_monthly_savings_label,
           suffix: '€',
           value: _epargneMensuelle,
           step: 50,
@@ -377,27 +441,27 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
         const SizedBox(height: 20),
         const Divider(),
         const SizedBox(height: 12),
-        shadcn.Text('Profil').muted().small(),
+        shadcn.Text(l10n.simulations_scoring_profile_section_label).muted().small(),
         const SizedBox(height: 12),
         _NumberField(
-          label: 'Âge',
-          suffix: 'ans',
+          label: l10n.simulations_scoring_age_label,
+          suffix: l10n.simulations_loan_suffix_years,
           value: _age.toDouble(),
           step: 1,
           decimals: 0,
           onChanged: (v) => _update(() => _age = v.round().clamp(16, 100)),
         ),
         const SizedBox(height: 16),
-        shadcn.Text('Profession').muted().small(),
+        shadcn.Text(l10n.simulations_scoring_profession_label).muted().small(),
         const SizedBox(height: 6),
         Select<ProfessionCategory>(
           value: _profession,
-          placeholder: const shadcn.Text('Profession'),
+          placeholder: shadcn.Text(l10n.simulations_scoring_profession_label),
           onChanged: (value) {
             if (value != null) _update(() => _profession = value);
           },
           itemBuilder: (context, value) => shadcn.Text(
-            value.label,
+            _localizedProfessionLabel(l10n, value),
             overflow: TextOverflow.ellipsis,
           ),
           // Par défaut, la popup fait exactement la largeur du bouton
@@ -413,7 +477,10 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
           popupConstraints: BoxConstraints.tightFor(
             width: _maxOptionWidth(
               context,
-              [for (final v in ProfessionCategory.values) v.label],
+              [
+                for (final v in ProfessionCategory.values)
+                  _localizedProfessionLabel(l10n, v),
+              ],
             ),
           ),
           popup: (context) => SelectPopup(
@@ -422,7 +489,7 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
                 for (final value in ProfessionCategory.values)
                   SelectItemButton(
                     value: value,
-                    child: shadcn.Text(value.label),
+                    child: shadcn.Text(_localizedProfessionLabel(l10n, value)),
                   ),
               ],
             ),
@@ -430,8 +497,8 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
         ),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Ancienneté des revenus actuels',
-          suffix: 'mois',
+          label: l10n.simulations_scoring_income_seniority_label,
+          suffix: l10n.simulations_loan_suffix_months,
           value: _ancienneteMois.toDouble(),
           step: 1,
           decimals: 0,
@@ -439,16 +506,16 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
               _update(() => _ancienneteMois = v.round().clamp(0, 600)),
         ),
         const SizedBox(height: 16),
-        shadcn.Text('Historique bancaire').muted().small(),
+        shadcn.Text(l10n.simulations_scoring_bank_history_label).muted().small(),
         const SizedBox(height: 6),
         Select<BankHistoryStatus>(
           value: _historiqueBancaire,
-          placeholder: const shadcn.Text('Historique bancaire'),
+          placeholder: shadcn.Text(l10n.simulations_scoring_bank_history_label),
           onChanged: (value) {
             if (value != null) _update(() => _historiqueBancaire = value);
           },
           itemBuilder: (context, value) => shadcn.Text(
-            value.label,
+            _localizedBankHistoryLabel(l10n, value),
             overflow: TextOverflow.ellipsis,
           ),
           // Voir le commentaire équivalent sur le Select Profession
@@ -458,7 +525,10 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
           popupConstraints: BoxConstraints.tightFor(
             width: _maxOptionWidth(
               context,
-              [for (final v in BankHistoryStatus.values) v.label],
+              [
+                for (final v in BankHistoryStatus.values)
+                  _localizedBankHistoryLabel(l10n, v),
+              ],
             ),
           ),
           popup: (context) => SelectPopup(
@@ -467,7 +537,7 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
                 for (final value in BankHistoryStatus.values)
                   SelectItemButton(
                     value: value,
-                    child: shadcn.Text(value.label),
+                    child: shadcn.Text(_localizedBankHistoryLabel(l10n, value)),
                   ),
               ],
             ),
@@ -477,7 +547,7 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
         OutlineButton(
           onPressed: _resetState,
           leading: const Icon(LucideIcons.refreshCw),
-          child: const shadcn.Text('Réinitialiser les paramètres'),
+          child: shadcn.Text(l10n.simulations_loan_reset_parameters),
         ),
       ],
     );
@@ -487,15 +557,69 @@ class _RealEstateScoringScreenState extends State<RealEstateScoringScreen> {
   // Colonne de droite : résultats
   // ---------------------------------------------------------------------
 
+  /// Reconstruit, pour chacun des 7 critères de [result] (dans l'ordre fixe
+  /// où `computeRealEstateScoring` les construit — voir
+  /// `real_estate_scoring_calculator.dart`), un libellé et une valeur
+  /// affichée localisés à partir des données brutes déjà connues de l'écran
+  /// (état saisi + agrégats de [result]), plutôt que d'utiliser
+  /// `ScoreCriterion.label`/`.valueLabel` qui restent en français (voir le
+  /// commentaire en tête de fichier sur `_localizedTierLabel` et consorts).
+  List<(String label, String value, ScoreTier tier)> _localizedRows(
+    AppLocalizations l10n,
+    RealEstateScoringResult result,
+  ) {
+    final tiers = [for (final c in result.criteria) c.tier];
+    return [
+      (
+        l10n.simulations_scoring_debt_ratio_label,
+        '${result.debtRatioPercent.toStringAsFixed(1)} %',
+        tiers[0],
+      ),
+      (
+        l10n.simulations_scoring_disposable_income_label,
+        l10n.simulations_scoring_disposable_income_value(
+          result.resteAVivreAnnuelParPart.round(),
+        ),
+        tiers[1],
+      ),
+      (
+        l10n.simulations_scoring_age_label,
+        l10n.investments_delay_years(_age),
+        tiers[2],
+      ),
+      (
+        l10n.simulations_scoring_profession_label,
+        _localizedProfessionLabel(l10n, _profession),
+        tiers[3],
+      ),
+      (
+        l10n.simulations_scoring_income_stability_label,
+        _localizedStabilityDurationLabel(l10n, _ancienneteMois),
+        tiers[4],
+      ),
+      (
+        l10n.simulations_scoring_bank_history_label,
+        _localizedBankHistoryLabel(l10n, _historiqueBancaire),
+        tiers[5],
+      ),
+      (
+        l10n.simulations_scoring_savings_effort_label,
+        '${result.savingsEffortPercent.toStringAsFixed(1)} %',
+        tiers[6],
+      ),
+    ];
+  }
+
   Widget _buildResultsContent(RealEstateScoringResult result, bool hidden) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       children: [
         _OverallScoreBadge(result: result),
         const SizedBox(height: 20),
         Column(
           children: [
-            for (final criterion in result.criteria)
-              _CriterionRow(criterion: criterion),
+            for (final row in _localizedRows(l10n, result))
+              _CriterionRow(label: row.$1, value: row.$2, tier: row.$3),
           ],
         ),
         const SizedBox(height: 20),
@@ -517,6 +641,7 @@ class _OverallScoreBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final tier = result.overallTier;
     final color = tier.color;
     return Container(
@@ -534,8 +659,14 @@ class _OverallScoreBadge extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                shadcn.Text('Profil ${tier.label.toLowerCase()}').semiBold(),
-                shadcn.Text('${result.totalPoints} / 35 points').small(),
+                shadcn.Text(
+                  l10n.simulations_scoring_overall_profile_label(
+                    _localizedTierLabel(l10n, tier),
+                  ),
+                ).semiBold(),
+                shadcn.Text(
+                  l10n.simulations_scoring_total_points(result.totalPoints),
+                ).small(),
               ],
             ),
           ),
@@ -546,12 +677,19 @@ class _OverallScoreBadge extends StatelessWidget {
 }
 
 class _CriterionRow extends StatelessWidget {
-  final ScoreCriterion criterion;
-  const _CriterionRow({required this.criterion});
+  final String label;
+  final String value;
+  final ScoreTier tier;
+  const _CriterionRow({
+    required this.label,
+    required this.value,
+    required this.tier,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = criterion.tier.color;
+    final l10n = AppLocalizations.of(context);
+    final color = tier.color;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -560,9 +698,9 @@ class _CriterionRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                shadcn.Text(criterion.label).medium().small(),
+                shadcn.Text(label).medium().small(),
                 const SizedBox(height: 2),
-                shadcn.Text(criterion.valueLabel).muted().xSmall(),
+                shadcn.Text(value).muted().xSmall(),
               ],
             ),
           ),
@@ -575,7 +713,7 @@ class _CriterionRow extends StatelessWidget {
               border: Border.all(color: color),
             ),
             child: shadcn.Text(
-              criterion.tier.label,
+              _localizedTierLabel(l10n, tier),
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.w600,
@@ -594,6 +732,7 @@ class _ScoringDisclaimer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final muted = Theme.of(context).colorScheme.mutedForeground;
     return Container(
       padding: const EdgeInsets.all(14),
@@ -608,12 +747,7 @@ class _ScoringDisclaimer extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: shadcn.Text(
-              "Estimation pédagogique et indicative : la grille de notation "
-              "utilisée ici est une simplification courante des critères "
-              "bancaires classiques, pas le barème d'un établissement "
-              "précis. Le scoring réel d'une banque tient compte de bien "
-              "d'autres éléments (garanties, patrimoine, politique interne "
-              "du moment...).",
+              l10n.simulations_scoring_disclaimer,
             ).muted().small(),
           ),
         ],

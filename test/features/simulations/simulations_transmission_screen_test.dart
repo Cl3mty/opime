@@ -1,10 +1,13 @@
 import 'dart:io';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/privacy/amount_visibility_controller.dart';
 import 'package:opime/core/simulations/simulation_state_repository.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/simulations/simulations_transmission_screen.dart';
 import 'package:opime/features/simulations/tax_parameters.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -24,6 +27,15 @@ void main() {
     Future<void> pumpScreen(WidgetTester tester) async {
       await tester.pumpWidget(
         ShadcnApp(
+          locale: const Locale('fr'),
+          supportedLocales: const [Locale('fr'), Locale('en')],
+          localizationsDelegates: [
+            shadcnLocalizationsFrDelegate,
+            ...AppLocalizations.localizationsDelegates,
+            GlobalMaterialLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
           home: Scaffold(
             child: TransmissionSimulationScreen(
               vaultPath: tempDir.path,

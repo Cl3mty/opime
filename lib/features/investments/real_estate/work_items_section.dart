@@ -5,19 +5,23 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/opime_date_picker.dart';
+import '../../../l10n/app_localizations.dart';
 import '../confirm_delete_dialog.dart';
 import 'rent_models.dart';
 
 /// Suggestions de catégorie proposées à la saisie (voir [WorkItem.category])
 /// — un simple raccourci qui remplit le champ, pas une liste fermée : le
 /// champ reste un texte libre pour ne pas bloquer sur un poste imprévu.
-const kWorkItemCategorySuggestions = [
-  'Gros œuvre',
-  'Plomberie',
-  'Électricité',
-  'Peinture',
-  'Mobilier',
-  'Autre',
+/// Traduites (contrairement à `kRealEstateDocumentCategories`) : rien ne
+/// compare cette valeur ailleurs dans le code, cliquer une suggestion se
+/// contente d'insérer son texte tel quel dans le champ libre.
+List<String> workItemCategorySuggestions(AppLocalizations l10n) => [
+  l10n.real_estate_work_category_structural,
+  l10n.real_estate_work_category_plumbing,
+  l10n.real_estate_work_category_electrical,
+  l10n.real_estate_work_category_paint,
+  l10n.real_estate_work_category_furniture,
+  l10n.real_estate_work_category_other,
 ];
 
 String _formatDate(DateTime date) =>
@@ -52,10 +56,11 @@ class WorkItemsSection extends StatelessWidget {
   }
 
   Future<void> _confirmAndDelete(BuildContext context, WorkItem item) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${item.label}" ?',
-      message: 'Ce poste de travaux sera définitivement retiré.',
+      title: l10n.real_estate_delete_work_item_title(item.label),
+      message: l10n.real_estate_delete_work_item_message,
     );
     if (!confirmed) return;
     await onDelete(item);
@@ -63,13 +68,14 @@ class WorkItemsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final sorted = _sorted;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const shadcn.Text('Travaux').large().medium(),
+            shadcn.Text(l10n.real_estate_work_items_title).large().medium(),
             const Spacer(),
             Builder(
               builder: (context) => GestureDetector(
@@ -84,7 +90,7 @@ class WorkItemsSection extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     shadcn.Text(
-                      'Ajouter un poste',
+                      l10n.real_estate_add_work_item_button,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.primary,
                       ),
@@ -98,14 +104,14 @@ class WorkItemsSection extends StatelessWidget {
         if (workItems.isNotEmpty) ...[
           const SizedBox(height: 4),
           shadcn.Text(
-            'Total : ${displayEuros(_total, false)}',
+            l10n.real_estate_work_items_total_label(
+              displayEuros(_total, false),
+            ),
           ).muted().small(),
         ],
         const SizedBox(height: 12),
         if (sorted.isEmpty)
-          shadcn.Text('Aucun poste de travaux pour l\'instant.')
-              .muted()
-              .small()
+          shadcn.Text(l10n.real_estate_no_work_items_yet).muted().small()
         else
           for (final item in sorted) ...[
             _WorkItemRow(
@@ -220,6 +226,7 @@ class _AddWorkItemDialogState extends State<_AddWorkItemDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 380),
@@ -230,19 +237,25 @@ class _AddWorkItemDialogState extends State<_AddWorkItemDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const shadcn.Text('Ajouter un poste de travaux')
+                shadcn.Text(l10n.real_estate_add_work_item_title)
                     .large()
                     .semiBold(),
                 const SizedBox(height: 12),
-                shadcn.Text('Libellé').muted().xSmall(),
+                shadcn.Text(l10n.real_estate_work_item_label_field)
+                    .muted()
+                    .xSmall(),
                 const SizedBox(height: 4),
                 TextField(
                   controller: _labelController,
-                  placeholder: const shadcn.Text('Ex : Réfection toiture'),
+                  placeholder: shadcn.Text(
+                    l10n.real_estate_work_item_label_hint,
+                  ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 12),
-                shadcn.Text('Catégorie (facultative)').muted().xSmall(),
+                shadcn.Text(
+                  l10n.real_estate_work_item_category_optional_label,
+                ).muted().xSmall(),
                 const SizedBox(height: 4),
                 TextField(controller: _categoryController),
                 const SizedBox(height: 6),
@@ -250,7 +263,7 @@ class _AddWorkItemDialogState extends State<_AddWorkItemDialog> {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    for (final suggestion in kWorkItemCategorySuggestions)
+                    for (final suggestion in workItemCategorySuggestions(l10n))
                       GestureDetector(
                         onTap: () => setState(
                           () => _categoryController.text = suggestion,
@@ -262,7 +275,9 @@ class _AddWorkItemDialogState extends State<_AddWorkItemDialog> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                shadcn.Text('Montant').muted().xSmall(),
+                shadcn.Text(l10n.real_estate_work_item_amount_label)
+                    .muted()
+                    .xSmall(),
                 const SizedBox(height: 4),
                 TextField(
                   controller: _amountController,
@@ -271,14 +286,16 @@ class _AddWorkItemDialogState extends State<_AddWorkItemDialog> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                shadcn.Text('Date').muted().xSmall(),
+                shadcn.Text(l10n.common_date).muted().xSmall(),
                 const SizedBox(height: 4),
                 OpimeDatePicker(
                   value: _date,
                   onChanged: (date) => setState(() => _date = date),
                 ),
                 const SizedBox(height: 12),
-                shadcn.Text('Note (facultative)').muted().xSmall(),
+                shadcn.Text(
+                  l10n.real_estate_note_optional_label,
+                ).muted().xSmall(),
                 const SizedBox(height: 4),
                 TextField(controller: _noteController),
                 const SizedBox(height: 16),
@@ -286,12 +303,12 @@ class _AddWorkItemDialogState extends State<_AddWorkItemDialog> {
                   children: [
                     PrimaryButton(
                       onPressed: _commit,
-                      child: const shadcn.Text('Ajouter'),
+                      child: shadcn.Text(l10n.common_add),
                     ),
                     const SizedBox(width: 8),
                     OutlineButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const shadcn.Text('Annuler'),
+                      child: shadcn.Text(l10n.common_cancel),
                     ),
                   ],
                 ),

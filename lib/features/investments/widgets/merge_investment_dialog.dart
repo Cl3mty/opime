@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../investments_models.dart';
 import '../investments_repository.dart';
@@ -83,11 +84,12 @@ class _MergeInvestmentDialogState extends State<_MergeInvestmentDialog> {
   }
 
   Future<void> _commit() async {
+    final l10n = AppLocalizations.of(context);
     final destId = _destSelection;
     if (destId == null) {
       _showToast(
-        title: 'Fusion impossible',
-        subtitle: 'Choisis la position dans laquelle fusionner.',
+        title: l10n.investments_merge_impossible_title,
+        subtitle: l10n.investments_merge_choose_destination_message,
       );
       return;
     }
@@ -112,8 +114,8 @@ class _MergeInvestmentDialogState extends State<_MergeInvestmentDialog> {
     } catch (e) {
       if (!mounted) return;
       _showToast(
-        title: 'Fusion impossible',
-        subtitle: 'Erreur lors de l\'enregistrement : $e',
+        title: l10n.investments_merge_impossible_title,
+        subtitle: l10n.investments_save_error('$e'),
       );
       return;
     }
@@ -124,6 +126,7 @@ class _MergeInvestmentDialogState extends State<_MergeInvestmentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final candidates = _candidates;
     return Center(
       child: ConstrainedBox(
@@ -143,7 +146,9 @@ class _MergeInvestmentDialogState extends State<_MergeInvestmentDialog> {
                     children: [
                       Expanded(
                         child: shadcn.Text(
-                          'Fusionner "${widget.sourceInvestment.label}"',
+                          l10n.investments_merge_dialog_title(
+                            widget.sourceInvestment.label,
+                          ),
                         ).large().semiBold(),
                       ),
                       IconButton.ghost(
@@ -154,23 +159,17 @@ class _MergeInvestmentDialogState extends State<_MergeInvestmentDialog> {
                   ),
                   const SizedBox(height: 4),
                   shadcn.Text(
-                    'Pour corriger une même position saisie deux fois sous '
-                    'des noms différents — pas pour un vrai mouvement '
-                    'financier (voir "Arbitrer" pour ça). Toutes les '
-                    'transactions de "${widget.sourceInvestment.label}" '
-                    'sont déplacées telles quelles (mêmes dates, quantités, '
-                    'prix) vers la position choisie ci-dessous, puis '
-                    '"${widget.sourceInvestment.label}" est supprimée. '
-                    'Cette action est irréversible.',
+                    l10n.investments_merge_dialog_description(
+                      widget.sourceInvestment.label,
+                    ),
                   ).muted().xSmall(),
                   const SizedBox(height: 16),
                   if (candidates.isEmpty)
                     shadcn.Text(
-                      'Aucune autre position dans ce compte vers laquelle '
-                      'fusionner.',
+                      l10n.investments_merge_no_other_position_message,
                     ).muted().small()
                   else ...[
-                    shadcn.Text('Fusionner vers').muted().xSmall(),
+                    shadcn.Text(l10n.investments_merge_target_label).muted().xSmall(),
                     const SizedBox(height: 4),
                     Select<String>(
                       value: _destSelection,
@@ -197,12 +196,12 @@ class _MergeInvestmentDialogState extends State<_MergeInvestmentDialog> {
                     children: [
                       PrimaryButton(
                         onPressed: candidates.isEmpty ? null : _commit,
-                        child: const shadcn.Text('Fusionner'),
+                        child: shadcn.Text(l10n.investments_merge_submit_button),
                       ),
                       const SizedBox(width: 8),
                       OutlineButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
+                        child: shadcn.Text(l10n.common_cancel),
                       ),
                     ],
                   ),

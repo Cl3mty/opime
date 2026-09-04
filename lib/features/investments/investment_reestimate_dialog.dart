@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/toggle_button_style.dart';
+import '../../l10n/app_localizations.dart';
 import '../real_estate_pricing/dvf_cache_repository.dart';
 import '../real_estate_pricing/geo_dvf_client.dart';
 import '../real_estate_pricing/price_estimator.dart';
@@ -71,9 +72,12 @@ class _ReestimateDialogState extends State<_ReestimateDialog> {
   }
 
   Future<void> _confirm() async {
+    final l10n = AppLocalizations.of(context);
     final address = _address;
     if (address == null || _surfaceM2 <= 0) {
-      setState(() => _error = 'Renseigne une adresse et une surface.');
+      setState(
+        () => _error = l10n.investments_reestimate_missing_fields_error,
+      );
       return;
     }
     setState(() {
@@ -94,7 +98,7 @@ class _ReestimateDialogState extends State<_ReestimateDialog> {
     if (estimate == null) {
       setState(() {
         _loading = false;
-        _error = 'Aucune vente comparable trouvée pour cette adresse.';
+        _error = l10n.investments_reestimate_no_comparable_sale_error;
       });
       return;
     }
@@ -114,6 +118,7 @@ class _ReestimateDialogState extends State<_ReestimateDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -132,7 +137,7 @@ class _ReestimateDialogState extends State<_ReestimateDialog> {
                     children: [
                       Expanded(
                         child: shadcn.Text(
-                          'Réestimer la valeur (€/m²)',
+                          l10n.investments_reestimate_dialog_title,
                         ).large().semiBold(),
                       ),
                       IconButton.ghost(
@@ -156,7 +161,7 @@ class _ReestimateDialogState extends State<_ReestimateDialog> {
                         onChanged: (_) => setState(
                           () => _propertyType = PropertyTypeFilter.maison,
                         ),
-                        child: const shadcn.Text('Maison'),
+                        child: shadcn.Text(l10n.investments_property_type_house),
                       ),
                       SelectedButton(
                         value: _propertyType == PropertyTypeFilter.appartement,
@@ -165,12 +170,14 @@ class _ReestimateDialogState extends State<_ReestimateDialog> {
                         onChanged: (_) => setState(
                           () => _propertyType = PropertyTypeFilter.appartement,
                         ),
-                        child: const shadcn.Text('Appartement'),
+                        child: shadcn.Text(
+                          l10n.investments_property_type_apartment,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  shadcn.Text('Surface (m²)').muted().small(),
+                  shadcn.Text(l10n.investments_surface_m2_label).muted().small(),
                   const SizedBox(height: 6),
                   TextField(
                     controller: TextEditingController(
@@ -200,7 +207,7 @@ class _ReestimateDialogState extends State<_ReestimateDialog> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(LucideIcons.mapPin),
-                    child: const shadcn.Text('Estimer'),
+                    child: shadcn.Text(l10n.investments_estimate_button),
                   ),
                 ],
               ),

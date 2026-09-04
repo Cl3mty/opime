@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/real_estate_pricing/ban_client.dart';
 import 'package:opime/features/real_estate_pricing/real_estate_address_picker.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Aucun appel réseau réel — même convention que les autres fakes de ce
@@ -45,6 +47,12 @@ void main() {
 
     await tester.pumpWidget(
       ShadcnApp(
+        locale: const Locale('fr'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: [
+          shadcnLocalizationsFrDelegate,
+          ...AppLocalizations.localizationsDelegates,
+        ],
         home: Scaffold(
           child: RealEstateAddressMapPicker(
             banClient: fakeClient,
@@ -77,6 +85,12 @@ void main() {
 
     await tester.pumpWidget(
       ShadcnApp(
+        locale: const Locale('fr'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: [
+          shadcnLocalizationsFrDelegate,
+          ...AppLocalizations.localizationsDelegates,
+        ],
         home: Scaffold(
           child: RealEstateAddressMapPicker(
             banClient: fakeClient,

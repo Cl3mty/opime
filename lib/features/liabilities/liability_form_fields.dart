@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/ui/opime_date_picker.dart';
 import '../../core/ui/toggle_button_style.dart';
+import '../../l10n/app_localizations.dart';
 import '../simulations/loan_calculator.dart';
 
 /// Champs communs aux 3 formulaires de création/édition d'un passif réel
@@ -51,12 +52,13 @@ class LiabilityFormFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
           controller: nameController,
-          placeholder: const shadcn.Text('Nom (ex: Prêt résidence principale)'),
+          placeholder: shadcn.Text(l10n.liabilities_name_hint),
           autofocus: true,
         ),
         const SizedBox(height: 8),
@@ -65,7 +67,7 @@ class LiabilityFormFields extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: prixController,
-                placeholder: const shadcn.Text('Prix total (€)'),
+                placeholder: shadcn.Text(l10n.liabilities_price_total_label),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -75,7 +77,7 @@ class LiabilityFormFields extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: apportController,
-                placeholder: const shadcn.Text('Apport (€, 0 si aucun)'),
+                placeholder: shadcn.Text(l10n.liabilities_down_payment_hint),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -89,7 +91,7 @@ class LiabilityFormFields extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: tauxController,
-                placeholder: const shadcn.Text('Taux d\'intérêt (%)'),
+                placeholder: shadcn.Text(l10n.liabilities_interest_rate_label),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -99,7 +101,9 @@ class LiabilityFormFields extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: assuranceMensuelleController,
-                placeholder: const shadcn.Text('Assurance mensuelle (€)'),
+                placeholder: shadcn.Text(
+                  l10n.liabilities_monthly_insurance_label,
+                ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -110,13 +114,15 @@ class LiabilityFormFields extends StatelessWidget {
         const SizedBox(height: 8),
         TextField(
           controller: nbrEcheancesController,
-          placeholder: const shadcn.Text('Nombre d\'échéances (mois)'),
+          placeholder: shadcn.Text(l10n.liabilities_installments_count_label),
           keyboardType: TextInputType.number,
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: shadcn.Text('Prêt différé').medium()),
+            Expanded(
+              child: shadcn.Text(l10n.liabilities_deferred_loan_label).medium(),
+            ),
             Switch(value: differeActif, onChanged: onDiffereActifChanged),
           ],
         ),
@@ -128,13 +134,17 @@ class LiabilityFormFields extends StatelessWidget {
           const SizedBox(height: 8),
           TextField(
             controller: dureeDiffereController,
-            placeholder: const shadcn.Text('Durée du différé (mois)'),
+            placeholder: shadcn.Text(l10n.liabilities_deferral_duration_label),
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: shadcn.Text('Franchise').muted().small()),
+              Expanded(
+                child: shadcn.Text(l10n.liabilities_deferral_type_label)
+                    .muted()
+                    .small(),
+              ),
               // Libellés courts ("Partielle"/"Totale", pas "Franchise
               // partielle"/"Franchise totale") : le contexte est déjà donné
               // par le libellé de la ligne, et les deux boutons pleine
@@ -148,14 +158,14 @@ class LiabilityFormFields extends StatelessWidget {
                     style: toggleUnselectedStyle(context),
                     onChanged: (_) =>
                         onTypeDiffereChanged(DeferType.partielle),
-                    child: const shadcn.Text('Partielle'),
+                    child: shadcn.Text(l10n.liabilities_deferral_partial),
                   ),
                   SelectedButton(
                     value: typeDiffere == DeferType.totale,
                     selectedStyle: const ButtonStyle.primary(),
                     style: toggleUnselectedStyle(context),
                     onChanged: (_) => onTypeDiffereChanged(DeferType.totale),
-                    child: const shadcn.Text('Totale'),
+                    child: shadcn.Text(l10n.liabilities_deferral_total),
                   ),
                 ],
               ),
@@ -175,21 +185,21 @@ class LiabilityFormFields extends StatelessWidget {
                   selectedStyle: const ButtonStyle.primary(),
                   style: toggleUnselectedStyle(context),
                   onChanged: (_) => onLoanTypeChanged(LoanType.amortissable),
-                  child: const shadcn.Text('Amortissable'),
+                  child: shadcn.Text(l10n.liabilities_loan_type_amortizing),
                 ),
                 SelectedButton(
                   value: loanType == LoanType.inFine,
                   selectedStyle: const ButtonStyle.primary(),
                   style: toggleUnselectedStyle(context),
                   onChanged: (_) => onLoanTypeChanged(LoanType.inFine),
-                  child: const shadcn.Text('In fine'),
+                  child: shadcn.Text(l10n.liabilities_loan_type_in_fine),
                 ),
               ],
             ),
             OpimeDatePicker(
               value: dateDebut,
               onChanged: onDateChanged,
-              placeholder: const shadcn.Text('Date de début'),
+              placeholder: shadcn.Text(l10n.liabilities_start_date_label),
             ),
           ],
         ),

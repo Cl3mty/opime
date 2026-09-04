@@ -5,6 +5,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/storage/vault_crypto.dart';
 import '../../core/storage/vault_encryption_metadata.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Mécanisme de récupération en cas de mot de passe oublié — accessible
 /// depuis [VaultUnlockScreen]. Deux temps : la clé de récupération
@@ -75,20 +76,21 @@ class _VaultRecoveryScreenState extends State<VaultRecoveryScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Clé de récupération incorrecte.';
+        _error = AppLocalizations.of(context).onboarding_recovery_key_incorrect;
         _loading = false;
       });
     }
   }
 
   Future<void> _setNewPassword() async {
+    final l10n = AppLocalizations.of(context);
     final newPassword = _newPasswordController.text;
     if (newPassword.isEmpty) {
-      setState(() => _error = 'Choisis un mot de passe.');
+      setState(() => _error = l10n.onboarding_choose_password);
       return;
     }
     if (newPassword != _confirmPasswordController.text) {
-      setState(() => _error = 'Les deux mots de passe ne correspondent pas.');
+      setState(() => _error = l10n.onboarding_passwords_mismatch);
       return;
     }
     setState(() {
@@ -106,6 +108,7 @@ class _VaultRecoveryScreenState extends State<VaultRecoveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final recovered = _recoveredDek != null;
     return Scaffold(
       child: Center(
@@ -124,17 +127,15 @@ class _VaultRecoveryScreenState extends State<VaultRecoveryScreen> {
                 const SizedBox(height: 24),
                 shadcn.Text(
                   recovered
-                      ? 'Nouveau mot de passe'
-                      : 'Récupération du coffre-fort',
+                      ? l10n.onboarding_recovery_new_password_title
+                      : l10n.onboarding_recovery_title,
                   textAlign: TextAlign.center,
                 ).large().large().medium(),
                 const SizedBox(height: 12),
                 shadcn.Text(
                   recovered
-                      ? 'Ta clé de récupération est valide. Choisis un '
-                            'nouveau mot de passe pour ce coffre-fort.'
-                      : 'Saisis la clé de récupération que tu as reçue à '
-                            'l\'activation du chiffrement.',
+                      ? l10n.onboarding_recovery_new_password_description
+                      : l10n.onboarding_recovery_description,
                   textAlign: TextAlign.center,
                 ).muted(),
                 const SizedBox(height: 24),
@@ -142,8 +143,8 @@ class _VaultRecoveryScreenState extends State<VaultRecoveryScreen> {
                   TextField(
                     controller: _recoveryKeyController,
                     autofocus: true,
-                    placeholder: const shadcn.Text(
-                      'Clé de récupération (ex. XXXX-XXXX-XXXX-XXXX)',
+                    placeholder: shadcn.Text(
+                      l10n.onboarding_recovery_key_hint,
                     ),
                     onSubmitted: (_) => _loading ? null : _verifyRecoveryKey(),
                   ),
@@ -158,7 +159,9 @@ class _VaultRecoveryScreenState extends State<VaultRecoveryScreen> {
                           )
                         : const Icon(LucideIcons.check),
                     child: shadcn.Text(
-                      _loading ? 'Vérification...' : 'Valider la clé',
+                      _loading
+                          ? l10n.onboarding_recovery_verifying
+                          : l10n.onboarding_recovery_validate_key,
                     ),
                   ),
                 ] else ...[
@@ -166,14 +169,14 @@ class _VaultRecoveryScreenState extends State<VaultRecoveryScreen> {
                     controller: _newPasswordController,
                     obscureText: true,
                     autofocus: true,
-                    placeholder: const shadcn.Text('Nouveau mot de passe'),
+                    placeholder: shadcn.Text(l10n.onboarding_new_password),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _confirmPasswordController,
                     obscureText: true,
-                    placeholder: const shadcn.Text(
-                      'Confirmer le nouveau mot de passe',
+                    placeholder: shadcn.Text(
+                      l10n.onboarding_confirm_new_password,
                     ),
                     onSubmitted: (_) => _loading ? null : _setNewPassword(),
                   ),
@@ -189,15 +192,15 @@ class _VaultRecoveryScreenState extends State<VaultRecoveryScreen> {
                         : const Icon(LucideIcons.lockOpen),
                     child: shadcn.Text(
                       _loading
-                          ? 'Enregistrement...'
-                          : 'Définir et déverrouiller',
+                          ? l10n.onboarding_recovery_saving
+                          : l10n.onboarding_recovery_set_and_unlock,
                     ),
                   ),
                 ],
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: _loading ? null : widget.onCancel,
-                  child: const shadcn.Text('Annuler'),
+                  child: shadcn.Text(l10n.common_cancel),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 8),

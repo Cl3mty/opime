@@ -4,6 +4,7 @@ import '../../core/date_format.dart';
 import '../../core/money_format.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/opime_date_picker.dart';
+import '../../l10n/app_localizations.dart';
 import '../dashboard/widgets/net_worth_chart.dart';
 import '../investments/investments_models.dart' show InvestmentAccount;
 import '../investments/investments_repository.dart';
@@ -191,6 +192,7 @@ class _ProjectEditorState extends State<ProjectEditor> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
+    final l10n = AppLocalizations.of(context);
     final isEditing = widget.project != null;
     final danglingLinks = isEditing
         ? hasDanglingLinks(
@@ -214,26 +216,24 @@ class _ProjectEditorState extends State<ProjectEditor> {
             const SizedBox(height: 20),
           ],
           shadcn.Text(
-            isEditing ? 'Modifier le projet' : 'Nouveau projet',
+            isEditing ? l10n.projects_edit_project : l10n.projects_new_project,
           ).large().semiBold(),
           const SizedBox(height: 16),
           TextField(
             controller: _nameController,
-            placeholder: const shadcn.Text(
-              'Nom du projet (ex: Achat résidence principale)',
-            ),
+            placeholder: shadcn.Text(l10n.projects_name_placeholder),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _descriptionController,
-            placeholder: const shadcn.Text('Description (facultatif)'),
+            placeholder: shadcn.Text(l10n.projects_description_placeholder),
             maxLines: 3,
           ),
           const SizedBox(height: 8),
           OpimeDatePicker(
             value: _echeance,
             onChanged: (date) => setState(() => _echeance = date),
-            placeholder: const shadcn.Text('Échéance'),
+            placeholder: shadcn.Text(l10n.projects_echeance_placeholder),
           ),
           const SizedBox(height: 8),
           Row(
@@ -241,15 +241,15 @@ class _ProjectEditorState extends State<ProjectEditor> {
               Expanded(
                 child: TextField(
                   controller: _rendementController,
-                  placeholder: const shadcn.Text('Rendement attendu (% / an)'),
+                  placeholder: shadcn.Text(l10n.projects_rendement_placeholder),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _apportMensuelController,
-                  placeholder: const shadcn.Text(
-                    'Apport mensuel en € (facultatif)',
+                  placeholder: shadcn.Text(
+                    l10n.projects_apport_mensuel_placeholder,
                   ),
                 ),
               ),
@@ -258,10 +258,10 @@ class _ProjectEditorState extends State<ProjectEditor> {
           const SizedBox(height: 8),
           TextField(
             controller: _montantCibleController,
-            placeholder: const shadcn.Text('Montant cible en € (facultatif)'),
+            placeholder: shadcn.Text(l10n.projects_montant_cible_placeholder),
           ),
           const SizedBox(height: 16),
-          shadcn.Text('Comptes liés').semiBold().small(),
+          shadcn.Text(l10n.projects_linked_accounts_label).semiBold().small(),
           const SizedBox(height: 8),
           _AccountPicker(
             accounts: _accounts,
@@ -269,7 +269,9 @@ class _ProjectEditorState extends State<ProjectEditor> {
             onToggle: _toggleAccount,
           ),
           const SizedBox(height: 16),
-          shadcn.Text('Passifs liés').semiBold().small(),
+          shadcn.Text(
+            l10n.projects_linked_liabilities_label,
+          ).semiBold().small(),
           const SizedBox(height: 8),
           _LiabilityPicker(
             liabilities: _liabilities,
@@ -278,22 +280,20 @@ class _ProjectEditorState extends State<ProjectEditor> {
           ),
           if (danglingLinks) ...[
             const SizedBox(height: 8),
-            shadcn.Text(
-              '1 lien ou plus ne se résout plus (élément supprimé depuis).',
-            ).muted().xSmall(),
+            shadcn.Text(l10n.projects_dangling_links_warning).muted().xSmall(),
           ],
           const SizedBox(height: 16),
           Row(
             children: [
               PrimaryButton(
                 onPressed: _save,
-                child: const shadcn.Text('Enregistrer'),
+                child: shadcn.Text(l10n.common_save),
               ),
               if (isEditing) ...[
                 const SizedBox(width: 8),
                 OutlineButton(
                   onPressed: _delete,
-                  child: const shadcn.Text('Supprimer'),
+                  child: shadcn.Text(l10n.common_delete),
                 ),
               ],
             ],
@@ -322,7 +322,9 @@ class _AccountPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (accounts.isEmpty) {
-      return shadcn.Text('Aucun compte disponible.').muted().small();
+      return shadcn.Text(
+        AppLocalizations.of(context).projects_no_accounts_available,
+      ).muted().small();
     }
     return Wrap(
       spacing: 8,
@@ -355,7 +357,9 @@ class _LiabilityPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (liabilities.isEmpty) {
-      return shadcn.Text('Aucun passif disponible.').muted().small();
+      return shadcn.Text(
+        AppLocalizations.of(context).projects_no_liabilities_available,
+      ).muted().small();
     }
     return Wrap(
       spacing: 8,
@@ -429,6 +433,7 @@ class _ProjectDetailSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final today = DateTime.now();
     final progress = computeProjectProgress(
       project: project,
@@ -481,7 +486,7 @@ class _ProjectDetailSection extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             shadcn.Text(
-              formatEcheanceRelative(project.echeance, today),
+              formatEcheanceRelative(l10n, project.echeance, today),
             ).muted().small(),
             const SizedBox(height: 20),
             GoalProgressBar(
@@ -491,7 +496,7 @@ class _ProjectDetailSection extends StatelessWidget {
             ),
             if (trajectory.length >= 2) ...[
               const SizedBox(height: 24),
-              shadcn.Text('Trajectoire projetée').semiBold().small(),
+              shadcn.Text(l10n.projects_trajectory_title).semiBold().small(),
               const SizedBox(height: 8),
               SizedBox(
                 height: 160,
@@ -511,25 +516,27 @@ class _ProjectDetailSection extends StatelessWidget {
               runSpacing: 10,
               children: [
                 _StatTile(
-                  label: 'Rendement attendu',
+                  label: l10n.projects_stat_rendement_attendu,
                   value: '${project.rendementAttendu.toStringAsFixed(2)} %/an',
                 ),
                 if (project.apportMensuel != 0)
                   _StatTile(
-                    label: 'Apport mensuel',
+                    label: l10n.projects_stat_apport_mensuel,
                     value: formatEuros(project.apportMensuel),
                   ),
                 _StatTile(
-                  label: 'Temps restant',
-                  value: days >= 0 ? '$days jours' : 'Échéance dépassée',
+                  label: l10n.projects_stat_temps_restant,
+                  value: days >= 0
+                      ? l10n.projects_days_count(days)
+                      : l10n.projects_echeance_deadline_passed,
                 ),
                 _StatTile(
-                  label: 'Montant actuel',
+                  label: l10n.projects_stat_montant_actuel,
                   value: formatEuros(progress.currentNetValue),
                 ),
                 if (montantCible != null)
                   _StatTile(
-                    label: 'Reste à atteindre',
+                    label: l10n.projects_stat_reste_a_atteindre,
                     value: formatEuros(
                       (montantCible - progress.currentNetValue).clamp(
                         0,
@@ -541,7 +548,9 @@ class _ProjectDetailSection extends StatelessWidget {
             ),
             if (linkedAssets.isNotEmpty || linkedLiabilities.isNotEmpty) ...[
               const SizedBox(height: 20),
-              shadcn.Text('Comptes et passifs liés').semiBold().small(),
+              shadcn.Text(
+                l10n.projects_linked_accounts_liabilities_title,
+              ).semiBold().small(),
               const SizedBox(height: 8),
               for (final (label, value) in linkedAssets)
                 _LinkedItemRow(label: label, value: value),
@@ -619,11 +628,17 @@ class _LinkedItemRow extends StatelessWidget {
 
 /// Format court de l'échéance pour les lignes de liste — voir
 /// [formatDateDdMmYyyy] pour la date brute complète.
-String formatEcheanceRelative(DateTime echeance, DateTime today) {
+String formatEcheanceRelative(
+  AppLocalizations l10n,
+  DateTime echeance,
+  DateTime today,
+) {
   final days = echeance.difference(today).inDays;
-  if (days < 0) return 'Échéance dépassée';
-  if (days == 0) return 'Échéance aujourd\'hui';
-  if (days < 31) return 'Dans $days jours';
-  if (days < 365) return 'Dans ${(days / 30).round()} mois';
-  return 'Dans ${(days / 365).round()} ans';
+  if (days < 0) return l10n.projects_echeance_deadline_passed;
+  if (days == 0) return l10n.projects_echeance_today;
+  if (days < 31) return l10n.projects_echeance_in_days(days);
+  if (days < 365) {
+    return l10n.projects_echeance_in_months((days / 30).round());
+  }
+  return l10n.projects_echeance_in_years((days / 365).round());
 }

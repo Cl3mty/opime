@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/core/privacy/amount_visibility_controller.dart';
 import 'package:opime/core/ui/asset_table_header_cell.dart';
 import 'package:opime/features/dashboard/category_detail_screen.dart';
@@ -70,6 +72,13 @@ void main() {
     bool defaultExpanded = false,
   }) {
     return ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
       home: Scaffold(
         child: CategoryDetailScreen(
           category: category(),
@@ -138,6 +147,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: cryptoCategory,
@@ -191,6 +207,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: cryptoCategory,
@@ -240,6 +263,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: cryptoCategory,
@@ -364,6 +394,13 @@ void main() {
       ];
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: category(),
@@ -417,6 +454,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: category(),
@@ -441,6 +485,13 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: category(),
@@ -470,6 +521,13 @@ void main() {
       ];
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: category(),
@@ -500,6 +558,13 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: liabilityCategory(),
@@ -527,6 +592,13 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: category(),
@@ -550,6 +622,13 @@ void main() {
     ) {
       return tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: CategoryDetailScreen(
               category: PatrimoineCategory(
@@ -599,7 +678,14 @@ void main() {
           tester.element(tooltipFinder),
         );
         await tester.pumpWidget(
-          ShadcnApp(home: Scaffold(child: tooltipContent)),
+          ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      home: Scaffold(child: tooltipContent)),
         );
         expect(
           find.text('Cours estimé à la main le 15/01/2026.'),
@@ -669,6 +755,13 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: CategoryDetailScreen(
                 category: autresCategory(),
@@ -700,6 +793,13 @@ void main() {
 
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: CategoryDetailScreen(
                 category: autresCategory(),
@@ -733,6 +833,13 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: CategoryDetailScreen(
                 category: autresCategory(),
@@ -830,6 +937,13 @@ void main() {
 
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: CategoryDetailScreen(
                 category: categoryWithPeriod,

@@ -12,6 +12,7 @@ import '../../core/storage/vault_encryption_migration_service.dart';
 import '../../core/storage/vault_encryption_repository.dart';
 import '../../core/storage/vault_session.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 
 const _migrationService = VaultEncryptionMigrationService();
 
@@ -125,6 +126,7 @@ class _ProgressView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,7 +136,9 @@ class _ProgressView extends StatelessWidget {
         LinearProgressIndicator(value: total == 0 ? null : done / total),
         const SizedBox(height: 8),
         shadcn.Text(
-          total == 0 ? 'Préparation...' : '$done / $total fichier(s)',
+          total == 0
+              ? l10n.settings_encryption_preparing
+              : l10n.settings_encryption_files_progress(done, total),
         ).muted().small(),
         const SizedBox(height: 16),
         Row(
@@ -148,9 +152,7 @@ class _ProgressView extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: shadcn.Text(
-                'Ne ferme pas l\'application pendant cette opération '
-                '(la fermeture de la fenêtre est bloquée le temps qu\'elle '
-                'se termine).',
+                l10n.settings_encryption_dont_close_app,
               ).muted().xSmall(),
             ),
           ],
@@ -182,17 +184,15 @@ class _RecoveryKeyViewState extends State<_RecoveryKeyView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const shadcn.Text('Ta clé de récupération').large().semiBold(),
+        shadcn.Text(l10n.settings_encryption_recovery_key_title).large().semiBold(),
         const SizedBox(height: 8),
-        const shadcn.Text(
-          'Note-la en lieu sûr (gestionnaire de mots de passe, papier...). '
-          'Elle permet de redéfinir ton mot de passe si tu l\'oublies — '
-          'sans elle, tes données sont définitivement perdues. Elle ne sera '
-          'plus jamais affichée.',
+        shadcn.Text(
+          l10n.settings_encryption_recovery_key_description,
         ).muted().small(),
         const SizedBox(height: 16),
         Container(
@@ -218,12 +218,14 @@ class _RecoveryKeyViewState extends State<_RecoveryKeyView> {
           state: _confirmed ? CheckboxState.checked : CheckboxState.unchecked,
           onChanged: (state) =>
               setState(() => _confirmed = state == CheckboxState.checked),
-          trailing: const shadcn.Text('J\'ai noté cette clé en lieu sûr'),
+          trailing: shadcn.Text(
+            l10n.settings_encryption_recovery_key_confirmed_checkbox,
+          ),
         ),
         const SizedBox(height: 16),
         PrimaryButton(
           onPressed: _confirmed ? widget.onConfirmed : null,
-          child: const shadcn.Text('Continuer'),
+          child: shadcn.Text(l10n.settings_encryption_continue),
         ),
       ],
     );
@@ -262,13 +264,14 @@ class _EnableEncryptionDialogState extends State<_EnableEncryptionDialog> {
   }
 
   Future<void> _submitPassword() async {
+    final l10n = AppLocalizations.of(context);
     final password = _passwordController.text;
     if (password.isEmpty) {
-      setState(() => _error = 'Choisis un mot de passe.');
+      setState(() => _error = l10n.onboarding_choose_password);
       return;
     }
     if (password != _confirmController.text) {
-      setState(() => _error = 'Les deux mots de passe ne correspondent pas.');
+      setState(() => _error = l10n.onboarding_passwords_mismatch);
       return;
     }
     setState(() {
@@ -316,32 +319,32 @@ class _EnableEncryptionDialogState extends State<_EnableEncryptionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return _DialogFrame(
       child: switch (_step) {
         _EnableStep.password => Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const shadcn.Text('Activer le chiffrement').large().semiBold(),
+            shadcn.Text(l10n.settings_encryption_enable).large().semiBold(),
             const SizedBox(height: 8),
-            const shadcn.Text(
-              'Choisis un mot de passe pour chiffrer les données privées de '
-              'ce coffre-fort (comptes, budget, passifs, projets, notes de '
-              'stratégie, simulations). Il te sera redemandé à chaque '
-              'lancement de l\'app.',
+            shadcn.Text(
+              l10n.settings_encryption_enable_description,
             ).muted().small(),
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
               obscureText: true,
               autofocus: true,
-              placeholder: const shadcn.Text('Mot de passe'),
+              placeholder: shadcn.Text(l10n.onboarding_password),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _confirmController,
               obscureText: true,
-              placeholder: const shadcn.Text('Confirmer le mot de passe'),
+              placeholder: shadcn.Text(
+                l10n.settings_encryption_confirm_password,
+              ),
               onSubmitted: (_) => _loading ? null : _submitPassword(),
             ),
             if (_error != null) ...[
@@ -361,7 +364,7 @@ class _EnableEncryptionDialogState extends State<_EnableEncryptionDialog> {
                   onPressed: _loading
                       ? null
                       : () => Navigator.of(context).pop(false),
-                  child: const shadcn.Text('Annuler'),
+                  child: shadcn.Text(l10n.common_cancel),
                 ),
                 const SizedBox(width: 8),
                 PrimaryButton(
@@ -373,7 +376,7 @@ class _EnableEncryptionDialogState extends State<_EnableEncryptionDialog> {
                           child: CircularProgressIndicator(),
                         )
                       : null,
-                  child: const shadcn.Text('Continuer'),
+                  child: shadcn.Text(l10n.settings_encryption_continue),
                 ),
               ],
             ),
@@ -384,7 +387,7 @@ class _EnableEncryptionDialogState extends State<_EnableEncryptionDialog> {
           onConfirmed: _runMigration,
         ),
         _EnableStep.migrating => _ProgressView(
-          label: 'Chiffrement des données en cours...',
+          label: l10n.settings_encryption_encrypting_progress_label,
           done: _done,
           total: _total,
         ),

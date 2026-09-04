@@ -5,6 +5,7 @@ import '../../../core/ui/asset_table_header_cell.dart';
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/performance_amount.dart';
 import '../../../core/ui/toggle_button_style.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../investments/widgets/transaction_widgets.dart'
     show ExcludedFromPatrimoineBadge;
 import '../../navigation/navigation_scope.dart';
@@ -86,6 +87,7 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final byInvestment = widget.categoriesByInvestment;
     final activeCategories =
         byInvestment != null && _mode == _BreakdownMode.parInvestissement
@@ -130,7 +132,7 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
                         onChanged: (_) =>
                             setState(() => _mode = _BreakdownMode.parCompte),
                         child: shadcn.Text(
-                          'Par compte',
+                          l10n.dashboard_view_by_account,
                           style: const TextStyle(fontSize: _toggleFontSize),
                         ),
                       ),
@@ -147,7 +149,7 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
                           () => _mode = _BreakdownMode.parInvestissement,
                         ),
                         child: shadcn.Text(
-                          'Par investissement',
+                          l10n.dashboard_view_by_investment,
                           style: const TextStyle(fontSize: _toggleFontSize),
                         ),
                       ),
@@ -183,6 +185,7 @@ class _HeaderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Row(
       children: [
         // Un clone invisible (mais occupant l'espace) du chevron
@@ -201,11 +204,15 @@ class _HeaderRow extends StatelessWidget {
           ),
         ),
         const Expanded(child: SizedBox()),
-        if (showPru) const AssetTableHeaderCell('PRU', width: _pruWidth),
-        const AssetTableHeaderCell('Valeur', width: _montantWidth),
-        const AssetTableHeaderCell('Évolution', width: _evolutionWidth),
+        if (showPru)
+          AssetTableHeaderCell(l10n.dashboard_column_pru, width: _pruWidth),
+        AssetTableHeaderCell(l10n.dashboard_column_value, width: _montantWidth),
+        AssetTableHeaderCell(
+          l10n.dashboard_column_change,
+          width: _evolutionWidth,
+        ),
         if (showPnl)
-          const AssetTableHeaderCell('+/- value', width: _pnlWidth),
+          AssetTableHeaderCell(l10n.dashboard_column_pnl, width: _pnlWidth),
       ],
     );
   }

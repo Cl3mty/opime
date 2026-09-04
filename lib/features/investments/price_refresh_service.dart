@@ -269,21 +269,25 @@ Future<Investment?> _resolveInvestmentPrice({
   }
 
   // Diversification géographique/sectorielle automatique (voir
-  // `Investment.sector`/`countryCode`) : un seul essai tant que le champ
-  // reste `null`, jamais réessayé une fois renseigné — que ce soit par cet
-  // appel ou par une classification manuelle de l'utilisateur, qui doit
-  // toujours pouvoir écraser une valeur auto-détectée sans qu'elle ne
-  // revienne au rafraîchissement suivant. Un échec (Yahoo sans secteur
-  // pour cet actif, suffixe de place non reconnu, panne réseau) laisse
-  // simplement le ou les champs à `null`, retentés au prochain passage —
-  // pas de drapeau d'échec permanent comme [Investment.priceUnavailable],
-  // `null` étant déjà l'état "non classé" existant avant cette
-  // fonctionnalité.
+  // `Investment.sector`/`countryCode`), et même principe pour le style de
+  // gestion (voir `Investment.fundStyle`/`FundStyle.fromYahooQuoteType`) :
+  // un seul essai tant que le champ reste `null`, jamais réessayé une fois
+  // renseigné — que ce soit par cet appel ou par une classification
+  // manuelle de l'utilisateur, qui doit toujours pouvoir écraser une valeur
+  // auto-détectée sans qu'elle ne revienne au rafraîchissement suivant. Un
+  // échec (Yahoo sans secteur pour cet actif, suffixe de place non reconnu,
+  // panne réseau) laisse simplement le ou les champs à `null`, retentés au
+  // prochain passage — pas de drapeau d'échec permanent comme
+  // [Investment.priceUnavailable], `null` étant déjà l'état "non classé"
+  // existant avant cette fonctionnalité.
   Sector? autoSector;
   String? autoCountryCode;
+  FundStyle? autoFundStyle;
   if (effectiveClass == AssetClass.actionsEtFonds &&
       !isCurrency &&
-      (investment.sector == null || investment.countryCode == null)) {
+      (investment.sector == null ||
+          investment.countryCode == null ||
+          investment.fundStyle == null)) {
     final classification = await yahoo.fetchClassification(
       symbol,
       onNetworkError: onNetworkError,
@@ -294,6 +298,9 @@ Future<Investment?> _resolveInvestmentPrice({
     }
     if (investment.countryCode == null) {
       autoCountryCode = classification.countryCode;
+    }
+    if (investment.fundStyle == null) {
+      autoFundStyle = FundStyle.fromYahooQuoteType(classification.quoteType);
     }
   }
 
@@ -315,14 +322,19 @@ Future<Investment?> _resolveInvestmentPrice({
   );
   if (result.points.isEmpty) {
     if (networkError || !expectsMarketPrice) {
-      return autoSector == null && autoCountryCode == null
+      return autoSector == null && autoCountryCode == null && autoFundStyle == null
           ? null
-          : investment.copyWith(sector: autoSector, countryCode: autoCountryCode);
+          : investment.copyWith(
+              sector: autoSector,
+              countryCode: autoCountryCode,
+              fundStyle: autoFundStyle,
+            );
     }
     return investment.copyWith(
       priceUnavailable: true,
       sector: autoSector,
       countryCode: autoCountryCode,
+      fundStyle: autoFundStyle,
     );
   }
 
@@ -374,6 +386,7 @@ Future<Investment?> _resolveInvestmentPrice({
     priceUnavailable: false,
     sector: autoSector,
     countryCode: autoCountryCode,
+    fundStyle: autoFundStyle,
   );
 }
 

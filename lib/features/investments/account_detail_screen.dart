@@ -5,6 +5,7 @@ import '../../core/money_format.dart';
 import '../../core/ui/copyable_identifier.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/opime_date_picker.dart';
+import '../../l10n/app_localizations.dart';
 import 'confirm_delete_dialog.dart';
 import 'document_storage.dart';
 import 'documents_section.dart';
@@ -220,12 +221,13 @@ class _AccountDetailViewState extends State<AccountDetailView> {
 
   Future<void> _deleteAccount() async {
     if (_hasTransactions) return;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer "${widget.account.name}" ?',
-      message:
-          'Ce compte et ses investissements (sans transaction) seront '
-          'définitivement supprimés.',
+      title: l10n.investments_delete_account_confirm_title(
+        widget.account.name,
+      ),
+      message: l10n.investments_delete_account_confirm_message,
     );
     if (!confirmed) return;
     await _repo.deleteAccount(widget.account.id);
@@ -289,6 +291,7 @@ class _AccountDetailViewState extends State<AccountDetailView> {
   }
 
   void _openAccountMenu(BuildContext anchorContext) {
+    final l10n = AppLocalizations.of(anchorContext);
     showDropdown(
       context: anchorContext,
       anchorAlignment: AlignmentDirectional.topEnd,
@@ -300,16 +303,18 @@ class _AccountDetailViewState extends State<AccountDetailView> {
           children: [
             MenuButton(
               leading: const Icon(LucideIcons.pencil, size: 14),
-              child: const shadcn.Text('Modifier le compte'),
+              child: shadcn.Text(l10n.investments_edit_account_menu_item),
               onPressed: (_) => _startEditAccount(),
             ),
             MenuButton(
               enabled: !_hasTransactions,
               leading: const Icon(LucideIcons.trash2, size: 14),
               trailing: _hasTransactions
-                  ? const shadcn.Text('Vide-le d\'abord').muted().xSmall()
+                  ? shadcn.Text(
+                      l10n.investments_delete_account_requires_empty_tooltip,
+                    ).muted().xSmall()
                   : null,
-              child: const shadcn.Text('Supprimer le compte'),
+              child: shadcn.Text(l10n.investments_delete_account_menu_item),
               onPressed: (_) => _deleteAccount(),
             ),
             MenuButton(
@@ -321,15 +326,17 @@ class _AccountDetailViewState extends State<AccountDetailView> {
               ),
               child: shadcn.Text(
                 widget.account.excludedFromPatrimoine
-                    ? 'Réintégrer au patrimoine'
-                    : 'Exclure du patrimoine',
+                    ? l10n.investments_reinclude_in_net_worth_menu_item
+                    : l10n.investments_exclude_from_net_worth_menu_item,
               ),
               onPressed: (_) => _toggleExcludedFromPatrimoine(),
             ),
             if (widget.account.assetClass == AssetClass.actionsEtFonds)
               MenuButton(
                 leading: const Icon(LucideIcons.upload, size: 14),
-                child: const shadcn.Text('Importer un relevé (IBKR)'),
+                child: shadcn.Text(
+                  l10n.investments_import_ibkr_statement_menu_item,
+                ),
                 onPressed: (_) => _importIbkrStatement(),
               ),
           ],
@@ -341,6 +348,7 @@ class _AccountDetailViewState extends State<AccountDetailView> {
   @override
   Widget build(BuildContext context) {
     final account = widget.account;
+    final l10n = AppLocalizations.of(context);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -403,7 +411,7 @@ class _AccountDetailViewState extends State<AccountDetailView> {
           else
             AccountSummaryHeader(account: account, hidden: widget.hidden),
           const SizedBox(height: 24),
-          const shadcn.Text('Investissements').large().medium(),
+          shadcn.Text(l10n.investments_section_title).large().medium(),
           const SizedBox(height: 12),
           for (final investment in account.investments) ...[
             _InvestmentCard(
@@ -493,6 +501,7 @@ class _InvestmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final value = investment.displayValue;
     final crossClass =
         investment.assetClass != null &&
@@ -558,13 +567,15 @@ class _InvestmentCard extends StatelessWidget {
                             if (!isGeneratedIdentifier(investment.isin))
                               CopyableIdentifier(
                                 value: investment.isin,
-                                toastTitle: 'Identifiant copié',
+                                toastTitle:
+                                    l10n.investments_identifier_copied_toast_title,
                               ),
                             if (investment.symbol != null &&
                                 investment.symbol!.isNotEmpty)
                               CopyableIdentifier(
                                 value: investment.symbol!,
-                                toastTitle: 'Ticker copié',
+                                toastTitle:
+                                    l10n.investments_ticker_copied_toast_title,
                               ),
                           ],
                         ),
@@ -593,7 +604,7 @@ class _InvestmentCard extends StatelessWidget {
                             ? '${formatQuantity(investment.quantityHeld, accountAssetClass)} '
                                   '${investment.isin}'
                             : '${formatQuantity(investment.quantityHeld, accountAssetClass)} '
-                                  'unités',
+                                  '${l10n.investments_quantity_units_suffix}',
                       ).muted().xSmall(),
                   ],
                 ),
@@ -619,6 +630,7 @@ class _AddInvestmentButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Row(
@@ -631,7 +643,7 @@ class _AddInvestmentButton extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           shadcn.Text(
-            'Ajouter un investissement',
+            l10n.investments_add_investment_button,
             style: TextStyle(color: Theme.of(context).colorScheme.primary),
           ),
         ],
@@ -659,6 +671,7 @@ class _CreateInvestmentForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -676,12 +689,12 @@ class _CreateInvestmentForm extends StatelessWidget {
               children: [
                 PrimaryButton(
                   onPressed: onCreate,
-                  child: const shadcn.Text('Ajouter'),
+                  child: shadcn.Text(l10n.common_add),
                 ),
                 const SizedBox(width: 8),
                 OutlineButton(
                   onPressed: onCancel,
-                  child: const shadcn.Text('Annuler'),
+                  child: shadcn.Text(l10n.common_cancel),
                 ),
               ],
             ),
@@ -754,6 +767,7 @@ class AccountEditForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -789,7 +803,9 @@ class AccountEditForm extends StatelessWidget {
                     width: 240,
                     child: TextField(
                       controller: nameController,
-                      placeholder: const shadcn.Text('Nom du compte'),
+                      placeholder: shadcn.Text(
+                        l10n.investments_account_name_hint_generic,
+                      ),
                       autofocus: true,
                     ),
                   ),
@@ -803,7 +819,9 @@ class AccountEditForm extends StatelessWidget {
                   Select<String>(
                     value: bankName,
                     constraints: const BoxConstraints(minWidth: 200),
-                    placeholder: const shadcn.Text('Établissement (banque)'),
+                    placeholder: shadcn.Text(
+                      l10n.investments_establishment_select_placeholder,
+                    ),
                     onChanged: (v) {
                       if (v != null) onBankNameChanged(v);
                     },
@@ -830,8 +848,8 @@ class AccountEditForm extends StatelessWidget {
             const SizedBox(height: 12),
             TextField(
               controller: descriptionController,
-              placeholder: const shadcn.Text(
-                'Description (facultative, ex: Épargne vacances)',
+              placeholder: shadcn.Text(
+                l10n.investments_account_description_hint,
               ),
               // Autofocus sur la description quand il n'y a pas de champ de
               // saisie libre (nom) au-dessus.
@@ -844,7 +862,7 @@ class AccountEditForm extends StatelessWidget {
                   OpimeDatePicker(
                     value: openingDate,
                     onChanged: onOpeningDateChanged,
-                    placeholder: const shadcn.Text('Date d\'ouverture'),
+                    placeholder: shadcn.Text(l10n.investments_opening_date_label),
                   ),
                   // La date reste effaçable une fois renseignée (le picker
                   // seul n'expose pas de "désélectionner" évident).
@@ -852,7 +870,9 @@ class AccountEditForm extends StatelessWidget {
                     const SizedBox(width: 8),
                     GhostButton(
                       onPressed: () => onOpeningDateChanged(null),
-                      child: const shadcn.Text('Effacer la date'),
+                      child: shadcn.Text(
+                        l10n.investments_clear_opening_date_button,
+                      ),
                     ),
                   ],
                 ],
@@ -863,12 +883,12 @@ class AccountEditForm extends StatelessWidget {
               children: [
                 PrimaryButton(
                   onPressed: onSave,
-                  child: const shadcn.Text('Enregistrer'),
+                  child: shadcn.Text(l10n.common_save),
                 ),
                 const SizedBox(width: 8),
                 OutlineButton(
                   onPressed: onCancel,
-                  child: const shadcn.Text('Annuler'),
+                  child: shadcn.Text(l10n.common_cancel),
                 ),
               ],
             ),

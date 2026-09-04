@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import '../../l10n/app_localizations.dart';
 import 'nav_models.dart';
 
 /// Liste tactile d'items de navigation, utilisée comme "hub" par la barre
@@ -28,6 +29,7 @@ class MobileNavHub extends StatelessWidget {
       separatorBuilder: (context, _) => const SizedBox(height: 4),
       itemBuilder: (context, index) {
         final item = items[index];
+        final l10n = AppLocalizations.of(context);
         final hasChildren = item.children.isNotEmpty;
         return Clickable(
           mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click),
@@ -43,7 +45,11 @@ class MobileNavHub extends StatelessWidget {
               children: [
                 Icon(item.icon, size: 18),
                 const SizedBox(width: 12),
-                Expanded(child: shadcn.Text(item.label).medium()),
+                Expanded(
+                  child: shadcn
+                      .Text(navLocalizedLabel(l10n, item.key, fallback: item.label))
+                      .medium(),
+                ),
                 Icon(
                   hasChildren
                       ? LucideIcons.chevronRight

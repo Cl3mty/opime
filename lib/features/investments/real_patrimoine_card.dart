@@ -6,6 +6,7 @@ import '../dashboard/patrimoine_models.dart'
     show DashboardPeriod, NetWorthPoint, PatrimoineCategory;
 import '../dashboard/widgets/net_worth_chart.dart';
 import '../dashboard/widgets/patrimoine_chart_widgets.dart';
+import '../../l10n/app_localizations.dart';
 
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
@@ -63,6 +64,7 @@ class _RealPatrimoineCardState extends State<RealPatrimoineCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final period = DashboardPeriod.values[widget.periodIndex];
     final actifsHistoryById = widget.actifsHistoryFor(period);
@@ -191,7 +193,7 @@ class _RealPatrimoineCardState extends State<RealPatrimoineCard> {
                       child: hasAnyData
                           ? const EmptySelectionAmount()
                           : shadcn.Text(
-                              'Pas encore de données.',
+                              l10n.investments_no_data_yet,
                             ).muted().small(),
                     )
                   : StackedNetWorthChart(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
 import '../../../core/money_format.dart' show displayEuros, parseDecimal;
 import '../../../core/ui/frosted_card.dart';
 import '../../../core/ui/opime_date_picker.dart';
@@ -149,6 +150,7 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
   }
 
   Future<void> _commit() async {
+    final l10n = AppLocalizations.of(context);
     final market = _marketController.text.trim();
     final leverage = parseDecimal(_leverageController.text);
     final size = parseDecimal(_sizeController.text);
@@ -167,20 +169,23 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
 
     String? error;
     if (market.isEmpty) {
-      error = 'Le marché (ex : BTC) est requis.';
+      error = l10n.investments_leveraged_market_required_error;
     } else if (leverage == null || leverage <= 0) {
-      error = 'Le levier doit être un nombre supérieur à 0.';
+      error = l10n.investments_leveraged_leverage_positive_error;
     } else if (size == null || size <= 0) {
-      error = 'La taille doit être un nombre supérieur à 0.';
+      error = l10n.investments_leveraged_size_positive_error;
     } else if (entryPrice == null || entryPrice <= 0) {
-      error = 'Le prix d\'entrée doit être un nombre supérieur à 0.';
+      error = l10n.investments_leveraged_entry_price_positive_error;
     } else if (entryPriceFxRateToEur == null || entryPriceFxRateToEur <= 0) {
-      error = 'Le taux de change du prix d\'entrée est requis.';
+      error = l10n.investments_leveraged_entry_fx_rate_required_error;
     } else if (openedAt == null) {
-      error = 'La date d\'ouverture est requise.';
+      error = l10n.investments_leveraged_opening_date_required_error;
     }
     if (error != null) {
-      _showToast(title: 'Position impossible à enregistrer', subtitle: error);
+      _showToast(
+        title: l10n.investments_leveraged_save_impossible_title,
+        subtitle: error,
+      );
       return;
     }
 
@@ -219,8 +224,8 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
     } catch (e) {
       if (!mounted) return;
       _showToast(
-        title: 'Position impossible à enregistrer',
-        subtitle: 'Erreur lors de l\'enregistrement : $e',
+        title: l10n.investments_leveraged_save_impossible_title,
+        subtitle: l10n.investments_save_error('$e'),
       );
       return;
     }
@@ -253,6 +258,7 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
   /// n'est pas encore résolu) — pas de calcul trompeur sur des champs
   /// incomplets.
   Widget _liveCalculations() {
+    final l10n = AppLocalizations.of(context);
     final leverage = parseDecimal(_leverageController.text);
     final size = parseDecimal(_sizeController.text);
     final entryPrice = parseDecimal(_entryPriceController.text);
@@ -288,15 +294,18 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
       runSpacing: 4,
       children: [
         shadcn.Text(
-          'Montant de la position : '
-          '${displayEuros(preview.entryNotionalValue, false)}',
+          l10n.investments_leveraged_notional_amount(
+            displayEuros(preview.entryNotionalValue, false),
+          ),
         ).muted().xSmall(),
         shadcn.Text(
-          'Marge : ${displayEuros(preview.margin, false)}',
+          l10n.investments_leveraged_margin(displayEuros(preview.margin, false)),
         ).muted().xSmall(),
         if (liquidation != null)
           shadcn.Text(
-            'Liquidation (estimée) : ${displayEuros(liquidation, false)}',
+            l10n.investments_leveraged_estimated_liquidation(
+              displayEuros(liquidation, false),
+            ),
           ).muted().xSmall(),
       ],
     );
@@ -304,6 +313,7 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -323,8 +333,8 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
                       Expanded(
                         child: shadcn.Text(
                           _isEdit
-                              ? 'Modifier la position'
-                              : 'Nouvelle position à effet de levier',
+                              ? l10n.investments_leveraged_edit_title
+                              : l10n.investments_leveraged_new_title,
                         ).large().semiBold(),
                       ),
                       IconButton.ghost(
@@ -361,13 +371,13 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
                             ],
                           ),
                         ),
-                        placeholder: const shadcn.Text('Marché'),
+                        placeholder: shadcn.Text(l10n.investments_market_placeholder),
                       ),
                     )
                   else
                     TextField(
                       controller: _marketController,
-                      placeholder: const shadcn.Text('Marché (ex : BTC)'),
+                      placeholder: shadcn.Text(l10n.investments_market_hint),
                       autofocus: !_isEdit,
                     ),
                   const SizedBox(height: 8),
@@ -377,7 +387,7 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            shadcn.Text('Sens').muted().xSmall(),
+                            shadcn.Text(l10n.investments_side_label).muted().xSmall(),
                             const SizedBox(height: 4),
                             Select<PositionSide>(
                               value: _side,
@@ -403,7 +413,10 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: _labeledField('Levier (ex : 2)', _leverageController),
+                        child: _labeledField(
+                          l10n.investments_leverage_hint,
+                          _leverageController,
+                        ),
                       ),
                     ],
                   ),
@@ -412,14 +425,14 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: _labeledField('Taille', _sizeController),
+                        child: _labeledField(l10n.investments_size_label, _sizeController),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            shadcn.Text('Prix d\'entrée').muted().xSmall(),
+                            shadcn.Text(l10n.investments_entry_price_label).muted().xSmall(),
                             const SizedBox(height: 4),
                             Row(
                               children: [
@@ -477,21 +490,21 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
                     children: [
                       Expanded(
                         child: _labeledField(
-                          'Take profit (facultatif)',
+                          l10n.investments_take_profit_hint,
                           _takeProfitController,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _labeledField(
-                          'Stop loss (facultatif)',
+                          l10n.investments_stop_loss_hint,
                           _stopLossController,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  shadcn.Text('Date d\'ouverture').muted().xSmall(),
+                  shadcn.Text(l10n.investments_opening_date_label).muted().xSmall(),
                   const SizedBox(height: 4),
                   OpimeDatePicker(
                     value: _openedAt,
@@ -500,7 +513,7 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: _noteController,
-                    placeholder: const shadcn.Text('Note (facultative)'),
+                    placeholder: shadcn.Text(l10n.investments_note_hint),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -508,13 +521,13 @@ class _LeveragedPositionDialogState extends State<_LeveragedPositionDialog> {
                       PrimaryButton(
                         onPressed: _commit,
                         child: shadcn.Text(
-                          _isEdit ? 'Enregistrer' : 'Ajouter',
+                          _isEdit ? l10n.common_save : l10n.common_add,
                         ),
                       ),
                       const SizedBox(width: 8),
                       OutlineButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const shadcn.Text('Annuler'),
+                        child: shadcn.Text(l10n.common_cancel),
                       ),
                     ],
                   ),
@@ -621,20 +634,21 @@ class _RefreshLeveragedPositionDialogState
   }
 
   Future<void> _commit() async {
+    final l10n = AppLocalizations.of(context);
     final markPrice = parseDecimal(_markPriceController.text);
     final liquidationPrice = parseDecimal(_liquidationPriceController.text);
     final funding = parseDecimal(_fundingController.text);
     if (markPrice == null || markPrice <= 0) {
       _showToast(
-        title: 'Actualisation impossible',
-        subtitle: 'Le cours doit être un nombre supérieur à 0.',
+        title: l10n.investments_refresh_impossible_title,
+        subtitle: l10n.investments_mark_price_positive_error,
       );
       return;
     }
     if (funding == null) {
       _showToast(
-        title: 'Actualisation impossible',
-        subtitle: 'Le funding cumulé doit être un nombre.',
+        title: l10n.investments_refresh_impossible_title,
+        subtitle: l10n.investments_cumulative_funding_number_error,
       );
       return;
     }
@@ -657,8 +671,8 @@ class _RefreshLeveragedPositionDialogState
     } catch (e) {
       if (!mounted) return;
       _showToast(
-        title: 'Actualisation impossible',
-        subtitle: 'Erreur lors de l\'enregistrement : $e',
+        title: l10n.investments_refresh_impossible_title,
+        subtitle: l10n.investments_save_error('$e'),
       );
       return;
     }

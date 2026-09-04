@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/academy/academy_models.dart';
 import '../../../core/academy/academy_progress_controller.dart';
+import '../../../l10n/app_localizations.dart';
 import '../academy_theme.dart';
 import 'academy_level_badge.dart';
 import 'academy_takeaway_box.dart';
@@ -50,6 +51,7 @@ class _AcademyCourseViewState extends State<AcademyCourseView> {
   @override
   Widget build(BuildContext context) {
     final steps = widget.steps;
+    final l10n = AppLocalizations.of(context);
     return AnimatedBuilder(
       animation: widget.progress,
       builder: (context, _) {
@@ -76,7 +78,7 @@ class _AcademyCourseViewState extends State<AcademyCourseView> {
                   ),
                 ),
                 shadcn.Text(
-                  '$completedCount / ${steps.length} acquises',
+                  l10n.academy_progress_summary(completedCount, steps.length),
                 ).muted().small(),
               ],
             ),
@@ -160,6 +162,7 @@ class _StepBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final done = progress.isCompleted(step.id);
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -202,12 +205,12 @@ class _StepBody extends StatelessWidget {
                       LucideIcons.circleCheck,
                       color: step.level.color,
                     ),
-                    child: const shadcn.Text('Acquis'),
+                    child: shadcn.Text(l10n.academy_button_completed),
                   )
                 : PrimaryButton(
                     onPressed: () => progress.toggle(step.id),
                     leading: const Icon(LucideIcons.check),
-                    child: const shadcn.Text('Marquer comme acquis'),
+                    child: shadcn.Text(l10n.academy_button_mark_completed),
                   ),
             const Spacer(),
             IconButton.ghost(

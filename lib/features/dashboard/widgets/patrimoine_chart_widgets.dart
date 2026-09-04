@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart';
+import '../../../l10n/app_localizations.dart';
 import '../patrimoine_models.dart';
 import 'net_worth_chart.dart';
 
@@ -48,6 +49,9 @@ class PatrimoineTitleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final netLabel = l10n.dashboard_patrimoine_net_label;
+    final brutLabel = l10n.dashboard_patrimoine_brut_label;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -57,18 +61,18 @@ class PatrimoineTitleRow extends StatelessWidget {
             if (v != null) onChanged(v);
           },
           itemBuilder: (context, value) => shadcn.Text(
-            value == PatrimoineKind.net ? 'Patrimoine net' : 'Patrimoine brut',
+            value == PatrimoineKind.net ? netLabel : brutLabel,
           ).semiBold().large(),
           popup: (context) => SelectPopup(
             items: SelectItemList(
               children: [
                 SelectItemButton(
                   value: PatrimoineKind.net,
-                  child: const shadcn.Text('Patrimoine net'),
+                  child: shadcn.Text(netLabel),
                 ),
                 SelectItemButton(
                   value: PatrimoineKind.brut,
-                  child: const shadcn.Text('Patrimoine brut'),
+                  child: shadcn.Text(brutLabel),
                 ),
               ],
             ),
@@ -76,14 +80,10 @@ class PatrimoineTitleRow extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Tooltip(
-          tooltip: (context) => const TooltipContainer(
+          tooltip: (context) => TooltipContainer(
             child: SizedBox(
               width: 260,
-              child: shadcn.Text(
-                'Rendement calculé en tenant compte du montant et de la '
-                'date de chaque versement (méthode MWR) : il reflète le '
-                'rendement réellement perçu.',
-              ),
+              child: shadcn.Text(l10n.dashboard_mwr_tooltip),
             ),
           ),
           child: Icon(
@@ -143,6 +143,7 @@ class CategoryMultiSelect extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Select<Iterable<String>>(
       value: selectedIds,
       canUnselect: true,
@@ -163,14 +164,16 @@ class CategoryMultiSelect extends StatelessWidget {
       itemBuilder: (context, value) {
         final ids = value.toSet();
         if (ids.length == options.length) {
-          return shadcn.Text('Tout').small();
+          return shadcn.Text(l10n.dashboard_chart_all_categories).small();
         }
         final labels = [
           for (final o in options)
             if (ids.contains(o.id)) o.label,
         ];
         return shadcn.Text(
-          labels.length <= 2 ? labels.join(', ') : '${labels.length} classes',
+          labels.length <= 2
+              ? labels.join(', ')
+              : l10n.dashboard_chart_categories_count(labels.length),
         ).small();
       },
       popup: (context) => SelectPopup(
@@ -195,7 +198,9 @@ class CategoryMultiSelect extends StatelessWidget {
                     shadcn.Text(o.label),
                     if (!o.selectable) ...[
                       const SizedBox(width: 6),
-                      shadcn.Text('(vide)').muted().xSmall(),
+                      shadcn.Text(
+                        l10n.dashboard_chart_category_empty,
+                      ).muted().xSmall(),
                     ],
                   ],
                 ),
@@ -212,9 +217,8 @@ class EmptySelectionAmount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return shadcn.Text(
-      'Pas assez de données sur cette période',
-    ).muted().small();
+    final l10n = AppLocalizations.of(context);
+    return shadcn.Text(l10n.dashboard_not_enough_data_period).muted().small();
   }
 }
 
@@ -273,6 +277,7 @@ class ExtremePercentLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final extreme = isExtremeChangePercent(percent);
     final positive = percent >= 0;
     final label = shadcn.Text(
@@ -283,15 +288,10 @@ class ExtremePercentLabel extends StatelessWidget {
     );
     if (!extreme) return label;
     return Tooltip(
-      tooltip: (context) => const TooltipContainer(
+      tooltip: (context) => TooltipContainer(
         child: SizedBox(
           width: 260,
-          child: shadcn.Text(
-            'Pourcentage énorme car la période démarre avec un montant '
-            'très faible (ex : toute première transaction minime) — '
-            'l\'essentiel de la hausse vient surtout de versements '
-            'ajoutés depuis, pas d\'une vraie plus-value.',
-          ),
+          child: shadcn.Text(l10n.dashboard_extreme_percent_tooltip),
         ),
       ),
       child: label,
@@ -329,6 +329,7 @@ class PeriodChangeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final percent = changePercent;
     final euroText = displaySignedEuros(absoluteChange, hidden);
     final baseStyle = Theme.of(
@@ -364,16 +365,10 @@ class PeriodChangeRow extends StatelessWidget {
         const SizedBox(width: 4),
         extreme
             ? Tooltip(
-                tooltip: (context) => const TooltipContainer(
+                tooltip: (context) => TooltipContainer(
                   child: SizedBox(
                     width: 260,
-                    child: shadcn.Text(
-                      'Pourcentage énorme car la période démarre avec un '
-                      'montant très faible (ex : toute première '
-                      'transaction minime) — l\'essentiel de la hausse '
-                      'vient surtout de versements ajoutés depuis, pas '
-                      'd\'une vraie plus-value.',
-                    ),
+                    child: shadcn.Text(l10n.dashboard_extreme_percent_tooltip),
                   ),
                 ),
                 child: label,
@@ -425,6 +420,14 @@ PatrimoineChartData buildPatrimoineChartData({
   required Set<String> selectedIds,
   List<NetWorthPoint>? passifSeries,
   List<NetWorthPoint>? netSeriesOverride,
+  // Libellé de la courbe unique du mode "Patrimoine net" — pas de
+  // BuildContext dans cette fonction pure, donc pas de lookup l10n direct
+  // ici : l'appelant (qui a un contexte) doit passer la version localisée
+  // via `AppLocalizations.of(context).dashboard_patrimoine_net_label`.
+  // Défaut conservé en français pour ne pas casser les appelants existants
+  // (`dashboard_screen.dart`, `real_patrimoine_card.dart`) tant qu'ils
+  // n'ont pas été mis à jour pour le passer explicitement.
+  String netLabel = 'Patrimoine net',
 }) {
   final net = kind == PatrimoineKind.net;
 
@@ -473,10 +476,10 @@ PatrimoineChartData buildPatrimoineChartData({
         ];
     return PatrimoineChartData(
       dates: [for (final point in netSeries) point.date],
-      layers: const [
+      layers: [
         ChartLayer(
           id: '_patrimoine_net',
-          label: 'Patrimoine net',
+          label: netLabel,
           color: netWorthColor,
         ),
       ],

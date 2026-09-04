@@ -9,6 +9,7 @@ import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
 import '../../core/ui/donut_hover.dart';
 import '../../core/ui/frosted_card.dart';
+import '../../l10n/app_localizations.dart';
 import '../dashboard/widgets/allocation_hover_tooltip.dart';
 import 'budget_recurring_templates_models.dart';
 import 'budget_recurring_templates_repository.dart';
@@ -34,21 +35,30 @@ final _redoActivator = SingleActivator(
   shift: true,
 );
 final _undoShortcutLabel = Platform.isMacOS ? '⌘Z' : 'Ctrl+Z';
-final _redoShortcutLabel = Platform.isMacOS ? '⌘⇧Z' : 'Ctrl+Maj+Z';
 
-const _moisNoms = [
-  'Janvier',
-  'Février',
-  'Mars',
-  'Avril',
-  'Mai',
-  'Juin',
-  'Juillet',
-  'Août',
-  'Septembre',
-  'Octobre',
-  'Novembre',
-  'Décembre',
+/// Sur macOS, "Maj" (Majuscule) n'apparaît jamais : le symbole ⇧ est déjà
+/// universel et n'a pas besoin de traduction, contrairement à "Maj" en toutes
+/// lettres sur les autres plateformes — d'où le besoin d'[AppLocalizations]
+/// uniquement dans cette branche.
+String _redoShortcutLabel(AppLocalizations l10n) =>
+    Platform.isMacOS ? '⌘⇧Z' : l10n.budget_redo_shortcut_windows;
+
+/// Noms des mois affichés en tête de mois ([_MonthTitleCard]) — construits à
+/// la demande depuis [AppLocalizations] plutôt qu'une liste `const` figée en
+/// français, indexable comme avant par `_month - 1`.
+List<String> _moisNoms(AppLocalizations l10n) => [
+  l10n.budget_month_january,
+  l10n.budget_month_february,
+  l10n.budget_month_march,
+  l10n.budget_month_april,
+  l10n.budget_month_may,
+  l10n.budget_month_june,
+  l10n.budget_month_july,
+  l10n.budget_month_august,
+  l10n.budget_month_september,
+  l10n.budget_month_october,
+  l10n.budget_month_november,
+  l10n.budget_month_december,
 ];
 
 // Palette alignée sur Ventilation : vert = entrées, rouge = dépenses, or = investissements.
@@ -362,10 +372,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
     // premier clic dans une cellule), aucune touche n'aurait de nœud focus
     // depuis lequel remonter.
     return CallbackShortcuts(
-      bindings: {
-        _undoActivator: _undo,
-        _redoActivator: _redo,
-      },
+      bindings: {_undoActivator: _undo, _redoActivator: _redo},
       child: Focus(
         autofocus: true,
         child: AnimatedBuilder(
@@ -378,6 +385,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
   }
 
   Widget _buildContent(BuildContext context, bool hidden) {
+    final l10n = AppLocalizations.of(context);
     final data = _data!;
     final accent = Theme.of(context).colorScheme.primary;
 
@@ -400,7 +408,9 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                     children: [
                       Tooltip(
                         tooltip: (context) => TooltipContainer(
-                          child: shadcn.Text('Annuler ($_undoShortcutLabel)'),
+                          child: shadcn.Text(
+                            l10n.budget_undo_tooltip(_undoShortcutLabel),
+                          ),
                         ),
                         child: IconButton.ghost(
                           icon: const Icon(LucideIcons.undo2, size: 18),
@@ -410,7 +420,9 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                       const SizedBox(width: 4),
                       Tooltip(
                         tooltip: (context) => TooltipContainer(
-                          child: shadcn.Text('Rétablir ($_redoShortcutLabel)'),
+                          child: shadcn.Text(
+                            l10n.budget_redo_tooltip(_redoShortcutLabel(l10n)),
+                          ),
                         ),
                         child: IconButton.ghost(
                           icon: const Icon(LucideIcons.redo2, size: 18),
@@ -426,7 +438,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                       final isNarrow = constraints.maxWidth < 900;
                       final children = [
                         _MonthTitleCard(
-                          monthLabel: _moisNoms[_month - 1],
+                          monthLabel: _moisNoms(l10n)[_month - 1],
                           year: _year,
                           onPrev: () => _changeMonth(-1),
                           onNext: () => _changeMonth(1),
@@ -493,7 +505,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                           ),
                           const SizedBox(height: 12),
                           _CategoryCard(
-                            title: 'REVENUS',
+                            title: l10n.budget_section_revenues,
                             color: _green,
                             items: data.revenues,
                             idPrefix: 'revenue',
@@ -503,7 +515,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                             onManageTemplates: () => _openTemplatesDialog(
                               context,
                               section: BudgetSection.revenue,
-                              sectionTitle: 'REVENUS',
+                              sectionTitle: l10n.budget_section_revenues,
                               items: data.revenues,
                               idPrefix: 'revenue',
                               onChanged: (items) =>
@@ -513,7 +525,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         ],
                       );
                       final col2 = _CategoryCard(
-                        title: 'FACTURES',
+                        title: l10n.budget_section_factures,
                         color: _red,
                         items: data.factures,
                         idPrefix: 'facture',
@@ -533,7 +545,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         onManageTemplates: () => _openTemplatesDialog(
                           context,
                           section: BudgetSection.facture,
-                          sectionTitle: 'FACTURES',
+                          sectionTitle: l10n.budget_section_factures,
                           items: data.factures,
                           idPrefix: 'facture',
                           onChanged: (items) =>
@@ -541,7 +553,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         ),
                       );
                       final col3 = _CategoryCard(
-                        title: 'DÉPENSES',
+                        title: l10n.budget_section_depenses,
                         color: _red,
                         items: data.depenses,
                         idPrefix: 'depense',
@@ -561,7 +573,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         onManageTemplates: () => _openTemplatesDialog(
                           context,
                           section: BudgetSection.depense,
-                          sectionTitle: 'DÉPENSES',
+                          sectionTitle: l10n.budget_section_depenses,
                           items: data.depenses,
                           idPrefix: 'depense',
                           onChanged: (items) =>
@@ -572,7 +584,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _CategoryCard(
-                            title: 'INVEST / ÉPARGNE',
+                            title: l10n.budget_section_invest_epargne,
                             color: accent,
                             items: data.investEpargnes,
                             idPrefix: 'invest',
@@ -583,7 +595,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                             onManageTemplates: () => _openTemplatesDialog(
                               context,
                               section: BudgetSection.investEpargne,
-                              sectionTitle: 'INVEST / ÉPARGNE',
+                              sectionTitle: l10n.budget_section_invest_epargne,
                               items: data.investEpargnes,
                               idPrefix: 'invest',
                               onChanged: (items) => _update(
@@ -593,7 +605,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                           ),
                           const SizedBox(height: 12),
                           _CategoryCard(
-                            title: 'PROJETS',
+                            title: l10n.budget_section_projets,
                             color: _red,
                             items: data.projets,
                             idPrefix: 'projet',
@@ -603,7 +615,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                             onManageTemplates: () => _openTemplatesDialog(
                               context,
                               section: BudgetSection.projet,
-                              sectionTitle: 'PROJETS',
+                              sectionTitle: l10n.budget_section_projets,
                               items: data.projets,
                               idPrefix: 'projet',
                               onChanged: (items) =>
@@ -612,7 +624,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                           ),
                           const SizedBox(height: 12),
                           _CategoryCard(
-                            title: 'DETTES',
+                            title: l10n.budget_section_dettes,
                             color: _red,
                             items: data.dettes,
                             idPrefix: 'dette',
@@ -622,7 +634,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                             onManageTemplates: () => _openTemplatesDialog(
                               context,
                               section: BudgetSection.dette,
-                              sectionTitle: 'DETTES',
+                              sectionTitle: l10n.budget_section_dettes,
                               items: data.dettes,
                               idPrefix: 'dette',
                               onChanged: (items) =>
@@ -663,7 +675,7 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 20),
-                  shadcn.Text('Flux du mois').muted().small(),
+                  shadcn.Text(l10n.budget_month_flow_title).muted().small(),
                   const SizedBox(height: 12),
                   BudgetTrackingSankeyChart(data: data, hidden: hidden),
                 ],
@@ -713,7 +725,9 @@ class _MonthTitleCard extends StatelessWidget {
         ),
         shadcn.Text('$year').muted(),
         const SizedBox(height: 6),
-        shadcn.Text('Tableau de suivi').muted().small(),
+        shadcn.Text(
+          AppLocalizations.of(context).budget_tracking_subtitle,
+        ).muted().small(),
       ],
     );
   }
@@ -742,7 +756,9 @@ class _RemainingGaugeCard extends StatelessWidget {
 
     return Column(
       children: [
-        shadcn.Text('Montant restant').muted().small(),
+        shadcn.Text(
+          AppLocalizations.of(context).budget_remaining_amount_label,
+        ).muted().small(),
         const SizedBox(height: 8),
         SizedBox(
           height: 130,
@@ -821,27 +837,48 @@ class _ComparisonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final rows = [
-      ('Factures', data.totalFacturesBudget, data.totalFacturesRealite, _red),
-      ('Dépenses', data.totalDepensesBudget, data.totalDepensesRealite, _red),
       (
-        'Invest/Épargne',
+        l10n.budget_bucket_factures,
+        data.totalFacturesBudget,
+        data.totalFacturesRealite,
+        _red,
+      ),
+      (
+        l10n.budget_tab_expenses,
+        data.totalDepensesBudget,
+        data.totalDepensesRealite,
+        _red,
+      ),
+      (
+        l10n.budget_bucket_invest_epargne,
         data.totalInvestBudget,
         data.totalInvestRealite,
         accent,
       ),
-      ('Projets', data.totalProjetsBudget, data.totalProjetsRealite, _red),
-      ('Dettes', data.totalDettesBudget, data.totalDettesRealite, _red),
+      (
+        l10n.nav_projects,
+        data.totalProjetsBudget,
+        data.totalProjetsRealite,
+        _red,
+      ),
+      (
+        l10n.budget_bucket_dettes,
+        data.totalDettesBudget,
+        data.totalDettesRealite,
+        _red,
+      ),
     ].where((r) => r.$2 > 0 || r.$3 > 0).toList();
 
     return Column(
       children: [
-        shadcn.Text('Sommaire des entrées/sorties').muted().small(),
+        shadcn.Text(l10n.budget_summary_inout_title).muted().small(),
         const SizedBox(height: 8),
         SizedBox(
           height: 110,
           child: rows.isEmpty
-              ? Center(child: shadcn.Text('Aucune donnée').muted())
+              ? Center(child: shadcn.Text(l10n.budget_no_data).muted())
               : CustomPaint(
                   size: Size.infinite,
                   painter: _ComparisonPainter(rows: rows),
@@ -861,7 +898,10 @@ class _ComparisonCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              shadcn.Text('Budget', style: const TextStyle(fontSize: 10)),
+              shadcn.Text(
+                l10n.nav_budget,
+                style: const TextStyle(fontSize: 10),
+              ),
               const SizedBox(width: 14),
               Container(
                 width: 18,
@@ -872,7 +912,10 @@ class _ComparisonCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              shadcn.Text('Réalité', style: const TextStyle(fontSize: 10)),
+              shadcn.Text(
+                l10n.budget_legend_realite,
+                style: const TextStyle(fontSize: 10),
+              ),
             ],
           ),
         ],
@@ -975,24 +1018,28 @@ class _DistributionCardState extends State<_DistributionCard> {
   int? _hoveredIndex;
   Offset? _pointer;
 
-  List<(String, double, Color)> get _slices =>
-      [
-        ('Factures', widget.data.totalFacturesRealite, _red),
-        ('Dépenses', widget.data.totalDepensesRealite, _orange),
-        ('Invest/Épargne', widget.data.totalInvestRealite, widget.accent),
-        ('Projets', widget.data.totalProjetsRealite, _pink),
-        ('Dettes', widget.data.totalDettesRealite, _maroon),
-      ].where((s) => s.$2 > 0).toList();
+  List<(String, double, Color)> _slices(AppLocalizations l10n) => [
+    (l10n.budget_bucket_factures, widget.data.totalFacturesRealite, _red),
+    (l10n.budget_tab_expenses, widget.data.totalDepensesRealite, _orange),
+    (
+      l10n.budget_bucket_invest_epargne,
+      widget.data.totalInvestRealite,
+      widget.accent,
+    ),
+    (l10n.nav_projects, widget.data.totalProjetsRealite, _pink),
+    (l10n.budget_bucket_dettes, widget.data.totalDettesRealite, _maroon),
+  ].where((s) => s.$2 > 0).toList();
 
   void _updateHover(Offset localPosition, Size size, double total) {
     final center = size.center(Offset.zero);
     final radius = math.min(size.width, size.height) / 2 - 4;
+    final slices = _slices(AppLocalizations.of(context));
     final hoveredIndex = hitTestDonutSlice(
       point: localPosition,
       center: center,
       radius: radius,
       strokeWidth: 20.0,
-      values: [for (final s in _slices) s.$2],
+      values: [for (final s in slices) s.$2],
     );
     setState(() {
       _hoveredIndex = hoveredIndex;
@@ -1002,7 +1049,8 @@ class _DistributionCardState extends State<_DistributionCard> {
 
   @override
   Widget build(BuildContext context) {
-    final slices = _slices;
+    final l10n = AppLocalizations.of(context);
+    final slices = _slices(l10n);
     final total = slices.fold<double>(0, (s, e) => s + e.$2);
     final hoveredIndex = _hoveredIndex;
     final hovered = hoveredIndex != null && hoveredIndex < slices.length
@@ -1011,12 +1059,12 @@ class _DistributionCardState extends State<_DistributionCard> {
 
     return Column(
       children: [
-        shadcn.Text('Répartition').muted().small(),
+        shadcn.Text(l10n.budget_distribution_title).muted().small(),
         const SizedBox(height: 8),
         SizedBox(
           height: 90,
           child: total <= 0
-              ? Center(child: shadcn.Text('Aucune donnée').muted())
+              ? Center(child: shadcn.Text(l10n.budget_no_data).muted())
               : LayoutBuilder(
                   builder: (context, constraints) {
                     final size = Size(
@@ -1174,6 +1222,7 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).colorScheme.border),
@@ -1190,10 +1239,10 @@ class _SummaryCard extends StatelessWidget {
               ),
             ),
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: const Center(
+            child: Center(
               child: shadcn.Text(
-                "ENTRÉES / SORTIES D'ARGENT",
-                style: TextStyle(
+                l10n.budget_inout_header,
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1211,13 +1260,13 @@ class _SummaryCard extends StatelessWidget {
                       const Expanded(flex: 2, child: SizedBox.shrink()),
                       Expanded(
                         child: shadcn.Text(
-                          'Budget',
+                          l10n.nav_budget,
                           textAlign: TextAlign.end,
                         ).muted().small(),
                       ),
                       Expanded(
                         child: shadcn.Text(
-                          'Réalité',
+                          l10n.budget_legend_realite,
                           textAlign: TextAlign.end,
                         ).muted().small(),
                       ),
@@ -1225,38 +1274,38 @@ class _SummaryCard extends StatelessWidget {
                   ),
                 ),
                 _summaryRow(
-                  '+ Revenus',
+                  l10n.budget_summary_row_revenues,
                   data.totalRevenuesBudget,
                   data.totalRevenuesRealite,
                 ),
                 _summaryRow(
-                  '- Factures',
+                  l10n.budget_summary_row_factures,
                   -data.totalFacturesBudget,
                   -data.totalFacturesRealite,
                 ),
                 _summaryRow(
-                  '- Dépenses',
+                  l10n.budget_summary_row_depenses,
                   -data.totalDepensesBudget,
                   -data.totalDepensesRealite,
                 ),
                 _summaryRow(
-                  '- Invest/Épargne',
+                  l10n.budget_summary_row_invest,
                   -data.totalInvestBudget,
                   -data.totalInvestRealite,
                 ),
                 _summaryRow(
-                  '- Projets',
+                  l10n.budget_summary_row_projets,
                   -data.totalProjetsBudget,
                   -data.totalProjetsRealite,
                 ),
                 _summaryRow(
-                  '- Dettes',
+                  l10n.budget_summary_row_dettes,
                   -data.totalDettesBudget,
                   -data.totalDettesRealite,
                 ),
                 const Divider(),
                 _summaryRow(
-                  'RESTANT',
+                  l10n.budget_summary_row_remaining,
                   data.restantBudget,
                   data.restantRealite,
                   bold: true,
@@ -1325,6 +1374,7 @@ class _TemplatesNudgeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final accent = Theme.of(context).colorScheme.primary;
     return Container(
       width: double.infinity,
@@ -1338,17 +1388,12 @@ class _TemplatesNudgeBanner extends StatelessWidget {
           Icon(LucideIcons.repeat, size: 16, color: accent),
           const SizedBox(width: 8),
           Expanded(
-            child: shadcn.Text(
-              count == 1
-                  ? '1 ligne récurrente disponible — l\'ajouter à ce mois ?'
-                  : '$count lignes récurrentes disponibles — les ajouter à '
-                        'ce mois ?',
-            ),
+            child: shadcn.Text(l10n.budget_templates_nudge_message(count)),
           ),
           PrimaryButton(
             size: ButtonSize.small,
             onPressed: onApply,
-            child: const shadcn.Text('Ajouter au mois'),
+            child: shadcn.Text(l10n.budget_templates_nudge_apply),
           ),
           const SizedBox(width: 4),
           IconButton.ghost(
@@ -1396,6 +1441,7 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).colorScheme.border),
@@ -1430,7 +1476,7 @@ class _CategoryCard extends StatelessWidget {
                   Tooltip(
                     // ignore: implicit_call_tearoffs
                     tooltip: TooltipContainer(
-                      child: const shadcn.Text('Lignes récurrentes'),
+                      child: shadcn.Text(l10n.budget_manage_recurring_tooltip),
                     ),
                     child: IconButton.ghost(
                       icon: const Icon(
@@ -1468,7 +1514,7 @@ class _CategoryCard extends StatelessWidget {
                             ),
                           ),
                           child: shadcn.Text(
-                            'Budget',
+                            l10n.nav_budget,
                             textAlign: TextAlign.end,
                           ).muted().small(),
                         ),
@@ -1486,7 +1532,7 @@ class _CategoryCard extends StatelessWidget {
                             ),
                           ),
                           child: shadcn.Text(
-                            'Réalité',
+                            l10n.budget_legend_realite,
                             textAlign: TextAlign.end,
                           ).muted().small(),
                         ),
@@ -1512,7 +1558,7 @@ class _CategoryCard extends StatelessWidget {
                                       initialValue: item.name,
                                       style: const TextStyle(fontSize: 12),
                                       placeholder: shadcn.Text(
-                                        'Nom',
+                                        l10n.common_name,
                                         style: TextStyle(
                                           fontSize: 10,
                                           color: Theme.of(
@@ -1565,7 +1611,7 @@ class _CategoryCard extends StatelessWidget {
                                     child: _AmountCell(
                                       value: item.budget,
                                       formula: item.budgetFormula,
-                                      placeholder: 'Budget',
+                                      placeholder: l10n.nav_budget,
                                       onChanged: (v, formula) => onChanged([
                                         for (final i in items)
                                           if (i.id == item.id)
@@ -1583,7 +1629,7 @@ class _CategoryCard extends StatelessWidget {
                                     child: _AmountCell(
                                       value: item.realite,
                                       formula: item.realiteFormula,
-                                      placeholder: 'Réalité',
+                                      placeholder: l10n.budget_legend_realite,
                                       onChanged: (v, formula) => onChanged([
                                         for (final i in items)
                                           if (i.id == item.id)
@@ -1618,7 +1664,7 @@ class _CategoryCard extends StatelessWidget {
                                   initialValue: item.name,
                                   style: const TextStyle(fontSize: 12),
                                   placeholder: shadcn.Text(
-                                    'Nom',
+                                    l10n.common_name,
                                     style: TextStyle(
                                       fontSize: 10,
                                       color: Theme.of(
@@ -1642,7 +1688,7 @@ class _CategoryCard extends StatelessWidget {
                                 child: _AmountCell(
                                   value: item.budget,
                                   formula: item.budgetFormula,
-                                  placeholder: 'Budget',
+                                  placeholder: l10n.nav_budget,
                                   onChanged: (v, formula) => onChanged([
                                     for (final i in items)
                                       if (i.id == item.id)
@@ -1660,7 +1706,7 @@ class _CategoryCard extends StatelessWidget {
                                 child: _AmountCell(
                                   value: item.realite,
                                   formula: item.realiteFormula,
-                                  placeholder: 'Réalité',
+                                  placeholder: l10n.budget_legend_realite,
                                   onChanged: (v, formula) => onChanged([
                                     for (final i in items)
                                       if (i.id == item.id)
@@ -1703,7 +1749,7 @@ class _CategoryCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         shadcn.Text(
-                          'Ajouter',
+                          l10n.common_add,
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
                           ),
@@ -1717,10 +1763,10 @@ class _CategoryCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: shadcn.Text(
-                          'TOTAL',
-                          style: TextStyle(
+                          l10n.common_total,
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -1976,6 +2022,7 @@ class _CategoryChipPickerState extends State<_CategoryChipPicker> {
       alignment: AlignmentDirectional.topStart,
       offset: const Offset(0, 4),
       builder: (context) {
+        final l10n = AppLocalizations.of(context);
         return StatefulBuilder(
           builder: (context, setPickerState) {
             void confirmRename(String cat) {
@@ -2013,10 +2060,7 @@ class _CategoryChipPickerState extends State<_CategoryChipPicker> {
                                   ),
                                 ),
                                 IconButton.ghost(
-                                  icon: const Icon(
-                                    LucideIcons.check,
-                                    size: 14,
-                                  ),
+                                  icon: const Icon(LucideIcons.check, size: 14),
                                   onPressed: () => confirmRename(cat),
                                 ),
                               ],
@@ -2070,7 +2114,9 @@ class _CategoryChipPickerState extends State<_CategoryChipPicker> {
                         Expanded(
                           child: TextField(
                             controller: _newCategoryController,
-                            placeholder: const shadcn.Text('Nouvelle catégorie'),
+                            placeholder: shadcn.Text(
+                              l10n.budget_new_category_placeholder,
+                            ),
                             border: Border.all(color: Colors.transparent),
                           ),
                         ),
@@ -2098,6 +2144,7 @@ class _CategoryChipPickerState extends State<_CategoryChipPicker> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Builder(
       builder: (btnContext) => GestureDetector(
         onTap: () => _openPicker(btnContext),
@@ -2111,7 +2158,9 @@ class _CategoryChipPickerState extends State<_CategoryChipPicker> {
             mainAxisSize: MainAxisSize.min,
             children: [
               shadcn.Text(
-                widget.category.isEmpty ? 'Catégorie' : widget.category,
+                widget.category.isEmpty
+                    ? l10n.common_category
+                    : widget.category,
               ).small(),
               const SizedBox(width: 4),
               const Icon(LucideIcons.chevronDown, size: 10),

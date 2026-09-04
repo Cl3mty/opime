@@ -1,6 +1,8 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme_controller.dart';
+import '../../app/locale_controller.dart';
+import '../../l10n/app_localizations.dart';
 import '../../core/assistant/assistant_config_controller.dart';
 import '../../core/assistant/llm_provider.dart';
 import '../../core/notifications/notifications_settings_controller.dart';
@@ -24,6 +26,7 @@ class SettingsScreen extends StatelessWidget {
   final Future<void> Function(String path) onVaultActivated;
   final VoidCallback onNoVaultSelected;
   final ThemeController themeController;
+  final LocaleController localeController;
   final AssistantConfigController assistantConfigController;
   final NotificationsSettingsController notificationsSettingsController;
   final KeyboardShortcutsController keyboardShortcutsController;
@@ -46,6 +49,7 @@ class SettingsScreen extends StatelessWidget {
     required this.onVaultActivated,
     required this.onNoVaultSelected,
     required this.themeController,
+    required this.localeController,
     required this.assistantConfigController,
     required this.notificationsSettingsController,
     required this.keyboardShortcutsController,
@@ -64,6 +68,7 @@ class SettingsScreen extends StatelessWidget {
     // seuil desktop, donc on les masque plutôt que d'afficher des réglages
     // sans effet.
     final isWide = isWideLayout(context);
+    final l10n = AppLocalizations.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
       // Toute la largeur disponible, comme les autres pages : plus de
@@ -72,9 +77,11 @@ class SettingsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Réglages').large().medium(),
+          Text(l10n.nav_settings).large().medium(),
           const SizedBox(height: 24),
           _ThemeCard(themeController: themeController),
+          const SizedBox(height: 16),
+          _LanguageCard(localeController: localeController),
           const SizedBox(height: 16),
           if (isWide) ...[
             AssistantSettingsCard(configController: assistantConfigController),
@@ -178,6 +185,7 @@ class _VersionCardState extends State<_VersionCard> {
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
     final muted = Theme.of(context).colorScheme.mutedForeground;
+    final l10n = AppLocalizations.of(context);
 
     return FrostedCard(
       child: Padding(
@@ -185,9 +193,9 @@ class _VersionCardState extends State<_VersionCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version et mises à jour').large().medium(),
+            Text(l10n.settings_version_updates).large().medium(),
             const SizedBox(height: 8),
-            Text('Version installée : $_currentVersion').muted(),
+            Text(l10n.settings_version_installed(_currentVersion)).muted(),
             const SizedBox(height: 12),
             if (_loading)
               Row(
@@ -198,19 +206,19 @@ class _VersionCardState extends State<_VersionCard> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                   const SizedBox(width: 10),
-                  const Text('Vérification des releases GitHub...').muted(),
+                  Text(l10n.settings_checking_releases).muted(),
                 ],
               )
             else if (_hasError)
               Text(
-                'Impossible de vérifier les mises à jour pour le moment.',
+                l10n.settings_update_check_failed,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.destructive,
                 ),
               )
             else if (_update != null) ...[
               Text(
-                'Nouvelle version détectée : ${_update!.latestVersion}',
+                l10n.settings_new_version(_update!.latestVersion),
                 style: TextStyle(color: accent, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 10),
@@ -219,13 +227,13 @@ class _VersionCardState extends State<_VersionCard> {
                   PrimaryButton(
                     onPressed: _downloadAndInstall,
                     leading: const Icon(LucideIcons.download),
-                    child: const Text('Télécharger et installer'),
+                    child: Text(l10n.settings_download_install),
                   ),
                   const SizedBox(width: 8),
                   OutlineButton(
                     onPressed: _openReleaseNotes,
                     leading: const Icon(LucideIcons.externalLink),
-                    child: const Text('Voir la release'),
+                    child: Text(l10n.settings_view_release),
                   ),
                 ],
               ),
@@ -236,8 +244,8 @@ class _VersionCardState extends State<_VersionCard> {
                   const SizedBox(width: 8),
                   Text(
                     _latestVersion == null
-                        ? 'Version distante inconnue.'
-                        : 'Vous êtes à jour (latest: $_latestVersion).',
+                        ? l10n.settings_remote_version_unknown
+                        : l10n.settings_up_to_date(_latestVersion!),
                     style: TextStyle(color: muted),
                   ),
                 ],
@@ -258,6 +266,7 @@ class _ThemeCard extends StatelessWidget {
     return AnimatedBuilder(
       animation: themeController,
       builder: (context, _) {
+        final l10n = AppLocalizations.of(context);
         final mode = themeController.mode;
         return FrostedCard(
           child: Padding(
@@ -265,7 +274,7 @@ class _ThemeCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Apparence').large().medium(),
+                Text(l10n.settings_appearance).large().medium(),
                 const SizedBox(height: 12),
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -287,12 +296,12 @@ class _ThemeCard extends StatelessWidget {
                           style: toggleUnselectedStyle(context),
                           onChanged: (_) =>
                               themeController.setMode(ThemeMode.light),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(LucideIcons.sun),
-                              SizedBox(width: 8),
-                              Text('Clair'),
+                              const Icon(LucideIcons.sun),
+                              const SizedBox(width: 8),
+                              Text(l10n.settings_light),
                             ],
                           ),
                         ),
@@ -302,12 +311,12 @@ class _ThemeCard extends StatelessWidget {
                           style: toggleUnselectedStyle(context),
                           onChanged: (_) =>
                               themeController.setMode(ThemeMode.dark),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(LucideIcons.moon),
-                              SizedBox(width: 8),
-                              Text('Sombre'),
+                              const Icon(LucideIcons.moon),
+                              const SizedBox(width: 8),
+                              Text(l10n.settings_dark),
                             ],
                           ),
                         ),
@@ -317,12 +326,103 @@ class _ThemeCard extends StatelessWidget {
                           style: toggleUnselectedStyle(context),
                           onChanged: (_) =>
                               themeController.setMode(ThemeMode.system),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(LucideIcons.monitor),
+                              const SizedBox(width: 8),
+                              Text(l10n.settings_system),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Carte Réglages de la langue d'affichage (Système / Français / Anglais),
+/// pilotée par [LocaleController] — même motif que [_ThemeCard] : une
+/// `AnimatedBuilder` autour du controller, avec un `ButtonGroup` à trois
+/// choix persistant via `shared_preferences`.
+class _LanguageCard extends StatelessWidget {
+  final LocaleController localeController;
+
+  const _LanguageCard({required this.localeController});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: localeController,
+      builder: (context, _) {
+        final l10n = AppLocalizations.of(context);
+        final locale = localeController.locale;
+        return FrostedCard(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.settings_language).large().medium(),
+                const SizedBox(height: 4),
+                Text(l10n.settings_language_description).muted().small(),
+                const SizedBox(height: 12),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final narrow = constraints.maxWidth < 360;
+                    return ButtonGroup(
+                      direction: narrow ? Axis.vertical : Axis.horizontal,
+                      expands: narrow,
+                      children: [
+                        SelectedButton(
+                          value: locale == AppLocale.system,
+                          selectedStyle: const ButtonStyle.primary(),
+                          style: toggleUnselectedStyle(context),
+                          onChanged: (_) =>
+                              localeController.setLocale(AppLocale.system),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(LucideIcons.monitor),
                               SizedBox(width: 8),
                               Text('Système'),
+                            ],
+                          ),
+                        ),
+                        SelectedButton(
+                          value: locale == AppLocale.french,
+                          selectedStyle: const ButtonStyle.primary(),
+                          style: toggleUnselectedStyle(context),
+                          onChanged: (_) =>
+                              localeController.setLocale(AppLocale.french),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.languages),
+                              SizedBox(width: 8),
+                              Text('Français'),
+                            ],
+                          ),
+                        ),
+                        SelectedButton(
+                          value: locale == AppLocale.english,
+                          selectedStyle: const ButtonStyle.primary(),
+                          style: toggleUnselectedStyle(context),
+                          onChanged: (_) =>
+                              localeController.setLocale(AppLocale.english),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.globe),
+                              SizedBox(width: 8),
+                              Text('English'),
                             ],
                           ),
                         ),
@@ -408,6 +508,7 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
       builder: (context, _) {
         final enabled = widget.configController.enabled;
         final provider = widget.configController.provider;
+        final l10n = AppLocalizations.of(context);
         return FrostedCard(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -421,7 +522,7 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('Assistant IA').large().medium()),
+                    Expanded(child: Text(l10n.settings_assistant).large().medium()),
                     Switch(
                       value: enabled,
                       onChanged: (value) =>
@@ -431,20 +532,20 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
                 ),
                 if (enabled) ...[
                   const SizedBox(height: 8),
-                  Text(_descriptionFor(provider)).muted().small(),
+                  Text(_descriptionFor(context, provider)).muted().small(),
                   const SizedBox(height: 16),
-                  _buildProviderSelector(provider),
+                  _buildProviderSelector(context, provider),
                   const SizedBox(height: 12),
                   if (provider == LlmProvider.ollama)
-                    _buildBaseUrlField()
+                    _buildBaseUrlField(context)
                   else
-                    _buildApiKeyField(provider),
+                    _buildApiKeyField(context, provider),
                   if (provider.isCloud) ...[
                     const SizedBox(height: 12),
-                    _buildCloudWarning(provider),
+                    _buildCloudWarning(context, provider),
                   ],
                   const SizedBox(height: 12),
-                  _buildContextCheckbox(),
+                  _buildContextCheckbox(context),
                 ],
               ],
             ),
@@ -454,25 +555,20 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
     );
   }
 
-  String _descriptionFor(LlmProvider provider) {
+  String _descriptionFor(BuildContext context, LlmProvider provider) {
+    final l10n = AppLocalizations.of(context);
     if (provider == LlmProvider.ollama) {
-      return 'Dialogue avec un modèle Ollama local (gemma, llama...) : '
-          'analyses du patrimoine, explications pédagogiques, questions sur '
-          'tes simulations et ta stratégie. Tout reste sur ta machine — '
-          'aucune donnée n\'est envoyée en ligne. Ollama doit tourner en '
-          'arrière-plan (« ollama serve ») et les modèles s\'installent '
-          'avec « ollama pull <modèle> ».';
+      return l10n.settings_ollama_description;
     }
-    return 'Dialogue avec ${provider.label} via ta propre clé API : '
-        'analyses du patrimoine, explications pédagogiques, questions sur '
-        'tes simulations et ta stratégie.';
+    return l10n.settings_cloud_description(provider.label);
   }
 
-  Widget _buildProviderSelector(LlmProvider provider) {
+  Widget _buildProviderSelector(BuildContext context, LlmProvider provider) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Fournisseur').medium(),
+        Text(l10n.settings_provider).medium(),
         const SizedBox(height: 6),
         Select<LlmProvider>(
           value: provider,
@@ -493,17 +589,18 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
     );
   }
 
-  Widget _buildBaseUrlField() {
+  Widget _buildBaseUrlField(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Expanded(child: Text('Adresse du serveur Ollama').medium()),
+            Expanded(child: Text(l10n.settings_ollama_address).medium()),
             Tooltip(
               // ignore: implicit_call_tearoffs
               tooltip: TooltipContainer(
-                child: Text('Rétablir l\'adresse par défaut'),
+                child: Text(l10n.settings_ollama_reset_default),
               ),
               child: IconButton.ghost(
                 icon: const Icon(LucideIcons.rotateCcw, size: 16),
@@ -522,19 +619,20 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
     );
   }
 
-  Widget _buildApiKeyField(LlmProvider provider) {
+  Widget _buildApiKeyField(BuildContext context, LlmProvider provider) {
+    final l10n = AppLocalizations.of(context);
     final error = widget.configController.apiKeyError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Clé API ${provider.label}').medium(),
+        Text(l10n.settings_api_key(provider.label)).medium(),
         const SizedBox(height: 6),
         TextField(
           key: ValueKey(provider),
           controller: _apiKeyController,
           obscureText: true,
           features: const [InputFeature.passwordToggle()],
-          placeholder: const Text('Colle ta clé API ici'),
+          placeholder: Text(l10n.settings_api_key_placeholder),
           onChanged: (value) =>
               widget.configController.setApiKeyFor(provider, value),
         ),
@@ -557,9 +655,10 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
     );
   }
 
-  Widget _buildCloudWarning(LlmProvider provider) {
+  Widget _buildCloudWarning(BuildContext context, LlmProvider provider) {
     final theme = Theme.of(context);
     final includesPatrimoine = widget.configController.includePatrimoine;
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -577,10 +676,12 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Avec ${provider.label}, tes messages'
-              '${includesPatrimoine ? ' et la synthèse de ton patrimoine' : ''} '
-              'sont envoyés aux serveurs de ce fournisseur, hors de ta '
-              'machine.',
+              l10n.settings_cloud_warning(
+                provider.label,
+                includesPatrimoine
+                    ? l10n.settings_cloud_include_patrimoine
+                    : '',
+              ),
             ).small(),
           ),
         ],
@@ -588,7 +689,8 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
     );
   }
 
-  Widget _buildContextCheckbox() {
+  Widget _buildContextCheckbox(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Checkbox(
       state: widget.configController.includePatrimoine
           ? CheckboxState.checked
@@ -596,9 +698,7 @@ class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
       onChanged: (state) => widget.configController.setIncludePatrimoine(
         state == CheckboxState.checked,
       ),
-      trailing: const Text(
-        'Inclure une synthèse de mon patrimoine dans le contexte du modèle',
-      ).small(),
+      trailing: Text(l10n.settings_include_patrimoine_context).small(),
     );
   }
 }
@@ -613,6 +713,7 @@ class _NotificationsCard extends StatelessWidget {
     return AnimatedBuilder(
       animation: configController,
       builder: (context, _) {
+        final l10n = AppLocalizations.of(context);
         final enabled = configController.enabled;
         return FrostedCard(
           child: Padding(
@@ -627,7 +728,7 @@ class _NotificationsCard extends StatelessWidget {
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('Actualités').large().medium()),
+                    Expanded(child: Text(l10n.settings_news).large().medium()),
                     Switch(
                       value: enabled,
                       onChanged: (value) => configController.setEnabled(value),
@@ -636,12 +737,7 @@ class _NotificationsCard extends StatelessWidget {
                 ),
                 if (enabled) ...[
                   const SizedBox(height: 8),
-                  const Text(
-                    'Actualités Yahoo Finance pour tes actions/ETF détenus, '
-                    'et alertes de variation de prix (CoinGecko) pour tes '
-                    'cryptomonnaies détenues. Aucune requête réseau n\'est '
-                    'effectuée si désactivé.',
-                  ).muted().small(),
+                  Text(l10n.settings_news_description).muted().small(),
                 ],
               ],
             ),
@@ -664,6 +760,7 @@ class _TaxParametersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -678,14 +775,9 @@ class _TaxParametersCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Paramètres fiscaux').large().medium(),
+                  Text(l10n.settings_tax_parameters).large().medium(),
                   const SizedBox(height: 4),
-                  const Text(
-                    'Barèmes, seuils et abattements utilisés par les '
-                    'simulateurs (IR, IFI, démembrement, donation, '
-                    'succession) — à jour toi-même en cas de révision par '
-                    'l\'État.',
-                  ).muted().small(),
+                  Text(l10n.settings_tax_parameters_description).muted().small(),
                 ],
               ),
             ),
@@ -693,7 +785,7 @@ class _TaxParametersCard extends StatelessWidget {
             OutlineButton(
               onPressed: () =>
                   NavigationScope.maybeOf(context)?.call('tax_parameters'),
-              child: const Text('Modifier'),
+              child: Text(l10n.common_edit),
             ),
           ],
         ),
@@ -713,6 +805,7 @@ class _ShortcutsCard extends StatelessWidget {
       animation: configController,
       builder: (context, _) {
         final enabled = configController.enabled;
+        final l10n = AppLocalizations.of(context);
         return FrostedCard(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -727,7 +820,7 @@ class _ShortcutsCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text('Raccourcis clavier').large().medium(),
+                      child: Text(l10n.settings_shortcuts).large().medium(),
                     ),
                     Switch(
                       value: enabled,
@@ -855,6 +948,7 @@ class _EncryptionCardState extends State<_EncryptionCard> {
       );
     }
     final enabled = _metadata?.enabled ?? false;
+    final l10n = AppLocalizations.of(context);
     return FrostedCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -869,21 +963,15 @@ class _EncryptionCardState extends State<_EncryptionCard> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Chiffrement du coffre-fort').large().medium(),
+                  child: Text(l10n.settings_encryption).large().medium(),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
               enabled
-                  ? 'Les données privées de ce coffre-fort (comptes, budget, '
-                        'passifs, projets, notes de stratégie, simulations) '
-                        'sont chiffrées. Le mot de passe est redemandé à '
-                        'chaque lancement de l\'app.'
-                  : 'Chiffre les données privées de ce coffre-fort avec un '
-                        'mot de passe que tu définis. Les caches publics '
-                        '(cours de marché, données immobilières, loyers...) '
-                        'restent toujours en clair.',
+                  ? l10n.settings_encryption_enabled
+                  : l10n.settings_encryption_disabled,
             ).muted().small(),
             const SizedBox(height: 12),
             if (enabled)
@@ -894,14 +982,12 @@ class _EncryptionCardState extends State<_EncryptionCard> {
                   OutlineButton(
                     onPressed: _regenerateRecoveryKey,
                     leading: const Icon(LucideIcons.keyRound),
-                    child: const Text(
-                      'Générer une nouvelle clé de récupération',
-                    ),
+                    child: Text(l10n.settings_encryption_regenerate_key),
                   ),
                   DestructiveButton(
                     onPressed: _disable,
                     leading: const Icon(LucideIcons.lockOpen),
-                    child: const Text('Désactiver le chiffrement'),
+                    child: Text(l10n.settings_encryption_disable),
                   ),
                 ],
               )
@@ -909,7 +995,7 @@ class _EncryptionCardState extends State<_EncryptionCard> {
               PrimaryButton(
                 onPressed: _enable,
                 leading: const Icon(LucideIcons.lock),
-                child: const Text('Activer le chiffrement'),
+                child: Text(l10n.settings_encryption_enable),
               ),
           ],
         ),
@@ -972,6 +1058,11 @@ class _VaultCardState extends State<_VaultCard> {
     // réellement nouveau (voir `VaultFolderService.pickAndRememberVault`),
     // mais poser la question à ce moment reste la meilleure place pour ne
     // pas interrompre le flux une fois le dossier déjà choisi.
+    // Uniquement la valeur destinée au dialogue natif est capturée ici,
+    // avant tout `await`, pour éviter d'utiliser `context` après un trou
+    // asynchrone (voir la remarque de `mounted` plus bas).
+    final dialogTitle =
+        AppLocalizations.of(context).settings_vault_pick_dialog_title;
     final kind = await showVaultKindDialog(context);
     if (kind == null) return;
 
@@ -981,7 +1072,7 @@ class _VaultCardState extends State<_VaultCard> {
     });
     try {
       final vault = await widget.vaultFolderService.pickAndRememberVault(
-        dialogTitle: 'Choisis ou crée un coffre-fort Opime',
+        dialogTitle: dialogTitle,
         kind: kind,
       );
       if (vault != null) {
@@ -989,7 +1080,9 @@ class _VaultCardState extends State<_VaultCard> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Impossible d\'ajouter un coffre-fort : $e');
+        setState(() {
+          _error = AppLocalizations.of(context).settings_vault_add_failed(e);
+        });
       }
     } finally {
       await _loadVaults();
@@ -1027,7 +1120,9 @@ class _VaultCardState extends State<_VaultCard> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Impossible d\'activer ce coffre-fort : $e');
+        setState(() {
+          _error = AppLocalizations.of(context).settings_vault_activate_failed(e);
+        });
       }
     } finally {
       await _loadVaults();
@@ -1048,7 +1143,9 @@ class _VaultCardState extends State<_VaultCard> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Impossible d\'oublier ce coffre-fort : $e');
+        setState(() {
+          _error = AppLocalizations.of(context).settings_vault_forget_failed(e);
+        });
       }
     } finally {
       await _loadVaults();
@@ -1059,6 +1156,7 @@ class _VaultCardState extends State<_VaultCard> {
   Widget build(BuildContext context) {
     final activeId = _activeVaultId;
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return FrostedCard(
       child: Padding(
@@ -1066,11 +1164,9 @@ class _VaultCardState extends State<_VaultCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Coffres-forts').large().medium(),
+            Text(l10n.settings_vaults).large().medium(),
             const SizedBox(height: 8),
-            const Text(
-              'Ajoute plusieurs coffres-forts, donne-leur un nom, bascule entre eux et oublie-les sans toucher aux données sur disque.',
-            ).muted().small(),
+            Text(l10n.settings_vaults_description).muted().small(),
             const SizedBox(height: 16),
             if (_loading)
               const SizedBox(
@@ -1093,7 +1189,7 @@ class _VaultCardState extends State<_VaultCard> {
               OutlineButton(
                 onPressed: _addVault,
                 leading: const Icon(LucideIcons.folderPlus),
-                child: const Text('Ajouter un coffre-fort'),
+                child: Text(l10n.settings_add_vault),
               ),
             ],
             if (_error != null) ...[
@@ -1147,7 +1243,9 @@ class _VaultCardState extends State<_VaultCard> {
                               color: theme.colorScheme.accent,
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            child: const Text('Actif').small(),
+                            child: Text(
+                              AppLocalizations.of(context).common_active,
+                            ).small(),
                           ),
                         ],
                       ],
@@ -1165,7 +1263,9 @@ class _VaultCardState extends State<_VaultCard> {
                   if (!isActive)
                     OutlineButton(
                       onPressed: () => _switchTo(vault),
-                      child: const Text('Basculer'),
+                      child: Text(
+                        AppLocalizations.of(context).common_switch,
+                      ),
                     ),
                   IconButton.ghost(
                     icon: const Icon(LucideIcons.pencil, size: 16),
@@ -1199,7 +1299,9 @@ class _VaultCardState extends State<_VaultCard> {
           Expanded(
             child: TextField(
               controller: _editNameController,
-              placeholder: const Text('Nom du coffre-fort'),
+              placeholder: Text(
+                AppLocalizations.of(context).settings_vault_name_hint,
+              ),
               autofocus: true,
             ),
           ),
@@ -1285,6 +1387,7 @@ class _ProfilesCardState extends State<_ProfilesCard> {
       builder: (context, _) {
         final profiles = widget.profileController.profiles;
         final activeId = widget.profileController.active?.id;
+        final l10n = AppLocalizations.of(context);
 
         return FrostedCard(
           child: Padding(
@@ -1292,12 +1395,9 @@ class _ProfilesCardState extends State<_ProfilesCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Comptes').large().medium(),
+                Text(l10n.settings_comptes).large().medium(),
                 const SizedBox(height: 8),
-                const Text(
-                  'Sépare le patrimoine, le budget et les notes de stratégie '
-                  'de chaque personne du coffre-fort actif.',
-                ).muted().small(),
+                Text(l10n.settings_comptes_description).muted().small(),
                 const SizedBox(height: 16),
                 for (final profile in profiles) ...[
                   if (_editingId == profile.id)
@@ -1347,7 +1447,9 @@ class _ProfilesCardState extends State<_ProfilesCard> {
                         color: theme.colorScheme.accent,
                         borderRadius: BorderRadius.circular(999),
                       ),
-                      child: const Text('Principal').small(),
+                      child: Text(
+                        AppLocalizations.of(context).common_principal,
+                      ).small(),
                     ),
                   ],
                   if (isActive) ...[
@@ -1374,7 +1476,7 @@ class _ProfilesCardState extends State<_ProfilesCard> {
         if (!isActive)
           OutlineButton(
             onPressed: () => widget.profileController.switchTo(profile.id),
-            child: const Text('Basculer'),
+            child: Text(AppLocalizations.of(context).common_switch),
           ),
         IconButton.ghost(
           icon: const Icon(LucideIcons.pencil, size: 16),
@@ -1418,6 +1520,7 @@ class _ProfilesCardState extends State<_ProfilesCard> {
   }
 
   Widget _buildEditRow(Profile profile) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -1425,14 +1528,14 @@ class _ProfilesCardState extends State<_ProfilesCard> {
           Expanded(
             child: TextField(
               controller: _editNameController,
-              placeholder: const Text('Nom'),
+              placeholder: Text(l10n.settings_profile_name),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: _editRelationshipController,
-              placeholder: const Text('Lien de parenté'),
+              placeholder: Text(l10n.settings_profile_relationship),
             ),
           ),
           const SizedBox(width: 8),
@@ -1450,6 +1553,7 @@ class _ProfilesCardState extends State<_ProfilesCard> {
   }
 
   Widget _buildCreateForm() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1458,7 +1562,7 @@ class _ProfilesCardState extends State<_ProfilesCard> {
             Expanded(
               child: TextField(
                 controller: _newNameController,
-                placeholder: const Text('Nom (ex: Camille)'),
+                placeholder: Text(l10n.settings_profile_name_hint),
                 autofocus: true,
               ),
             ),
@@ -1466,7 +1570,7 @@ class _ProfilesCardState extends State<_ProfilesCard> {
             Expanded(
               child: TextField(
                 controller: _newRelationshipController,
-                placeholder: const Text('Lien de parenté (ex: Épouse)'),
+                placeholder: Text(l10n.settings_profile_relationship_hint),
               ),
             ),
           ],
@@ -1476,12 +1580,12 @@ class _ProfilesCardState extends State<_ProfilesCard> {
           children: [
             PrimaryButton(
               onPressed: _commitCreate,
-              child: const Text('Créer le compte'),
+              child: Text(l10n.settings_create_account),
             ),
             const SizedBox(width: 8),
             OutlineButton(
               onPressed: () => setState(() => _creating = false),
-              child: const Text('Annuler'),
+              child: Text(l10n.common_cancel),
             ),
           ],
         ),
@@ -1490,6 +1594,7 @@ class _ProfilesCardState extends State<_ProfilesCard> {
   }
 
   Widget _buildAddButton() {
+    final l10n = AppLocalizations.of(context);
     return GestureDetector(
       onTap: () => setState(() => _creating = true),
       child: Row(
@@ -1502,7 +1607,7 @@ class _ProfilesCardState extends State<_ProfilesCard> {
           ),
           const SizedBox(width: 8),
           Text(
-            'Ajouter un compte',
+            l10n.settings_add_account,
             style: TextStyle(color: Theme.of(context).colorScheme.primary),
           ),
         ],

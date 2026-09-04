@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 
 import '../../core/money_format.dart';
 import '../../core/privacy/amount_visibility_controller.dart';
+import '../../l10n/app_localizations.dart';
 import '../../core/simulations/simulation_state_repository.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/toggle_button_style.dart';
@@ -71,11 +72,29 @@ class _RealEstateEstimationScreenState
   RentEstimate? _rentEstimate;
   bool _loadingRent = false;
 
-  static final _defaultUnit = RentalUnit(
-    label: 'Bien entier',
-    strategy: RentalStrategy.longTerm(monthlyRent: 800),
-  );
-  List<RentalUnit> _units = [_defaultUnit];
+  /// Unité de location par défaut (bien loué en entier) — titre localisé
+  /// plutôt que statique : le modèle `RentalUnit` vit sans `BuildContext`.
+  RentalUnit get _defaultUnit => RentalUnit(
+        label: AppLocalizations.of(context)
+            .simulations_estimation_unit_default_label,
+        strategy: RentalStrategy.longTerm(monthlyRent: 800),
+      );
+  late List<RentalUnit> _units;
+
+  bool _unitsInitialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // `_defaultUnit` lit `AppLocalizations` : interdit dans `initState`,
+    // autorisé ici (appelé avant le premier `build`). Ne réinitialise qu'une
+    // fois — un changement de locale ne doit pas écraser les unités du
+    // brouillon de l'utilisateur.
+    if (!_unitsInitialized) {
+      _unitsInitialized = true;
+      _units = [_defaultUnit];
+    }
+  }
 
   double _travaux = 0;
   double _fraisNotairePercent = 7.5;
@@ -348,6 +367,7 @@ class _RealEstateEstimationScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final loan = _simulateLoan();
     final result = _usage == _UsageType.locatif
         ? _simulateProfitability(loan)
@@ -358,15 +378,15 @@ class _RealEstateEstimationScreenState
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 980;
-          final left = _buildInputsContent();
+          final left = _buildInputsContent(l10n);
           final right = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildMapSection(),
+              _buildMapSection(l10n),
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 20),
-              _buildResultsContent(result, loan, hidden),
+              _buildResultsContent(l10n, result, loan, hidden),
             ],
           );
           if (compact) {
@@ -409,11 +429,11 @@ class _RealEstateEstimationScreenState
   // Colonne de droite (au-dessus des résultats) : carte
   // ---------------------------------------------------------------------
 
-  Widget _buildMapSection() {
+  Widget _buildMapSection(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        shadcn.Text('Adresse du bien').semiBold().small(),
+        shadcn.Text(l10n.simulations_estimation_property_address).semiBold().small(),
         const SizedBox(height: 8),
         // Toujours visible, quelle que soit la carte de chaleur affichée en
         // dessous — la recherche d'une adresse précise reste possible à
@@ -428,7 +448,7 @@ class _RealEstateEstimationScreenState
                   setState(() => _mapMetric = HeatmapMetric.pricePerSqm),
               selectedStyle: const ButtonStyle.primary(),
               style: toggleUnselectedStyle(context),
-              child: const shadcn.Text('Prix au m²'),
+              child: shadcn.Text(l10n.simulations_estimation_price_per_sqm),
             ),
             SelectedButton(
               value: _mapMetric == HeatmapMetric.rentPerSqm,
@@ -436,7 +456,7 @@ class _RealEstateEstimationScreenState
                   setState(() => _mapMetric = HeatmapMetric.rentPerSqm),
               selectedStyle: const ButtonStyle.primary(),
               style: toggleUnselectedStyle(context),
-              child: const shadcn.Text('Loyer au m²'),
+              child: shadcn.Text(l10n.simulations_estimation_rent_per_sqm),
             ),
           ],
         ),
@@ -455,11 +475,11 @@ class _RealEstateEstimationScreenState
   // Colonne de gauche : formulaire
   // ---------------------------------------------------------------------
 
-  Widget _buildInputsContent() {
+  Widget _buildInputsContent(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        shadcn.Text('Usage du bien').muted().small(),
+        shadcn.Text(l10n.simulations_estimation_property_usage).muted().small(),
         const SizedBox(height: 8),
         ButtonGroup(
           children: [
@@ -468,19 +488,19 @@ class _RealEstateEstimationScreenState
               onChanged: (_) => _update(() => _usage = _UsageType.locatif),
               selectedStyle: const ButtonStyle.primary(),
               style: toggleUnselectedStyle(context),
-              child: const shadcn.Text('Investissement locatif'),
+              child: shadcn.Text(l10n.simulations_estimation_usage_locatif),
             ),
             SelectedButton(
               value: _usage == _UsageType.residence,
               onChanged: (_) => _update(() => _usage = _UsageType.residence),
               selectedStyle: const ButtonStyle.primary(),
               style: toggleUnselectedStyle(context),
-              child: const shadcn.Text('Résidence principale/secondaire'),
+              child: shadcn.Text(l10n.simulations_estimation_usage_residence),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        shadcn.Text('Type de bien').muted().small(),
+        shadcn.Text(l10n.simulations_estimation_property_type).muted().small(),
         const SizedBox(height: 8),
         ButtonGroup(
           children: [
@@ -493,7 +513,7 @@ class _RealEstateEstimationScreenState
               },
               selectedStyle: const ButtonStyle.primary(),
               style: toggleUnselectedStyle(context),
-              child: const shadcn.Text('Maison'),
+              child: shadcn.Text(l10n.simulations_estimation_type_maison),
             ),
             SelectedButton(
               value: _propertyType == PropertyTypeFilter.appartement,
@@ -504,13 +524,13 @@ class _RealEstateEstimationScreenState
               },
               selectedStyle: const ButtonStyle.primary(),
               style: toggleUnselectedStyle(context),
-              child: const shadcn.Text('Appartement'),
+              child: shadcn.Text(l10n.simulations_estimation_type_appartement),
             ),
           ],
         ),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Surface',
+          label: l10n.simulations_estimation_field_surface,
           suffix: 'm²',
           value: _surfaceM2,
           step: 1,
@@ -518,7 +538,7 @@ class _RealEstateEstimationScreenState
         ),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Prix au m² (corrigeable)',
+          label: l10n.simulations_estimation_field_price_per_sqm,
           suffix: '€/m²',
           value: _effectivePricePerSqm,
           step: 50,
@@ -531,7 +551,7 @@ class _RealEstateEstimationScreenState
           Row(
             children: [
               Expanded(
-                child: shadcn.Text('Unités locatives').semiBold().small(),
+                child: shadcn.Text(l10n.simulations_estimation_rental_units).semiBold().small(),
               ),
               IconButton.ghost(
                 icon: const Icon(LucideIcons.plus, size: 16),
@@ -539,7 +559,7 @@ class _RealEstateEstimationScreenState
                   () => _units = [
                     ..._units,
                     RentalUnit(
-                      label: 'Unité ${_units.length + 1}',
+                      label: l10n.simulations_estimation_unit_number(_units.length + 1),
                       strategy: RentalStrategy.longTerm(monthlyRent: 500),
                     ),
                   ],
@@ -552,6 +572,7 @@ class _RealEstateEstimationScreenState
               key: ValueKey(_units[i].id),
               unit: _units[i],
               canRemove: _units.length > 1,
+              l10n: l10n,
               onChanged: (updated) => _update(() {
                 _units = [..._units];
                 _units[i] = updated;
@@ -564,10 +585,10 @@ class _RealEstateEstimationScreenState
         const SizedBox(height: 20),
         const Divider(),
         const SizedBox(height: 12),
-        shadcn.Text('Financement').semiBold().small(),
+        shadcn.Text(l10n.simulations_estimation_financing).semiBold().small(),
         const SizedBox(height: 12),
         _NumberField(
-          label: 'Travaux',
+          label: l10n.simulations_estimation_field_travaux,
           suffix: '€',
           value: _travaux,
           step: 1000,
@@ -575,7 +596,7 @@ class _RealEstateEstimationScreenState
         ),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Frais de notaire',
+          label: l10n.simulations_estimation_field_frais_notaire,
           suffix: '%',
           value: _fraisNotairePercent,
           step: 0.5,
@@ -584,7 +605,7 @@ class _RealEstateEstimationScreenState
         ),
         const SizedBox(height: 16),
         _NumberField(
-          label: 'Charges annuelles (copro, taxe foncière, assurance...)',
+          label: l10n.simulations_estimation_field_charges_annuelles,
           suffix: '€/an',
           value: _chargesAnnuelles,
           step: 100,
@@ -594,7 +615,7 @@ class _RealEstateEstimationScreenState
         Row(
           children: [
             Expanded(
-              child: shadcn.Text('Achat comptant (sans crédit)').small(),
+              child: shadcn.Text(l10n.simulations_estimation_cash_purchase).small(),
             ),
             _SimpleSwitch(
               value: _cashPurchase,
@@ -605,16 +626,18 @@ class _RealEstateEstimationScreenState
         if (!_cashPurchase) ...[
           const SizedBox(height: 12),
           shadcn.Text(
-            'Montant emprunté (dérivé) : ${displayEuros((_coutTotalProjet - _loanParams.apport).clamp(0.0, double.infinity), widget.amountVisibility.hidden)}',
+            l10n.simulations_estimation_derived_loan_amount(
+              displayEuros((_coutTotalProjet - _loanParams.apport).clamp(0.0, double.infinity), widget.amountVisibility.hidden),
+            ),
           ).muted().small(),
           const SizedBox(height: 4),
           shadcn.Text(
-            // Apport réglé exclusivement dans l'onglet Prêt (voir
-            // [_LoanParams]) — plus de champ dupliqué ici.
-            "Apport ${displayEuros(_loanParams.apport, widget.amountVisibility.hidden)}, "
-            "taux ${_loanParams.tauxInteret.toStringAsFixed(2)} % sur ${_loanParams.dureeAnnees} ans, "
-            "assurance ${displayEuros(_loanParams.assuranceMensuelle, widget.amountVisibility.hidden)}/mois "
-            "— réglés dans l'onglet Prêt.",
+            l10n.simulations_estimation_loan_info(
+              displayEuros(_loanParams.apport, widget.amountVisibility.hidden),
+              _loanParams.tauxInteret.toStringAsFixed(2),
+              _loanParams.dureeAnnees,
+              displayEuros(_loanParams.assuranceMensuelle, widget.amountVisibility.hidden),
+            ),
           ).muted().xSmall(),
           const SizedBox(height: 8),
           Row(
@@ -622,7 +645,7 @@ class _RealEstateEstimationScreenState
               OutlineButton(
                 onPressed: _useConfiguredLoan,
                 leading: const Icon(LucideIcons.link),
-                child: const shadcn.Text('Utiliser le prêt configuré'),
+                child: shadcn.Text(l10n.simulations_estimation_use_configured_loan),
               ),
               if (_loanJustSynced) ...[
                 const SizedBox(width: 8),
@@ -640,6 +663,7 @@ class _RealEstateEstimationScreenState
   // ---------------------------------------------------------------------
 
   Widget _buildResultsContent(
+    AppLocalizations l10n,
     RealEstateProfitabilityResult? result,
     LoanResult? loan,
     bool hidden,
@@ -650,7 +674,7 @@ class _RealEstateEstimationScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        shadcn.Text('Prix estimé du bien').muted(),
+        shadcn.Text(l10n.simulations_estimation_estimated_price).muted(),
         const SizedBox(height: 8),
         shadcn.Text(
           displayEuros(_prixAchat, hidden),
@@ -658,35 +682,41 @@ class _RealEstateEstimationScreenState
         ),
         const SizedBox(height: 4),
         if (_loadingEstimate)
-          shadcn.Text('Estimation en cours...').muted().small()
+          shadcn.Text(l10n.simulations_estimation_estimation_in_progress).muted().small()
         else if (_priceEstimate != null)
           shadcn.Text(
-            'Basé sur ${_priceEstimate!.sampleSize} vente(s) comparable(s)'
-            '${_priceEstimate!.radiusKmUsed != null ? ' dans un rayon de ${_priceEstimate!.radiusKmUsed!.toStringAsFixed(1)} km' : ' (commune entière)'}'
-            ', ${_priceEstimate!.yearsUsed.join('-')}.',
+            l10n.simulations_estimation_comparable_sales_info(
+              _priceEstimate!.sampleSize,
+              _priceEstimate!.radiusKmUsed != null
+                  ? l10n.simulations_estimation_within_radius(
+                      _priceEstimate!.radiusKmUsed!.toStringAsFixed(1),
+                    )
+                  : l10n.simulations_estimation_whole_township,
+              _priceEstimate!.yearsUsed.join('-'),
+            ),
           ).muted().small()
         else if (_address != null)
           shadcn.Text(
-            'Aucune vente comparable trouvée — prix à ajuster manuellement.',
+            l10n.simulations_estimation_no_comparable_sales,
           ).muted().small(),
         if (_loadingRent) ...[
           const SizedBox(height: 4),
-          shadcn.Text('Estimation du loyer en cours...').muted().small(),
+          shadcn.Text(l10n.simulations_estimation_rent_estimation_in_progress).muted().small(),
         ] else if (_rentEstimate != null) ...[
           const SizedBox(height: 4),
           shadcn.Text.rich(
             TextSpan(
               style: DefaultTextStyle.of(context).style,
               children: [
-                const TextSpan(text: 'Loyer estimé : '),
+                TextSpan(text: l10n.simulations_estimation_estimated_rent_label),
                 TextSpan(
                   text: '${_rentEstimate!.loyerPredM2.toStringAsFixed(1)} €/m²',
                   style: TextStyle(fontWeight: FontWeight.bold, color: accent),
                 ),
                 TextSpan(
                   text: _rentEstimate!.predictionType == 'commune'
-                      ? ' (commune)'
-                      : ' (zone élargie)',
+                      ? l10n.simulations_estimation_rent_zone_commune
+                      : l10n.simulations_estimation_rent_zone_expanded,
                 ),
               ],
             ),
@@ -697,18 +727,18 @@ class _RealEstateEstimationScreenState
           _ProfitabilityStats(
             items: [
               (
-                'Revenu locatif brut',
+                l10n.simulations_estimation_gross_rental_income,
                 displayEuros(result.revenuLocatifAnnuelBrut, hidden),
                 '/an',
               ),
               (
-                'Revenu locatif net',
+                l10n.simulations_estimation_net_rental_income,
                 displayEuros(result.revenuLocatifAnnuelNet, hidden),
                 '/an',
               ),
               if (!_cashPurchase)
                 (
-                  'Mensualité crédit',
+                  l10n.simulations_estimation_loan_payment,
                   displayEuros(result.mensualiteCredit, hidden),
                   '/mois',
                 ),
@@ -740,11 +770,13 @@ class _RealEstateEstimationScreenState
                     children: [
                       shadcn.Text(
                         result.autofinance
-                            ? 'Projet autofinancé'
-                            : 'Projet non autofinancé',
+                            ? l10n.simulations_estimation_project_self_financed
+                            : l10n.simulations_estimation_project_not_self_financed,
                       ).semiBold(),
                       shadcn.Text(
-                        'Cash-flow mensuel : ${displayEuros(result.cashFlowMensuel, hidden)}',
+                        l10n.simulations_estimation_monthly_cash_flow(
+                          displayEuros(result.cashFlowMensuel, hidden),
+                        ),
                       ).small(),
                     ],
                   ),
@@ -758,17 +790,17 @@ class _RealEstateEstimationScreenState
             runSpacing: 12,
             children: [
               _StatChip(
-                label: 'Rendement brut',
+                label: l10n.simulations_estimation_gross_yield,
                 value: '${result.rendementBrutPercent.toStringAsFixed(2)} %',
                 accent: accent,
               ),
               _StatChip(
-                label: 'Rendement net',
+                label: l10n.simulations_estimation_net_yield,
                 value: '${result.rendementNetPercent.toStringAsFixed(2)} %',
                 accent: accent,
               ),
               _StatChip(
-                label: 'Coût total du projet',
+                label: l10n.simulations_estimation_total_project_cost,
                 value: displayEuros(result.coutTotalProjet, hidden),
                 accent: accent,
               ),
@@ -783,13 +815,13 @@ class _RealEstateEstimationScreenState
             runSpacing: 12,
             children: [
               _StatChip(
-                label: 'Coût total du projet',
+                label: l10n.simulations_estimation_total_project_cost,
                 value: displayEuros(_coutTotalProjet, hidden),
                 accent: accent,
               ),
               if (loan != null)
                 _StatChip(
-                  label: 'Mensualité crédit',
+                  label: l10n.simulations_estimation_loan_payment,
                   value: '${displayEuros(loan.mensualite, hidden)}/mois',
                   accent: accent,
                 ),
@@ -851,6 +883,7 @@ class _RentalUnitEditor extends StatelessWidget {
   final bool canRemove;
   final ValueChanged<RentalUnit> onChanged;
   final VoidCallback onRemove;
+  final AppLocalizations l10n;
 
   const _RentalUnitEditor({
     super.key,
@@ -858,6 +891,7 @@ class _RentalUnitEditor extends StatelessWidget {
     required this.canRemove,
     required this.onChanged,
     required this.onRemove,
+    required this.l10n,
   });
 
   @override
@@ -891,12 +925,12 @@ class _RentalUnitEditor extends StatelessWidget {
           const SizedBox(height: 8),
           Select<RentalStrategyKind>(
             value: unit.strategy.kind,
-            placeholder: const shadcn.Text('Stratégie'),
+            placeholder: shadcn.Text(l10n.simulations_estimation_strategy),
             onChanged: (kind) {
               if (kind == null) return;
               onChanged(
                 unit.copyWith(
-                  strategy: _defaultStrategyFor(kind, unit.strategy),
+                  strategy: _defaultStrategyFor(l10n, kind, unit.strategy),
                 ),
               );
             },
@@ -923,14 +957,15 @@ class _RentalUnitEditor extends StatelessWidget {
     );
   }
 
-  static String _strategyLabel(RentalStrategyKind kind) => switch (kind) {
-    RentalStrategyKind.longTerm => 'Longue durée',
-    RentalStrategyKind.shortTerm => 'Courte durée',
-    RentalStrategyKind.seasonalMix => 'Mixte saisonnier',
-    RentalStrategyKind.colocation => 'Colocation',
+  String _strategyLabel(RentalStrategyKind kind) => switch (kind) {
+    RentalStrategyKind.longTerm => l10n.simulations_estimation_strategy_long_term,
+    RentalStrategyKind.shortTerm => l10n.simulations_estimation_strategy_short_term,
+    RentalStrategyKind.seasonalMix => l10n.simulations_estimation_strategy_seasonal_mix,
+    RentalStrategyKind.colocation => l10n.simulations_estimation_strategy_colocation,
   };
 
   static RentalStrategy _defaultStrategyFor(
+    AppLocalizations l10n,
     RentalStrategyKind kind,
     RentalStrategy current,
   ) => switch (kind) {
@@ -951,7 +986,12 @@ class _RentalUnitEditor extends StatelessWidget {
     ),
     RentalStrategyKind.colocation => RentalStrategy.colocation(
       rooms: current.rooms.isEmpty
-          ? [RentalRoom(label: 'Chambre 1', monthlyRent: 450)]
+          ? [
+              RentalRoom(
+                label: l10n.simulations_estimation_room_default_label,
+                monthlyRent: 450,
+              ),
+            ]
           : current.rooms,
     ),
   };
@@ -963,7 +1003,7 @@ class _RentalUnitEditor extends StatelessWidget {
     switch (strategy.kind) {
       case RentalStrategyKind.longTerm:
         return _CompactNumberField(
-          label: 'Loyer mensuel (€)',
+          label: l10n.simulations_estimation_field_monthly_rent,
           value: strategy.monthlyRent ?? 0,
           onChanged: (v) =>
               onStrategyChanged(RentalStrategy.longTerm(monthlyRent: v)),
@@ -973,7 +1013,7 @@ class _RentalUnitEditor extends StatelessWidget {
           children: [
             Expanded(
               child: _CompactNumberField(
-                label: 'Tarif/nuit (€)',
+                label: l10n.simulations_estimation_field_nightly_rate,
                 value: strategy.nightlyRate ?? 0,
                 onChanged: (v) => onStrategyChanged(
                   RentalStrategy.shortTerm(
@@ -986,7 +1026,7 @@ class _RentalUnitEditor extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: _CompactNumberField(
-                label: 'Occupation (%)',
+                label: l10n.simulations_estimation_field_occupancy,
                 value: strategy.occupancyRatePercent ?? 0,
                 onChanged: (v) => onStrategyChanged(
                   RentalStrategy.shortTerm(
@@ -1005,7 +1045,7 @@ class _RentalUnitEditor extends StatelessWidget {
               children: [
                 Expanded(
                   child: _CompactNumberField(
-                    label: 'Mois longue durée',
+                    label: l10n.simulations_estimation_field_long_term_months,
                     value: (strategy.longTermMonths ?? 0).toDouble(),
                     onChanged: (v) => onStrategyChanged(
                       RentalStrategy.seasonalMix(
@@ -1024,7 +1064,7 @@ class _RentalUnitEditor extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _CompactNumberField(
-                    label: 'Loyer longue durée (€)',
+                    label: l10n.simulations_estimation_field_long_term_rent,
                     value: strategy.longTermMonthlyRent ?? 0,
                     onChanged: (v) => onStrategyChanged(
                       RentalStrategy.seasonalMix(
@@ -1046,7 +1086,7 @@ class _RentalUnitEditor extends StatelessWidget {
               children: [
                 Expanded(
                   child: _CompactNumberField(
-                    label: 'Mois courte durée',
+                    label: l10n.simulations_estimation_field_short_term_months,
                     value: (strategy.shortTermMonths ?? 0).toDouble(),
                     onChanged: (v) => onStrategyChanged(
                       RentalStrategy.seasonalMix(
@@ -1065,7 +1105,7 @@ class _RentalUnitEditor extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _CompactNumberField(
-                    label: 'Tarif/nuit été (€)',
+                    label: l10n.simulations_estimation_field_summer_nightly_rate,
                     value: strategy.shortTermNightlyRate ?? 0,
                     onChanged: (v) => onStrategyChanged(
                       RentalStrategy.seasonalMix(
@@ -1128,13 +1168,13 @@ class _RentalUnitEditor extends StatelessWidget {
                 final rooms = [
                   ...strategy.rooms,
                   RentalRoom(
-                    label: 'Chambre ${strategy.rooms.length + 1}',
+                    label: l10n.simulations_estimation_room_number(strategy.rooms.length + 1),
                     monthlyRent: 450,
                   ),
                 ];
                 onStrategyChanged(RentalStrategy.colocation(rooms: rooms));
               },
-              child: const shadcn.Text('+ Ajouter une chambre'),
+              child: shadcn.Text(l10n.simulations_estimation_add_room),
             ),
           ],
         );

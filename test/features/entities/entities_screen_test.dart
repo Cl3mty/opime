@@ -2,12 +2,14 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opime/core/privacy/amount_visibility_controller.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/entities/entities_models.dart';
 import 'package:opime/features/entities/entities_repository.dart';
 import 'package:opime/features/entities/entities_screen.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
 import 'package:opime/features/investments/patrimoine_refresh_controller.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 void main() {
@@ -23,6 +25,12 @@ void main() {
 
   Future<void> pump(WidgetTester tester) => tester.pumpWidget(
     ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
       home: Scaffold(
         child: EntitiesScreen(
           vaultPath: tempDir.path,

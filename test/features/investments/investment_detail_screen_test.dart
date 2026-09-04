@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/l10n/app_localizations.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
 import 'package:opime/features/investments/investment_detail_screen.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/investments_repository.dart';
@@ -53,6 +55,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: InvestmentDetailView(
               vaultPath: tempDir.path,
@@ -130,6 +139,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: InvestmentDetailView(
               vaultPath: tempDir.path,
@@ -201,6 +217,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: InvestmentDetailView(
               vaultPath: tempDir.path,
@@ -274,6 +297,13 @@ void main() {
 
       await tester.pumpWidget(
         ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
           home: Scaffold(
             child: InvestmentDetailView(
               vaultPath: tempDir.path,
@@ -332,6 +362,13 @@ void main() {
 
     await tester.pumpWidget(
       ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
         home: Scaffold(
           child: InvestmentDetailView(
             vaultPath: tempDir.path,
@@ -380,6 +417,13 @@ void main() {
 
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: InvestmentDetailView(
                 vaultPath: tempDir.path,
@@ -429,6 +473,13 @@ void main() {
 
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: InvestmentDetailView(
                 vaultPath: tempDir.path,
@@ -527,6 +578,13 @@ void main() {
 
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: InvestmentDetailView(
                 vaultPath: tempDir.path,

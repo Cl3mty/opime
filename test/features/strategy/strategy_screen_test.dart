@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:opime/features/strategy/strategy_folders_repository.dart';
 import 'package:opime/features/strategy/strategy_repository.dart';
 import 'package:opime/features/strategy/strategy_screen.dart';
@@ -41,7 +43,13 @@ void main() {
       // (flutter_quill) pour ces tests centrés sur les dossiers — les
       // délégués restent quand même fournis par prudence, un tap sur une
       // note pousserait sinon vers `NoteEditor` sans eux.
-      localizationsDelegates: FlutterQuillLocalizations.localizationsDelegates,
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        ...FlutterQuillLocalizations.localizationsDelegates,
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
       home: Scaffold(child: StrategyScreen(vaultPath: tempDir.path)),
     );
   }

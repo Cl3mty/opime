@@ -1,6 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/ui/frosted_card.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Écran de démarrage affiché à la place du Dashboard tant qu'un profil
 /// réel n'a strictement aucune donnée (aucun compte, aucun investissement,
@@ -18,6 +19,7 @@ class DashboardOnboardingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Stack(
       children: [
         Positioned.fill(
@@ -47,14 +49,11 @@ class DashboardOnboardingView extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     shadcn.Text(
-                      'Ton tableau de bord est vide',
+                      l10n.dashboard_onboarding_empty_title,
                     ).large().semiBold(),
                     const SizedBox(height: 8),
                     shadcn.Text(
-                      'Ajoute tes comptes, investissements et crédits pour '
-                      'voir apparaître ton patrimoine, ton allocation et '
-                      "leur évolution. Ça se passe avec le bouton "
-                      '« Compléter mon patrimoine », en haut de l\'écran.',
+                      l10n.dashboard_onboarding_empty_description,
                       textAlign: TextAlign.center,
                     ).muted().small(),
                   ],
@@ -81,13 +80,14 @@ class _PointerToAddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Icon(LucideIcons.arrowUp, size: 28, color: color),
         const SizedBox(height: 4),
         shadcn.Text(
-          'Clique ici pour commencer',
+          l10n.dashboard_onboarding_cta_hint,
           style: TextStyle(color: color, fontWeight: FontWeight.w600),
         ).small(),
       ],

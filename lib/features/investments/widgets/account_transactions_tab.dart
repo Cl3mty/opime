@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../../core/money_format.dart' show parseDecimal;
 import '../../../core/ui/frosted_card.dart';
+import '../../../l10n/app_localizations.dart';
 import '../confirm_delete_dialog.dart';
 import '../currency_data.dart' show kKnownStablecoins;
 import '../document_storage.dart';
@@ -155,16 +156,13 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
     // une position déséquilibrée (ex : un titre "arrivé" nulle part) sur
     // l'autre compte/position, une erreur silencieuse difficile à repérer.
     final linkedId = transaction.linkedTransactionId;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await confirmDelete(
       context,
-      title: 'Supprimer cette transaction ?',
+      title: l10n.investments_delete_transaction_title,
       message: linkedId == null
-          ? 'Cette action est irréversible et modifiera la quantité '
-                'détenue et le PRU de "${investment.label}".'
-          : 'Cette transaction fait partie d\'un transfert/arbitrage : sa '
-                'contrepartie sera aussi supprimée. Cette action est '
-                'irréversible et modifiera la quantité détenue et le PRU '
-                'des deux positions concernées.',
+          ? l10n.investments_delete_transaction_message(investment.label)
+          : l10n.investments_delete_linked_transaction_message,
     );
     if (!confirmed) return;
     final orphanedDocuments = [
@@ -191,6 +189,7 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final all = _allTransactions;
     final rows = _rows;
     // Voir `TransactionRow.centerDate` : la date ne reste centrée que tant
@@ -213,7 +212,7 @@ class _AccountTransactionsTabState extends State<AccountTransactionsTab> {
         ),
         const SizedBox(height: 12),
         if (rows.isEmpty)
-          shadcn.Text('Aucune transaction pour l\'instant.').muted().small(),
+          shadcn.Text(l10n.investments_no_transactions_yet).muted().small(),
         for (final row in rows) ...[
           if (row is _ArbitragePair)
             ArbitrageTransactionRow(
@@ -384,15 +383,16 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
 
   bool get _showCurrencySelector => !_isEurCurrency && !_isCurrency;
 
-  String get _quantityFieldLabel {
-    if (!_isCurrency) return 'Quantité';
+  String _quantityFieldLabel(AppLocalizations l10n) {
+    if (!_isCurrency) return l10n.investments_field_quantity;
     return _isEurCurrency
-        ? 'Montant (€)'
-        : 'Montant (${widget.investment.isin})';
+        ? l10n.investments_field_amount_eur
+        : l10n.investments_field_amount_currency(widget.investment.isin);
   }
 
-  String get _priceFieldLabel =>
-      _isCurrency ? 'Cours de la paire de devise' : 'Prix unitaire';
+  String _priceFieldLabel(AppLocalizations l10n) => _isCurrency
+      ? l10n.investments_field_currency_pair_rate
+      : l10n.investments_field_unit_price;
 
   String get _txnCurrency =>
       _isCurrency ? 'EUR' : _priceCurrencyController.currency;
@@ -541,6 +541,7 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -559,7 +560,9 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
                     children: [
                       Expanded(
                         child: shadcn.Text(
-                          'Modifier la transaction — ${widget.investment.label}',
+                          l10n.investments_edit_transaction_title(
+                            widget.investment.label,
+                          ),
                         ).large().semiBold(),
                       ),
                       IconButton.ghost(
@@ -575,8 +578,8 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
                     quantityController: _quantityController,
                     priceController: _priceController,
                     noteController: _noteController,
-                    quantityLabel: _quantityFieldLabel,
-                    priceLabel: _priceFieldLabel,
+                    quantityLabel: _quantityFieldLabel(l10n),
+                    priceLabel: _priceFieldLabel(l10n),
                     showPriceField: !_isEurCurrency,
                     showCurrencySelector: _showCurrencySelector,
                     priceCurrencyController: _priceCurrencyController,
@@ -594,7 +597,7 @@ class _EditTransactionDialogState extends State<_EditTransactionDialog> {
                         : null,
                     onCreate: _commit,
                     onCancel: () => Navigator.of(context).pop(),
-                    submitLabel: 'Enregistrer',
+                    submitLabel: l10n.common_save,
                     documentsSection: _usesTransactionScopedDocuments
                         ? DocumentsSection(
                             vaultPath: widget.vaultPath,

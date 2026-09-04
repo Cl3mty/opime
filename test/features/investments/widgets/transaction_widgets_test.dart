@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opime/core/ui/shadcn_localizations_fr.dart';
+import 'package:opime/l10n/app_localizations.dart';
 import 'package:opime/features/investments/investments_models.dart';
 import 'package:opime/features/investments/widgets/transaction_widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
@@ -15,6 +17,13 @@ void main() {
           // (popup à `maxWidth: 560`, padding `EdgeInsets.all(20)`).
           await tester.pumpWidget(
             ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
               home: Scaffold(
                 child: Center(
                   child: SizedBox(
@@ -60,6 +69,13 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      
             home: Scaffold(
               child: ManualPriceBadge(updatedAt: DateTime(2024, 1, 15)),
             ),
@@ -73,7 +89,14 @@ void main() {
           tester.element(find.byType(Tooltip)),
         );
         await tester.pumpWidget(
-          ShadcnApp(home: Scaffold(child: tooltipContent)),
+          ShadcnApp(
+      locale: const Locale('fr'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        shadcnLocalizationsFrDelegate,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      home: Scaffold(child: tooltipContent)),
         );
 
         expect(find.text('Estimé le 15/01/2024'), findsOneWidget);
