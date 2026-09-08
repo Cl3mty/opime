@@ -1,0 +1,10 @@
+# Uniquement le web est construit sur Vercel — exclure le reste accélère
+# l'upload du dépôt avant chaque build (voir vercel.json).
+android/
+ios/
+macos/
+windows/
+linux/
+test/
+build/
+.dart_tool/

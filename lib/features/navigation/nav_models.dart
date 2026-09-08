@@ -1,0 +1,513 @@
+import 'package:shadcn_flutter/shadcn_flutter.dart';
+import '../../l10n/app_localizations.dart';
+
+class NavItem {
+  final String key;
+  final String label;
+  final IconData icon; // redevient IconData standard
+  final List<NavItem> children;
+
+  const NavItem({
+    required this.key,
+    required this.label,
+    required this.icon,
+    this.children = const [],
+  });
+}
+
+class NavGroup {
+  final String key;
+  final String label;
+  final List<NavItem> items;
+  const NavGroup({
+    required this.key,
+    required this.label,
+    required this.items,
+  });
+}
+
+/// Sur desktop, le Dashboard permet déjà de naviguer vers chaque catégorie
+/// d'actif/passif (clic sur une ligne des cartes Actifs/Passifs) : les
+/// détailler aussi dans la sidebar serait redondant, donc [patrimoineGroup]
+/// (desktop) ne garde que "Tableau de bord". Sur mobile, sans ces cartes
+/// cliquables, l'onglet Portfolio continue de les exposer via
+/// [patrimoineCategoryItems].
+const patrimoineGroup = NavGroup(
+  key: 'patrimoine',
+  label: 'Patrimoine',
+  items: [
+    NavItem(
+      key: 'dashboard',
+      label: 'Tableau de bord',
+      icon: LucideIcons.gauge,
+    ),
+    NavItem(
+      key: 'analyses',
+      label: 'Analyses',
+      icon: LucideIcons.radar,
+    ),
+    NavItem(
+      key: 'projets',
+      label: 'Projets',
+      icon: LucideIcons.target,
+    ),
+  ],
+);
+
+const patrimoineCategoryItems = [
+  NavItem(
+    key: 'actifs',
+    label: 'Placements',
+    icon: LucideIcons.circlePlus,
+    children: [
+      NavItem(
+        key: 'actifs_actions_fonds',
+        label: 'Actions & Fonds',
+        icon: LucideIcons.chartLine,
+      ),
+      NavItem(
+        key: 'actifs_private_equity',
+        label: 'Private Equity',
+        icon: LucideIcons.rocket,
+      ),
+      NavItem(
+        key: 'actifs_immobilier',
+        label: 'Immobilier',
+        icon: LucideIcons.house,
+      ),
+      NavItem(key: 'actifs_crypto', label: 'Crypto', icon: LucideIcons.bitcoin),
+      NavItem(
+        key: 'actifs_metaux_precieux',
+        label: 'Métaux précieux',
+        icon: LucideIcons.gem,
+      ),
+      NavItem(
+        key: 'actifs_epargne',
+        label: 'Épargne',
+        icon: LucideIcons.piggyBank,
+      ),
+      NavItem(key: 'actifs_autres', label: 'Autres', icon: LucideIcons.boxes),
+    ],
+  ),
+  NavItem(
+    key: 'passifs',
+    label: 'Dettes',
+    icon: LucideIcons.circleMinus,
+    children: [
+      NavItem(
+        key: 'passifs_emprunts',
+        label: 'Emprunts',
+        icon: LucideIcons.handCoins,
+      ),
+      NavItem(
+        key: 'passifs_prets_immobiliers',
+        label: 'Crédits immobiliers',
+        icon: LucideIcons.house,
+      ),
+    ],
+  ),
+];
+
+/// Holdings, sociétés commerciales, SCI (voir
+/// `features/entities/entities_models.dart`) — toujours affiché dans la
+/// sidebar (`app_sidebar.dart`), quel que soit le coffre-fort : n'importe
+/// lequel peut créer des entités ou non, aucune distinction personnel/
+/// professionnel de coffre-fort n'existe. Comme tout autre groupe, peut
+/// être masqué via les préférences de sidebar (`hiddenKeys`) par qui ne
+/// s'en sert jamais.
+const entitesGroup = NavGroup(
+  key: 'professionnel',
+  label: 'Professionnel',
+  items: [
+    NavItem(key: 'entites', label: 'Entités', icon: LucideIcons.building2),
+  ],
+);
+
+const academieGroup = NavGroup(
+  key: 'academie',
+  label: 'Académie',
+  items: [
+    NavItem(
+      key: 'investissement',
+      label: 'Fondamentaux',
+      icon: LucideIcons.university,
+      children: [
+        NavItem(
+          key: 'invest_pourquoi',
+          label: 'Pourquoi investir ?',
+          icon: LucideIcons.lightbulb,
+        ),
+        NavItem(
+          key: 'invest_inflation',
+          label: 'L\'inflation',
+          icon: LucideIcons.trendingDown,
+        ),
+        NavItem(
+          key: 'invest_risque',
+          label: 'Le risque',
+          icon: LucideIcons.shieldAlert,
+        ),
+        NavItem(
+          key: 'invest_diversification',
+          label: 'Diversification',
+          icon: LucideIcons.shuffle,
+        ),
+        NavItem(key: 'invest_etf', label: 'Les ETF', icon: LucideIcons.layers),
+        NavItem(
+          key: 'invest_frais',
+          label: 'Les frais',
+          icon: LucideIcons.percent,
+        ),
+        NavItem(
+          key: 'invest_fiscalite',
+          label: 'La fiscalité',
+          // Même icône que Simulation > Fiscalité, pour que "fiscalité"
+          // se reconnaisse visuellement partout dans l'app.
+          icon: LucideIcons.flame,
+        ),
+        NavItem(
+          key: 'invest_pyramide',
+          label: 'Pyramide de l\'investissement',
+          icon: LucideIcons.pyramid,
+        ),
+        NavItem(
+          key: 'invest_allocation',
+          label: 'Allocation stratégique/dynamique',
+          icon: LucideIcons.scale,
+        ),
+        NavItem(
+          key: 'invest_temps_long',
+          label: 'Le temps long',
+          icon: LucideIcons.hourglass,
+        ),
+      ],
+    ),
+    NavItem(
+      key: 'enveloppes',
+      label: 'Enveloppes',
+      icon: LucideIcons.library,
+      children: [
+        NavItem(
+          key: 'envelope_compte_courant',
+          label: 'Compte courant',
+          icon: LucideIcons.landmark,
+        ),
+        NavItem(
+          key: 'envelope_livret_a',
+          label: 'Livret A',
+          icon: LucideIcons.piggyBank,
+        ),
+        NavItem(key: 'envelope_ldds', label: 'LDDS', icon: LucideIcons.sprout),
+        NavItem(key: 'envelope_lep', label: 'LEP', icon: LucideIcons.coins),
+        NavItem(key: 'envelope_pel', label: 'PEL', icon: LucideIcons.house),
+        NavItem(key: 'envelope_cto', label: 'CTO', icon: LucideIcons.briefcase),
+        NavItem(
+          key: 'envelope_pea',
+          label: 'PEA',
+          icon: LucideIcons.trendingUp,
+        ),
+        NavItem(
+          key: 'envelope_assurance_vie',
+          label: 'Assurance-vie',
+          icon: LucideIcons.heartHandshake,
+        ),
+        NavItem(
+          key: 'envelope_contrat_capitalisation',
+          label: 'Contrat de capitalisation',
+          icon: LucideIcons.building2,
+        ),
+        NavItem(
+          key: 'envelope_pee_peg',
+          label: 'PEE / PEG',
+          icon: LucideIcons.users,
+        ),
+        NavItem(key: 'envelope_per', label: 'PER', icon: LucideIcons.sunset),
+      ],
+    ),
+    NavItem(
+      key: 'formation',
+      label: 'Formation',
+      icon: LucideIcons.graduationCap,
+      children: [
+        NavItem(
+          key: 'formation_bourse',
+          label: 'Bourse',
+          icon: LucideIcons.chartCandlestick,
+        ),
+        NavItem(
+          key: 'formation_metaux',
+          label: 'Métaux précieux',
+          icon: LucideIcons.gem,
+        ),
+        NavItem(
+          key: 'formation_crypto',
+          label: 'Crypto',
+          icon: LucideIcons.bitcoin,
+        ),
+        NavItem(
+          key: 'formation_immobilier',
+          label: 'Immobilier',
+          icon: LucideIcons.house,
+        ),
+        NavItem(
+          key: 'formation_structuration',
+          label: 'Structuration patrimoniale',
+          icon: LucideIcons.network,
+        ),
+      ],
+    ),
+  ],
+);
+
+/// Items de l'onglet "Portfolio" de la navigation mobile (le tableau de
+/// bord a déjà son propre onglet "Home") : sans les cartes cliquables du
+/// Dashboard desktop, le mobile garde Actifs/Passifs pour y naviguer.
+const portfolioTabItems = patrimoineCategoryItems;
+
+const outilsGroup = NavGroup(
+  key: 'outils',
+  label: 'Outils',
+  items: [
+    NavItem(
+      key: 'strategie',
+      label: 'Stratégie',
+      icon: LucideIcons.notebookPen,
+    ),
+    NavItem(
+      key: 'budget',
+      label: 'Budget',
+      icon: LucideIcons.wallet,
+      children: [
+        NavItem(
+          key: 'budget_ventilation',
+          label: 'Ventilation',
+          icon: LucideIcons.workflow,
+        ),
+        NavItem(
+          key: 'budget_suivi',
+          label: 'Suivi',
+          icon: LucideIcons.listChecks,
+        ),
+      ],
+    ),
+    NavItem(
+      key: 'simulation',
+      label: 'Simulation',
+      icon: LucideIcons.cpu,
+      children: [
+        NavItem(
+          key: 'simulation_patrimoine',
+          label: 'Patrimoine',
+          icon: LucideIcons.trendingUp,
+        ),
+        NavItem(
+          key: 'simulation_immobilier',
+          label: 'Immobilier',
+          icon: LucideIcons.house,
+        ),
+        NavItem(
+          key: 'simulation_taxation',
+          label: 'Fiscalité',
+          icon: LucideIcons.flame,
+        ),
+        NavItem(
+          key: 'simulation_transmission',
+          label: 'Transmission',
+          icon: LucideIcons.users,
+        ),
+      ],
+    ),
+    NavItem(key: 'assistant', label: 'Assistant', icon: LucideIcons.bot),
+  ],
+);
+
+/// Items du groupe Outils pour l'onglet "Tools" de la navigation mobile
+/// (pas d'assistant en version mobile).
+final toolsTabItems = [
+  for (final item in outilsGroup.items)
+    if (item.key != 'assistant') item,
+];
+
+/// Parcours (breadcrumb) de la page sélectionnée, affiché dans la TopBar :
+/// pour un sous-item (ex : « Transmission » sous « Simulation »), la liste
+/// des libellés du parent vers la page (`['Simulation', 'Transmission']`) ;
+/// pour une page de premier niveau, un unique libellé. Les catégories du
+/// dashboard (`actifs_*`/`passifs_*`), navigables sur desktop depuis les
+/// cartes du Tableau de bord, sont rattachées à « Actifs »/« Passifs »
+/// comme sur l'onglet mobile — même si la sidebar desktop ne les expose pas.
+List<String> navBreadcrumbForKey(String key) {
+  final navItems = [
+    ...patrimoineGroup.items,
+    ...entitesGroup.items,
+    ...academieGroup.items,
+    ...outilsGroup.items,
+    ...patrimoineCategoryItems,
+  ];
+  for (final item in navItems) {
+    if (item.key == key) return [item.label];
+    for (final child in item.children) {
+      if (child.key == key) return [item.label, child.label];
+    }
+  }
+  return switch (key) {
+    'settings' => ['Réglages'],
+    _ => [''],
+  };
+}
+
+/// Libellé de la page sélectionnée, affiché en titre dans la TopBar
+/// desktop. Pour un sous-item (ex : « Ventilation » sous « Budget »), c'est
+/// le libellé de l'item parent de la sidebar qui est renvoyé — le titre
+/// reste celui de l'entrée de sidebar, pas du sous-menu. Les pages hors
+/// sidebar (Réglages...) retombent sur leur propre libellé.
+String navLabelForKey(String key) {
+  for (final group in [patrimoineGroup, entitesGroup, academieGroup, outilsGroup]) {
+    for (final item in group.items) {
+      if (item.key == key) return item.label;
+      for (final child in item.children) {
+        if (child.key == key) return item.label;
+      }
+    }
+  }
+  return switch (key) {
+    'settings' => 'Réglages',
+    _ => '',
+  };
+}
+
+/// Libellé localisé d'un item ou d'un groupe de navigation à partir de sa
+/// clé (`NavItem.key` / `NavGroup.key`). Les libellés français restent codés
+/// en dur dans les modèles (`label`) — comme `AcademyLevel.label` — car ce
+/// fichier vit sans `BuildContext` ; la traduction se résout ici, aux seuls
+/// points d'affichage (sidebar, topbar, navigation mobile). Retombe sur
+/// [fallback] (typiquement le libellé français du modèle) pour une clé
+/// inconnue.
+String navLocalizedLabel(
+  AppLocalizations l10n,
+  String key, {
+  String fallback = '',
+}) {
+  return switch (key) {
+    // Groupes.
+    'patrimoine' => l10n.nav_patrimoine,
+    'professionnel' => l10n.nav_professional,
+    'academie' => l10n.nav_academy,
+    'outils' => l10n.nav_tools,
+    // Items de premier niveau.
+    'dashboard' => l10n.nav_dashboard,
+    'analyses' => l10n.nav_analyses,
+    'projets' => l10n.nav_projects,
+    'entites' => l10n.nav_entities,
+    'strategie' => l10n.nav_strategy,
+    'budget' => l10n.nav_budget,
+    'budget_ventilation' => l10n.nav_budget_allocation,
+    'budget_suivi' => l10n.nav_budget_tracking,
+    'simulation' => l10n.nav_simulation,
+    'simulation_patrimoine' => l10n.nav_simulation_wealth,
+    'simulation_immobilier' => l10n.nav_simulation_real_estate,
+    'simulation_taxation' => l10n.nav_simulation_taxation,
+    'simulation_transmission' => l10n.nav_simulation_transmission,
+    'assistant' => l10n.nav_assistant,
+    // Catégories d'avoir.
+    'actifs' => l10n.nav_assets,
+    'actifs_actions_fonds' => l10n.nav_assets_actions_funds,
+    'actifs_private_equity' => l10n.nav_assets_private_equity,
+    'actifs_immobilier' => l10n.nav_assets_real_estate,
+    'actifs_crypto' => l10n.nav_assets_crypto,
+    'actifs_metaux_precieux' => l10n.nav_assets_precious_metals,
+    'actifs_epargne' => l10n.nav_assets_savings,
+    'actifs_autres' => l10n.nav_assets_other,
+    // Catégories de dette.
+    'passifs' => l10n.nav_liabilities,
+    'passifs_emprunts' => l10n.nav_liabilities_loans,
+    'passifs_prets_immobiliers' => l10n.nav_liabilities_mortgages,
+    // Académie — Fondamentaux.
+    'investissement' => l10n.nav_investment,
+    'invest_pourquoi' => l10n.nav_invest_why,
+    'invest_inflation' => l10n.nav_invest_inflation,
+    'invest_risque' => l10n.nav_invest_risk,
+    'invest_diversification' => l10n.nav_invest_diversification,
+    'invest_etf' => l10n.nav_invest_etf,
+    'invest_frais' => l10n.nav_invest_fees,
+    'invest_fiscalite' => l10n.nav_invest_taxation,
+    'invest_pyramide' => l10n.nav_invest_pyramid,
+    'invest_allocation' => l10n.nav_invest_allocation,
+    'invest_temps_long' => l10n.nav_invest_long_term,
+    // Académie — Enveloppes.
+    'enveloppes' => l10n.nav_envelopes,
+    'envelope_compte_courant' => l10n.nav_envelope_current_account,
+    'envelope_livret_a' => l10n.nav_envelope_livret_a,
+    'envelope_ldds' => l10n.nav_envelope_ldds,
+    'envelope_lep' => l10n.nav_envelope_lep,
+    'envelope_pel' => l10n.nav_envelope_pel,
+    'envelope_cto' => l10n.nav_envelope_cto,
+    'envelope_pea' => l10n.nav_envelope_pea,
+    'envelope_assurance_vie' => l10n.nav_envelope_life_insurance,
+    'envelope_contrat_capitalisation' =>
+        l10n.nav_envelope_capitalization_contract,
+    'envelope_pee_peg' => l10n.nav_envelope_pee_peg,
+    'envelope_per' => l10n.nav_envelope_per,
+    // Académie — Formation.
+    'formation' => l10n.nav_training,
+    'formation_bourse' => l10n.nav_training_stock_market,
+    'formation_metaux' => l10n.nav_training_precious_metals,
+    'formation_crypto' => l10n.nav_training_crypto,
+    'formation_immobilier' => l10n.nav_training_real_estate,
+    'formation_structuration' => l10n.nav_training_wealth_structuring,
+    // Pages hors sidebar.
+    'settings' => l10n.nav_settings,
+    _ => fallback,
+  };
+}
+
+/// Fil d'Ariane localisé de la page courante : chaque segment du parcours
+/// (parent → sous-page) est traduit via [navLocalizedLabel]. Retourne `['']`
+/// pour une clé inconnue, comme [navBreadcrumbForKey].
+List<String> navLocalizedBreadcrumb(AppLocalizations l10n, String key) {
+  return [
+    for (final k in navBreadcrumbKeysForKey(key)) navLocalizedLabel(l10n, k),
+  ];
+}
+
+/// Clés du fil d'Ariane de la page courante, du parent vers la feuille — la
+/// version "labels" de [navBreadcrumbForKey], pour résoudre la traduction au
+/// point d'affichage.
+List<String> navBreadcrumbKeysForKey(String key) {
+  final navItems = [
+    ...patrimoineGroup.items,
+    ...entitesGroup.items,
+    ...academieGroup.items,
+    ...outilsGroup.items,
+    ...patrimoineCategoryItems,
+  ];
+  for (final item in navItems) {
+    if (item.key == key) return [item.key];
+    for (final child in item.children) {
+      if (child.key == key) return [item.key, child.key];
+    }
+  }
+  return switch (key) {
+    'settings' => ['settings'],
+    _ => [''],
+  };
+}
+
+/// Titre localisé de la page sélectionnée (TopBar desktop). Pour un
+/// sous-item, c'est le libellé du parent qui sert de titre — retombe sur
+/// [navLabelForKey] par clé.
+String navLocalizedTitle(AppLocalizations l10n, String key) {
+  for (final group in [
+    patrimoineGroup,
+    entitesGroup,
+    academieGroup,
+    outilsGroup,
+  ]) {
+    for (final item in group.items) {
+      if (item.key == key) return navLocalizedLabel(l10n, item.key);
+      for (final child in item.children) {
+        if (child.key == key) return navLocalizedLabel(l10n, item.key);
+      }
+    }
+  }
+  return navLocalizedLabel(l10n, key);
+}

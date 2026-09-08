@@ -1,0 +1,181 @@
+import 'package:path/path.dart' as p;
+import '../../core/storage/vault_crypto.dart' show VaultCipher;
+import '../../core/storage/vault_session.dart';
+import '../../core/storage/vault_file_storage.dart';
+import '../../core/storage/vault_fs.dart';
+
+class StrategyNote {
+  final String id;
+  final String title;
+  final DateTime updatedAt;
+  final DateTime createdAt;
+
+  StrategyNote({
+    required this.id,
+    required this.title,
+    required this.updatedAt,
+    required this.createdAt,
+  });
+}
+
+class StrategyRepository {
+  final String vaultPath;
+  late final VaultFileStorage _storage;
+
+  StrategyRepository(this.vaultPath, {VaultCipher? cipher}) {
+    _storage = VaultFileStorage(
+      vaultPath: vaultPath,
+      cipher: cipher ?? VaultSession.current,
+    );
+  }
+
+  VaultDirectory get _dir => VaultDirectory(p.join(vaultPath, 'strategy'));
+  String _relativePathFor(String id) => p.join('strategy', '$id.md');
+
+  Future<void> _ensureDir() async {
+    try {
+      if (!await _dir.exists()) {
+        await _dir.create(recursive: true);
+      }
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('ERREUR création dossier strategy: $e');
+      // ignore: avoid_print
+      print(st);
+      rethrow;
+    }
+  }
+
+  /// Notes "modèle" créées au tout premier passage dans l'onglet
+  /// Stratégie, pour inciter un nouvel utilisateur à prendre des notes :
+  /// chacune ne contient qu'un emoji et un titre.
+  static const List<(String, String)> _templateNotes = [
+    ('👀', 'Watchlist'),
+    ('💡', 'Thèse d\'investissement'),
+    ('♟️', 'Stratégie'),
+    ('🎯', 'Objectifs'),
+    ('✅', 'Checklist'),
+  ];
+
+  String _titleFromMarkdown(String markdown) {
+    final firstLine = markdown
+        .split('\n')
+        .firstWhere((l) => l.trim().isNotEmpty, orElse: () => 'Nouvelle note');
+    return firstLine.replaceFirst(RegExp(r'^#+\s*'), '').trim().isEmpty
+        ? 'Nouvelle note'
+        : firstLine.replaceFirst(RegExp(r'^#+\s*'), '').trim();
+  }
+
+  /// Insère " (copie)" à la fin de la première ligne non vide (le titre,
+  /// voir [_titleFromMarkdown]) pour distinguer visuellement un duplicata de
+  /// son original dans la liste — voir [duplicateNote]. Le reste du contenu
+  /// n'est jamais modifié. Sans ligne non vide (note vide), retombe sur un
+  /// titre par défaut plutôt que de produire une note sans titre.
+  String _withCopySuffix(String markdown) {
+    final lines = markdown.split('\n');
+    final index = lines.indexWhere((l) => l.trim().isNotEmpty);
+    if (index == -1) return '# Nouvelle note (copie)\n';
+    lines[index] = '${lines[index].trimRight()} (copie)';
+    return lines.join('\n');
+  }
+
+  /// L'id est un timestamp de création (millisecondsSinceEpoch). On s'en sert
+  /// comme clé de tri stable, plutôt que la date de modification du fichier
+  /// (qui change à chaque autosave et ferait "sauter" les notes dans la liste).
+  DateTime _createdAtFromId(String id) {
+    final millis = int.tryParse(id);
+    return millis != null
+        ? DateTime.fromMillisecondsSinceEpoch(millis)
+        : DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  Future<List<StrategyNote>> listNotes() async {
+    await _ensureDir();
+    final files = (await _dir.list())
+        .where((e) => e is VaultFile && e.path.endsWith('.md'))
+        .cast<VaultFile>()
+        .toList();
+    final notes = <StrategyNote>[];
+    for (final f in files) {
+      final id = p.basenameWithoutExtension(f.path);
+      final content = await _storage.readString(_relativePathFor(id));
+      final stat = await f.stat();
+      notes.add(
+        StrategyNote(
+          id: id,
+          title: _titleFromMarkdown(content),
+          updatedAt: stat.modified,
+          createdAt: _createdAtFromId(id),
+        ),
+      );
+    }
+    // Tri stable : plus récent (par création) en haut, ne bouge pas au clic/édition.
+    notes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return notes;
+  }
+
+  Future<String> readNote(String id) async {
+    final relativePath = _relativePathFor(id);
+    if (!await _storage.exists(relativePath)) return '';
+    return _storage.readString(relativePath);
+  }
+
+  Future<void> writeNote(String id, String markdown) =>
+      _storage.writeString(_relativePathFor(id), markdown);
+
+  /// Crée les notes "modèle" au tout premier passage dans l'onglet
+  /// Stratégie, puis ne fait plus rien ensuite — même si l'utilisateur
+  /// supprime ensuite toutes ses notes (marqueur `.templates_created`
+  /// dans le dossier strategy). Retourne `true` si les notes ont été
+  /// créées, `false` si elles existent déjà.
+  Future<bool> createTemplatesIfFirstVisit() async {
+    await _ensureDir();
+    final marker = VaultFile(p.join(_dir.path, '.templates_created'));
+    if (await marker.exists()) return false;
+
+    // Plusieurs notes sont créées quasi dans la même milliseconde : on
+    // incrémente l'id (timestamp) pour garantir leur unicité.
+    final baseMillis = DateTime.now().millisecondsSinceEpoch;
+    for (var i = 0; i < _templateNotes.length; i++) {
+      final (emoji, title) = _templateNotes[i];
+      final id = (baseMillis + i).toString();
+      await writeNote(id, '# $emoji $title\n');
+    }
+    await marker.writeAsString(DateTime.now().toIso8601String());
+    return true;
+  }
+
+  Future<StrategyNote> createNote() async {
+    await _ensureDir();
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    await writeNote(id, '# Nouvelle note\n');
+    final now = DateTime.now();
+    return StrategyNote(
+      id: id,
+      title: 'Nouvelle note',
+      updatedAt: now,
+      createdAt: now,
+    );
+  }
+
+  /// Duplique le contenu de la note [id] dans une nouvelle note indépendante
+  /// (nouvel id, titre suffixé — voir [_withCopySuffix]) — l'appelant
+  /// (`StrategyScreen`) est responsable de reporter son éventuelle
+  /// affectation à un dossier, celle-ci vivant dans
+  /// `StrategyFoldersRepository`, hors de ce repository.
+  Future<StrategyNote> duplicateNote(String id) async {
+    await _ensureDir();
+    final duplicated = _withCopySuffix(await readNote(id));
+    final newId = DateTime.now().millisecondsSinceEpoch.toString();
+    await writeNote(newId, duplicated);
+    final now = DateTime.now();
+    return StrategyNote(
+      id: newId,
+      title: _titleFromMarkdown(duplicated),
+      updatedAt: now,
+      createdAt: now,
+    );
+  }
+
+  Future<void> deleteNote(String id) => _storage.delete(_relativePathFor(id));
+}

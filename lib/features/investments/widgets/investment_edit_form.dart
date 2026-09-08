@@ -1,0 +1,285 @@
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:opime/l10n/app_localizations.dart';
+import '../../../core/ui/frosted_card.dart';
+import '../../../core/ui/opime_date_picker.dart';
+import '../investment_identifier_field.dart';
+import '../investments_models.dart';
+import 'investment_classification_fields.dart';
+
+/// Champ(s) d'identification d'une nouvelle position — un bien immobilier
+/// n'a qu'un nom (pas d'identifiant), un actif à liste déroulante connue
+/// (métaux physiques, épargne en devise, crypto) n'a besoin que du champ
+/// identifiant (le libellé en découle automatiquement), tout le reste a
+/// besoin des deux : identifiant libre (ISIN...) et libellé séparé — voir
+/// [requiresLabelFieldFor]. Sans bouton propre : utilisé aussi bien pour
+/// créer un investissement seul (`account_detail_screen.dart`'s
+/// `_CreateInvestmentForm`) que pour créer une position en même temps que
+/// sa première transaction (`stock_account/add_transaction_dialog.dart`).
+class InvestmentIdentityFields extends StatelessWidget {
+  final AssetClass assetClass;
+  final AccountEnvelope? accountEnvelope;
+  final TextEditingController isinController;
+  final TextEditingController labelController;
+
+  const InvestmentIdentityFields({
+    super.key,
+    required this.assetClass,
+    this.accountEnvelope,
+    required this.isinController,
+    required this.labelController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (assetClass == AssetClass.immobilier) {
+      return TextField(
+        controller: labelController,
+        placeholder: shadcn.Text(l10n.investments_real_estate_name_hint),
+      );
+    }
+    if (!requiresLabelFieldFor(assetClass, accountEnvelope: accountEnvelope)) {
+      // Liste déroulante connue (métaux physiques, épargne en devise,
+      // crypto) : le libellé découle de la sélection, inutile de le
+      // demander séparément.
+      return InvestmentIdentifierField(
+        assetClass: assetClass,
+        accountEnvelope: accountEnvelope,
+        isinController: isinController,
+        labelController: labelController,
+      );
+    }
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: labelController,
+            placeholder: shadcn.Text(l10n.investments_label_hint_stocks),
+            // Le libellé d'abord, l'identifiant ensuite : on connaît
+            // généralement le nom d'un titre avant son ISIN, plus intuitif à
+            // saisir dans cet ordre.
+            autofocus: true,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: InvestmentIdentifierField(
+            assetClass: assetClass,
+            accountEnvelope: accountEnvelope,
+            isinController: isinController,
+            labelController: labelController,
+            autofocus: false,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Formulaire d'édition de l'identifiant et du libellé d'un investissement
+/// — mêmes champs que la création d'un investissement, remplis avec les
+/// valeurs actuelles. Utilisé par la page d'un investissement
+/// (`investment_detail_screen.dart`) et la popup de détail d'une position
+/// (`stock_account/position_detail_dialog.dart`).
+class InvestmentEditForm extends StatelessWidget {
+  final AssetClass assetClass;
+  final bool isImmobilier;
+  final AccountEnvelope? accountEnvelope;
+  final TextEditingController isinController;
+  final TextEditingController labelController;
+  final FundStyle? fundStyle;
+  final ValueChanged<FundStyle?> onFundStyleChanged;
+  final Sector? sector;
+  final ValueChanged<Sector?> onSectorChanged;
+  final List<SectorWeight> sectorBreakdown;
+  final ValueChanged<List<SectorWeight>> onSectorBreakdownChanged;
+  final String? countryCode;
+  final ValueChanged<String?> onCountryCodeChanged;
+  final List<CountryWeight> countryBreakdown;
+  final ValueChanged<List<CountryWeight>> onCountryBreakdownChanged;
+  final PrivateEquityKind? privateEquityKind;
+  final int? vestingCliffMonths;
+  final ValueChanged<int?> onVestingCliffMonthsChanged;
+  final int? vestingDurationMonths;
+  final ValueChanged<int?> onVestingDurationMonthsChanged;
+  final DateTime? exerciseDeadline;
+  final ValueChanged<DateTime?> onExerciseDeadlineChanged;
+  final VoidCallback onSave;
+  final VoidCallback onCancel;
+
+  const InvestmentEditForm({
+    super.key,
+    required this.assetClass,
+    this.isImmobilier = false,
+    this.accountEnvelope,
+    required this.isinController,
+    required this.labelController,
+    required this.fundStyle,
+    required this.onFundStyleChanged,
+    required this.sector,
+    required this.onSectorChanged,
+    this.sectorBreakdown = const [],
+    required this.onSectorBreakdownChanged,
+    required this.countryCode,
+    required this.onCountryCodeChanged,
+    this.countryBreakdown = const [],
+    required this.onCountryBreakdownChanged,
+    this.privateEquityKind,
+    this.vestingCliffMonths,
+    required this.onVestingCliffMonthsChanged,
+    this.vestingDurationMonths,
+    required this.onVestingDurationMonthsChanged,
+    this.exerciseDeadline,
+    required this.onExerciseDeadlineChanged,
+    required this.onSave,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return FrostedCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isImmobilier)
+              TextField(
+                controller: labelController,
+                placeholder: shadcn.Text(l10n.investments_real_estate_name_hint),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: labelController,
+                      placeholder: shadcn.Text(l10n.investments_label_hint_stocks),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: InvestmentIdentifierField(
+                      assetClass: assetClass,
+                      accountEnvelope: accountEnvelope,
+                      isinController: isinController,
+                      labelController: labelController,
+                      autofocus: false,
+                    ),
+                  ),
+                ],
+              ),
+            if (assetClass == AssetClass.actionsEtFonds) ...[
+              const SizedBox(height: 12),
+              // `Wrap` plutôt qu'un unique `Row` : avec les 3 classements
+              // manuels (style de gestion, secteur, pays — voir
+              // `Investment.fundStyle`/`sector`/`countryCode`), un `Row`
+              // seul déborderait sur les fenêtres étroites.
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Select<FundStyle>(
+                        value: fundStyle,
+                        placeholder: shadcn.Text(l10n.investments_fund_style_placeholder),
+                        onChanged: (style) {
+                          if (style != null) onFundStyleChanged(style);
+                        },
+                        itemBuilder: (context, style) =>
+                            shadcn.Text(style.label),
+                        popup: (context) => SelectPopup(
+                          items: SelectItemList(
+                            children: [
+                              for (final style in FundStyle.values)
+                                SelectItemButton(
+                                  value: style,
+                                  child: shadcn.Text(style.label),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (fundStyle != null) ...[
+                        const SizedBox(width: 4),
+                        IconButton.ghost(
+                          icon: const Icon(LucideIcons.x, size: 14),
+                          onPressed: () => onFundStyleChanged(null),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              InvestmentClassificationFields(
+                sector: sector,
+                onSectorChanged: onSectorChanged,
+                sectorBreakdown: sectorBreakdown,
+                onSectorBreakdownChanged: onSectorBreakdownChanged,
+                countryCode: countryCode,
+                onCountryCodeChanged: onCountryCodeChanged,
+                countryBreakdown: countryBreakdown,
+                onCountryBreakdownChanged: onCountryBreakdownChanged,
+              ),
+            ],
+            if (assetClass == AssetClass.privateEquity &&
+                privateEquityKind == PrivateEquityKind.actionsSalarie) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      initialValue: vestingCliffMonths?.toString() ?? '',
+                      placeholder: shadcn.Text(l10n.investments_vesting_cliff_hint),
+                      onChanged: (v) =>
+                          onVestingCliffMonthsChanged(int.tryParse(v.trim())),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      initialValue: vestingDurationMonths?.toString() ?? '',
+                      placeholder: shadcn.Text(
+                        l10n.investments_vesting_duration_hint,
+                      ),
+                      onChanged: (v) => onVestingDurationMonthsChanged(
+                        int.tryParse(v.trim()),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              OpimeDatePicker(
+                value: exerciseDeadline,
+                onChanged: onExerciseDeadlineChanged,
+                placeholder: shadcn.Text(
+                  l10n.investments_exercise_deadline_hint,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                PrimaryButton(
+                  onPressed: onSave,
+                  child: shadcn.Text(l10n.common_save),
+                ),
+                const SizedBox(width: 8),
+                OutlineButton(
+                  onPressed: onCancel,
+                  child: shadcn.Text(l10n.common_cancel),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://opime.vercel.app/sitemap.xml
