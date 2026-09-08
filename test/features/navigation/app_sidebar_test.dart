@@ -59,7 +59,6 @@ void main() {
             onToggleCollapse: () {},
             profileController: profileController,
             sidebarPrefsController: sidebarPrefsController,
-            assistantEnabled: true,
             vaultFolderService: VaultFolderService(),
             onVaultActivated: (_) async {},
             onNoVaultSelected: () {},

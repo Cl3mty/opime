@@ -26,9 +26,8 @@ class NotificationsController extends ChangeNotifier {
 
   DateTime? _lastSeen;
 
-  /// Nombre d'éléments plus récents que la dernière consultation — même
-  /// pattern que `AssistantChatController.unreadResponses`, pour que le
-  /// badge de la top bar ne se reconstruise que sur ce compteur, pas sur
+  /// Nombre d'éléments plus récents que la dernière consultation, pour que
+  /// le badge de la top bar ne se reconstruise que sur ce compteur, pas sur
   /// tout le controller.
   final ValueNotifier<int> unreadCount = ValueNotifier(0);
 

@@ -4,8 +4,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme_controller.dart';
 import '../../app/locale_controller.dart';
 import '../../l10n/app_localizations.dart';
-import '../../core/assistant/assistant_config_controller.dart';
-import '../../core/assistant/llm_provider.dart';
 import '../../core/notifications/notifications_settings_controller.dart';
 import '../../core/profiles/profile_controller.dart';
 import '../../core/profiles/profile_models.dart';
@@ -27,7 +25,6 @@ class SettingsScreen extends StatelessWidget {
   final VoidCallback onNoVaultSelected;
   final ThemeController themeController;
   final LocaleController localeController;
-  final AssistantConfigController assistantConfigController;
   final NotificationsSettingsController notificationsSettingsController;
   final KeyboardShortcutsController keyboardShortcutsController;
   final ProfileController profileController;
@@ -50,7 +47,6 @@ class SettingsScreen extends StatelessWidget {
     required this.onNoVaultSelected,
     required this.themeController,
     required this.localeController,
-    required this.assistantConfigController,
     required this.notificationsSettingsController,
     required this.keyboardShortcutsController,
     required this.profileController,
@@ -62,11 +58,9 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // L'Assistant IA n'a pas d'onglet en version mobile (voir
-    // nav_models.dart) et les raccourcis clavier supposent un clavier
-    // physique : les deux cartes n'ont pas d'équivalent utile en dessous du
-    // seuil desktop, donc on les masque plutôt que d'afficher des réglages
-    // sans effet.
+    // Les raccourcis clavier supposent un clavier physique : cette carte n'a
+    // pas d'équivalent utile en dessous du seuil desktop, donc on la masque
+    // plutôt que d'afficher des réglages sans effet.
     final isWide = isWideLayout(context);
     final l10n = AppLocalizations.of(context);
     return SingleChildScrollView(
@@ -83,10 +77,6 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _LanguageCard(localeController: localeController),
           const SizedBox(height: 16),
-          if (isWide) ...[
-            AssistantSettingsCard(configController: assistantConfigController),
-            const SizedBox(height: 16),
-          ],
           _NotificationsCard(configController: notificationsSettingsController),
           const SizedBox(height: 16),
           if (isWide) ...[
@@ -435,270 +425,6 @@ class _LanguageCard extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-/// Carte Réglages de l'assistant IA (activation, fournisseur, clé API ou
-/// adresse Ollama). Publique (contrairement aux autres cartes de cet écran)
-/// pour rester testable indépendamment du reste de [SettingsScreen] —
-/// certaines de ses cartes voisines (ex : `_VersionCard`) font de vrais
-/// appels réseau en `initState`, peu désirable dans un test ciblant
-/// uniquement la logique fournisseur/clé API de celle-ci.
-class AssistantSettingsCard extends StatefulWidget {
-  final AssistantConfigController configController;
-
-  const AssistantSettingsCard({super.key, required this.configController});
-
-  @override
-  State<AssistantSettingsCard> createState() => _AssistantSettingsCardState();
-}
-
-class _AssistantSettingsCardState extends State<AssistantSettingsCard> {
-  final _baseUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _baseUrlController.text = widget.configController.baseUrl;
-    _apiKeyController.text = _currentApiKey;
-    widget.configController.addListener(_onConfigChanged);
-  }
-
-  @override
-  void dispose() {
-    widget.configController.removeListener(_onConfigChanged);
-    _baseUrlController.dispose();
-    _apiKeyController.dispose();
-    super.dispose();
-  }
-
-  String get _currentApiKey =>
-      widget.configController.apiKeyFor(widget.configController.provider) ??
-      '';
-
-  void _onConfigChanged() {
-    // Synchronise le champ d'adresse si une autre source (écran assistant,
-    // restauration...) a changé la base URL sans passer par cette carte.
-    final baseUrl = widget.configController.baseUrl;
-    if (baseUrl != _baseUrlController.text) {
-      _baseUrlController.text = baseUrl;
-    }
-    // Idem pour la clé API — resynchronisée aussi quand l'utilisateur
-    // bascule de fournisseur, puisque chacun a la sienne.
-    final apiKey = _currentApiKey;
-    if (apiKey != _apiKeyController.text) {
-      _apiKeyController.text = apiKey;
-    }
-    if (!mounted) return;
-    setState(() {});
-  }
-
-  Future<void> _resetBaseUrl() async {
-    await widget.configController.setBaseUrl(
-      AssistantConfigController.defaultBaseUrl,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.configController,
-      builder: (context, _) {
-        final enabled = widget.configController.enabled;
-        final provider = widget.configController.provider;
-        final l10n = AppLocalizations.of(context);
-        return FrostedCard(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      LucideIcons.bot,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(l10n.settings_assistant).large().medium()),
-                    Switch(
-                      value: enabled,
-                      onChanged: (value) =>
-                          widget.configController.setEnabled(value),
-                    ),
-                  ],
-                ),
-                if (enabled) ...[
-                  const SizedBox(height: 8),
-                  Text(_descriptionFor(context, provider)).muted().small(),
-                  const SizedBox(height: 16),
-                  _buildProviderSelector(context, provider),
-                  const SizedBox(height: 12),
-                  if (provider == LlmProvider.ollama)
-                    _buildBaseUrlField(context)
-                  else
-                    _buildApiKeyField(context, provider),
-                  if (provider.isCloud) ...[
-                    const SizedBox(height: 12),
-                    _buildCloudWarning(context, provider),
-                  ],
-                  const SizedBox(height: 12),
-                  _buildContextCheckbox(context),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  String _descriptionFor(BuildContext context, LlmProvider provider) {
-    final l10n = AppLocalizations.of(context);
-    if (provider == LlmProvider.ollama) {
-      return l10n.settings_ollama_description;
-    }
-    return l10n.settings_cloud_description(provider.label);
-  }
-
-  Widget _buildProviderSelector(BuildContext context, LlmProvider provider) {
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(l10n.settings_provider).medium(),
-        const SizedBox(height: 6),
-        Select<LlmProvider>(
-          value: provider,
-          onChanged: (value) {
-            if (value != null) widget.configController.setProvider(value);
-          },
-          itemBuilder: (context, value) => Text(value.label),
-          popup: (context) => SelectPopup(
-            items: SelectItemList(
-              children: [
-                for (final p in LlmProvider.values)
-                  SelectItemButton(value: p, child: Text(p.label)),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBaseUrlField(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(child: Text(l10n.settings_ollama_address).medium()),
-            Tooltip(
-              // ignore: implicit_call_tearoffs
-              tooltip: TooltipContainer(
-                child: Text(l10n.settings_ollama_reset_default),
-              ),
-              child: IconButton.ghost(
-                icon: const Icon(LucideIcons.rotateCcw, size: 16),
-                onPressed: _resetBaseUrl,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _baseUrlController,
-          onChanged: (value) => widget.configController.setBaseUrl(value),
-          placeholder: const Text('http://localhost:11434'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildApiKeyField(BuildContext context, LlmProvider provider) {
-    final l10n = AppLocalizations.of(context);
-    final error = widget.configController.apiKeyError;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(l10n.settings_api_key(provider.label)).medium(),
-        const SizedBox(height: 6),
-        TextField(
-          key: ValueKey(provider),
-          controller: _apiKeyController,
-          obscureText: true,
-          features: const [InputFeature.passwordToggle()],
-          placeholder: Text(l10n.settings_api_key_placeholder),
-          onChanged: (value) =>
-              widget.configController.setApiKeyFor(provider, value),
-        ),
-        if (error != null) ...[
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                LucideIcons.triangleAlert,
-                size: 14,
-                color: Theme.of(context).colorScheme.destructive,
-              ),
-              const SizedBox(width: 6),
-              Expanded(child: Text(error).small()),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildCloudWarning(BuildContext context, LlmProvider provider) {
-    final theme = Theme.of(context);
-    final includesPatrimoine = widget.configController.includePatrimoine;
-    final l10n = AppLocalizations.of(context);
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.destructive.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            LucideIcons.triangleAlert,
-            size: 16,
-            color: theme.colorScheme.destructive,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              l10n.settings_cloud_warning(
-                provider.label,
-                includesPatrimoine
-                    ? l10n.settings_cloud_include_patrimoine
-                    : '',
-              ),
-            ).small(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContextCheckbox(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Checkbox(
-      state: widget.configController.includePatrimoine
-          ? CheckboxState.checked
-          : CheckboxState.unchecked,
-      onChanged: (state) => widget.configController.setIncludePatrimoine(
-        state == CheckboxState.checked,
-      ),
-      trailing: Text(l10n.settings_include_patrimoine_context).small(),
     );
   }
 }

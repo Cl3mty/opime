@@ -4,8 +4,6 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_localizations/flutter_localizations.dart' as fl;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:window_manager/window_manager.dart';
-import 'core/assistant/assistant_chat_controller.dart';
-import 'core/assistant/assistant_config_controller.dart';
 import 'core/notifications/notifications_settings_controller.dart';
 import 'core/privacy/amount_visibility_controller.dart';
 import 'core/shortcuts/app_shortcuts.dart';
@@ -27,9 +25,9 @@ import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/vault_migration_interrupted_screen.dart';
 import 'features/onboarding/vault_recovery_screen.dart';
 import 'features/onboarding/vault_unlock_screen.dart';
+import 'features/assistant/assistant_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/tax_parameters_screen.dart';
-import 'features/assistant/assistant_screen.dart';
 import 'app/theme_controller.dart';
 import 'app/locale_controller.dart';
 import 'l10n/app_localizations.dart';
@@ -141,7 +139,6 @@ class _OpimeAppState extends State<OpimeApp> {
   final _localeController = LocaleController();
   final _amountVisibilityController = AmountVisibilityController();
   final _keyboardShortcutsController = KeyboardShortcutsController();
-  final _assistantConfigController = AssistantConfigController();
   final _notificationsSettingsController = NotificationsSettingsController();
   final _notificationsController = NotificationsController();
   final _patrimoineRefreshController = PatrimoineRefreshController();
@@ -202,9 +199,9 @@ class _OpimeAppState extends State<OpimeApp> {
   /// seul ne suffit PAS à distinguer deux coffres-forts distincts (voir la
   /// doc de tête de `VaultSession.vaultId`) : cet id sert de complément
   /// fiable partout où il faut détecter un VRAI changement de coffre-fort
-  /// (invalidation de [VaultSession], portée de l'assistant/des
-  /// notifications dans [_recreateAssistantChat]/[_refreshNotificationsIfNeeded],
-  /// et [_activeDataKey] pour les `ValueKey` des pages de [_buildHome]).
+  /// (invalidation de [VaultSession], portée des notifications dans
+  /// [_refreshNotificationsIfNeeded], et [_activeDataKey] pour les
+  /// `ValueKey` des pages de [_buildHome]).
   String? _activeVaultId;
 
   /// Identifiant combiné coffre-fort + profil actif, unique même sur le
@@ -245,26 +242,12 @@ class _OpimeAppState extends State<OpimeApp> {
   /// mot de passe) depuis l'écran de déverrouillage classique.
   bool _showingVaultRecovery = false;
 
-  /// Conversation avec l'assistant : vit ici (et non dans l'écran) pour
-  /// que les réponses continuent en arrière-plan quand on navigue ailleurs.
-  /// Recréé quand le contexte change (vault ou profil actif), ce qui coupe
-  /// proprement les requêtes en cours — d'où le toast d'interruption.
-  AssistantChatController? _assistantChatController;
-
-  /// Clé de contexte du controller courant : `vaultId|vaultPath|profileId`
-  /// (voir [_activeVaultId] pour pourquoi l'id est nécessaire en plus du
-  /// chemin). Quand elle change, la conversation est remise à zéro (données
-  /// d'un autre profil = autre conversation).
-  String? _assistantChatScope;
-
   /// Clé de contexte du dernier rafraîchissement des notifications
-  /// (`vaultId|vaultPath|profileId`) — même rôle que [_assistantChatScope],
-  /// pour ne relancer un rafraîchissement que quand le profil/vault a réellement
-  /// changé.
+  /// (`vaultId|vaultPath|profileId`), pour ne relancer un rafraîchissement
+  /// que quand le profil/vault a réellement changé.
   String? _notificationsScope;
 
   void _handleProfileControllerChanged() {
-    _recreateAssistantChat();
     _refreshNotificationsIfNeeded();
     if (mounted) setState(() {});
   }
@@ -299,43 +282,6 @@ class _OpimeAppState extends State<OpimeApp> {
     }
   }
 
-  /// (Re)crée le controller de chat quand le vault ou le profil actif a
-  /// changé. L'ancien est disposé (requêtes annulées) et, si une réponse
-  /// était en cours, un toast prévient l'utilisateur qu'elle a été coupée.
-  void _recreateAssistantChat() {
-    final profile = _profileController;
-    if (profile == null || profile.active == null) return;
-    final scope = '$_activeVaultId|$_vaultPath|${profile.active!.id}';
-    if (scope == _assistantChatScope) return;
-
-    final old = _assistantChatController;
-    final wasBusy = old?.busy ?? false;
-    old?.dispose();
-    _assistantChatScope = scope;
-    _assistantChatController = AssistantChatController(
-      config: _assistantConfigController,
-      activeDataPath: () => profile.activeDataPath,
-    );
-    if (wasBusy && mounted) {
-      // Le changement de contexte (vault/profil) coupe les réponses en
-      // cours : on le signale plutôt que de laisser l'utilisateur croire
-      // qu'elles arrivent encore.
-      showToast(
-        context: context,
-        location: ToastLocation.bottomRight,
-        builder: (context, overlay) => SurfaceCard(
-          child: Basic(
-            leading: const Icon(LucideIcons.circlePause, size: 18),
-            title: Text(AppLocalizations.of(context).shell_response_interrupted),
-            subtitle: Text(
-              AppLocalizations.of(context).shell_response_interrupted_subtitle,
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -350,7 +296,6 @@ class _OpimeAppState extends State<OpimeApp> {
     // valeur ne serait relue qu'au prochain rebuild déclenché par autre
     // chose.
     _keyboardShortcutsController.addListener(() => setState(() {}));
-    _assistantConfigController.load();
     _notificationsSettingsController.load();
     _notificationsSettingsController.addListener(
       _onNotificationsSettingsChanged,
@@ -506,7 +451,6 @@ class _OpimeAppState extends State<OpimeApp> {
       _profileController = controller;
       _sidebarPrefsController = sidebarPrefs;
     });
-    _recreateAssistantChat();
     _refreshNotificationsIfNeeded();
   }
 
@@ -566,9 +510,6 @@ class _OpimeAppState extends State<OpimeApp> {
   void _resetVault() {
     _profileController?.removeListener(_handleProfileControllerChanged);
     _profileController?.dispose();
-    _assistantChatController?.dispose();
-    _assistantChatController = null;
-    _assistantChatScope = null;
     _notificationsScope = null;
     VaultSession.current = null;
     VaultSession.vaultPath = null;
@@ -874,8 +815,6 @@ class _OpimeAppState extends State<OpimeApp> {
             currentAccountFocusController: _currentAccountFocusController,
             onboardingHighlightController: _onboardingHighlightController,
             priceSyncStatusController: _priceSyncStatusController,
-            assistantConfigController: _assistantConfigController,
-            assistantChatController: _assistantChatController!,
             notificationsSettingsController: _notificationsSettingsController,
             notificationsController: _notificationsController,
             sidebarCollapsed: _sidebarCollapsed,
@@ -892,43 +831,38 @@ class _OpimeAppState extends State<OpimeApp> {
                 onboardingHighlight: _onboardingHighlightController,
                 profileName: _profileController!.active?.name ?? '',
               ),
-              // Analyses/Projets/Entités : réservés à Opime Premium dans
-              // cette édition gratuite (voir `core/premium/premium_lock
-              // .dart`) — la vraie page reste construite, mais figée
-              // derrière un aperçu verrouillé (`LockedFeatureScreen`).
+              // Analyses/Projets : réservés à Opime Premium dans cette
+              // édition gratuite (voir `core/premium/premium_lock.dart`) —
+              // leur vrai code ne vit pas dans ce dépôt public, seul un
+              // aperçu illustratif (mockup, données factices) est construit
+              // ici, lui-même figé derrière `LockedFeatureScreen`.
               'analyses': (context) => LockedFeatureScreen(
                 title: 'Analyses',
                 description:
                     'Graphiques de répartition et de performance avancés : '
                     'réservés à Opime Premium.',
-                pageBuilder: (_) => AnalysesScreen(
-                  key: ValueKey(_activeDataKey),
-                  vaultPath: _profileController!.activeDataPath,
-                  amountVisibility: _amountVisibilityController,
-                ),
+                pageBuilder: (_) => const AnalysesScreen(),
               ),
               'projets': (context) => LockedFeatureScreen(
                 title: 'Projets',
                 description:
                     'Suivi d\'objectifs financiers chiffrés dans le temps : '
                     'réservé à Opime Premium.',
-                pageBuilder: (_) => ProjectsScreen(
-                  key: ValueKey(_activeDataKey),
-                  vaultPath: _profileController!.activeDataPath,
-                ),
+                pageBuilder: (_) => const ProjectsScreen(),
               ),
+              // Entités : la gestion (création/édition/organigramme) ne vit
+              // pas dans ce dépôt public — voir `core/premium/premium_lock
+              // .dart`. Le modèle de données et la vue en lecture d'une
+              // entité restent en revanche partagés avec le Dashboard
+              // gratuit (aucune distinction personnel/professionnel de
+              // coffre-fort n'existe à ce niveau, voir `entity_detail
+              // _screen.dart`).
               'entites': (context) => LockedFeatureScreen(
                 title: 'Entités',
                 description:
                     'Gestion des holdings, sociétés commerciales et SCI '
                     '(comptes professionnels) : réservée à Opime Premium.',
-                pageBuilder: (_) => EntitiesScreen(
-                  key: ValueKey(_activeDataKey),
-                  vaultPath: _profileController!.activeDataPath,
-                  amountVisibility: _amountVisibilityController,
-                  patrimoineRefreshController: _patrimoineRefreshController,
-                  profileName: _profileController!.active?.name ?? '',
-                ),
+                pageBuilder: (_) => const EntitiesScreen(),
               ),
               for (final assetClass in AssetClass.values)
                 assetClass.categoryId: (_) => RealCategoryDetailScreen(
@@ -962,16 +896,14 @@ class _OpimeAppState extends State<OpimeApp> {
                 ),
               // Formation (Académie > Formation) : réservée à Opime Premium
               // — Fondamentaux et Enveloppes (au-dessus) restent gratuits.
+              // Le vrai contenu des leçons ne vit pas dans ce dépôt public,
+              // seul un aperçu illustratif (mockup) est construit ici.
               for (final track in formationTracks)
                 track.id: (context) => LockedFeatureScreen(
                   title: track.title,
                   description:
                       'Ce parcours de formation est réservé à Opime Premium.',
-                  pageBuilder: (_) => FormationTrackScreen(
-                    key: ValueKey('${_activeDataKey}_${track.id}'),
-                    vaultPath: _profileController!.activeDataPath,
-                    track: track,
-                  ),
+                  pageBuilder: (_) => FormationTrackScreen(track: track),
                 ),
               'strategie': (_) => StrategyScreen(
                 key: ValueKey(_activeDataKey),
@@ -1007,16 +939,15 @@ class _OpimeAppState extends State<OpimeApp> {
                 vaultPath: _profileController!.activeDataPath,
                 amountVisibility: _amountVisibilityController,
               ),
+              // Assistant IA : le vrai client LLM/contexte financier ne vit
+              // pas dans ce dépôt public — voir `core/premium/premium_lock
+              // .dart`. Un aperçu illustratif (mockup) est construit ici.
               'assistant': (context) => LockedFeatureScreen(
                 title: 'Assistant IA',
                 description:
                     'L\'assistant conversationnel sur votre patrimoine est '
                     'réservé à Opime Premium.',
-                pageBuilder: (_) => AssistantScreen(
-                  key: ValueKey('assistant_$_activeDataKey'),
-                  configController: _assistantConfigController,
-                  chatController: _assistantChatController!,
-                ),
+                pageBuilder: (_) => const AssistantScreen(),
               ),
               'settings': (_) => SettingsScreen(
                 key: ValueKey(_activeDataKey),
@@ -1025,7 +956,6 @@ class _OpimeAppState extends State<OpimeApp> {
                 onNoVaultSelected: _resetVault,
                 themeController: _themeController,
                 localeController: _localeController,
-                assistantConfigController: _assistantConfigController,
                 notificationsSettingsController:
                     _notificationsSettingsController,
                 keyboardShortcutsController: _keyboardShortcutsController,

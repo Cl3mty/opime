@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Réglage device-local de la fonctionnalité "Actualités" (actualités
 /// Yahoo Finance pour les actions/ETF détenus, alertes de variation de prix
 /// CoinGecko pour les cryptos détenues) — même pattern que
-/// [ThemeController]/[AssistantConfigController] : un `ChangeNotifier`
+/// `ThemeController` : un `ChangeNotifier`
 /// chargé au démarrage et ré-écrit dans `shared_preferences` à chaque
 /// modification. Préférence device-local (comme le thème), pas une donnée
 /// de domaine liée à un vault, donc pas de fichier JSON du vault ici.

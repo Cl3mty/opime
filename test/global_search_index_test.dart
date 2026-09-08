@@ -18,11 +18,19 @@ void main() {
     final entries = await GlobalSearchIndex.build(vaultPath: tempDir.path);
     final categories = entries.map((e) => e.category).toSet();
     // Le patrimoine réel est vide sur un vault sans comptes : toutes les
-    // autres catégories (contenu statique) sont présentes.
+    // autres catégories (contenu statique) sont présentes — sauf Formation
+    // (Opime Premium, sans contenu réel dans cette édition gratuite, voir
+    // `features/academy/formation_data.dart`) et Vocabulaire (glossaire
+    // alimenté uniquement par les leçons de Formation dans ce dépôt).
     expect(
       categories,
       containsAll(
-        SearchCategory.values.where((c) => c != SearchCategory.patrimoine),
+        SearchCategory.values.where(
+          (c) =>
+              c != SearchCategory.patrimoine &&
+              c != SearchCategory.formation &&
+              c != SearchCategory.vocabulaire,
+        ),
       ),
     );
   });
@@ -40,28 +48,18 @@ void main() {
     );
   });
 
-  test('terme du glossaire retrouvable par sa définition', () async {
-    final entries = await GlobalSearchIndex.build(vaultPath: tempDir.path);
-    // "spread" est un terme du vocabulaire de la formation Bourse
-    final spread = GlobalSearchIndex.search(entries, 'spread');
-    expect(
-      spread.any((e) => e.category == SearchCategory.vocabulaire),
-      isTrue,
-    );
-  });
-
-  test('SCPI trouvée dans la formation et l\'enveloppe', () async {
-    final entries = await GlobalSearchIndex.build(vaultPath: tempDir.path);
-    final scpi = GlobalSearchIndex.search(entries, 'scpi');
-    expect(scpi, isNotEmpty);
-    expect(
-      scpi.any(
-        (e) =>
-            e.category == SearchCategory.formation && e.title.contains('SCPI'),
-      ),
-      isTrue,
-    );
-  });
+  test(
+    'le glossaire (Vocabulaire) est vide : son seul contenu était les '
+    'leçons de Formation (Opime Premium), absentes de cette édition '
+    'gratuite',
+    () async {
+      final entries = await GlobalSearchIndex.build(vaultPath: tempDir.path);
+      expect(
+        entries.where((e) => e.category == SearchCategory.vocabulaire),
+        isEmpty,
+      );
+    },
+  );
 
   test('champ patrimoine réel indexé', () async {
     final vault = Directory(tempDir.path);

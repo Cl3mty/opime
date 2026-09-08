@@ -3,7 +3,6 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 import '../../core/academy/academy_models.dart';
 import '../../l10n/app_localizations.dart';
 import '../academy/envelopes_data.dart';
-import '../academy/formation_data.dart';
 import '../academy/investissement_data.dart';
 import '../investments/investments_models.dart';
 import '../investments/investments_repository.dart';
@@ -100,7 +99,6 @@ class GlobalSearchIndex {
       ..._pageEntries(),
       ..._fondamentauxEntries(),
       ..._enveloppeEntries(),
-      ..._formationEntries(),
       ..._vocabulaireEntries(),
       ...await _patrimoineEntries(vaultPath),
     ];
@@ -214,34 +212,15 @@ class GlobalSearchIndex {
     ];
   }
 
-  /// Pas de la Formation : chaque pas navigue vers le parcours qui le
-  /// contient ([AcademyTrack.id], la seule page réelle du module).
-  static List<SearchEntry> _formationEntries() {
-    return [
-      for (final track in formationTracks)
-        for (final step in track.steps)
-          SearchEntry(
-            key: track.id,
-            category: SearchCategory.formation,
-            title: step.title,
-            subtitle: track.title,
-            icon: track.icon,
-            extra: _stepText(step),
-          ),
-    ];
-  }
-
-  /// Termes du glossaire expliqués dans les leçons (Fondamentaux et
-  /// Formation) : le sous-titre rappelle la leçon d'origine, [extra] porte
-  /// la définition pour la recherche.
+  /// Termes du glossaire expliqués dans les leçons Fondamentaux. La
+  /// Formation (Opime Premium) n'a pas de contenu réel dans cette édition
+  /// gratuite — voir `features/academy/formation_data.dart` — donc rien à
+  /// indexer pour elle.
   static List<SearchEntry> _vocabulaireEntries() {
     return [
       // Les cartes Fondamentaux sont des leçons autonomes : le terme navigue
       // vers la carte elle-même.
       ..._vocabFor(investissementCards, targetKey: (step) => step.id),
-      // Les pas de la Formation naviguent vers le parcours porteur.
-      for (final track in formationTracks)
-        ..._vocabFor(track.steps, targetKey: (_) => track.id),
     ];
   }
 

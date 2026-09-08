@@ -33,7 +33,7 @@ A few features are reserved for **[Opime Premium](https://opime.vercel.app)**:
 - **Assistant IA** (conversational assistant on your own data)
 - **Académie > Formation** (guided courses on stocks, crypto, real estate, wealth structuring)
 
-Those tabs stay visible in the navigation, greyed out — clicking one shows a frozen, non-interactive preview of the real screen (see `lib/core/premium/locked_feature_screen.dart`) so you know exactly what you'd get, with a link to upgrade.
+Those tabs stay visible in the navigation, greyed out — clicking one shows a frozen, non-interactive illustrative preview (see `lib/core/premium/locked_feature_screen.dart`) so you get an idea of the feature, with a link to upgrade. The real implementation of these features isn't part of this open-source repo — only Opime Premium has it.
 
 ---
 

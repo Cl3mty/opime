@@ -1,7 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:opime/l10n/app_localizations.dart';
-import '../core/assistant/assistant_chat_controller.dart';
-import '../core/assistant/assistant_config_controller.dart';
 import '../core/notifications/notifications_settings_controller.dart';
 import '../core/privacy/amount_visibility_controller.dart';
 import '../core/profiles/profile_controller.dart';
@@ -73,8 +71,6 @@ class AppShell extends StatefulWidget {
   final CurrentAccountFocusController currentAccountFocusController;
   final OnboardingHighlightController onboardingHighlightController;
   final PriceSyncStatusController priceSyncStatusController;
-  final AssistantConfigController assistantConfigController;
-  final AssistantChatController assistantChatController;
   final NotificationsSettingsController notificationsSettingsController;
   final NotificationsController notificationsController;
   final Map<String, WidgetBuilder> pages;
@@ -106,8 +102,6 @@ class AppShell extends StatefulWidget {
     required this.currentAccountFocusController,
     required this.onboardingHighlightController,
     required this.priceSyncStatusController,
-    required this.assistantConfigController,
-    required this.assistantChatController,
     required this.notificationsSettingsController,
     required this.notificationsController,
     required this.pages,
@@ -124,7 +118,6 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   String _selectedKey = 'dashboard';
   int _dashboardEpoch = 0;
-  bool _lastAssistantEnabled = false;
 
   /// Pile des pages visitées avant la page courante (desktop uniquement,
   /// voir [_select]) — alimente le chevron retour tout à gauche de la
@@ -157,7 +150,6 @@ class _AppShellState extends State<AppShell> {
       // pour revenir à sa racine sur un reclic de la sidebar.
       if (key == 'dashboard') _dashboardEpoch++;
     });
-    _onAssistantVisibilityChanged();
   }
 
   /// Retire la dernière page de [_pageHistory] et y revient — SANS empiler
@@ -172,28 +164,12 @@ class _AppShellState extends State<AppShell> {
       _mobileShowingHub = false;
       if (_selectedKey == 'dashboard') _dashboardEpoch++;
     });
-    _onAssistantVisibilityChanged();
-  }
-
-  /// Synchronise le controller de chat avec la visibilité de la page
-  /// Assistant : ouverte, les réponses qui s'y terminent ne comptent pas
-  /// comme « non lues » (et le compteur repart à zéro).
-  void _onAssistantVisibilityChanged() {
-    final chat = widget.assistantChatController;
-    chat.assistantVisible = _selectedKey == 'assistant';
-    if (chat.assistantVisible) chat.markAllRead();
   }
 
   @override
   void initState() {
     super.initState();
-    _lastAssistantEnabled = widget.assistantConfigController.enabled;
-    widget.assistantConfigController.addListener(_onAssistantConfigChanged);
-    widget.assistantChatController.unreadResponses.addListener(
-      _onAssistantUnreadChanged,
-    );
     widget.sidebarCollapsed.addListener(_onSidebarCollapsedChanged);
-    _onAssistantVisibilityChanged();
   }
 
   /// Le raccourci clavier ⌘B (posé à la racine de l'app, voir `main.dart`)
@@ -204,79 +180,9 @@ class _AppShellState extends State<AppShell> {
   }
 
   @override
-  void didUpdateWidget(covariant AppShell oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.assistantChatController != widget.assistantChatController) {
-      oldWidget.assistantChatController.unreadResponses.removeListener(
-        _onAssistantUnreadChanged,
-      );
-      widget.assistantChatController.unreadResponses.addListener(
-        _onAssistantUnreadChanged,
-      );
-      _onAssistantVisibilityChanged();
-    }
-  }
-
-  @override
   void dispose() {
-    widget.assistantConfigController.removeListener(_onAssistantConfigChanged);
-    widget.assistantChatController.unreadResponses.removeListener(
-      _onAssistantUnreadChanged,
-    );
     widget.sidebarCollapsed.removeListener(_onSidebarCollapsedChanged);
     super.dispose();
-  }
-
-  /// Signal de fin d'une réponse générée hors de la page Assistant : un
-  /// toast propose de revenir au chat (le badge de la sidebar reste, lui,
-  /// jusqu'à l'ouverture de la page).
-  void _onAssistantUnreadChanged() {
-    if (!mounted) return;
-    final unread = widget.assistantChatController.unreadResponses.value;
-    if (unread == 0 || _selectedKey == 'assistant') return;
-    final l10n = AppLocalizations.of(context);
-    showToast(
-      context: context,
-      location: ToastLocation.bottomRight,
-      builder: (context, overlay) => SurfaceCard(
-        child: Basic(
-          leading: const Icon(LucideIcons.bot, size: 18),
-          title: Text(l10n.shell_assistant_response_ready),
-          subtitle: Text(
-            unread > 1
-                ? l10n.shell_responses_pending(unread)
-                : l10n.shell_one_response_ready,
-          ),
-          trailing: PrimaryButton(
-            onPressed: () {
-              overlay.close();
-              _select('assistant');
-            },
-            child: Text(l10n.common_see),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onAssistantConfigChanged() {
-    if (!mounted) return;
-    final enabled = widget.assistantConfigController.enabled;
-    // Seule l'activation conditionne sidebar/TopBar : pas de rebuild du
-    // shell à chaque changement sans rapport (saisie de l'adresse, choix du
-    // modèle dans l'écran assistant...).
-    if (enabled == _lastAssistantEnabled && _selectedKey != 'assistant') {
-      return;
-    }
-    setState(() {
-      _lastAssistantEnabled = enabled;
-      // L'assistant désactivé dans les Réglages ne doit plus être
-      // accessible : si c'est justement la page affichée, on revient au
-      // tableau de bord.
-      if (!enabled && _selectedKey == 'assistant') {
-        _selectedKey = 'dashboard';
-      }
-    });
   }
 
   _MobileTab get _currentMobileTab =>
@@ -410,8 +316,6 @@ class _AppShellState extends State<AppShell> {
               widget.sidebarCollapsed.value = !widget.sidebarCollapsed.value,
           profileController: widget.profileController,
           sidebarPrefsController: widget.sidebarPrefsController,
-          assistantEnabled: widget.assistantConfigController.enabled,
-          assistantUnread: widget.assistantChatController.unreadResponses,
           vaultFolderService: widget.vaultFolderService,
           onVaultActivated: widget.onVaultActivated,
           onNoVaultSelected: widget.onNoVaultSelected,

@@ -23,9 +23,8 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// `DashboardScreen`/`_RealDashboard` fait bien de la vraie E/S disque dans
 /// `initState` (`InvestmentsRepository.listAll`, `LiabilitiesRepository
-/// .listAll`, `loadAllPriceHistories`) — même motif déjà éprouvé pour
-/// `AnalysesScreen` (`test/features/analyses/analyses_screen_test.dart`,
-/// repris ici à l'identique) : `tester.runAsync` pour driver ces vraies E/S,
+/// .listAll`, `loadAllPriceHistories`) : `tester.runAsync` pour driver ces
+/// vraies E/S,
 /// `pumpWidget` restant dans la MÊME zone `runAsync` que la boucle de
 /// sondage qui l'attend (sinon la continuation reste suspendue
 /// indéfiniment dans la zone fake-async du test, piège documenté ailleurs

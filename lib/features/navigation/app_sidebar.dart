@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
 import '../../core/platform_info.dart';
@@ -21,16 +20,6 @@ class AppSidebar extends StatelessWidget {
   final Future<void> Function(String path) onVaultActivated;
   final VoidCallback onNoVaultSelected;
 
-  /// L'assistant est-il activé dans les Réglages ? Si non, son item est
-  /// retiré du groupe Outils sur desktop.
-  final bool assistantEnabled;
-
-  /// Nombre de réponses de l'assistant générées pendant qu'on était ailleurs
-  /// (« non lues »), affiché en badge sur l'item Assistant. `ValueListenable`
-  /// pour ne re-rendre la sidebar que quand le compteur bouge (une fois par
-  /// réponse, pas à chaque token du streaming).
-  final ValueListenable<int>? assistantUnread;
-
   const AppSidebar({
     super.key,
     required this.selectedKey,
@@ -39,8 +28,6 @@ class AppSidebar extends StatelessWidget {
     required this.onToggleCollapse,
     required this.profileController,
     required this.sidebarPrefsController,
-    required this.assistantEnabled,
-    this.assistantUnread,
     required this.vaultFolderService,
     required this.onVaultActivated,
     required this.onNoVaultSelected,
@@ -98,32 +85,7 @@ class AppSidebar extends StatelessWidget {
     final locked = isPremiumLocked(item.key);
     final mutedColor = theme.colorScheme.mutedForeground;
     final label = shadcn.Text(itemLabel, style: locked ? TextStyle(color: mutedColor) : null);
-    // Badge « réponses non lues » sur l'item Assistant : une pastille
-    // numérique dans la version étendue, une simple pastille pleine dans la
-    // version réduite (le libellé n'y est pas affiché, l'icône non plus si
-    // on ne l'habillait pas).
-    final unread =
-        item.key == 'assistant' ? (assistantUnread?.value ?? 0) : 0;
-    final icon = unread > 0
-        ? Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Icon(item.icon),
-              Positioned(
-                right: -7,
-                top: -6,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          )
-        : Icon(item.icon, color: locked ? mutedColor : null);
+    final icon = Icon(item.icon, color: locked ? mutedColor : null);
 
     return _withTooltip(
       locked ? '$itemLabel — réservé à Opime Premium' : itemLabel,
@@ -135,17 +97,6 @@ class AppSidebar extends StatelessWidget {
             if (locked) ...[
               const SizedBox(width: 6),
               Icon(LucideIcons.lock, size: 12, color: mutedColor),
-            ],
-            if (unread > 0) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: shadcn.Text('$unread').small,
-              ),
             ],
           ],
         ),
@@ -317,11 +268,7 @@ class AppSidebar extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     return AnimatedBuilder(
-      animation: Listenable.merge([
-        profileController,
-        sidebarPrefsController,
-        if (assistantUnread != null) assistantUnread,
-      ]),
+      animation: Listenable.merge([profileController, sidebarPrefsController]),
       builder: (context, _) {
         final active = profileController.active;
         final hiddenKeys = active != null
@@ -417,22 +364,14 @@ class AppSidebar extends StatelessWidget {
             const NavigationDivider(),
             _buildGroup(context, academieGroup, hiddenKeys),
             const NavigationDivider(),
-            // L'Assistant est réservé au desktop, y compris sur tablette
-            // (où la largeur d'écran déclenche par ailleurs cette même
-            // sidebar) : toolsTabItems l'exclut déjà pour la navigation
-            // mobile. Sur desktop, il n'apparaît que si l'assistant est
-            // activé dans les Réglages (assistantEnabled).
+            // L'Assistant (verrouillé, voir `premium_lock.dart`) est réservé
+            // au desktop, y compris sur tablette (où la largeur d'écran
+            // déclenche par ailleurs cette même sidebar) : toolsTabItems
+            // l'exclut déjà pour la navigation mobile.
             _buildGroup(
               context,
               isDesktopPlatform
-                  ? NavGroup(
-                      key: outilsGroup.key,
-                      label: outilsGroup.label,
-                      items: [
-                        for (final item in outilsGroup.items)
-                          if (assistantEnabled || item.key != 'assistant') item,
-                      ],
-                    )
+                  ? outilsGroup
                   : NavGroup(
                       key: outilsGroup.key,
                       label: outilsGroup.label,

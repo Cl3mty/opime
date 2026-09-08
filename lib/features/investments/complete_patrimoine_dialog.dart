@@ -3,14 +3,15 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Text;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn show Text;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:opime/l10n/app_localizations.dart';
 import '../../core/money_format.dart';
+import '../../core/premium/premium_lock.dart';
 import '../../core/ui/frosted_card.dart';
 import '../../core/ui/opime_date_picker.dart';
 import '../../core/ui/toggle_button_style.dart';
 import '../entities/entities_models.dart';
 import '../entities/entities_repository.dart';
-import '../entities/entities_screen.dart' show showEntityEditorDialog;
 import '../liabilities/liabilities_models.dart';
 import '../liabilities/liabilities_repository.dart';
 import '../liabilities/liability_form_fields.dart';
@@ -410,25 +411,35 @@ class _CompletePatrimoineDialogState extends State<_CompletePatrimoineDialog> {
     await _loadCustomOtherCategories();
   }
 
-  /// Ouvre l'éditeur d'entité (`entities_screen.dart`) depuis [_Step.owner]
-  /// — une fois sauvegardée, la nouvelle entité devient l'entité choisie et
-  /// le flux continue normalement sur [_Step.kind] (contrairement à un
-  /// compte/investissement, une entité n'a pas de sous-flux dédié : sa
-  /// seule raison d'être créée ici est d'avoir un propriétaire pour ce qui
-  /// va suivre).
+  /// Créer une nouvelle entité depuis [_Step.owner] est réservé à Opime
+  /// Premium dans cette édition gratuite (voir `core/premium
+  /// /premium_lock.dart`) : plutôt que d'ouvrir un éditeur d'entité, affiche
+  /// un message et un lien vers la mise à niveau. Un coffre-fort qui a déjà
+  /// des entités (créées depuis Opime Premium) peut toujours les choisir
+  /// comme propriétaire ci-dessus — seule la création est bloquée.
   Future<void> _createEntityAndSelect() async {
-    final result = await showEntityEditorDialog(
-      context,
-      allEntities: _entities,
+    final l10n = AppLocalizations.of(context);
+    showToast(
+      context: context,
+      location: ToastLocation.bottomRight,
+      builder: (context, overlay) => SurfaceCard(
+        child: Basic(
+          leading: const Icon(LucideIcons.lock, size: 18),
+          title: shadcn.Text(l10n.investments_wizard_new_entity_label),
+          subtitle: const shadcn.Text('Réservé à Opime Premium.'),
+          trailing: PrimaryButton(
+            onPressed: () {
+              overlay.close();
+              launchUrl(
+                Uri.parse(premiumUpgradeUrl),
+                mode: LaunchMode.externalApplication,
+              );
+            },
+            child: const shadcn.Text('Découvrir'),
+          ),
+        ),
+      ),
     );
-    if (result == null) return;
-    await _entityRepo.saveEntity(result);
-    if (!mounted) return;
-    setState(() {
-      _entities = [..._entities, result];
-      _selectedEntityId = result.id;
-      _step = _Step.kind;
-    });
   }
 
   Future<void> _loadCustomOtherCategories() async {
@@ -1773,6 +1784,10 @@ class _OwnerStep extends StatelessWidget {
           leading: const Icon(LucideIcons.plus, size: 18),
           label: l10n.investments_wizard_new_entity_label,
           sublabel: l10n.investments_wizard_new_entity_sublabel,
+          // Création d'entité réservée à Opime Premium dans cette édition
+          // gratuite — voir `core/premium/premium_lock.dart` et
+          // `_showEntityCreationLockedMessage` ci-dessous.
+          trailing: const Icon(LucideIcons.lock, size: 14),
           onTap: onCreateEntity,
         ),
       ],

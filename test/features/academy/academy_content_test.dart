@@ -5,9 +5,11 @@ import 'package:opime/features/academy/formation_data.dart';
 import 'package:opime/features/navigation/nav_models.dart';
 
 void main() {
+  // La Formation (Opime Premium) n'a pas de contenu réel dans cette édition
+  // gratuite — voir `features/academy/formation_data.dart` — donc pas de
+  // pas ("steps") à inclure ici, contrairement à Fondamentaux.
   final allAcademyStepIds = [
     ...investissementCards.map((c) => c.id),
-    for (final track in formationTracks) ...track.steps.map((s) => s.id),
   ];
 
   group('Enveloppes', () {
@@ -72,24 +74,6 @@ void main() {
       final ids = formationTracks.map((t) => t.id).toList();
       expect(ids.toSet().length, ids.length);
     });
-
-    test('chaque parcours a au moins une leçon', () {
-      for (final track in formationTracks) {
-        expect(track.steps, isNotEmpty, reason: track.id);
-      }
-    });
-
-    test(
-      'le niveau d\'un parcours correspond au niveau le plus élevé de ses leçons',
-      () {
-        for (final track in formationTracks) {
-          final expected = track.steps
-              .map((s) => s.level.index)
-              .reduce((a, b) => a > b ? a : b);
-          expect(track.level.index, expected, reason: track.id);
-        }
-      },
-    );
   });
 
   test(

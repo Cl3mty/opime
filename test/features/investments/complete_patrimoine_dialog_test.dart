@@ -1261,13 +1261,14 @@ void main() {
     );
 
     testWidgets(
-      'créer une nouvelle entité depuis l\'étape préalable l\'enregistre '
-      'puis continue le flux sur "Que voulez-vous compléter ?" (pas de '
-      'fermeture du wizard, contrairement à une simple création d\'entité)',
+      'créer une nouvelle entité depuis l\'étape préalable est réservé à '
+      'Opime Premium dans cette édition gratuite : n\'ouvre aucun éditeur, '
+      'ne persiste rien, et reste sur "À qui appartient ceci ?"',
       (tester) async {
         // Une entité déjà existante est nécessaire pour atteindre l'étape
-        // préalable (voir le test ci-dessus) — celle créée ici depuis le
-        // wizard s'ajoute à elle.
+        // préalable (voir les tests ci-dessus) — celle-ci reste la seule à
+        // l'issue du test : la création est bloquée, pas seulement son
+        // écran de gestion dédié (voir `core/premium/premium_lock.dart`).
         await tester.runAsync(
           () => EntityRepository(tempDir.path).saveEntity(
             const BusinessEntity(
@@ -1284,30 +1285,24 @@ void main() {
           awaitedText: 'À qui appartient ceci ?',
         );
         await tester.tap(find.text('Nouvelle entité'));
-        await tester.pumpAndSettle();
-
-        expect(find.text('Nouvelle entité'), findsWidgets);
-
-        await tester.enterText(
-          find.widgetWithText(TextField, 'Nom (ex : Holding Dupont)'),
-          'Holding Dupont',
-        );
         await tester.pump();
 
-        await tester.runAsync(() async {
-          await tester.tap(find.text('Enregistrer'));
-          for (var i = 0; i < 20; i++) {
-            await Future<void>.delayed(const Duration(milliseconds: 50));
-            await tester.pump(const Duration(milliseconds: 50));
-          }
-        });
-
-        expect(find.text('Que voulez-vous compléter ?'), findsOneWidget);
+        // Pas de navigation : toujours sur l'étape préalable, avec un
+        // message plutôt qu'un éditeur d'entité.
+        expect(find.text('À qui appartient ceci ?'), findsOneWidget);
+        expect(find.text('Que voulez-vous compléter ?'), findsNothing);
+        expect(find.text('Réservé à Opime Premium.'), findsOneWidget);
 
         final saved = await tester.runAsync(
           () => EntityRepository(tempDir.path).listAll(),
         );
-        expect(saved!.map((e) => e.name), containsAll(['Holding Dupont']));
+        expect(saved!.map((e) => e.name), ['SCI Existante']);
+
+        // Laisse le toast (auto-fermeture par défaut après 5 s, voir
+        // `showToast`'s `showDuration`) se dissoudre avant la fin du test —
+        // sinon son Timer encore actif fait échouer `!timersPending` à la
+        // vérification finale du binding.
+        await tester.pump(const Duration(seconds: 7));
       },
     );
 
