@@ -55,8 +55,8 @@ Everything under the **Dashboard** is free, forever, with **no limit** on the nu
 | Académie — Fondamentaux & Enveloppes | ✅ | ✅ |
 | **Analyses** — advanced allocation/performance charts | | ✅ |
 | **Projets** — financial goal tracking | | ✅ |
-| **Entités** — holdings, sociétés commerciales, SCI | | ✅ |
-| **Assistant IA** — conversational assistant on your own data | | ✅ |
+| **Sociétés** — holdings, commercial companies, real estate SCIs | | ✅ |
+| **AI Assistant** — conversational assistant on your own data, via your own API key (OpenAI, Anthropic, Google) or fully local with Ollama | | ✅ |
 | **Académie > Formation** — guided courses (stocks, crypto, real estate, wealth structuring) | | ✅ |
 
 The Premium-only tabs stay visible in the navigation, greyed out — clicking one shows a frozen, illustrative preview so you know exactly what you'd get, with a link to **[upgrade](https://opime.vercel.app/pricing)**. Their real implementation isn't part of this open-source repo, by design — only Opime Premium has it.
@@ -124,7 +124,7 @@ Opime's core has no ads and is free forever. Here's how to help it keep going:
 
 - ⭐ **[Star the repo](https://github.com/Cl3mty/opime)** — the easiest way to help it reach more people.
 - 💡 **[Vote on ideas](https://github.com/Cl3mty/opime/discussions/categories/ideas)** or post your own — it directly shapes what gets built next.
-- 💎 **[Upgrade to Opime Premium](https://opime.vercel.app/pricing)** for Analyses, Projets, Entités, the AI Assistant, and the Académie Formation courses — this is what funds development of the free edition too.
+- 💎 **[Upgrade to Opime Premium](https://opime.vercel.app/pricing)** for Analyses, Projets, Sociétés, the AI Assistant, and the Académie Formation courses — this is what funds development of the free edition too.
 
 ---
 

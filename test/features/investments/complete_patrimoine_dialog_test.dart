@@ -1178,7 +1178,7 @@ void main() {
     testWidgets(
       'au moins une entité existe déjà : le flux démarre sur "À qui '
       'appartient ceci ?", avec "Moi-même" toujours en première option à '
-      'côté des entités et de "Nouvelle entité" — jamais obligé de '
+      'côté des entités et de "Nouvelle société" — jamais obligé de '
       'rattacher un nouveau compte/passif à une entité',
       (tester) async {
         await tester.runAsync(
@@ -1199,7 +1199,7 @@ void main() {
 
         expect(find.text('Moi-même'), findsOneWidget);
         expect(find.text('Holding Dupont'), findsOneWidget);
-        expect(find.text('Nouvelle entité'), findsOneWidget);
+        expect(find.text('Nouvelle société'), findsOneWidget);
       },
     );
 
@@ -1284,7 +1284,7 @@ void main() {
           tester,
           awaitedText: 'À qui appartient ceci ?',
         );
-        await tester.tap(find.text('Nouvelle entité'));
+        await tester.tap(find.text('Nouvelle société'));
         await tester.pump();
 
         // Pas de navigation : toujours sur l'étape préalable, avec un

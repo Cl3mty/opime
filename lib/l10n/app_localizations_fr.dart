@@ -154,7 +154,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get dashboard_entities_section_title => 'Patrimoine professionnel';
 
   @override
-  String get dashboard_entities_manage_button => 'Gérer les entités';
+  String get dashboard_entities_manage_button => 'Gérer les sociétés';
 
   @override
   String get dashboard_not_enough_data_period =>
@@ -607,7 +607,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get nav_dashboard => 'Tableau de bord';
 
   @override
-  String get nav_entities => 'Entités';
+  String get nav_entities => 'Sociétés';
 
   @override
   String get nav_home => 'Accueil';
@@ -1380,7 +1380,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get dashboard_view_by_investment => 'Par investissement';
 
   @override
-  String get entities_add_button => 'Ajouter une entité';
+  String get entities_add_button => 'Ajouter une société';
 
   @override
   String get entities_add_stake_button => 'Ajouter une part de détention';
@@ -1410,26 +1410,26 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get entities_delete_confirm_message =>
-      'Cette entité sera définitivement supprimée. Ses comptes/passifs existants ne sont pas supprimés, mais ne seront plus rattachés à aucune entité.';
+      'Cette société sera définitivement supprimée. Ses comptes/passifs existants ne sont pas supprimés, mais ne seront plus rattachés à aucune société.';
 
   @override
   String get entities_detail_load_error =>
-      'Impossible de charger les comptes de cette entité. Vérifiez que le dossier Coffre-fort est accessible.';
+      'Impossible de charger les comptes de cette société. Vérifiez que le dossier Coffre-fort est accessible.';
 
   @override
   String entities_dilution_note(Object name) {
-    return 'Ne comptez pas la valeur de cette entité dans le bilan de $name — le lien de possession s\'en charge.';
+    return 'Ne comptez pas la valeur de cette société dans le bilan de $name — le lien de possession s\'en charge.';
   }
 
   @override
-  String get entities_editor_edit_title => 'Modifier l\'entité';
+  String get entities_editor_edit_title => 'Modifier la société';
 
   @override
-  String get entities_editor_new_title => 'Nouvelle entité';
+  String get entities_editor_new_title => 'Nouvelle société';
 
   @override
   String get entities_empty_list_hint =>
-      'Aucune entité pour l\'instant — ajoute un holding, une société commerciale ou une SCI.';
+      'Aucune société pour l\'instant — ajoute un holding, une société commerciale ou une SCI.';
 
   @override
   String get entities_included_in_net_worth_hint =>
@@ -1443,7 +1443,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get entities_load_error =>
-      'Impossible de charger les entités. Vérifiez que le dossier Coffre-fort est accessible.';
+      'Impossible de charger les sociétés. Vérifiez que le dossier Coffre-fort est accessible.';
 
   @override
   String get entities_name_hint => 'Nom (ex : Holding Dupont)';
@@ -1916,7 +1916,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get investments_wizard_new_currency_label => 'Nouvelle devise';
 
   @override
-  String get investments_wizard_new_entity_label => 'Nouvelle entité';
+  String get investments_wizard_new_entity_label => 'Nouvelle société';
 
   @override
   String get investments_wizard_new_entity_sublabel =>

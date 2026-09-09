@@ -383,7 +383,7 @@ abstract class AppLocalizations {
   /// No description provided for @dashboard_entities_manage_button.
   ///
   /// In fr, this message translates to:
-  /// **'Gérer les entités'**
+  /// **'Gérer les sociétés'**
   String get dashboard_entities_manage_button;
 
   /// No description provided for @dashboard_not_enough_data_period.
@@ -1103,7 +1103,7 @@ abstract class AppLocalizations {
   /// No description provided for @nav_entities.
   ///
   /// In fr, this message translates to:
-  /// **'Entités'**
+  /// **'Sociétés'**
   String get nav_entities;
 
   /// No description provided for @nav_home.
@@ -2463,7 +2463,7 @@ abstract class AppLocalizations {
   /// No description provided for @entities_add_button.
   ///
   /// In fr, this message translates to:
-  /// **'Ajouter une entité'**
+  /// **'Ajouter une société'**
   String get entities_add_button;
 
   /// No description provided for @entities_add_stake_button.
@@ -2505,37 +2505,37 @@ abstract class AppLocalizations {
   /// No description provided for @entities_delete_confirm_message.
   ///
   /// In fr, this message translates to:
-  /// **'Cette entité sera définitivement supprimée. Ses comptes/passifs existants ne sont pas supprimés, mais ne seront plus rattachés à aucune entité.'**
+  /// **'Cette société sera définitivement supprimée. Ses comptes/passifs existants ne sont pas supprimés, mais ne seront plus rattachés à aucune société.'**
   String get entities_delete_confirm_message;
 
   /// No description provided for @entities_detail_load_error.
   ///
   /// In fr, this message translates to:
-  /// **'Impossible de charger les comptes de cette entité. Vérifiez que le dossier Coffre-fort est accessible.'**
+  /// **'Impossible de charger les comptes de cette société. Vérifiez que le dossier Coffre-fort est accessible.'**
   String get entities_detail_load_error;
 
   /// No description provided for @entities_dilution_note.
   ///
   /// In fr, this message translates to:
-  /// **'Ne comptez pas la valeur de cette entité dans le bilan de {name} — le lien de possession s\'en charge.'**
+  /// **'Ne comptez pas la valeur de cette société dans le bilan de {name} — le lien de possession s\'en charge.'**
   String entities_dilution_note(Object name);
 
   /// No description provided for @entities_editor_edit_title.
   ///
   /// In fr, this message translates to:
-  /// **'Modifier l\'entité'**
+  /// **'Modifier la société'**
   String get entities_editor_edit_title;
 
   /// No description provided for @entities_editor_new_title.
   ///
   /// In fr, this message translates to:
-  /// **'Nouvelle entité'**
+  /// **'Nouvelle société'**
   String get entities_editor_new_title;
 
   /// No description provided for @entities_empty_list_hint.
   ///
   /// In fr, this message translates to:
-  /// **'Aucune entité pour l\'instant — ajoute un holding, une société commerciale ou une SCI.'**
+  /// **'Aucune société pour l\'instant — ajoute un holding, une société commerciale ou une SCI.'**
   String get entities_empty_list_hint;
 
   /// No description provided for @entities_included_in_net_worth_hint.
@@ -2559,7 +2559,7 @@ abstract class AppLocalizations {
   /// No description provided for @entities_load_error.
   ///
   /// In fr, this message translates to:
-  /// **'Impossible de charger les entités. Vérifiez que le dossier Coffre-fort est accessible.'**
+  /// **'Impossible de charger les sociétés. Vérifiez que le dossier Coffre-fort est accessible.'**
   String get entities_load_error;
 
   /// No description provided for @entities_name_hint.
@@ -3375,7 +3375,7 @@ abstract class AppLocalizations {
   /// No description provided for @investments_wizard_new_entity_label.
   ///
   /// In fr, this message translates to:
-  /// **'Nouvelle entité'**
+  /// **'Nouvelle société'**
   String get investments_wizard_new_entity_label;
 
   /// No description provided for @investments_wizard_new_entity_sublabel.

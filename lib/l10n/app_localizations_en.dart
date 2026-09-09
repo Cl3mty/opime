@@ -154,7 +154,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboard_entities_section_title => 'Professional wealth';
 
   @override
-  String get dashboard_entities_manage_button => 'Manage entities';
+  String get dashboard_entities_manage_button => 'Manage companies';
 
   @override
   String get dashboard_not_enough_data_period =>
@@ -603,7 +603,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nav_dashboard => 'Dashboard';
 
   @override
-  String get nav_entities => 'Entities';
+  String get nav_entities => 'Companies';
 
   @override
   String get nav_home => 'Home';
@@ -1370,7 +1370,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboard_view_by_investment => 'By investment';
 
   @override
-  String get entities_add_button => 'Add an entity';
+  String get entities_add_button => 'Add a company';
 
   @override
   String get entities_add_stake_button => 'Add an ownership stake';
@@ -1400,26 +1400,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get entities_delete_confirm_message =>
-      'This entity will be permanently deleted. Its existing accounts/liabilities are not deleted but will no longer be linked to any entity.';
+      'This company will be permanently deleted. Its existing accounts/liabilities are not deleted but will no longer be linked to any company.';
 
   @override
   String get entities_detail_load_error =>
-      'Unable to load this entity\'s accounts. Check that the Vault folder is accessible.';
+      'Unable to load this company\'s accounts. Check that the Vault folder is accessible.';
 
   @override
   String entities_dilution_note(Object name) {
-    return 'Do not count this entity\'s value in the balance sheet of $name — the ownership link handles this.';
+    return 'Do not count this company\'s value in the balance sheet of $name — the ownership link handles this.';
   }
 
   @override
-  String get entities_editor_edit_title => 'Edit entity';
+  String get entities_editor_edit_title => 'Edit company';
 
   @override
-  String get entities_editor_new_title => 'New entity';
+  String get entities_editor_new_title => 'New company';
 
   @override
   String get entities_empty_list_hint =>
-      'No entities yet — add a holding, a commercial company, or an SCI.';
+      'No companies yet — add a holding, a commercial company, or an SCI.';
 
   @override
   String get entities_included_in_net_worth_hint =>
@@ -1433,7 +1433,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get entities_load_error =>
-      'Unable to load entities. Check that the Vault folder is accessible.';
+      'Unable to load companies. Check that the Vault folder is accessible.';
 
   @override
   String get entities_name_hint => 'Name (e.g. Dupont Holding)';
@@ -1900,7 +1900,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get investments_wizard_new_currency_label => 'New currency';
 
   @override
-  String get investments_wizard_new_entity_label => 'New entity';
+  String get investments_wizard_new_entity_label => 'New company';
 
   @override
   String get investments_wizard_new_entity_sublabel =>

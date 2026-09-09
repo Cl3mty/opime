@@ -119,7 +119,7 @@ const entitesGroup = NavGroup(
   key: 'professionnel',
   label: 'Professionnel',
   items: [
-    NavItem(key: 'entites', label: 'Entités', icon: LucideIcons.building2),
+    NavItem(key: 'entites', label: 'Sociétés', icon: LucideIcons.building2),
   ],
 );
 

@@ -858,7 +858,7 @@ class _OpimeAppState extends State<OpimeApp> {
               // coffre-fort n'existe à ce niveau, voir `entity_detail
               // _screen.dart`).
               'entites': (context) => LockedFeatureScreen(
-                title: 'Entités',
+                title: 'Sociétés',
                 description:
                     'Gestion des holdings, sociétés commerciales et SCI '
                     '(comptes professionnels) : réservée à Opime Premium.',
