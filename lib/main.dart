@@ -133,7 +133,7 @@ class OpimeApp extends StatefulWidget {
 
 class _OpimeAppState extends State<OpimeApp> {
   static const _githubOwner = 'Cl3mty';
-  static const _githubRepo = 'opime-free';
+  static const _githubRepo = 'opime';
 
   final _themeController = ThemeController();
   final _localeController = LocaleController();

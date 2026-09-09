@@ -16,18 +16,17 @@ import '../../core/ui/responsive.dart';
 import '../../core/updates/platform_asset_matcher.dart';
 import '../../l10n/app_localizations.dart';
 
-const _githubRepoUrl = 'https://github.com/Cl3mty/opime-free';
+const _githubRepoUrl = 'https://github.com/Cl3mty/opime';
 
 /// Catégorie "Idées" des GitHub Discussions du dépôt — vote natif (▲, voir
 /// `.github/DISCUSSION_TEMPLATE/ideas.yml`) plutôt qu'une simple liste
 /// d'issues : c'est le mécanisme de vote communautaire de fonctionnalités
 /// choisi pour Opime.
 const _githubIdeasUrl =
-    'https://github.com/Cl3mty/opime-free/discussions/categories/ideas';
-const _githubLatestReleaseUrl =
-    'https://github.com/Cl3mty/opime-free/releases/latest';
+    'https://github.com/Cl3mty/opime/discussions/categories/ideas';
+const _githubLatestReleaseUrl = 'https://github.com/Cl3mty/opime/releases/latest';
 const _githubLatestReleaseApiUrl =
-    'https://api.github.com/repos/Cl3mty/opime-free/releases/latest';
+    'https://api.github.com/repos/Cl3mty/opime/releases/latest';
 
 /// Logo Opime — même asset et même traitement (coins arrondis, `BoxFit
 /// .cover`) que la vignette de la sidebar (voir `app_sidebar.dart`), pour

@@ -1,76 +1,83 @@
-# Opime Free
+<div align="center">
 
-The free, open-source edition of **Opime** — a portfolio and investment management app that is:
+<img src="assets/icon/icon.png" alt="Opime" width="112" />
 
-- 🆓 **Free** — no subscription, no paywall, no account required
-- 🔓 **Open-source** — AGPL-3.0, inspect it, fork it, improve it
-- 💻 **Multi-platform** — built with Flutter for macOS, Windows, Linux, iOS and Android
-- 🔐 **Yours** — your data lives in a folder *you* choose.
+# Opime
 
-Opime helps you track your net worth, plan your budget, and simulate long-term financial decisions — without handing your financial data to a third party.
+**Take back control of your net worth.**
 
-🔗 **[opime.vercel.app](https://opime.vercel.app)** — try it right in your browser, no install needed.
+Track every account, every investment, and every financial project you have — in one place, without ever sending your data anywhere but your own device.
+
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-informational)](#getting-started)
+[![Try it now](https://img.shields.io/badge/try_it-opime.vercel.app-6E56CF?logo=googlechrome&logoColor=white)](https://opime.vercel.app)
+
+**[✨ Try Opime right now in your browser — no install needed ✨](https://opime.vercel.app)**
+
+</div>
+
+---
+
+Opime is a portfolio and net worth tracker with a **free-forever core**: unlimited accounts, every asset class, budget, financial simulations — no trial, no time limit, no credit card. It's also **open-source** (AGPL-3.0), so you can read every line that touches your money before you trust it with your data.
+
+<div align="center">
+
+![Opime dashboard](assets/landing/screenshot_dashboard_light.png#gh-light-mode-only)
+![Opime dashboard](assets/landing/screenshot_dashboard.png#gh-dark-mode-only)
+
+</div>
 
 > **Status:** early-stage / actively developed. Desktop (macOS) is the primary target right now; mobile builds are not yet configured. Expect rough edges.
 
 ---
 
-## Free vs. Opime Premium
+## Why people use Opime
 
-This edition covers everything under the **Dashboard**, with **no limit** on the number of accounts or on which asset/liability classes you track:
-
-- Net worth dashboard, unlimited accounts, all asset & liability categories
-- Budget (allocation + tracking)
-- Strategy notes
-- All four simulations (wealth projection, real estate, taxation, transmission)
-- Académie — Fondamentaux & Enveloppes
-
-A few features are reserved for **[Opime Premium](https://opime.vercel.app)**:
-
-- **Analyses** (advanced allocation/performance charts)
-- **Projets** (goal tracking)
-- **Entités** (holdings, sociétés commerciales, SCI — professional accounts)
-- **Assistant IA** (conversational assistant on your own data)
-- **Académie > Formation** (guided courses on stocks, crypto, real estate, wealth structuring)
-
-Those tabs stay visible in the navigation, greyed out — clicking one shows a frozen, non-interactive illustrative preview (see `lib/core/premium/locked_feature_screen.dart`) so you get an idea of the feature, with a link to upgrade. The real implementation of these features isn't part of this open-source repo — only Opime Premium has it.
+- 🆓 **Free forever, no limits** — unlimited accounts and asset/liability classes, not a crippled "trial" of the real thing.
+- 🔒 **Local-first, always** — your data lives as plain JSON/Markdown in a folder *you* pick (iCloud Drive, Dropbox, or just your disk). Opime never phones home.
+- 🔓 **Open-source** — AGPL-3.0. Inspect it, fork it, self-host it, hold it accountable.
+- 👨‍👩‍👧‍👦 **Built for a whole household** — a separate, fully isolated account for your spouse, your kids, or anyone else you help manage money for.
+- 💻 **Everywhere** — Flutter app for macOS, Windows, Linux, iOS, Android, and the web.
+- 🎨 **Actually pleasant to use** — a modern, polished interface instead of a spreadsheet with a UI bolted on.
 
 ---
 
-## Features
+## What's included
 
-### 🔒 Local-first, always
-Every profile's data is stored as plain JSON and Markdown files in an `Opime` folder you pick on first launch. Put it in iCloud Drive, Dropbox, or a local folder — Opime doesn't know or care, and never phones home.
+Everything under the **Dashboard** is free, forever, with **no limit** on the number of accounts or which asset/liability classes you track:
 
-### 👨‍👩‍👧‍👦 Multiple accounts
-Create a separate account for your spouse, your kids, a parent, or anyone else you help manage finances for. Each account has its own strategy notes, budget, and assets & liabilities, fully isolated on disk, with no limit on the number of accounts. Switch between accounts in one click from the sidebar.
+| | Free | Opime Premium |
+|---|:---:|:---:|
+| Net worth dashboard, unlimited accounts & asset classes | ✅ | ✅ |
+| Budget (allocation + tracking) | ✅ | ✅ |
+| Strategy notes | ✅ | ✅ |
+| Simulations — wealth, real estate, taxation, transmission | ✅ | ✅ |
+| Académie — Fondamentaux & Enveloppes | ✅ | ✅ |
+| **Analyses** — advanced allocation/performance charts | | ✅ |
+| **Projets** — financial goal tracking | | ✅ |
+| **Entités** — holdings, sociétés commerciales, SCI | | ✅ |
+| **Assistant IA** — conversational assistant on your own data | | ✅ |
+| **Académie > Formation** — guided courses (stocks, crypto, real estate, wealth structuring) | | ✅ |
 
-### 📝 Strategy notes
-A rich-text notes editor (headings, bold/italic/underline, text color, checklists, links) for writing down your investment thesis, plans, and reminders — auto-saved as readable Markdown files.
+The Premium-only tabs stay visible in the navigation, greyed out — clicking one shows a frozen, illustrative preview so you know exactly what you'd get, with a link to **[upgrade](https://opime.vercel.app/pricing)**. Their real implementation isn't part of this open-source repo, by design — only Opime Premium has it.
 
-### 💰 Budget
-Track income, expenses, and monthly investments by category, visualized as an interactive Sankey flow diagram. Save and name multiple budget versions and revisit or edit them later.
+<div align="center">
 
-### 📈 Simulations
-- **Wealth projection** — compound-interest growth of your portfolio over time, in either a simple deterministic mode or a Monte Carlo mode (configurable expected return and volatility per asset class) showing a confidence band instead of a single guess.
-- **Loan simulator** — amortizing or interest-only ("in fine") loans, optional deferred repayment (partial or total), origination and guarantee fees, full month-by-month amortization table.
-- **Tax estimator** — French income tax (*impôt sur le revenu*) and real-estate wealth tax (*IFI*) brackets, with the *quotient familial* and exemption thresholds applied. Uses the 2026 scale; always double-check with a certified professional before relying on it.
+![Budget](assets/landing/screenshot_budget.png) &nbsp; ![Simulations](assets/landing/screenshot_simulation.png)
 
-### 🎨 Customizable
-Light, dark, or system theme. Each account can also choose which asset/liability categories appear in their own sidebar.
-
-### 🔄 Update notifications
-Opime checks GitHub Releases on launch and shows a one-click download banner when a newer version is available.
+</div>
 
 ---
 
 ## Getting started
 
-Opime is built with [Flutter](https://flutter.dev). To run it locally:
+**Fastest way:** open **[opime.vercel.app](https://opime.vercel.app)** — it runs entirely in your browser, backed by a real folder on your disk, not browser-only storage.
+
+**Or run it locally**, built with [Flutter](https://flutter.dev):
 
 ```bash
-git clone https://github.com/<your-username>/opime-free.git
-cd opime-free
+git clone https://github.com/Cl3mty/opime.git
+cd opime
 flutter pub get
 flutter run -d macos   # or -d windows / -d linux
 ```
@@ -86,7 +93,7 @@ On first launch, you'll be asked to choose (or create) the folder where your dat
 
 ## Tech stack
 
-- **[Flutter](https://flutter.dev)** — single codebase for desktop and mobile
+- **[Flutter](https://flutter.dev)** — single codebase for desktop, mobile, and web
 - **[shadcn_flutter](https://pub.dev/packages/shadcn_flutter)** — UI components
 - **[flutter_quill](https://pub.dev/packages/flutter_quill)** — rich-text editing for Strategy notes
 - Plain **JSON / Markdown files** for storage — no database, no backend
@@ -107,25 +114,22 @@ On first launch, you'll be asked to choose (or create) the folder where your dat
 - [ ] Mobile builds (iOS / Android) — default Flutter scaffolding exists, but the app is still built and tested desktop-first
 - [ ] Native in-app installer flow for updates (instead of opening the browser)
 
-Contributions and ideas welcome — have a look at the [Ideas discussions](https://github.com/Cl3mty/opime-free/discussions/categories/ideas) to vote on existing proposals or post your own.
+Contributions and ideas welcome — have a look at the [Ideas discussions](https://github.com/Cl3mty/opime/discussions/categories/ideas) to vote on existing proposals or post your own.
 
 ---
 
 ## Support the project
 
-Opime Free has no ads and never will — if it's useful to you, here's how to help it keep going:
+Opime's core has no ads and is free forever. Here's how to help it keep going:
 
-- ⭐ **[Star the repo](https://github.com/Cl3mty/opime-free)** — the easiest way to help it reach more people.
-- 💡 **[Vote on ideas](https://github.com/Cl3mty/opime-free/discussions/categories/ideas)** or post your own — it directly shapes what gets built next.
-- 💎 **[Upgrade to Opime Premium](https://opime.vercel.app)** for Analyses, Projets, Entités, the AI Assistant, and the Académie Formation courses — this is what funds development of the free edition too.
-- ☕ If you'd like to support the time spent maintaining it and shipping new features:
-
-  [![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/clemty)
+- ⭐ **[Star the repo](https://github.com/Cl3mty/opime)** — the easiest way to help it reach more people.
+- 💡 **[Vote on ideas](https://github.com/Cl3mty/opime/discussions/categories/ideas)** or post your own — it directly shapes what gets built next.
+- 💎 **[Upgrade to Opime Premium](https://opime.vercel.app/pricing)** for Analyses, Projets, Entités, the AI Assistant, and the Académie Formation courses — this is what funds development of the free edition too.
 
 ---
 
 ## License
 
-Opime Free is licensed under the **[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0). In short: you're free to use, study, modify, and redistribute this code — including running a modified version as a network service — as long as you make your source (including your modifications) available under the same license to anyone who interacts with it over a network.
+Opime is licensed under the **[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0). In short: you're free to use, study, modify, and redistribute this code — including running a modified version as a network service — as long as you make your source (including your modifications) available under the same license to anyone who interacts with it over a network.
 
 Opime Premium (the paid tier referenced above) is a separate, proprietary codebase and is not covered by this license.
