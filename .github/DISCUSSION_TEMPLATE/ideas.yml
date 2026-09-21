@@ -1,0 +1,37 @@
+title: "[Idée] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de proposer une idée pour Opime ! Une fois publiée, les autres
+        personnes peuvent voter pour elle avec le bouton ▲ en haut de la
+        discussion — plus une idée a de votes, plus elle a de poids dans les
+        priorités.
+
+        Une idée existe peut-être déjà pour ce que tu as en tête : un coup
+        d'œil à la liste avant de publier évite les doublons.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Que voudrais-tu voir dans Opime ?
+      placeholder: Décris la fonctionnalité ou l'amélioration proposée.
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Pourquoi ?
+      description: Quel problème ça résout, ou quel usage ça permet ?
+      placeholder: Dans quel contexte en aurais-tu besoin ?
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+      description: As-tu déjà essayé de contourner ce manque autrement ?
+      placeholder: Optionnel.
+    validations:
+      required: false
