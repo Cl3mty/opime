@@ -4,52 +4,51 @@
 
 # Opime
 
-**Take back control of your net worth.**
+**Reprends le contrôle de ton patrimoine.**
 
-Every account, every investment, every financial project — in one place, 100% free, and without ever sending your data anywhere but your own device.
+Chaque compte, chaque investissement, chaque projet financier — au même endroit, 100 % gratuit, sans jamais envoyer tes données ailleurs que sur ton propre appareil.
 
-[![Try it now](https://img.shields.io/badge/try_it_now-opime.vercel.app-6E56CF?logo=googlechrome&logoColor=white&style=for-the-badge)](https://opime.vercel.app)
+[![Essayer maintenant](https://img.shields.io/badge/essayer_maintenant-opime.vercel.app-6E56CF?logo=googlechrome&logoColor=white&style=for-the-badge)](https://opime.vercel.app)
 
-[![Latest release](https://img.shields.io/github/v/release/Cl3mty/opime-releases?label=latest%20release)](https://github.com/Cl3mty/opime-releases/releases/latest)
-[![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-informational)](#get-opime)
-[![Status](https://img.shields.io/badge/status-actively--developed-brightgreen)](#roadmap)
-[![License](https://img.shields.io/badge/license-all--rights--reserved-lightgrey)](#license)
+[![Dernière version](https://img.shields.io/github/v/release/Cl3mty/opime?label=derni%C3%A8re%20version)](https://github.com/Cl3mty/opime/releases/latest)
+[![Plateformes](https://img.shields.io/badge/plateformes-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-informational)](#télécharger-opime)
+[![Statut](https://img.shields.io/badge/statut-en--développement--actif-brightgreen)](#feuille-de-route)
 
 <br>
 
-<img src="assets/landing/screenshot_dashboard_light.png#gh-light-mode-only" alt="Opime dashboard" width="800">
-<img src="assets/landing/screenshot_dashboard.png#gh-dark-mode-only" alt="Opime dashboard" width="800">
+<img src="assets/landing/screenshot_dashboard_light.png#gh-light-mode-only" alt="Tableau de bord Opime" width="800">
+<img src="assets/landing/screenshot_dashboard.png#gh-dark-mode-only" alt="Tableau de bord Opime" width="800">
 
 </div>
 
 <br>
 
-> This repository doesn't hold any source code — Opime's app is closed-source. It exists to publish Releases (so the app can check for updates and you can download installers) and to host the community Discussions/stars a private repo can't.
+> Ce dépôt ne contient aucun code source. Il sert uniquement à publier les nouvelles versions (pour que l'app puisse se mettre à jour et que tu puisses télécharger les installeurs) et à accueillir les Discussions/étoiles de la communauté.
 
-## Why Opime
+## Pourquoi Opime
 
-- 🆓 **100% free, forever** — every single feature, no paid tier, no trial, no credit card.
-- 🔒 **Local-first, always** — your data lives as plain JSON/Markdown files in a folder *you* pick (iCloud Drive, Dropbox, or just your disk). Opime never phones home.
-- 👨‍👩‍👧‍👦 **Built for a whole household** — a separate, fully isolated account for your spouse, your kids, or anyone else you help manage money for.
-- 💻 **Everywhere** — macOS, Windows, Linux, iOS, Android, and the web.
-- 🎨 **Actually pleasant to use** — a modern, polished interface instead of a spreadsheet with a UI bolted on.
+- 🆓 **100 % gratuit, pour toujours** — absolument toutes les fonctionnalités, sans palier payant, sans essai, sans carte bancaire.
+- 🔒 **Local-first, toujours** — tes données vivent sous forme de fichiers JSON/Markdown, dans un dossier *que tu choisis* (iCloud Drive, Dropbox, ou simplement ton disque). Opime ne contacte jamais de serveur.
+- 👨‍👩‍👧‍👦 **Pensé pour tout un foyer** — un compte séparé et totalement isolé pour ton/ta conjoint(e), tes enfants, ou toute autre personne dont tu gères les finances.
+- 💻 **Partout** — macOS, Windows, Linux, iOS, Android, et le web.
+- 🎨 **Vraiment agréable à utiliser** — une interface moderne et soignée plutôt qu'un tableur avec une UI plaquée dessus.
 
-## What's included
+## Fonctionnalités incluses
 
-Nothing is locked. This is the entire app:
+Rien n'est verrouillé. Voici l'application dans son intégralité :
 
 | | |
 |---|---|
-| 📊 **Net worth dashboard** | Unlimited accounts, every asset & liability class |
-| 💰 **Budget** | Income/expense tracking, visualized as a Sankey flow |
-| 📝 **Strategy notes** | Rich-text notes for your investment thesis and plans |
-| 📈 **Simulations** | Wealth projections, loan amortization, tax estimation |
-| 🔍 **Analyses** | Advanced allocation & performance charts |
-| 🎯 **Projets** | Track progress toward your financial goals |
-| 🏢 **Sociétés** | Holdings, commercial companies, real-estate SCIs |
-| 🤖 **AI Assistant** | Chat about your own data — your API key, or fully local with Ollama |
-| 🎓 **Académie** | Guided courses: fundamentals, stocks, crypto, real estate, structuring |
-| 🔗 **Patrimoine sharing** | Hand an advisor a partial, password-protected, time-limited view |
+| 📊 **Tableau de bord patrimoine** | Comptes illimités, toutes les classes d'actifs et de passifs |
+| 💰 **Budget** | Suivi des revenus/dépenses, visualisé sous forme de flux Sankey |
+| 📝 **Notes de stratégie** | Notes en texte enrichi pour ta thèse d'investissement et tes plans |
+| 📈 **Simulations** | Projections patrimoniales, amortissement de prêt, estimation fiscale |
+| 🔍 **Analyses** | Graphiques avancés d'allocation et de performance |
+| 🎯 **Projets** | Suis la progression de tes objectifs financiers |
+| 🏢 **Sociétés** | Holdings, sociétés commerciales, SCI immobilières |
+| 🤖 **Assistant IA** | Discute avec tes propres données — ta propre clé API, ou entièrement en local avec Ollama |
+| 🎓 **Académie** | Parcours guidés : fondamentaux, bourse, crypto, immobilier, structuration |
+| 🔗 **Partage de patrimoine** | Donne à un conseiller une vue partielle, protégée par mot de passe et limitée dans le temps |
 
 <div align="center">
 <table>
@@ -69,47 +68,43 @@ Nothing is locked. This is the entire app:
 <img src="assets/landing/screenshot_projects.png#gh-dark-mode-only" alt="Projets">
 </td>
 <td width="50%" align="center" valign="middle">
-<a href="https://opime.vercel.app"><strong>→ See it running live at opime.vercel.app</strong></a>
+<a href="https://opime.vercel.app"><strong>→ À voir en direct sur opime.vercel.app</strong></a>
 </td>
 </tr>
 </table>
 </div>
 
-## Get Opime
+## Télécharger Opime
 
-- 🌐 **[opime.vercel.app](https://opime.vercel.app)** — the fastest way in: runs entirely in your browser, backed by a real folder on your disk, not browser-only storage.
-- 💻 **[Latest release](https://github.com/Cl3mty/opime-releases/releases/latest)** — desktop installers for macOS, Windows, and Linux. The app checks this page itself and prompts you when a newer version is out.
+- 🌐 **[opime.vercel.app](https://opime.vercel.app)** — le plus rapide : tourne entièrement dans ton navigateur, avec un vrai dossier sur ton disque, pas juste du stockage navigateur.
+- 💻 **[Dernière version](https://github.com/Cl3mty/opime/releases/latest)** — installeurs desktop pour macOS, Windows et Linux. L'app consulte elle-même cette page et te prévient quand une nouvelle version sort.
 
-On first launch, you'll be asked to choose (or create) the folder where your data will live.
+Au premier lancement, il te sera demandé de choisir (ou créer) le dossier où vivront tes données.
 
-## Data & privacy
+## Données & confidentialité
 
-- Everything lives locally in the `Opime` folder you choose — nothing is ever sent to a server, on desktop or on the web version.
-- **At-rest encryption is available, opt-in, from Settings** — a password plus a one-time recovery key. Toggling it is crash-safe: an interrupted attempt is detected and resumed on next launch.
-- Deleting a profile removes it from the list but keeps its data folder on disk, so you can recover it manually if needed.
+- Tout est stocké localement dans le dossier `Opime` que tu choisis — rien n'est jamais envoyé à un serveur, sur desktop comme sur la version web.
+- **Le chiffrement au repos est disponible, en option, depuis les Réglages** — un mot de passe plus une clé de récupération à usage unique. L'activer/désactiver est sûr en cas de coupure : une tentative interrompue est détectée et reprise au lancement suivant.
+- Supprimer un profil le retire de la liste mais garde son dossier de données sur le disque, pour pouvoir le récupérer manuellement si besoin.
 
-## Tech stack
+## Stack technique
 
-Built with **[Flutter](https://flutter.dev)** — one codebase for desktop, mobile, and web. Plain **JSON/Markdown files** for storage — no database, no backend.
+Développé avec **[Flutter](https://flutter.dev)** — une seule base de code pour desktop, mobile et web. De simples fichiers **JSON/Markdown** pour le stockage — pas de base de données, pas de backend.
 
-## Roadmap
+## Feuille de route
 
-- [ ] Consolidated net worth dashboard across profiles (currently shown per profile only)
-- [ ] Mobile builds (iOS / Android) — scaffolding exists, but the app is still built and tested desktop-first
-- [ ] Native in-app installer flow for updates (instead of opening the browser)
+- [ ] Tableau de bord consolidé multi-profils (aujourd'hui affiché par profil uniquement)
+- [ ] Builds mobiles (iOS / Android) — la structure existe, mais l'app est encore développée et testée desktop en priorité
+- [ ] Flux d'installation native pour les mises à jour (plutôt que d'ouvrir le navigateur)
 
-Got an idea? [Vote on existing proposals or post your own](https://github.com/Cl3mty/opime-releases/discussions/categories/ideas).
+Une idée ? [Vote pour une proposition existante ou propose la tienne](https://github.com/Cl3mty/opime/discussions/categories/ideas).
 
-## Support the project
+## Soutenir le projet
 
-Opime has no ads and costs nothing to use. If it's useful to you, here's how to help it keep going:
+Opime n'a aucune publicité et ne coûte rien à utiliser. Si l'app t'est utile, voici comment l'aider à continuer :
 
-- ⭐ **[Star this repo](https://github.com/Cl3mty/opime-releases)** — the easiest way to help it reach more people.
-- 💡 **[Vote on ideas](https://github.com/Cl3mty/opime-releases/discussions/categories/ideas)** — it directly shapes what gets built next.
-- ☕ **Buy me a coffee** — if you'd like to support the time spent building and maintaining it:
+- ⭐ **[Mettre une étoile sur ce dépôt](https://github.com/Cl3mty/opime)** — le moyen le plus simple de l'aider à toucher plus de monde.
+- 💡 **[Voter pour des idées](https://github.com/Cl3mty/opime/discussions/categories/ideas)** — ça façonne directement ce qui sera développé ensuite.
+- ☕ **Buy me a coffee** — si tu veux soutenir le temps passé à développer et maintenir l'app :
 
   [![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/clemty)
-
-## License
-
-Opime is free to use but closed-source — all rights reserved. This repository ships no code, so there's nothing here to license; it only distributes official builds and hosts the community space around them.
